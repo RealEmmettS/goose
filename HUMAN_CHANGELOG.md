@@ -14,6 +14,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Latest — June 2026
 
 **Added**
+- The goose now has a proper "mind" instead of the temporary wandering placeholder. When it
+  first shows up it makes a little entrance — it walks on from the bottom of the screen and
+  pauses a moment to introduce itself — then settles into roaming on its own, choosing where
+  to go and occasionally tracking mud. This is built so new tricks (grabbing your cursor,
+  opening windows, and so on) can be added cleanly later.
 - The goose now leaves muddy footprints! When it "steps in mud," a trail of little brown
   prints follows it as it waddles, and they slowly fade and shrink away on their own. (To show
   the trail across your screen, the goose's see-through layer now covers the whole monitor.)

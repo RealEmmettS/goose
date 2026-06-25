@@ -12,6 +12,15 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **Task state machine + wander + FirstUX intro (milestone M4)** — the M2 roam stand-in is
+  replaced by the real AI. A `Task` trait (the documented internal extension seam, plan §18 —
+  no external mod ABI), a `TaskCtx`, a registry of randomly-pickable tasks chosen via the
+  biased `Deck`, and a `World` task runner. Tasks set targets/params only; the engine
+  auto-locomotes. Ships `WanderTask` (roam to random points for a verified 20–40 s dwell, with
+  occasional mud-tracking folded in) and a scripted `FirstUxTask` (the goose walks on-stage
+  from off the bottom edge and pauses to introduce itself for the verified 20 s
+  `FirstWanderTime`, then hands off to roaming). Timings are the verified `config.ini` values
+  (20 / 20 / 40); config-driven values arrive with the TOML loader in a later round.
 - **Footmarks + mud trail (milestone M3)** — the goose leaves a trail of fading muddy
   footprints while it's "tracking mud," at the verified lifetimes (8.5 s life / 1 s
   shrink-out). To render world-space trails the overlay moved from the small per-goose

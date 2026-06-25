@@ -1,53 +1,61 @@
-//! The simulation world: owns the goose and advances it one fixed tick at a time.
+//! The simulation world: owns the goose and drives it through the task state machine.
 //!
-//! M2 ships a minimal autonomous **roam** driver — walk to a random on-screen point,
-//! pause briefly, repeat — purely so the overlay has something correct-speed to show.
-//! It is an explicit stand-in for the real task/AI state machine (wander, mud, nab, …)
-//! that arrives in M4; keep behaviour here intentionally thin.
+//! A scripted **FirstUX** intro runs once (the goose walks on-stage and introduces itself),
+//! then the default roaming state picks a random *pickable* task via the biased
+//! [`Deck`](crate::rng::Deck). Tasks set targets/params; [`crate::locomotion`] moves the
+//! goose; the gait + footmark logic here is mechanical.
 
-use crate::entity::GooseEntity;
 use crate::locomotion;
 use crate::math::{Rect, Vec2};
 use crate::rig::Rig;
-use crate::rng::{RandomSource, SplitMix64};
+use crate::rng::{Deck, SplitMix64};
+use crate::task::{FirstUxTask, Task, TaskCtx, WanderTask};
 use crate::time::DT;
 
 /// Distance travelled per full walking-gait cycle (radians of `gait_phase` per `TAU`).
 const GAIT_CYCLE_DISTANCE: f32 = 22.0;
-
-#[derive(Debug, Clone, Copy)]
-enum Roam {
-    Moving,
-    Pausing { until: f32 },
-}
 
 /// The whole simulation: one goose roaming within `bounds` (the virtual-desktop space).
 pub struct World {
     pub goose: GooseEntity,
     pub bounds: Rect,
     rng: SplitMix64,
-    roam: Roam,
+    current: Box<dyn Task>,
+    /// Factories for the randomly-pickable roaming tasks (the original's `TaskDatabase`).
+    pickable: Vec<fn() -> Box<dyn Task>>,
+    /// Shuffle-bag over `pickable` indices (no repeats until exhausted).
+    deck: Deck<SplitMix64>,
     elapsed: f32,
-    /// Index of the last gait half-step a footmark was considered for (one per foot plant).
+    /// Index of the last gait half-step a footmark was considered for.
     last_step: i64,
 }
 
+use crate::entity::GooseEntity;
+
 impl World {
-    /// A world bounded by `bounds`, with the goose centred and the roam driver primed to
-    /// pick its first target on the first tick. `seed` makes the roam fully deterministic.
+    /// A world bounded by `bounds`, with the goose entering from just off the bottom edge
+    /// for the FirstUX intro. `seed` makes the whole simulation deterministic.
     pub fn new(bounds: Rect, seed: u64) -> Self {
         let center = (bounds.min + bounds.max) * 0.5;
         let mut goose = GooseEntity::new();
-        goose.position = center;
+        // Enter from just off the bottom edge; FirstUX walks the goose on-stage.
+        goose.position = Vec2::new(center.x, bounds.max.y + 60.0);
         goose.target_pos = center;
         goose.current_speed = goose.parameters.walk_speed;
         goose.current_acceleration = goose.parameters.acceleration_normal;
-        goose.rig = Rig::update(center, goose.direction, 0.0, 0.0);
+        goose.rig = Rig::update(goose.position, goose.direction, 0.0, 0.0);
+
+        let pickable: Vec<fn() -> Box<dyn Task>> =
+            vec![|| Box::new(WanderTask::new()) as Box<dyn Task>];
+        let deck = Deck::new(pickable.len(), SplitMix64::seed(seed ^ 0x9E37_79B9));
+
         Self {
             goose,
             bounds,
             rng: SplitMix64::seed(seed),
-            roam: Roam::Pausing { until: 0.0 }, // → picks a target on tick 1
+            current: Box::new(FirstUxTask::new()), // scripted intro runs first
+            pickable,
+            deck,
             elapsed: 0.0,
             last_step: 0,
         }
@@ -58,50 +66,43 @@ impl World {
         self.elapsed
     }
 
-    fn arrived(&self) -> bool {
-        Vec2::distance(self.goose.position, self.goose.target_pos) < 1.0
+    /// The id of the currently running task (e.g. `"first_ux"`, `"wander"`).
+    pub fn current_task(&self) -> &'static str {
+        self.current.id()
     }
 
-    fn pick_new_target(&mut self) {
-        let x = self.rng.range(self.bounds.min.x, self.bounds.max.x);
-        let y = self.rng.range(self.bounds.min.y, self.bounds.max.y);
-        self.goose.target_pos = Vec2::new(x, y);
-        // M3 demo: sometimes the goose "steps in mud" and tracks prints for the next
-        // DurationToTrackMud seconds. M4's Task_TrackMud formalises this trigger.
-        if self.rng.next_f64() < 0.6 {
-            self.goose.track_mud_end_time =
-                self.elapsed + self.goose.parameters.duration_to_track_mud;
-        }
+    /// Pick the next roaming task from the shuffle-bag.
+    fn next_task(&mut self) -> Box<dyn Task> {
+        let idx = self.deck.draw();
+        (self.pickable[idx])()
     }
 
     /// Advance the world by one fixed [`DT`] tick.
     pub fn tick(&mut self) {
         self.elapsed += DT;
 
-        match self.roam {
-            Roam::Pausing { until } if self.elapsed >= until => {
-                self.pick_new_target();
-                self.roam = Roam::Moving;
-            }
-            Roam::Moving if self.arrived() => {
-                let pause = self.rng.range(0.3, 1.2);
-                self.roam = Roam::Pausing {
-                    until: self.elapsed + pause,
-                };
-            }
-            _ => {}
+        // Run the current task (it only sets targets/params); pick the next when it's done.
+        let done = {
+            let mut ctx = TaskCtx {
+                now: self.elapsed,
+                dt: DT,
+                bounds: self.bounds,
+                rng: &mut self.rng,
+            };
+            self.current.run(&mut self.goose, &mut ctx)
+        };
+        if done {
+            self.current = self.next_task();
         }
 
+        // Auto-locomotion toward the task's target.
         let before = self.goose.position;
         locomotion::step(&mut self.goose, DT);
 
-        // Advance the walking gait by the distance travelled (so a stopped goose stands
-        // still); one full waddle cycle per GAIT_CYCLE_DISTANCE of travel.
+        // Advance the walking gait by distance travelled (a stopped goose stands still).
         let moved = Vec2::distance(before, self.goose.position);
         self.goose.gait_phase += moved * (std::f32::consts::TAU / GAIT_CYCLE_DISTANCE);
 
-        // Keep the rig in sync for rendering; a touch of neck reach while moving fast
-        // (cosmetic only — real posture/mood modulation is M13).
         let speed_frac =
             (self.goose.velocity.magnitude() / self.goose.parameters.walk_speed).min(1.0);
         self.goose.rig = Rig::update(
@@ -111,8 +112,7 @@ impl World {
             self.goose.gait_phase,
         );
 
-        // Drop a fading muddy print at each foot-plant (half gait cycle) while the goose
-        // is tracking mud. Footmarks fade on their own (8.5 s life / 1 s shrink).
+        // Drop a fading muddy print at each foot-plant (half gait cycle) while tracking mud.
         let step = (self.goose.gait_phase / std::f32::consts::PI).floor() as i64;
         if step > self.last_step {
             if self.elapsed < self.goose.track_mud_end_time {
@@ -140,58 +140,79 @@ mod tests {
     fn bounds() -> Rect {
         Rect {
             min: Vec2::new(0.0, 0.0),
-            max: Vec2::new(1920.0, 1080.0),
+            max: Vec2::new(1000.0, 800.0),
         }
     }
 
     #[test]
-    fn goose_moves_over_time() {
+    fn goose_walks_in_during_first_ux() {
         let mut w = World::new(bounds(), 1);
+        assert_eq!(w.current_task(), "first_ux");
         let start = w.goose.position;
         for _ in 0..240 {
             w.tick();
         }
-        assert!(
-            Vec2::distance(start, w.goose.position) > 1.0,
-            "the goose should have roamed away from centre"
-        );
+        // It walks on-stage (upward) during the intro.
+        assert!(Vec2::distance(start, w.goose.position) > 1.0);
     }
 
     #[test]
-    fn goose_stays_in_bounds() {
+    fn roams_within_bounds_after_intro() {
         let mut w = World::new(bounds(), 2);
+        // Warm up past the off-stage entrance (it reaches centre within ~1 s of walking).
+        for _ in 0..1_000 {
+            w.tick();
+        }
         for _ in 0..5_000 {
             w.tick();
             let p = w.goose.position;
-            // Targets are in-bounds and the goose stops on arrival, so it never leaves.
-            assert!(p.x >= -1.0 && p.x <= 1921.0 && p.y >= -1.0 && p.y <= 1081.0);
+            assert!(
+                p.x >= -1.0 && p.x <= 1001.0 && p.y >= -1.0 && p.y <= 801.0,
+                "{p:?}"
+            );
         }
     }
 
     #[test]
-    fn roam_is_deterministic_for_seed() {
+    fn hands_off_first_ux_to_roaming() {
+        let mut w = World::new(bounds(), 3);
+        // FirstUX = walk in + a FIRST_WANDER_TIME pause; well past it we're roaming.
+        let mut saw_wander = false;
+        for _ in 0..6_000 {
+            w.tick();
+            if w.current_task() == "wander" {
+                saw_wander = true;
+                break;
+            }
+        }
+        assert!(saw_wander, "should hand off from first_ux to wander");
+    }
+
+    #[test]
+    fn deterministic_for_seed() {
         let mut a = World::new(bounds(), 42);
         let mut b = World::new(bounds(), 42);
-        for _ in 0..1_000 {
+        for _ in 0..4_000 {
             a.tick();
             b.tick();
         }
         assert_eq!(a.goose.position, b.goose.position);
+        assert_eq!(a.current_task(), b.current_task());
     }
 
     #[test]
     fn tracks_mud_and_drops_fading_prints() {
         let mut w = World::new(bounds(), 5);
-        w.goose.track_mud_end_time = 1_000.0; // force mud-tracking on
-        for _ in 0..1_200 {
+        // Force mud-tracking on while the goose walks in (it's moving, so it steps).
+        w.goose.track_mud_end_time = 1_000.0;
+        for _ in 0..700 {
             w.tick();
         }
-        // Walking in mud leaves prints.
         assert!(
             w.goose.foot_marks.alive_count(w.now()) > 0,
-            "expected muddy prints while tracking mud"
+            "expected muddy prints while tracking mud and moving"
         );
-        // With mud-tracking off and enough time elapsed, prints fade away.
+        // With tracking off and enough time elapsed, prints fade away.
         w.goose.track_mud_end_time = -1.0;
         let faded_at = w.now() + 10.0; // past the 8.5 s lifetime
         assert_eq!(w.goose.foot_marks.alive_count(faded_at), 0);

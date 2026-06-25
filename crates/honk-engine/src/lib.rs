@@ -29,6 +29,7 @@ pub mod math;
 pub mod render;
 pub mod rig;
 pub mod rng;
+pub mod task;
 pub mod time;
 pub mod world;
 
@@ -39,5 +40,6 @@ pub use footmarks::{FootMark, FootMarks};
 pub use math::{Rect, Vec2};
 pub use rig::Rig;
 pub use rng::{Deck, RandomSource, SplitMix64};
+pub use task::{FirstUxTask, Task, WanderTask};
 pub use time::{Accumulator, Clock, DT, FRAMERATE};
 pub use world::World;
