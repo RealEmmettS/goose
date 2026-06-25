@@ -12,6 +12,13 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **Audio (milestone M5)** — the goose honks. A `rodio` backend in the binary plays the
+  bundled original sounds (Honk1–4, BITE, MudSquith, Pat1–3) mapped from platform-free
+  `Sound` requests the engine emits (`honk-engine::sound::Sound` + a `World` queue drained
+  each frame). The goose honks on wander-retarget and squelches while tracking mud.
+  `--no-sound` / `--silent` mutes it (the original `SilenceSounds`); a missing audio device
+  degrades to a silent no-op. Sounds are embedded via `include_bytes!` from `Assets/Sounds/`.
+  Audio is Windows-scoped this round (the macOS/Linux backends wire it in M16/M17).
 - **Task state machine + wander + FirstUX intro (milestone M4)** — the M2 roam stand-in is
   replaced by the real AI. A `Task` trait (the documented internal extension seam, plan §18 —
   no external mod ABI), a `TaskCtx`, a registry of randomly-pickable tasks chosen via the

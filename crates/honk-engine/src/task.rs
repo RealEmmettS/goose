@@ -12,6 +12,7 @@
 use crate::entity::GooseEntity;
 use crate::math::{Rect, Vec2};
 use crate::rng::{RandomSource, SplitMix64};
+use crate::sound::Sound;
 
 /// Verified wander timings (`config.ini`): seconds. Config-driven values arrive with the
 /// TOML loader in a later round; these are the defaults.
@@ -29,6 +30,8 @@ pub struct TaskCtx<'a> {
     pub bounds: Rect,
     /// Shared RNG for target/dwell choices.
     pub rng: &'a mut SplitMix64,
+    /// Sound requests a task wants played this frame.
+    pub sounds: &'a mut Vec<Sound>,
 }
 
 /// A goose behavior. Tasks set targets/params only; locomotion is the engine's job.
@@ -80,6 +83,10 @@ impl Task for WanderTask {
             // Sometimes the goose tracks mud on its way to the next spot.
             if ctx.rng.next_f64() < 0.5 {
                 goose.track_mud_end_time = ctx.now + goose.parameters.duration_to_track_mud;
+            }
+            // And sometimes it honks for no reason at all.
+            if ctx.rng.next_f64() < 0.25 {
+                ctx.sounds.push(Sound::Honk);
             }
         }
         ctx.now >= self.end_time.unwrap()
@@ -137,6 +144,7 @@ mod tests {
     #[test]
     fn wander_picks_in_bounds_targets_and_finishes() {
         let mut rng = SplitMix64::seed(1);
+        let mut sounds: Vec<Sound> = Vec::new();
         let b = ctx_bounds();
         let mut goose = GooseEntity::new();
         let mut task = WanderTask::new();
@@ -146,6 +154,7 @@ mod tests {
             dt: 1.0 / 120.0,
             bounds: b,
             rng: &mut rng,
+            sounds: &mut sounds,
         };
         assert!(!task.run(&mut goose, &mut ctx));
         assert!(goose.target_pos.x >= b.min.x && goose.target_pos.x <= b.max.x);
@@ -157,6 +166,7 @@ mod tests {
             dt: 1.0 / 120.0,
             bounds: b,
             rng: &mut rng,
+            sounds: &mut sounds,
         };
         assert!(task.run(&mut goose, &mut ctx));
     }
@@ -164,6 +174,7 @@ mod tests {
     #[test]
     fn first_ux_walks_in_then_finishes_after_intro() {
         let mut rng = SplitMix64::seed(2);
+        let mut sounds: Vec<Sound> = Vec::new();
         let b = ctx_bounds();
         let center = (b.min + b.max) * 0.5;
         let mut goose = GooseEntity::new();
@@ -176,6 +187,7 @@ mod tests {
             dt: 1.0 / 120.0,
             bounds: b,
             rng: &mut rng,
+            sounds: &mut sounds,
         };
         assert!(!task.run(&mut goose, &mut ctx));
         assert_eq!(goose.target_pos, center);
@@ -187,6 +199,7 @@ mod tests {
             dt: 1.0 / 120.0,
             bounds: b,
             rng: &mut rng,
+            sounds: &mut sounds,
         };
         assert!(!task.run(&mut goose, &mut ctx));
         let mut ctx = TaskCtx {
@@ -194,6 +207,7 @@ mod tests {
             dt: 1.0 / 120.0,
             bounds: b,
             rng: &mut rng,
+            sounds: &mut sounds,
         };
         assert!(task.run(&mut goose, &mut ctx));
     }

@@ -7,11 +7,18 @@
 //! later rounds.
 
 #[cfg(windows)]
+mod audio;
+
+#[cfg(windows)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use honk_engine::render::{render_footmarks, render_rig};
     use honk_engine::tiny_skia::{Color, Pixmap};
     use honk_engine::{Accumulator, Clock, World};
     use honk_platform_windows::Overlay;
+
+    // `--no-sound` / `--silent` runs the goose mute (the original's SilenceSounds).
+    let no_sound = std::env::args().any(|a| a == "--no-sound" || a == "--silent");
+    let mut audio = if no_sound { None } else { audio::Audio::new() };
 
     let mut overlay = Overlay::new()?;
     // Fullscreen primary-monitor overlay so world-space props (footmarks, later
@@ -43,6 +50,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         last = now;
         for _ in 0..accumulator.pump(dt) {
             world.tick();
+        }
+
+        // Drain and play any sounds the sim requested this frame (silently dropped if muted).
+        let sounds = world.take_sounds();
+        if let Some(a) = audio.as_mut() {
+            for s in sounds {
+                a.play(s);
+            }
         }
 
         if now - last_present >= PRESENT_INTERVAL {

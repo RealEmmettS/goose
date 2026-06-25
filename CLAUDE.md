@@ -8,9 +8,11 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: planning. There is no application code yet** — no `Cargo.toml`, no `src/`.
-The repo holds the brief, the original app's files as reference, and three planning docs (one
-canonical hybrid plus the two superseded drafts it was synthesized from).
+**Current stage: implementation in progress (milestones M0–M5 done).** The Cargo workspace
+exists: `honk-engine` (platform-free core), `honk-platform-windows` (the layered overlay),
+and the root `honk300` binary — a procedurally-rendered goose roams a transparent Windows
+overlay, leaves mud trails, runs a task/FirstUX AI, and honks (rodio). `honk300_plan.md` is
+the canonical plan (milestones M0–M19); the two superseded drafts remain as reference.
 
 ## Read these first (source-of-truth pointers)
 
@@ -49,9 +51,11 @@ canonical hybrid plus the two superseded drafts it was synthesized from).
 ## Locked decisions (do not re-litigate)
 
 - Name `honk300` (binary `honk300`, optional `honk` alias); fresh permanent WiX/Inno GUIDs.
-- Procedural/clean-room goose. Sounds bundled 1:1 (personal use). **Memes: do NOT copy** —
-  regenerate originally via an `Assets/Images/Memes/codex.md` brief. **Notes: author fresh
-  originals**, not paraphrases.
+- Procedural/clean-room goose (no sprite extraction — the visual is drawn from the rig).
+  **All other original assets are bundled 1:1 and committed** to `Assets/` (sounds now;
+  memes + notes at M9): this is a **personal tool the owner self-distributes to his own
+  machines only**, so the earlier "regenerate memes / author fresh notes" plan is
+  **superseded — copy the originals.** (Not for public redistribution.)
 - Linux: **X11-first** (runs under XWayland); native Wayland behind an opt-in `--wayland`
   flag (reduced mischief).
 - Packaging: Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) + shell/PowerShell
@@ -86,10 +90,11 @@ from a sibling repo); **`crates-publish.yml` is intentionally dropped** (no crat
 
 ## Asset & IP rule
 
-`DESKTOP-GOOSE/` contains Samperson's / third-party copyrighted assets (memes, notes, sounds)
-— **reference only; do not redistribute** in source or public builds. The goose visual is
-clean-room procedural; memes are regenerated as original art; notepad messages are authored
-fresh.
+This is a **personal tool the owner builds for and self-distributes to his own machines
+only** — not a public release. On that basis the original assets in `DESKTOP-GOOSE/` are
+**bundled 1:1 into `Assets/` and committed** (sounds done in M5; memes + notes copied at M9).
+The goose **visual** is still clean-room procedural (drawn from the rig, no sprite art exists
+to extract). Do **not** publicly redistribute these bundled third-party assets.
 
 ## Changelog rule
 

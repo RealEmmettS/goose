@@ -8,7 +8,8 @@
 use crate::locomotion;
 use crate::math::{Rect, Vec2};
 use crate::rig::Rig;
-use crate::rng::{Deck, SplitMix64};
+use crate::rng::{Deck, RandomSource, SplitMix64};
+use crate::sound::Sound;
 use crate::task::{FirstUxTask, Task, TaskCtx, WanderTask};
 use crate::time::DT;
 
@@ -28,6 +29,8 @@ pub struct World {
     elapsed: f32,
     /// Index of the last gait half-step a footmark was considered for.
     last_step: i64,
+    /// Sound requests produced this tick, drained by the platform audio backend.
+    pending_sounds: Vec<Sound>,
 }
 
 use crate::entity::GooseEntity;
@@ -58,12 +61,18 @@ impl World {
             deck,
             elapsed: 0.0,
             last_step: 0,
+            pending_sounds: Vec::new(),
         }
     }
 
     /// The world's monotonic clock (seconds), the time base for footmark fade.
     pub fn now(&self) -> f32 {
         self.elapsed
+    }
+
+    /// Take the sound requests produced since the last call (for the audio backend).
+    pub fn take_sounds(&mut self) -> Vec<Sound> {
+        std::mem::take(&mut self.pending_sounds)
     }
 
     /// The id of the currently running task (e.g. `"first_ux"`, `"wander"`).
@@ -88,6 +97,7 @@ impl World {
                 dt: DT,
                 bounds: self.bounds,
                 rng: &mut self.rng,
+                sounds: &mut self.pending_sounds,
             };
             self.current.run(&mut self.goose, &mut ctx)
         };
@@ -122,6 +132,10 @@ impl World {
                     self.goose.rig.feet.right
                 };
                 self.goose.foot_marks.add(foot, self.elapsed);
+                // A wet squelch now and then while squishing through mud.
+                if self.rng.next_f64() < 0.35 {
+                    self.pending_sounds.push(Sound::MudSquish);
+                }
             }
             self.last_step = step;
         }
@@ -216,5 +230,23 @@ mod tests {
         w.goose.track_mud_end_time = -1.0;
         let faded_at = w.now() + 10.0; // past the 8.5 s lifetime
         assert_eq!(w.goose.foot_marks.alive_count(faded_at), 0);
+    }
+
+    #[test]
+    fn emits_sound_requests_while_roaming() {
+        let mut w = World::new(bounds(), 7);
+        let mut heard = false;
+        // Run well past FirstUX into roaming; the goose honks on retarget / squishes in mud.
+        for _ in 0..30_000 {
+            w.tick();
+            if !w.take_sounds().is_empty() {
+                heard = true;
+                break;
+            }
+        }
+        assert!(
+            heard,
+            "the goose should request sounds (honk/mud) while roaming"
+        );
     }
 }

@@ -14,6 +14,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Latest — June 2026
 
 **Added**
+- The goose makes noise now! It honks as it wanders and squelches when it tromps through
+  mud, using the original goose's own sounds. You can silence it with a "no sound" option,
+  and if your computer has no speakers it just stays quiet. (Since this is a personal version
+  you run on your own machines, the original sounds — and later the memes and notes — are
+  bundled right in.)
 - The goose now has a proper "mind" instead of the temporary wandering placeholder. When it
   first shows up it makes a little entrance — it walks on from the bottom of the screen and
   pauses a moment to introduce itself — then settles into roaming on its own, choosing where
