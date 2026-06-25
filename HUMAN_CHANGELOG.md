@@ -6,14 +6,22 @@ what changed and why.
 
 For the technical version with file paths and exact details, see CHANGELOG.md.
 
-> **Where the project is:** building has started. The "brain" of the goose now exists in code,
-> though there's still nothing on your screen yet — that's the next step.
+> **Where the project is:** the goose is alive on screen. It now appears on your desktop and
+> walks around. There's no installer yet — that comes later.
 
 ---
 
 ## Latest — June 2026
 
 **Added**
+- The goose now actually appears on your screen and walks around! It floats on top of
+  everything as a see-through window, so you can still click the things behind it — only the
+  goose itself is solid. It wanders to a random spot, waddling on two little orange feet, then
+  pauses and picks a new spot. We rebuilt how it's drawn so it looks like the real Desktop
+  Goose: a plump white body, a neck up to a small head with an orange beak and an eye, and a
+  soft shadow underneath. (The wandering is a simple placeholder for now — the goose's real
+  personality and mischief come later.) It's smooth and light on your computer because it only
+  redraws the little patch around the goose, not the whole screen.
 - The first real piece of the goose: its "brain." This is the part that knows how the goose
   moves (its walk, run, and charge speeds), how it's shaped, how it leaves muddy footprints that
   fade away, and how it randomly decides what to do next — all rebuilt from scratch and matched

@@ -24,17 +24,20 @@ pub use tiny_skia;
 pub mod entity;
 pub mod feet;
 pub mod footmarks;
+pub mod locomotion;
 pub mod math;
 pub mod render;
 pub mod rig;
 pub mod rng;
 pub mod time;
+pub mod world;
 
 // A curated surface for downstream crates (the platform backends, the eventual binary).
 pub use entity::{GooseEntity, ParametersTable, SpeedTier};
-pub use feet::ProceduralFeet;
+pub use feet::Feet;
 pub use footmarks::{FootMark, FootMarks};
 pub use math::{Rect, Vec2};
 pub use rig::Rig;
 pub use rng::{Deck, RandomSource, SplitMix64};
-pub use time::{Clock, DT, FRAMERATE};
+pub use time::{Accumulator, Clock, DT, FRAMERATE};
+pub use world::World;

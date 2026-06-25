@@ -70,22 +70,23 @@ fn compare(name: &str, rig: &Rig) {
     );
 }
 
+// Side-profile poses (facing +x) show the goose silhouette best.
+const AT: Vec2 = Vec2 { x: 300.0, y: 300.0 };
+
 #[test]
 fn golden_rest_pose() {
-    // Default goose: at (300,300), facing 90° (+y), neck raised.
-    compare("rest", &Rig::default());
+    // Upright neck, feet planted (gait phase 0).
+    compare("rest", &Rig::update(AT, 0.0, 0.0, 0.0));
 }
 
 #[test]
-fn golden_extended_neck() {
-    compare("extended", &Rig::update(Vec2::new(300.0, 300.0), 90.0, 1.0));
+fn golden_reaching_neck() {
+    // Neck lowered / reaching forward.
+    compare("reaching", &Rig::update(AT, 0.0, 1.0, 0.0));
 }
 
 #[test]
-fn golden_facing_right() {
-    // Facing 0° (+x), neck partially extended.
-    compare(
-        "facing_right",
-        &Rig::update(Vec2::new(300.0, 300.0), 0.0, 0.3),
-    );
+fn golden_mid_stride() {
+    // Walking: neck slightly reaching, feet mid-swing.
+    compare("mid_stride", &Rig::update(AT, 0.0, 0.3, 1.6));
 }

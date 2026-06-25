@@ -8,3 +8,6 @@
 *.rs.bk
 .DS_Store
 Thumbs.db
+
+# Local task/memory dashboard tooling (/tasks-start) — not a project deliverable
+/.tasks/

@@ -11,7 +11,7 @@
 
 [workspace]
 resolver = "2"
-members = ["crates/honk-engine"]
+members = ["crates/honk-engine", "crates/honk-platform-windows"]
 
 [workspace.package]
 # Edition 2021 matches the family majority (TR300/ND300 = 2021; WB300 = 2024). Locked
@@ -27,6 +27,29 @@ repository = "https://github.com/RealEmmettS/goose"
 # CPU vector raster of the procedural goose (clean-room renderer). Pure Rust, no OS deps.
 # `png-format` pulls the `png` encoder used by the offscreen golden-frame test harness.
 tiny-skia = { version = "0.11", features = ["png-format"] }
+
+# The root package is also the shipped `honk300` binary (the plan puts `src/main.rs` at the
+# workspace root). M1/M2 wire the engine to the Windows overlay; the CLI/IPC/TUI come later.
+[package]
+name = "honk300"
+version = "0.0.0"
+description = "Cross-platform Desktop Goose — a procedural goose that roams your screen"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+default-run = "honk300"
+
+[[bin]]
+name = "honk300"
+path = "src/main.rs"
+
+[dependencies]
+honk-engine = { path = "crates/honk-engine" }
+
+[target.'cfg(windows)'.dependencies]
+honk-platform-windows = { path = "crates/honk-platform-windows" }
 
 # The profile cargo-dist will build with in the later packaging round.
 [profile.dist]

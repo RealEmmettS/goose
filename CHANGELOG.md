@@ -4,14 +4,39 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: implementation begun (M0).** The platform-free engine core now
-> exists; there is no release yet. The entries below track planning and build work. A
-> plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must
-> stay in lockstep (see `CLAUDE.md` → "Changelog rule").
+> **Project stage: implementation in progress (M0–M2).** The goose now renders and walks
+> on a Windows overlay; there is no release yet. The entries below track planning and build
+> work. A plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and
+> must stay in lockstep (see `CLAUDE.md` → "Changelog rule").
 
 ## [Unreleased]
 
 ### Added
+- **Windows overlay + walking goose (milestones M1 + M2)** — `honk300` now renders the
+  procedural goose on a transparent, always-on-top, click-through-where-transparent overlay
+  and walks it around the desktop.
+  - **Engine (platform-free, tested):** a fixed-120 Hz `Accumulator` (catch-up clamped to
+    avoid the spiral of death); clean-room `locomotion` (accelerate toward `target_pos`,
+    cap at the speed tier, face the travel direction, stop cleanly on arrival); a `World`
+    with a minimal **roam driver** (a temporary stand-in for the M4 task/AI system); and a
+    distance-driven **procedural-feet gait** with a subtle body bob.
+  - **Windows backend (`honk-platform-windows`):** a layered popup window presented via
+    `UpdateLayeredWindow` with premultiplied BGRA (softbuffer can't do per-pixel alpha on a
+    Windows layered window). The small window is repositioned every frame, so it *is* the
+    dirty rect — present cost stays proportional to the goose, not the screen. `WS_EX_LAYERED`
+    **without** `WS_EX_TRANSPARENT` gives natural per-pixel-alpha click-through (opaque goose
+    clickable, transparent margins fall through).
+  - **Renderer reworked to the original's technique:** capsule body / neck / two-segment
+    head, an orange beak and webbed feet, a grey outline, and a ground shadow — tuned to
+    resemble the real side-profile goose, animated by the neck-lerp + gait + body bob.
+  - **Root `honk300` binary:** the three-clock loop (sim 120 Hz, present ~60 Hz on the
+    goose's bounding box). Golden frames re-blessed (rest / reaching / mid-stride).
+  - **Design note (deviation from plan §4):** the overlay uses raw Win32 (the `windows`
+    crate) rather than winit — a small moving layered window via `UpdateLayeredWindow` is the
+    canonical low-CPU desktop-pet pattern, and per-backend windowing fits the capability-trait
+    design. winit can be revisited at M15 (multi-monitor) / M16 (cross-platform loop). The
+    workspace root is now also the `honk300` binary package; added the `honk-platform-windows`
+    crate.
 - **Cargo workspace + `honk-engine` crate (milestone M0)** — the platform-free
   simulation core: `#![forbid(unsafe_code)]`, no windowing/OS/audio/input dependency,
   fully headless-testable. Ported 1:1 from the verified modding-API source

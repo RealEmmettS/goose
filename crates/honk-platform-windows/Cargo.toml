@@ -1,0 +1,21 @@
+[package]
+name = "honk-platform-windows"
+version = "0.0.0"
+description = "Windows overlay backend for honk300 (layered window + UpdateLayeredWindow)"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+honk-engine = { path = "../honk-engine" }
+tiny-skia.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_LibraryLoader",
+] }

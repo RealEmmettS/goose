@@ -116,6 +116,8 @@ pub struct GooseEntity {
     pub foot_marks: FootMarks,
     /// Computed body geometry for rendering.
     pub rig: Rig,
+    /// Accumulated walking-gait phase (radians), advanced by distance travelled.
+    pub gait_phase: f32,
     /// Tunable parameters.
     pub parameters: ParametersTable,
 }
@@ -136,6 +138,7 @@ impl Default for GooseEntity {
             track_mud_end_time: -1.0,
             foot_marks: FootMarks::new(),
             rig: Rig::default(),
+            gait_phase: 0.0,
             parameters: ParametersTable::default(),
         }
     }
