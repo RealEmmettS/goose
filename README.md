@@ -5,3 +5,39 @@ FOR REFERENCE:
 "C:\Users\hey\git\qube-machine-report"
 "C:\Users\hey\git\qube-network-diagnostics"
 "C:\Users\hey\git\qube-workbranch-view"
+
+---
+
+## Status — the decided plan
+
+**Stage:** planning. No application code yet (no `Cargo.toml` / `src/`); implementation starts at
+milestone **M0**.
+
+**Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
+*hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
+structural spine) and [`codex_plan.md`](./codex_plan.md) (grafts) — after verifying each draft's
+load-bearing claims against the original's shipped C# source and the `*300` sibling repos. Both
+drafts are now **superseded reference only**; where the three conflict, `honk300_plan.md` wins.
+(Why the hybrid is lopsided: `claude_plan.md`'s engine constants match `Exports.cs` verbatim,
+while `codex_plan.md`'s guessed speed values were wrong.)
+
+**Decided direction (see `honk300_plan.md` for the full detail):**
+
+- **Binary `honk300`**, installed under three names — `honk300` / `honk` / `goose` — with a
+  finite "goose-speak" CLI (`goose plz` to start, `honk bad` / `goose no honk` to stop,
+  `goose do honk` to poke, `<name> config`, `<name> help`).
+- **Clean-room procedural goose** (no sprite extraction); engine ported 1:1 from the verified
+  constants. Sounds bundled 1:1 (personal use); memes regenerated originally; notes authored fresh.
+- **TOML config** + a **ratatui terminal config TUI** at `<name> config` that toggles every
+  behavior (including Autumn), hot-applying changes to a running goose where cheap.
+- **New autonomous behaviors**, each an optional toggle, scoped to parameter-modulation of the
+  procedural rig (no new art): dynamic moods, seasonal moods, multi-monitor chase, on-the-hour
+  double honk, perch-&-ride windows, hover-sweep pat streak + hearts, quiet-hours/DND respect, a
+  Calm-goose valve. Default = full original prank, always-on.
+- **No external mods** (Autumn is built-in; extensibility via documented internal seams) and
+  **no system tray** (quit via hold-ESC or any stop command over a single-instance IPC channel).
+- **Built for every OS + architecture:** Windows x64 **and ARM64**, macOS Intel **and Apple
+  Silicon** (universal2), Linux x64 **and ARM** (gnu + musl). Native + CLI installers like
+  TR300/ND300/WB300; **no crates.io**.
+- Linux is **X11-first** (runs under XWayland); native Wayland is an opt-in `--wayland` mode with
+  reduced mischief.

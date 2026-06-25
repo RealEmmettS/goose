@@ -14,6 +14,38 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Latest — June 2026
 
 **Added**
+- One master build plan that combines the two earlier plans into a single source of truth. Both
+  earlier plans were fact-checked against the original goose's own files; the more accurate one
+  was used as the foundation and the best ideas from the other were merged in. (For example, one
+  plan had the goose's exact speed and size numbers right, while the other had guessed them wrong
+  — so the correct numbers won.)
+
+**Decided**
+- A batch of new, optional things the goose can do on its own — all switch-on/switch-off — that
+  build on the original's spirit: little moods (it might get hyper, sad, or sleepy and act
+  differently), gentle season changes through the year (the autumn leaves become a year-round
+  idea), chasing across multiple monitors, a double honk at the top of each hour, hopping up to
+  ride a window while you drag it, happy hearts when you pet it by sweeping your cursor over it,
+  and quiet manners (it calms down at night, during Do-Not-Disturb, and while you're in a
+  full-screen game or call). Out of the box it still behaves like the original prank, always on.
+- A built-in settings screen you open in the terminal to flip any of these on or off (including
+  the autumn leaves), with changes that mostly take effect instantly on the running goose.
+- Three names to launch and control it (you can type "honk300," "honk," or "goose"), with playful
+  commands like "goose plz" to start it, "honk bad" to stop it, and "goose do honk" to make it
+  honk on demand. A help screen and the settings screen both list everything.
+- It will be built and packaged for every system and chip type it's advertised on — Windows, Mac,
+  and Linux, on both the standard and the newer ARM processors.
+
+**Changed**
+- The two earlier plans are now kept only as background reference; the new combined plan is the
+  one to follow. The project's front-page notes now say this too, with a short summary of what was
+  decided.
+
+---
+
+## Earlier — June 2026
+
+**Added**
 - A detailed build plan for "honk300," a brand-new version of Desktop Goose (the prank app
   where a goose wanders around your screen and causes mischief), rebuilt to run on Windows,
   Mac, and Linux. The plan works out how the original goose actually behaves and lays out
