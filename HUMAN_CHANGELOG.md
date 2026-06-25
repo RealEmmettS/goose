@@ -6,14 +6,23 @@ what changed and why.
 
 For the technical version with file paths and exact details, see CHANGELOG.md.
 
-> **Where the project is:** still in the planning stage. Nothing is built yet — these notes
-> cover the groundwork.
+> **Where the project is:** building has started. The "brain" of the goose now exists in code,
+> though there's still nothing on your screen yet — that's the next step.
 
 ---
 
 ## Latest — June 2026
 
 **Added**
+- The first real piece of the goose: its "brain." This is the part that knows how the goose
+  moves (its walk, run, and charge speeds), how it's shaped, how it leaves muddy footprints that
+  fade away, and how it randomly decides what to do next — all rebuilt from scratch and matched
+  exactly to the original goose's own numbers. It can even draw a little picture of the goose to
+  a file (used behind the scenes to catch accidental changes later), even though it isn't running
+  on your desktop yet. None of the screen, window, or computer-specific parts are here yet — on
+  purpose — so this piece is simple to test thoroughly, and every automated check passes. The
+  drawn goose's exact proportions are a rough first pass; making it look just right happens once
+  it's actually on screen.
 - One master build plan that combines the two earlier plans into a single source of truth. Both
   earlier plans were fact-checked against the original goose's own files; the more accurate one
   was used as the foundation and the best ideas from the other were merged in. (For example, one

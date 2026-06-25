@@ -1,0 +1,12 @@
+[package]
+name = "honk-engine"
+version = "0.0.0"
+description = "Platform-free simulation core for honk300 (the cross-platform Desktop Goose port)"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tiny-skia.workspace = true

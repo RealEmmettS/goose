@@ -1,0 +1,34 @@
+# honk300 — Cargo workspace root.
+#
+# A deliberate divergence from the single-crate *300 sibling repos (TR300/ND300/WB300):
+# the workspace forces the platform-agnostic engine (`honk-engine`) to never `use` an OS
+# crate. The shipped artifact still remains ONE binary (installed under three names),
+# which keeps cargo-dist / the installers happy in a later packaging round.
+#
+# Round 1 (M0) ships only `honk-engine`. Later rounds add the platform backend crates,
+# the config-TUI crate, the assets crate, and the root `honk300` binary, plus the
+# [workspace.metadata.dist] / wix / CI blocks (deferred to the M19 packaging round).
+
+[workspace]
+resolver = "2"
+members = ["crates/honk-engine"]
+
+[workspace.package]
+# Edition 2021 matches the family majority (TR300/ND300 = 2021; WB300 = 2024). Locked
+# decision C3 in honk300_plan.md. Editions are per-crate language epochs; 1.95 supports
+# either. MSRV is pinned in lockstep with rust-toolchain.toml — bump both together.
+edition = "2021"
+rust-version = "1.95"
+authors = ["Emmett S <hey@emmetts.dev>"]
+license = "PolyForm-Noncommercial-1.0.0"
+repository = "https://github.com/RealEmmettS/goose"
+
+[workspace.dependencies]
+# CPU vector raster of the procedural goose (clean-room renderer). Pure Rust, no OS deps.
+# `png-format` pulls the `png` encoder used by the offscreen golden-frame test harness.
+tiny-skia = { version = "0.11", features = ["png-format"] }
+
+# The profile cargo-dist will build with in the later packaging round.
+[profile.dist]
+inherits = "release"
+lto = "thin"

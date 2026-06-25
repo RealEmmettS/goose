@@ -1,0 +1,10 @@
+# Rust build artifacts
+/target
+
+# Cargo.lock IS committed (this is an application workspace, not a library) — it pins
+# the dependency graph for reproducible builds and `cargo audit` (plan §15, risk O_supply).
+
+# Editor / OS cruft
+*.rs.bk
+.DS_Store
+Thumbs.db

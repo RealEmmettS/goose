@@ -1,0 +1,5 @@
+# Pin the toolchain in lockstep with `rust-version` in Cargo.toml's [workspace.package].
+# Matches the *300 family (TR300/ND300/WB300). Bump both together.
+[toolchain]
+channel = "1.95"
+components = ["rustfmt", "clippy"]

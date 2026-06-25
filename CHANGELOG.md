@@ -4,14 +4,33 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: planning.** There is no application code or release yet. The
-> entries below track planning and scaffolding work. A plain-English companion
-> lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep
-> (see `CLAUDE.md` → "Changelog rule").
+> **Project stage: implementation begun (M0).** The platform-free engine core now
+> exists; there is no release yet. The entries below track planning and build work. A
+> plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must
+> stay in lockstep (see `CLAUDE.md` → "Changelog rule").
 
 ## [Unreleased]
 
 ### Added
+- **Cargo workspace + `honk-engine` crate (milestone M0)** — the platform-free
+  simulation core: `#![forbid(unsafe_code)]`, no windowing/OS/audio/input dependency,
+  fully headless-testable. Ported 1:1 from the verified modding-API source
+  (`…/GooseModdingAPI/{Exports.cs, SamEngine.cs}`): `Vec2` + `SamMath`; the 120 Hz
+  fixed-timestep constants (`DT = 1/120`); the **faithful biased** `Deck` shuffle-bag
+  (decision C8 — a seedable SplitMix64 drives it for deterministic tests; RNG internals
+  are clean-room); `GooseEntity` + `ParametersTable` at the verified values (Walk/Run/
+  Charge 80/200/400, accel 1300/2300, step 0.2/0.1, mud 15); the rig geometry constants
+  with a clean-room `update_rig`; `ProceduralFeet`; the 64-slot `FootMarks` ring buffer
+  (lifetime 8.5 s / shrink 1 s); and a clean-room tiny-skia renderer (`Rig → Pixmap`
+  with a dirty-rect bounding box). Pinned by 26 unit tests (constants, rig vertices, the
+  exact `Deck` sequence + its documented bias, footmark lifetimes) and 3 committed
+  golden-frame PNGs. The renderer's proportions are a first clean-room approximation —
+  the goldens are a regression baseline, not a fidelity reference (visual tuning is M1+).
+- **Workspace scaffold** — root `Cargo.toml` (workspace, edition 2021 / Rust 1.95 via
+  `[workspace.package]`, `[profile.dist]`), `rust-toolchain.toml` pinned to 1.95, and
+  `crates/honk-engine/Cargo.toml`. The `[workspace.metadata.dist]` / WiX / CI blocks are
+  intentionally deferred to the M19 packaging round. Local gate is green
+  (`fmt --check`, `clippy -D warnings`, `test --workspace`, `build --release`).
 - `honk300_plan.md` — **the canonical, authoritative plan.** A claim-tested *hybrid* that
   synthesizes `claude_plan.md` (structural spine) and `codex_plan.md` (grafts), then folds in an
   approved round of new scope. Each draft's load-bearing claims were verified against ground
