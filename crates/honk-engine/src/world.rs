@@ -5,12 +5,14 @@
 //! [`Deck`](crate::rng::Deck). Tasks set targets/params; [`crate::locomotion`] moves the
 //! goose; the gait + footmark logic here is mechanical.
 
+use crate::hearts::Hearts;
+use crate::interaction::{PatTracker, Pointer};
 use crate::locomotion;
 use crate::math::{Rect, Vec2};
 use crate::rig::Rig;
 use crate::rng::{Deck, RandomSource, SplitMix64};
 use crate::sound::Sound;
-use crate::task::{FirstUxTask, Task, TaskCtx, WanderTask};
+use crate::task::{FirstUxTask, HyperTask, Task, TaskCtx, WanderTask};
 use crate::time::DT;
 
 /// Distance travelled per full walking-gait cycle (radians of `gait_phase` per `TAU`).
@@ -31,6 +33,18 @@ pub struct World {
     last_step: i64,
     /// Sound requests produced this tick, drained by the platform audio backend.
     pending_sounds: Vec<Sound>,
+    /// Detects pats from hovering cursor sweeps and tracks the happy/calm streak (M6 §5.9).
+    pat: PatTracker,
+    /// Heart particles emitted while being patted.
+    hearts: Hearts,
+    /// Last pointer state fed in via [`World::set_pointer`].
+    pointer: Pointer,
+    /// Left button held on the previous pointer update (for click rising-edge detection).
+    prev_left_down: bool,
+    /// A click landed on the goose; the next tick installs the hyper burst.
+    pending_hyper: bool,
+    /// The task that was running before a transient interrupt (hyper), restored when it ends.
+    interrupted: Option<Box<dyn Task>>,
 }
 
 use crate::entity::GooseEntity;
@@ -62,6 +76,12 @@ impl World {
             elapsed: 0.0,
             last_step: 0,
             pending_sounds: Vec::new(),
+            pat: PatTracker::new(),
+            hearts: Hearts::new(),
+            pointer: Pointer::default(),
+            prev_left_down: false,
+            pending_hyper: false,
+            interrupted: None,
         }
     }
 
@@ -73,6 +93,56 @@ impl World {
     /// Take the sound requests produced since the last call (for the audio backend).
     pub fn take_sounds(&mut self) -> Vec<Sound> {
         std::mem::take(&mut self.pending_sounds)
+    }
+
+    /// The live heart particles (for the renderer).
+    pub fn hearts(&self) -> &Hearts {
+        &self.hearts
+    }
+
+    /// Whether the goose is currently in its post-pat calm window.
+    pub fn is_calm(&self) -> bool {
+        self.pat.is_calm(self.elapsed)
+    }
+
+    /// Whether the world-space `point` is over the goose (its rig bounding box; plan §6).
+    pub fn goose_hit(&self, point: Vec2) -> bool {
+        self.goose.rig.bounding_box().contains(point)
+    }
+
+    /// Feed one frame of pointer state (cursor + buttons, world space). Detects pats
+    /// (hover sweeps → hearts + calm) and a click on the goose (→ a hyper burst next tick).
+    pub fn set_pointer(&mut self, pointer: Pointer) {
+        let hovering = pointer.present && self.goose_hit(pointer.pos);
+
+        // Pat = hovering hover-sweeps. Each registered pat spawns a heart above the goose.
+        let pats = self.pat.update(hovering, pointer.pos, self.elapsed);
+        if pats > 0 {
+            let head = self.goose.rig.neck_head;
+            for _ in 0..pats.min(3) {
+                let jitter = Vec2::new(self.rng.range(-7.0, 7.0), self.rng.range(-3.0, 3.0));
+                self.hearts.add(head + jitter, self.elapsed);
+            }
+            self.pending_sounds.push(Sound::Pat);
+        }
+
+        // Click = left-button rising edge while hovering → a hyper burst on the next tick.
+        let clicked = hovering && pointer.left_down && !self.prev_left_down;
+        if clicked {
+            self.pending_hyper = true;
+        }
+
+        self.prev_left_down = pointer.left_down;
+        self.pointer = pointer;
+    }
+
+    /// Interrupt the current task with a hyper burst, saving the prior task to resume later.
+    fn start_hyper(&mut self) {
+        if self.current.id() == "hyper" {
+            return; // already mid-burst; don't stack
+        }
+        let prev = std::mem::replace(&mut self.current, Box::new(HyperTask::new()));
+        self.interrupted = Some(prev);
     }
 
     /// The id of the currently running task (e.g. `"first_ux"`, `"wander"`).
@@ -90,7 +160,14 @@ impl World {
     pub fn tick(&mut self) {
         self.elapsed += DT;
 
+        // A click landed last frame: install the hyper burst, saving the prior task.
+        if self.pending_hyper {
+            self.pending_hyper = false;
+            self.start_hyper();
+        }
+
         // Run the current task (it only sets targets/params); pick the next when it's done.
+        let calm = self.pat.is_calm(self.elapsed);
         let done = {
             let mut ctx = TaskCtx {
                 now: self.elapsed,
@@ -98,11 +175,16 @@ impl World {
                 bounds: self.bounds,
                 rng: &mut self.rng,
                 sounds: &mut self.pending_sounds,
+                calm,
             };
             self.current.run(&mut self.goose, &mut ctx)
         };
         if done {
-            self.current = self.next_task();
+            // A finished interrupt (hyper) resumes the task it suspended; otherwise draw next.
+            self.current = match self.interrupted.take() {
+                Some(prev) => prev,
+                None => self.next_task(),
+            };
         }
 
         // Auto-locomotion toward the task's target.
@@ -230,6 +312,117 @@ mod tests {
         w.goose.track_mud_end_time = -1.0;
         let faded_at = w.now() + 10.0; // past the 8.5 s lifetime
         assert_eq!(w.goose.foot_marks.alive_count(faded_at), 0);
+    }
+
+    /// Sweep the cursor back and forth over the goose `strokes` times, hovering throughout.
+    fn pat_the_goose(w: &mut World, strokes: usize) {
+        let anchor = w.goose.rig.body_center;
+        // Baseline frame so the first real move has a previous position to measure from.
+        w.set_pointer(Pointer {
+            pos: anchor,
+            present: true,
+            left_down: false,
+        });
+        for i in 0..strokes {
+            let dx = if i % 2 == 0 { 6.0 } else { -6.0 };
+            w.set_pointer(Pointer {
+                pos: anchor + Vec2::new(dx, 0.0),
+                present: true,
+                left_down: false,
+            });
+        }
+    }
+
+    #[test]
+    fn hovering_sweeps_pat_the_goose_spawning_hearts_and_calm() {
+        let mut w = World::new(bounds(), 1);
+        pat_the_goose(&mut w, 12);
+        assert!(
+            w.hearts().alive_count(w.now()) >= 1,
+            "patting spawns heart particles"
+        );
+        assert!(w.is_calm(), "patting calms the goose");
+    }
+
+    #[test]
+    fn cursor_off_the_goose_does_not_pat() {
+        let mut w = World::new(bounds(), 1);
+        let away = w.bounds.max + Vec2::new(50.0, 50.0); // well outside the goose
+        w.set_pointer(Pointer {
+            pos: away,
+            present: true,
+            left_down: false,
+        });
+        for i in 0..12 {
+            let dx = if i % 2 == 0 { 20.0 } else { -20.0 };
+            w.set_pointer(Pointer {
+                pos: away + Vec2::new(dx, 0.0),
+                present: true,
+                left_down: false,
+            });
+        }
+        assert_eq!(w.hearts().alive_count(w.now()), 0, "no pats off the goose");
+        assert!(!w.is_calm());
+    }
+
+    #[test]
+    fn clicking_the_goose_triggers_hyper_then_resumes_prior_task() {
+        let mut w = World::new(bounds(), 5);
+        // Warm up into the roaming wander task.
+        for _ in 0..6_000 {
+            w.tick();
+            if w.current_task() == "wander" {
+                break;
+            }
+        }
+        assert_eq!(w.current_task(), "wander");
+
+        // A left-press on the goose: a release/idle baseline frame, then the press edge.
+        let anchor = w.goose.rig.body_center;
+        w.set_pointer(Pointer {
+            pos: anchor,
+            present: true,
+            left_down: false,
+        });
+        w.set_pointer(Pointer {
+            pos: anchor,
+            present: true,
+            left_down: true,
+        });
+        w.tick();
+        assert_eq!(w.current_task(), "hyper", "a click sends the goose hyper");
+
+        // After the burst it resumes the task it interrupted.
+        for _ in 0..(120 * 3) {
+            w.tick();
+        }
+        assert_eq!(
+            w.current_task(),
+            "wander",
+            "the hyper burst resumes the prior task"
+        );
+    }
+
+    #[test]
+    fn clicking_away_from_the_goose_does_not_trigger_hyper() {
+        let mut w = World::new(bounds(), 6);
+        let away = w.bounds.max + Vec2::new(50.0, 50.0);
+        w.set_pointer(Pointer {
+            pos: away,
+            present: true,
+            left_down: false,
+        });
+        w.set_pointer(Pointer {
+            pos: away,
+            present: true,
+            left_down: true,
+        });
+        w.tick();
+        assert_ne!(
+            w.current_task(),
+            "hyper",
+            "clicks off the goose pass through"
+        );
     }
 
     #[test]

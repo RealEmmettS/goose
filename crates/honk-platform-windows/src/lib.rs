@@ -25,13 +25,29 @@ use windows::Win32::Graphics::Gdi::{
     HBITMAP, HDC, HGDIOBJ,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetSystemMetrics, PeekMessageW,
-    PostQuitMessage, RegisterClassExW, ShowWindow, TranslateMessage, UpdateLayeredWindow, MSG,
-    PM_REMOVE, SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
-    SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, ULW_ALPHA, WM_DESTROY, WM_QUIT, WNDCLASSEXW,
-    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetCursorPos, GetSystemMetrics,
+    PeekMessageW, PostQuitMessage, RegisterClassExW, ShowWindow, TranslateMessage,
+    UpdateLayeredWindow, MSG, PM_REMOVE, SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN,
+    SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, ULW_ALPHA,
+    WM_DESTROY, WM_QUIT, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    WS_EX_TOPMOST, WS_POPUP,
 };
+
+/// Poll the global cursor position (desktop coordinates) and the left-button state.
+/// Returns `(x, y, left_down)`. Desktop coordinates equal world coordinates because the
+/// overlay's origin is the primary monitor's top-left corner. Used to feed the engine's
+/// hit-testing (pat hover-streak + click→hyper, plan §6) each frame.
+pub fn pointer_state() -> (f32, f32, bool) {
+    unsafe {
+        let mut pt = POINT::default();
+        let _ = GetCursorPos(&mut pt);
+        // High bit of GetAsyncKeyState ⇒ the key is currently down.
+        let left_down = (GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000) != 0;
+        (pt.x as f32, pt.y as f32, left_down)
+    }
+}
 
 /// A reusable top-down 32-bpp DIB section we blit the goose into each frame.
 struct Dib {

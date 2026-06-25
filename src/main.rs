@@ -11,10 +11,10 @@ mod audio;
 
 #[cfg(windows)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use honk_engine::render::{render_footmarks, render_rig};
+    use honk_engine::render::{render_footmarks, render_hearts, render_rig};
     use honk_engine::tiny_skia::{Color, Pixmap};
-    use honk_engine::{Accumulator, Clock, World};
-    use honk_platform_windows::Overlay;
+    use honk_engine::{Accumulator, Clock, Pointer, Vec2, World};
+    use honk_platform_windows::{pointer_state, Overlay};
 
     // `--no-sound` / `--silent` runs the goose mute (the original's SilenceSounds).
     let no_sound = std::env::args().any(|a| a == "--no-sound" || a == "--silent");
@@ -52,6 +52,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             world.tick();
         }
 
+        // Feed the cursor for hit-testing: hover-sweeps pat the goose (hearts + calm),
+        // a left-click on it sends it hyper (plan §5.9 / §6). The overlay origin is the
+        // monitor's top-left, so desktop cursor coordinates are world coordinates.
+        let (mx, my, left_down) = pointer_state();
+        world.set_pointer(Pointer {
+            pos: Vec2::new(mx, my),
+            present: true,
+            left_down,
+        });
+
         // Drain and play any sounds the sim requested this frame (silently dropped if muted).
         let sounds = world.take_sounds();
         if let Some(a) = audio.as_mut() {
@@ -65,6 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             canvas.fill(Color::TRANSPARENT);
             render_footmarks(&mut canvas, &world.goose.foot_marks, world.now(), origin);
             render_rig(&mut canvas, world.rig(), origin);
+            render_hearts(&mut canvas, world.hearts(), world.now(), origin);
             overlay.present(&canvas, origin.x.floor() as i32, origin.y.floor() as i32)?;
         }
 

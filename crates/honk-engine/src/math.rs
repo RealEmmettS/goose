@@ -113,6 +113,11 @@ impl Rect {
         })
     }
 
+    /// Whether `p` lies inside the rectangle (inclusive of the edges).
+    pub fn contains(&self, p: Vec2) -> bool {
+        p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y
+    }
+
     /// Width of the rect.
     pub fn width(&self) -> f32 {
         self.max.x - self.min.x
@@ -194,6 +199,19 @@ mod tests {
         assert!(approx(clamp(5.0, 0.0, 10.0), 5.0));
         assert!(approx(clamp(-1.0, 0.0, 10.0), 0.0));
         assert!(approx(clamp(99.0, 0.0, 10.0), 10.0));
+    }
+
+    #[test]
+    fn rect_contains_points() {
+        let r = Rect {
+            min: Vec2::new(0.0, 0.0),
+            max: Vec2::new(10.0, 10.0),
+        };
+        assert!(r.contains(Vec2::new(5.0, 5.0)), "interior point");
+        assert!(r.contains(Vec2::new(0.0, 0.0)), "min corner (inclusive)");
+        assert!(r.contains(Vec2::new(10.0, 10.0)), "max corner (inclusive)");
+        assert!(!r.contains(Vec2::new(-0.1, 5.0)), "left of the rect");
+        assert!(!r.contains(Vec2::new(5.0, 10.1)), "below the rect");
     }
 
     #[test]

@@ -14,6 +14,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Latest — June 2026
 
 **Added**
+- The goose notices your mouse now. If you sweep the cursor back and forth over it — petting
+  it — little hearts puff up from its head and it settles down happily and goes quiet for a
+  moment. And if you *click* it, it gets startled and zooms around the screen for a couple of
+  seconds before going back to whatever it was doing. (Clicks and pets only land on the goose
+  itself; everywhere else your mouse works as normal.)
 - The goose makes noise now! It honks as it wanders and squelches when it tromps through
   mud, using the original goose's own sounds. You can silence it with a "no sound" option,
   and if your computer has no speakers it just stays quiet. (Since this is a personal version

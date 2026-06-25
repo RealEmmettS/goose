@@ -111,6 +111,32 @@ pub fn render_footmarks(pixmap: &mut Pixmap, marks: &FootMarks, now: f32, origin
     }
 }
 
+/// Render the rising/fading heart particles (M6 pat-streak; call after the goose so hearts
+/// float on top). Each heart is a small procedural pink heart at its current alpha.
+pub fn render_hearts(pixmap: &mut Pixmap, hearts: &crate::hearts::Hearts, now: f32, origin: Vec2) {
+    const HEART: (u8, u8, u8) = (0xff, 0x5a, 0x7a); // soft pink-red
+    const LOBE: f32 = 3.4;
+    for (pos, alpha) in hearts.active(now) {
+        let a = (alpha * 255.0) as u8;
+        if a == 0 {
+            continue;
+        }
+        let p = paint(HEART, a);
+        let c = pos - origin;
+        // Two top lobes…
+        disc(pixmap, c + Vec2::new(-LOBE * 0.85, -LOBE * 0.45), LOBE, &p);
+        disc(pixmap, c + Vec2::new(LOBE * 0.85, -LOBE * 0.45), LOBE, &p);
+        // …over a downward point.
+        triangle(
+            pixmap,
+            c + Vec2::new(-LOBE * 1.75, -LOBE * 0.1),
+            c + Vec2::new(LOBE * 1.75, -LOBE * 0.1),
+            c + Vec2::new(0.0, LOBE * 1.9),
+            &p,
+        );
+    }
+}
+
 /// Render the goose described by `rig` into `pixmap`, with world `origin` at the pixmap's
 /// top-left corner.
 pub fn render_rig(pixmap: &mut Pixmap, rig: &Rig, origin: Vec2) {
@@ -186,6 +212,34 @@ mod tests {
             opaque > 500,
             "expected a visible goose, got {opaque} opaque px"
         );
+    }
+
+    #[test]
+    fn renders_a_visible_heart() {
+        use crate::hearts::Hearts;
+        let mut hearts = Hearts::new();
+        hearts.add(Vec2::new(64.0, 64.0), 0.0);
+        let mut pixmap = Pixmap::new(128, 128).expect("alloc");
+        pixmap.fill(Color::TRANSPARENT);
+        render_hearts(&mut pixmap, &hearts, 0.0, Vec2::ZERO);
+        // Count clearly-pink opaque pixels (the heart colour: high R, low-ish G/B).
+        let pink = pixmap
+            .data()
+            .chunks_exact(4)
+            .filter(|px| px[3] > 120 && px[0] > 150 && px[1] < 170 && px[2] < 210)
+            .count();
+        assert!(pink > 15, "expected a visible heart, got {pink} pink px");
+    }
+
+    #[test]
+    fn no_hearts_draws_nothing() {
+        use crate::hearts::Hearts;
+        let hearts = Hearts::new();
+        let mut pixmap = Pixmap::new(64, 64).expect("alloc");
+        pixmap.fill(Color::TRANSPARENT);
+        render_hearts(&mut pixmap, &hearts, 0.0, Vec2::ZERO);
+        let opaque = pixmap.data().chunks_exact(4).filter(|px| px[3] > 0).count();
+        assert_eq!(opaque, 0, "no hearts → nothing drawn");
     }
 
     #[test]

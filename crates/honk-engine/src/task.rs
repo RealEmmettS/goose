@@ -20,6 +20,9 @@ pub const FIRST_WANDER_TIME: f32 = 20.0;
 pub const MIN_WANDERING_TIME: f32 = 20.0;
 pub const MAX_WANDERING_TIME: f32 = 40.0;
 
+/// How long the click→charge "hyper" burst lasts, in seconds (M6, plan §5.6 hyper).
+pub const HYPER_DURATION: f32 = 2.5;
+
 /// Per-tick context handed to a running task.
 pub struct TaskCtx<'a> {
     /// World clock (seconds).
@@ -32,6 +35,8 @@ pub struct TaskCtx<'a> {
     pub rng: &'a mut SplitMix64,
     /// Sound requests a task wants played this frame.
     pub sounds: &'a mut Vec<Sound>,
+    /// The goose is in its post-pat calm window (suppresses spontaneous honks; M6 §5.9).
+    pub calm: bool,
 }
 
 /// A goose behavior. Tasks set targets/params only; locomotion is the engine's job.
@@ -72,9 +77,12 @@ impl Task for WanderTask {
     }
 
     fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        // Re-assert walk-tier locomotion every tick so the goose cleanly resumes its stroll
+        // after a transient interrupt (e.g. a hyper burst) left a faster tier on it.
+        goose.current_speed = goose.parameters.walk_speed;
+        goose.current_acceleration = goose.parameters.acceleration_normal;
+
         if self.end_time.is_none() {
-            goose.current_speed = goose.parameters.walk_speed;
-            goose.current_acceleration = goose.parameters.acceleration_normal;
             goose.target_pos = random_point(ctx);
             self.end_time = Some(ctx.now + ctx.rng.range(MIN_WANDERING_TIME, MAX_WANDERING_TIME));
         }
@@ -84,8 +92,48 @@ impl Task for WanderTask {
             if ctx.rng.next_f64() < 0.5 {
                 goose.track_mud_end_time = ctx.now + goose.parameters.duration_to_track_mud;
             }
-            // And sometimes it honks for no reason at all.
-            if ctx.rng.next_f64() < 0.25 {
+            // And sometimes it honks for no reason at all — unless it's been freshly patted,
+            // when it stays content and quiet for the calm window (§5.9).
+            if !ctx.calm && ctx.rng.next_f64() < 0.25 {
+                ctx.sounds.push(Sound::Honk);
+            }
+        }
+        ctx.now >= self.end_time.unwrap()
+    }
+}
+
+/// The click→charge reaction: a short, fast, erratic "hyper" burst (plan §5.6 hyper / M6).
+/// Installed as a transient interrupt when you click the goose; when it finishes the world
+/// restores whatever task was running before. The full self-triggered mood FSM is M13.
+#[derive(Default)]
+pub struct HyperTask {
+    end_time: Option<f32>,
+}
+
+impl HyperTask {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Task for HyperTask {
+    fn id(&self) -> &'static str {
+        "hyper"
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        // Charge tier for the whole burst, re-asserted each tick.
+        goose.current_speed = goose.parameters.charge_speed;
+        goose.current_acceleration = goose.parameters.acceleration_charged;
+
+        if self.end_time.is_none() {
+            goose.target_pos = random_point(ctx);
+            ctx.sounds.push(Sound::Honk); // an indignant honk at being clicked
+            self.end_time = Some(ctx.now + HYPER_DURATION);
+        } else if arrived(goose, 3.0) {
+            // Bolt to a fresh spot the instant it arrives — erratic, no dwell.
+            goose.target_pos = random_point(ctx);
+            if ctx.rng.next_f64() < 0.5 {
                 ctx.sounds.push(Sound::Honk);
             }
         }
@@ -155,6 +203,7 @@ mod tests {
             bounds: b,
             rng: &mut rng,
             sounds: &mut sounds,
+            calm: false,
         };
         assert!(!task.run(&mut goose, &mut ctx));
         assert!(goose.target_pos.x >= b.min.x && goose.target_pos.x <= b.max.x);
@@ -167,8 +216,143 @@ mod tests {
             bounds: b,
             rng: &mut rng,
             sounds: &mut sounds,
+            calm: false,
         };
         assert!(task.run(&mut goose, &mut ctx));
+    }
+
+    /// Run `WanderTask` through `iters` forced arrivals and count the spontaneous honks.
+    fn wander_arrival_honks(calm: bool, seed: u64, iters: usize) -> usize {
+        let mut rng = SplitMix64::seed(seed);
+        let mut sounds: Vec<Sound> = Vec::new();
+        let b = ctx_bounds();
+        let mut goose = GooseEntity::new();
+        let mut task = WanderTask::new();
+        let mut now = 0.0;
+        for _ in 0..iters {
+            // Snap onto the current target so the next run sees an arrival.
+            goose.position = goose.target_pos;
+            let mut ctx = TaskCtx {
+                now,
+                dt: 1.0 / 120.0,
+                bounds: b,
+                rng: &mut rng,
+                sounds: &mut sounds,
+                calm,
+            };
+            task.run(&mut goose, &mut ctx);
+            now += 0.1;
+        }
+        sounds.iter().filter(|s| **s == Sound::Honk).count()
+    }
+
+    #[test]
+    fn calm_suppresses_spontaneous_honks() {
+        let seed = 12_345;
+        let noisy = wander_arrival_honks(false, seed, 80);
+        assert!(noisy > 0, "control: an un-calm goose honks on arrivals");
+        let calm = wander_arrival_honks(true, seed, 80);
+        assert_eq!(
+            calm, 0,
+            "a calm (post-pat) goose suppresses spontaneous honks"
+        );
+    }
+
+    #[test]
+    fn wander_reasserts_speed_each_run() {
+        let mut rng = SplitMix64::seed(99);
+        let mut sounds: Vec<Sound> = Vec::new();
+        let b = ctx_bounds();
+        let mut goose = GooseEntity::new();
+        let mut task = WanderTask::new();
+        // First run arms the task and sets walk speed.
+        let mut ctx = TaskCtx {
+            now: 0.0,
+            dt: 1.0 / 120.0,
+            bounds: b,
+            rng: &mut rng,
+            sounds: &mut sounds,
+            calm: false,
+        };
+        task.run(&mut goose, &mut ctx);
+        // Simulate a hyper burst having left charge-tier speed on the goose.
+        goose.current_speed = 999.0;
+        goose.current_acceleration = 999.0;
+        let mut ctx = TaskCtx {
+            now: 1.0,
+            dt: 1.0 / 120.0,
+            bounds: b,
+            rng: &mut rng,
+            sounds: &mut sounds,
+            calm: false,
+        };
+        task.run(&mut goose, &mut ctx);
+        assert_eq!(
+            goose.current_speed, goose.parameters.walk_speed,
+            "wander should restore walk speed after a hyper burst"
+        );
+        assert_eq!(
+            goose.current_acceleration,
+            goose.parameters.acceleration_normal
+        );
+    }
+
+    #[test]
+    fn hyper_sets_charge_tier_and_finishes() {
+        let mut rng = SplitMix64::seed(4);
+        let mut sounds: Vec<Sound> = Vec::new();
+        let b = ctx_bounds();
+        let mut goose = GooseEntity::new();
+        let mut task = HyperTask::new();
+        let mut ctx = TaskCtx {
+            now: 0.0,
+            dt: 1.0 / 120.0,
+            bounds: b,
+            rng: &mut rng,
+            sounds: &mut sounds,
+            calm: false,
+        };
+        assert!(!task.run(&mut goose, &mut ctx), "still hyper at t=0");
+        assert_eq!(goose.current_speed, goose.parameters.charge_speed);
+        assert_eq!(
+            goose.current_acceleration,
+            goose.parameters.acceleration_charged
+        );
+        // Well past the burst it reports finished.
+        let mut ctx = TaskCtx {
+            now: HYPER_DURATION + 0.1,
+            dt: 1.0 / 120.0,
+            bounds: b,
+            rng: &mut rng,
+            sounds: &mut sounds,
+            calm: false,
+        };
+        assert!(
+            task.run(&mut goose, &mut ctx),
+            "hyper ends after its duration"
+        );
+    }
+
+    #[test]
+    fn hyper_honks_excitedly_on_enter() {
+        let mut rng = SplitMix64::seed(8);
+        let mut sounds: Vec<Sound> = Vec::new();
+        let b = ctx_bounds();
+        let mut goose = GooseEntity::new();
+        let mut task = HyperTask::new();
+        let mut ctx = TaskCtx {
+            now: 0.0,
+            dt: 1.0 / 120.0,
+            bounds: b,
+            rng: &mut rng,
+            sounds: &mut sounds,
+            calm: false,
+        };
+        task.run(&mut goose, &mut ctx);
+        assert!(
+            sounds.contains(&Sound::Honk),
+            "clicking the goose makes it honk"
+        );
     }
 
     #[test]
@@ -188,6 +372,7 @@ mod tests {
             bounds: b,
             rng: &mut rng,
             sounds: &mut sounds,
+            calm: false,
         };
         assert!(!task.run(&mut goose, &mut ctx));
         assert_eq!(goose.target_pos, center);
@@ -200,6 +385,7 @@ mod tests {
             bounds: b,
             rng: &mut rng,
             sounds: &mut sounds,
+            calm: false,
         };
         assert!(!task.run(&mut goose, &mut ctx));
         let mut ctx = TaskCtx {
@@ -208,6 +394,7 @@ mod tests {
             bounds: b,
             rng: &mut rng,
             sounds: &mut sounds,
+            calm: false,
         };
         assert!(task.run(&mut goose, &mut ctx));
     }

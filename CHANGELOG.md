@@ -12,6 +12,19 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **Hit-testing: pat (hover-streak + hearts) + click→hyper (milestone M6)** — the goose
+  reacts to the cursor. Two distinct interactions (plan §5.9 / §6), built on a new per-frame
+  pointer feed (`World::set_pointer` taking a platform-free `interaction::Pointer`; the
+  Windows backend polls `GetCursorPos` + `GetAsyncKeyState`). **Pat** = repeated cursor
+  *hover-sweeps* over the goose (no buttons): a `PatTracker` accumulates hover-movement into
+  a happy streak, each registered pat spawns a rising/fading **heart particle** (new
+  `honk-engine::hearts` module + `render::render_hearts`, a clean-room procedural heart) and
+  keeps the goose briefly **calm** (a content goose suppresses its spontaneous honks). **Click**
+  = a left-press on the goose → a charge-speed **hyper** burst (`task::HyperTask`) that bolts
+  around erratically and honks, installed as a transient interrupt that **saves and restores
+  the task it suspended** (the resume mechanism perch-and-ride will reuse in M8). Hit-testing
+  uses the rig bounding box (`Rect::contains`), naturally click-through everywhere else.
+  Engine-side logic is fully unit-tested; the on-screen result was verified visually.
 - **Audio (milestone M5)** — the goose honks. A `rodio` backend in the binary plays the
   bundled original sounds (Honk1–4, BITE, MudSquith, Pat1–3) mapped from platform-free
   `Sound` requests the engine emits (`honk-engine::sound::Sound` + a `World` queue drained
