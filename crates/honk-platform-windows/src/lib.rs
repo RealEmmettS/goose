@@ -28,9 +28,9 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetSystemMetrics, PeekMessageW,
     PostQuitMessage, RegisterClassExW, ShowWindow, TranslateMessage, UpdateLayeredWindow, MSG,
-    PM_REMOVE, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
-    SW_SHOWNOACTIVATE, ULW_ALPHA, WM_DESTROY, WM_QUIT, WNDCLASSEXW, WS_EX_LAYERED,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    PM_REMOVE, SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+    SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, ULW_ALPHA, WM_DESTROY, WM_QUIT, WNDCLASSEXW,
+    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
 /// A reusable top-down 32-bpp DIB section we blit the goose into each frame.
@@ -132,7 +132,8 @@ impl Overlay {
         }
     }
 
-    /// The full virtual-desktop bounds (across all monitors), as the engine's roam space.
+    /// The full virtual-desktop bounds (across all monitors). Multi-monitor traversal is
+    /// M15; M3's fullscreen overlay covers the primary monitor (see [`Overlay::primary_bounds`]).
     pub fn virtual_bounds() -> Rect {
         unsafe {
             let x = GetSystemMetrics(SM_XVIRTUALSCREEN) as f32;
@@ -142,6 +143,19 @@ impl Overlay {
             Rect {
                 min: Vec2::new(x, y),
                 max: Vec2::new(x + w, y + h),
+            }
+        }
+    }
+
+    /// The primary monitor's bounds (origin `(0, 0)`). The fullscreen overlay covers this
+    /// so world-space props (footmarks, later meme/notepad windows) render in place.
+    pub fn primary_bounds() -> Rect {
+        unsafe {
+            let w = GetSystemMetrics(SM_CXSCREEN) as f32;
+            let h = GetSystemMetrics(SM_CYSCREEN) as f32;
+            Rect {
+                min: Vec2::new(0.0, 0.0),
+                max: Vec2::new(w, h),
             }
         }
     }

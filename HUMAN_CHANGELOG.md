@@ -14,6 +14,18 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Latest — June 2026
 
 **Added**
+- The goose now leaves muddy footprints! When it "steps in mud," a trail of little brown
+  prints follows it as it waddles, and they slowly fade and shrink away on their own. (To show
+  the trail across your screen, the goose's see-through layer now covers the whole monitor.)
+
+**Improved**
+- The goose actually looks like the real Desktop Goose now. To get it right, the real goose was
+  run and watched directly: it's a soft, rounded white blob with its head tucked into the front
+  of its body, a little rounded orange beak, a small dark eye, orange webbed feet, and a soft
+  dotted shadow underneath. An earlier version had given it too long a neck (copied from a
+  drawing rather than the real thing) — that's fixed.
+
+**Added (earlier this session)**
 - The goose now actually appears on your screen and walks around! It floats on top of
   everything as a see-through window, so you can still click the things behind it — only the
   goose itself is solid. It wanders to a random spot, waddling on two little orange feet, then

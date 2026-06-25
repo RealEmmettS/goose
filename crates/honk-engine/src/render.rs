@@ -1,16 +1,17 @@
 //! Clean-room procedural renderer: a [`Rig`] (and its footmarks) → a `tiny_skia::Pixmap`.
 //!
-//! Same *technique* the original uses (`GooseRenderData`): filled stadium/capsule body
-//! parts in white, an orange beak and feet, a soft grey outline, and a ground shadow —
-//! drawn back-to-front (shadow → legs → under-body → body → neck → head → beak → eye →
-//! feet). Platform-free and offscreen: the same routine feeds the per-monitor overlay and
-//! the golden-frame tests.
+//! Reproduces the *technique* of the original (`GooseRenderData`) and is tuned against
+//! direct observation of the running goose: a soft rounded **blob** built from overlapping
+//! white stadium/capsule forms (under-body, body, neck, head) with a thin grey outline, a
+//! short rounded **orange beak**, a small dark eye, orange webbed feet, and a **stippled**
+//! ground shadow. Drawn back-to-front. Platform-free and offscreen — the same routine
+//! feeds the overlay and the golden-frame tests.
 //!
-//! World→pixmap mapping is a translation: the world point `origin` maps to the pixmap's
-//! top-left. Colours are the verified defaults (`#ffffff` / `#ffa500` / `#d3d3d3`); the
-//! eye/shadow/mud tones are clean-room render details. The exact proportions are tuned to
-//! resemble the original side-profile goose (the original render maths are closed); the
-//! goldens are a regression baseline, not a pixel-fidelity reference.
+//! Overlap trick: each white form is drawn as [outline-disc-then-white]; where forms
+//! overlap, the front form's white covers the back form's outline, leaving only the outer
+//! silhouette outlined — the same single-outline blob the original shows. World→pixmap is
+//! a translation by `origin`. Colours are the verified defaults (`#ffffff` / `#ffa500` /
+//! `#d3d3d3`); eye/shadow/mud tones are clean-room render details.
 
 use crate::footmarks::FootMarks;
 use crate::math::Vec2;
@@ -20,11 +21,11 @@ use tiny_skia::{Color, FillRule, LineCap, Paint, PathBuilder, Pixmap, Stroke, Tr
 const WHITE: (u8, u8, u8) = (0xff, 0xff, 0xff);
 const ORANGE: (u8, u8, u8) = (0xff, 0xa5, 0x00);
 const OUTLINE: (u8, u8, u8) = (0xd3, 0xd3, 0xd3);
-const EYE: (u8, u8, u8) = (0x20, 0x20, 0x20);
+const EYE: (u8, u8, u8) = (0x1a, 0x1a, 0x1a);
 const MUD: (u8, u8, u8) = (0x5a, 0x40, 0x28);
 
 /// Extra radius drawn underneath each white part to give it a `#d3d3d3` outline.
-const OUTLINE_WIDTH: f32 = 2.0;
+const OUTLINE_WIDTH: f32 = 1.6;
 
 fn paint(rgb: (u8, u8, u8), alpha: u8) -> Paint<'static> {
     let mut p = Paint::default();
@@ -48,8 +49,9 @@ fn capsule(pixmap: &mut Pixmap, a: Vec2, b: Vec2, radius: f32, p: &Paint) {
     }
 }
 
-/// A white capsule with a `#d3d3d3` outline underneath.
-fn outlined_capsule(pixmap: &mut Pixmap, a: Vec2, b: Vec2, radius: f32) {
+/// A white capsule with a `#d3d3d3` outline underneath (internal outlines are covered by
+/// overlapping white forms, leaving only the outer silhouette).
+fn white_capsule(pixmap: &mut Pixmap, a: Vec2, b: Vec2, radius: f32) {
     capsule(pixmap, a, b, radius + OUTLINE_WIDTH, &paint(OUTLINE, 255));
     capsule(pixmap, a, b, radius, &paint(WHITE, 255));
 }
@@ -73,6 +75,33 @@ fn triangle(pixmap: &mut Pixmap, a: Vec2, b: Vec2, c: Vec2, p: &Paint) {
     }
 }
 
+/// A stippled (dotted) elliptical ground shadow, matching the original's dither-brush look.
+fn stipple_shadow(pixmap: &mut Pixmap, ground: Vec2) {
+    let rx = rig::BODY_RADIUS * 0.95;
+    let ry = rx * 0.32;
+    let dot = paint((0x20, 0x20, 0x20), 70);
+    let step = 3.0;
+    let mut dy = -ry;
+    while dy <= ry {
+        let mut dx = -rx;
+        // Offset alternate rows for a denser dither.
+        let row_off = if ((dy / step) as i32) % 2 == 0 {
+            0.0
+        } else {
+            step * 0.5
+        };
+        while dx <= rx {
+            let nx = (dx + row_off) / rx;
+            let ny = dy / ry;
+            if nx * nx + ny * ny <= 1.0 {
+                disc(pixmap, ground + Vec2::new(dx + row_off, dy), 0.95, &dot);
+            }
+            dx += step;
+        }
+        dy += step;
+    }
+}
+
 /// Render the muddy footprints into `pixmap` (call before the goose so it sits on top).
 pub fn render_footmarks(pixmap: &mut Pixmap, marks: &FootMarks, now: f32, origin: Vec2) {
     for (mark, scale) in marks.active(now) {
@@ -89,82 +118,42 @@ pub fn render_rig(pixmap: &mut Pixmap, rig: &Rig, origin: Vec2) {
     let fwd = rig.forward;
     let across = fwd.perpendicular();
 
-    // Shadow: a flattened disc on the ground.
-    let ground = t(rig.ground);
-    if let Some(circle) = PathBuilder::from_circle(0.0, 0.0, rig::BODY_RADIUS * 0.85) {
-        let squash = Transform::from_row(1.0, 0.0, 0.0, 0.28, ground.x, ground.y);
-        pixmap.fill_path(
-            &circle,
-            &paint((0, 0, 0), 55),
-            FillRule::Winding,
-            squash,
-            None,
-        );
-    }
+    stipple_shadow(pixmap, t(rig.ground));
 
-    // Legs: thin orange shanks from under the body down to each foot.
-    let foot_l = t(rig.feet.left);
-    let foot_r = t(rig.feet.right);
-    capsule(
-        pixmap,
-        t(rig.leg_top_left),
-        foot_l,
-        2.0,
-        &paint(ORANGE, 255),
-    );
-    capsule(
-        pixmap,
-        t(rig.leg_top_right),
-        foot_r,
-        2.0,
-        &paint(ORANGE, 255),
-    );
-
-    // Body mass: under-body (chest) behind, main body on top.
+    // Body blob: belly behind, main body on top (both white stadiums).
     let ub = t(rig.underbody_center);
-    outlined_capsule(
+    white_capsule(
         pixmap,
         ub - fwd * (rig::UNDERBODY_LENGTH * 0.5),
         ub + fwd * (rig::UNDERBODY_LENGTH * 0.5),
         rig::UNDERBODY_RADIUS,
     );
     let bc = t(rig.body_center);
-    outlined_capsule(
+    white_capsule(
         pixmap,
         bc - fwd * (rig::BODY_LENGTH * 0.5),
         bc + fwd * (rig::BODY_LENGTH * 0.5),
         rig::BODY_RADIUS,
     );
 
-    // Neck (capsule) → two-segment head (capsules), all white.
-    outlined_capsule(pixmap, t(rig.neck_base), t(rig.neck_head), rig::NECC_RADIUS);
-    outlined_capsule(
-        pixmap,
-        t(rig.neck_head),
-        t(rig.head1_end),
-        rig::HEAD_RADIUS_1,
-    );
-    outlined_capsule(
-        pixmap,
-        t(rig.head1_end),
-        t(rig.head2_end),
-        rig::HEAD_RADIUS_2,
-    );
+    // Neck (thinner) → head (a rounded stadium ending at the snout). When tucked these sit
+    // inside/atop the body and merge into the blob; raising the neck lifts the head out.
+    let neck_head = t(rig.neck_head);
+    let snout = t(rig.snout_center);
+    white_capsule(pixmap, t(rig.neck_base), neck_head, rig::NECC_RADIUS * 0.82);
+    white_capsule(pixmap, neck_head, snout, rig::HEAD_RADIUS_2 + 2.0);
 
-    // Beak: an orange triangle from the snout to the beak tip.
-    let snout = t(rig.head2_end);
-    let tip = t(rig.beak_tip);
-    let half = across * 5.0;
-    triangle(pixmap, snout + half, snout - half, tip, &paint(ORANGE, 255));
+    // Beak: a short, rounded orange stub forward of the snout.
+    capsule(pixmap, snout, t(rig.beak_tip), 5.0, &paint(ORANGE, 255));
 
     // Eye: a small dark disc on the upper-front of the head.
-    disc(pixmap, t(rig.eye), rig::EYE_RADIUS + 0.5, &paint(EYE, 255));
+    disc(pixmap, t(rig.eye), rig::EYE_RADIUS + 0.6, &paint(EYE, 255));
 
-    // Feet: orange webbed triangles pointing forward.
-    for foot in [foot_l, foot_r] {
+    // Feet: orange webbed triangles pointing forward (drawn last, at the bottom-front).
+    for foot in [t(rig.feet.left), t(rig.feet.right)] {
         let heel = foot - fwd * 2.0;
-        let toe_a = foot + fwd * 5.0 + across * 4.0;
-        let toe_b = foot + fwd * 5.0 - across * 4.0;
+        let toe_a = foot + fwd * 5.0 + across * 3.5;
+        let toe_b = foot + fwd * 5.0 - across * 3.5;
         triangle(pixmap, heel, toe_a, toe_b, &paint(ORANGE, 255));
     }
 }

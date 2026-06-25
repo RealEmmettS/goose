@@ -28,6 +28,8 @@ pub struct World {
     rng: SplitMix64,
     roam: Roam,
     elapsed: f32,
+    /// Index of the last gait half-step a footmark was considered for (one per foot plant).
+    last_step: i64,
 }
 
 impl World {
@@ -47,7 +49,13 @@ impl World {
             rng: SplitMix64::seed(seed),
             roam: Roam::Pausing { until: 0.0 }, // → picks a target on tick 1
             elapsed: 0.0,
+            last_step: 0,
         }
+    }
+
+    /// The world's monotonic clock (seconds), the time base for footmark fade.
+    pub fn now(&self) -> f32 {
+        self.elapsed
     }
 
     fn arrived(&self) -> bool {
@@ -58,6 +66,12 @@ impl World {
         let x = self.rng.range(self.bounds.min.x, self.bounds.max.x);
         let y = self.rng.range(self.bounds.min.y, self.bounds.max.y);
         self.goose.target_pos = Vec2::new(x, y);
+        // M3 demo: sometimes the goose "steps in mud" and tracks prints for the next
+        // DurationToTrackMud seconds. M4's Task_TrackMud formalises this trigger.
+        if self.rng.next_f64() < 0.6 {
+            self.goose.track_mud_end_time =
+                self.elapsed + self.goose.parameters.duration_to_track_mud;
+        }
     }
 
     /// Advance the world by one fixed [`DT`] tick.
@@ -96,6 +110,21 @@ impl World {
             speed_frac * 0.4,
             self.goose.gait_phase,
         );
+
+        // Drop a fading muddy print at each foot-plant (half gait cycle) while the goose
+        // is tracking mud. Footmarks fade on their own (8.5 s life / 1 s shrink).
+        let step = (self.goose.gait_phase / std::f32::consts::PI).floor() as i64;
+        if step > self.last_step {
+            if self.elapsed < self.goose.track_mud_end_time {
+                let foot = if step % 2 == 0 {
+                    self.goose.rig.feet.left
+                } else {
+                    self.goose.rig.feet.right
+                };
+                self.goose.foot_marks.add(foot, self.elapsed);
+            }
+            self.last_step = step;
+        }
     }
 
     /// The current rig, for the renderer.
@@ -148,5 +177,23 @@ mod tests {
             b.tick();
         }
         assert_eq!(a.goose.position, b.goose.position);
+    }
+
+    #[test]
+    fn tracks_mud_and_drops_fading_prints() {
+        let mut w = World::new(bounds(), 5);
+        w.goose.track_mud_end_time = 1_000.0; // force mud-tracking on
+        for _ in 0..1_200 {
+            w.tick();
+        }
+        // Walking in mud leaves prints.
+        assert!(
+            w.goose.foot_marks.alive_count(w.now()) > 0,
+            "expected muddy prints while tracking mud"
+        );
+        // With mud-tracking off and enough time elapsed, prints fade away.
+        w.goose.track_mud_end_time = -1.0;
+        let faded_at = w.now() + 10.0; // past the 8.5 s lifetime
+        assert_eq!(w.goose.foot_marks.alive_count(faded_at), 0);
     }
 }

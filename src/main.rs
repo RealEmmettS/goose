@@ -8,25 +8,28 @@
 
 #[cfg(windows)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use honk_engine::render::render_rig;
+    use honk_engine::render::{render_footmarks, render_rig};
     use honk_engine::tiny_skia::{Color, Pixmap};
-    use honk_engine::{Accumulator, Clock, Vec2, World};
+    use honk_engine::{Accumulator, Clock, World};
     use honk_platform_windows::Overlay;
 
-    // Fixed window size so the layered surface (and its DIB) is allocated once; the goose
-    // is centred in it and the whole window is repositioned each frame.
-    const FRAME: u32 = 200;
-
     let mut overlay = Overlay::new()?;
-    let bounds = Overlay::virtual_bounds();
-    let mut world = World::new(bounds, seed_from_clock());
+    // Fullscreen primary-monitor overlay so world-space props (footmarks, later
+    // meme/notepad windows) render where they belong. World origin maps to the
+    // monitor's top-left, so the canvas is the monitor and `origin` is its min corner.
+    let bounds = Overlay::primary_bounds();
+    let origin = bounds.min;
+    let width = bounds.width().ceil().max(1.0) as u32;
+    let height = bounds.height().ceil().max(1.0) as u32;
 
-    let mut canvas = Pixmap::new(FRAME, FRAME).ok_or("could not allocate the goose canvas")?;
+    let mut world = World::new(bounds, seed_from_clock());
+    let mut canvas = Pixmap::new(width, height).ok_or("could not allocate the overlay canvas")?;
     let mut accumulator = Accumulator::new();
     let clock = Clock::start();
     let mut last = clock.elapsed_secs();
     let mut last_present = f32::NEG_INFINITY;
-    const PRESENT_INTERVAL: f32 = 1.0 / 60.0;
+    // Fullscreen present is heavier than a tiny window, so cap it a little lower.
+    const PRESENT_INTERVAL: f32 = 1.0 / 40.0;
 
     println!("honk300: a goose is loose on your desktop. Press Ctrl+C here to send it home.");
 
@@ -44,14 +47,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if now - last_present >= PRESENT_INTERVAL {
             last_present = now;
-            let rig = world.rig();
-            // Centre the goose's bounding box in the fixed FRAME canvas.
-            let bb = rig.bounding_box();
-            let bb_center = (bb.min + bb.max) * 0.5;
-            let origin = bb_center - Vec2::new(FRAME as f32 * 0.5, FRAME as f32 * 0.5);
-
             canvas.fill(Color::TRANSPARENT);
-            render_rig(&mut canvas, rig, origin);
+            render_footmarks(&mut canvas, &world.goose.foot_marks, world.now(), origin);
+            render_rig(&mut canvas, world.rig(), origin);
             overlay.present(&canvas, origin.x.floor() as i32, origin.y.floor() as i32)?;
         }
 

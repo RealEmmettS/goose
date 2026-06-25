@@ -12,6 +12,27 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **Footmarks + mud trail (milestone M3)** — the goose leaves a trail of fading muddy
+  footprints while it's "tracking mud," at the verified lifetimes (8.5 s life / 1 s
+  shrink-out). To render world-space trails the overlay moved from the small per-goose
+  window to a **fullscreen primary-monitor layered overlay** (the plan's intended
+  per-monitor architecture; multi-monitor traversal is M15). The engine drops an
+  alternating-foot print at each gait half-step while tracking mud; the M2 roam driver
+  triggers mud-tracking periodically (M4's `Task_TrackMud` will formalize the trigger).
+  Present is capped a touch lower (~40 Hz) since a fullscreen layered present is heavier;
+  a dirty-rect optimization (`UpdateLayeredWindowIndirect` + `prcDirty`) is a future perf task.
+
+### Improved
+- **Goose look reworked to match the real original — from direct observation.** The published
+  modding API documents the rig *model* but not the `updateRig`/`Render` maths (closed binary;
+  not decompiled, per the clean-room rule), so the goose was re-grounded by **running the
+  original Desktop Goose and observing it**: the real procedural goose is a soft rounded
+  **blob** of overlapping white capsule forms with the head **tucked into the front-top of the
+  body** (short neck, raised by the neck-lerp), a short **rounded orange beak**, a small dark
+  eye, orange webbed feet, a thin `#d3d3d3` outline, and a **stippled** ground shadow (the
+  original's dither `shadowBrush`). The earlier tall-necked silhouette (drawn from the stylized
+  donate-page illustration) was corrected. Renderer reworked accordingly (`render.rs`,
+  `rig.rs`); golden frames re-blessed.
 - **Windows overlay + walking goose (milestones M1 + M2)** — `honk300` now renders the
   procedural goose on a transparent, always-on-top, click-through-where-transparent overlay
   and walks it around the desktop.
