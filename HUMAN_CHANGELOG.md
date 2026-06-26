@@ -6,14 +6,27 @@ what changed and why.
 
 For the technical version with file paths and exact details, see CHANGELOG.md.
 
-> **Where the project is:** the goose is alive on screen. It now appears on your desktop and
-> walks around. There's no installer yet — that comes later.
+> **Where the project is:** the goose is alive on screen. It appears on your desktop, walks
+> around, reacts to your mouse, makes sounds, and can steal the cursor in a short, bounded prank.
+> The next milestone is teaching it to interact with windows. There's no installer yet — that
+> comes later.
 
 ---
 
 ## Latest — June 2026
 
 **Added**
+- The goose can steal your mouse cursor now, and that milestone is complete. When mouse stealing
+  is available, clicking the goose makes it charge toward the pointer, bite when it catches it,
+  and run around in its startled zooming mode for a short, bounded moment while holding the cursor
+  before letting go. There is also a no-mouse-stealing option for running the goose without that
+  prank. Behind the scenes, this was built so Windows works first while Mac and Linux can plug in
+  their own cursor support later without changing the goose's brain.
+- The project now has a place to record important architecture decisions. The first record
+  captures how cursor stealing works, how unsupported systems should gracefully say "not
+  available," why the renderer should move toward a lightweight sprite-sheet approach later, and
+  what follow-up work should happen next. This keeps big decisions from getting buried in chat or
+  task notes.
 - The goose notices your mouse now. If you sweep the cursor back and forth over it — petting
   it — little hearts puff up from its head and it settles down happily and goes quiet for a
   moment. And if you *click* it, it gets startled and zooms around the screen for a couple of
@@ -34,11 +47,27 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   the trail across your screen, the goose's see-through layer now covers the whole monitor.)
 
 **Improved**
-- The goose actually looks like the real Desktop Goose now. To get it right, the real goose was
-  run and watched directly: it's a soft, rounded white blob with its head tucked into the front
-  of its body, a little rounded orange beak, a small dark eye, orange webbed feet, and a soft
-  dotted shadow underneath. An earlier version had given it too long a neck (copied from a
-  drawing rather than the real thing) — that's fixed.
+- The goose has been pulled back toward the original Desktop Goose look. The drawing is still
+  fully procedural, but it now uses one cleaner, thinner oval body instead of several obvious
+  pieces stuck together. The head stays tucked in, the beak is short, the eye is simpler, the
+  feet are a little clearer, and the shadow is softer. A taller sprite-like version was tried and
+  saved as a local comparison, then replaced because it did not feel as much like the original.
+
+**Behind the scenes**
+- The earlier milestones were reviewed before closing the cursor-stealing milestone. That review
+  fixed stale status notes, confirmed the goose's core logic still stays separate from
+  Windows-only behavior, and created follow-up work for improving the fullscreen overlay's
+  performance before packaging.
+- The task board now shows the cursor-stealing milestone as done and moves the window-dragging
+  milestone into the active slot. The future sprite-sheet renderer is tracked as its own follow-up
+  task instead of being treated as unfinished cursor-stealing work.
+- The project guidance for future agents now says when to add or update architecture decision
+  records, and it repeats the rule that the technical and human changelogs must stay in sync.
+
+**Decided**
+- The next major renderer should be a small, custom sprite-sheet system rather than a full game
+  engine or heavy graphics framework. That should make the goose easier to customize while still
+  fitting the transparent desktop overlay used on Windows and the future Mac and Linux versions.
 
 **Added (earlier this session)**
 - The goose now actually appears on your screen and walks around! It floats on top of

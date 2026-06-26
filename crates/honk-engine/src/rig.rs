@@ -5,9 +5,9 @@
 //! filled stadium/capsule forms in white with a thin grey outline pen, an orange beak and
 //! feet, and a stippled ground shadow. The exact `updateRig` placement maths live only in
 //! the closed binary, so the assembly here is a clean-room reconstruction — but it is
-//! **tuned against direct observation of the running original**: the real procedural goose
-//! is a soft rounded *blob* whose head is tucked into the front-top of the body (a short
-//! neck), not a tall-necked silhouette. The neck-lerp raises the head out of the tuck.
+//! **tuned against direct observation and iterative golden previews**: the renderer keeps the
+//! original's compact rounded body, tucked head, and short beak while avoiding copied sprite
+//! assets.
 //!
 //! Frame: `forward` is the facing/travel unit vector, `up = (0, -1)` is screen-up, and
 //! `across = forward.perpendicular()` separates the two feet in side view. The whole rig
@@ -97,14 +97,14 @@ impl Rig {
         // Belly: lower and forward of the body, filling out the blob's lower-front.
         let underbody_center = center + UP * (UNDERBODY_ELEVATION + 4.0) + forward * 9.0 + bob;
 
-        // The head tucks into the body's front-top at p=0 and lifts/forward as p→1. Scaled
-        // from the verified neck constants so the tuck reads as the observed blob.
+        // Clean-room assembly around the verified rig constants: the original desktop goose
+        // is a compact blob with the head tucked into the front-top of the body.
         let neck_base = body_center + forward * 11.0 + UP * 5.0;
-        let lift = crate::math::lerp(11.0, NECC_HEIGHT_1, p); // 11 (tucked) → 20 (raised)
-        let reach = crate::math::lerp(NECC_FORWARD_1 + 11.0, NECC_FORWARD_2, p); // 14 → 16
+        let lift = crate::math::lerp(11.0, NECC_HEIGHT_1, p);
+        let reach = crate::math::lerp(NECC_FORWARD_1 + 11.0, NECC_FORWARD_2, p);
         let neck_head = body_center + forward * reach + UP * lift + bob;
 
-        // Snout extends forward of the skull; the beak is a short rounded orange stub.
+        // Snout extends forward of the skull; the renderer tapers the beak from here.
         let snout_center = neck_head + forward * 8.0;
         let beak_tip = snout_center + forward * 9.0 + UP * (-2.0);
 
@@ -130,10 +130,15 @@ impl Rig {
     }
 
     /// World-space bounding box covering the whole goose (for dirty-rect present),
-    /// padded by the largest body radius.
+    /// padded by the current renderer's largest organic curve radius.
     pub fn bounding_box(&self) -> Rect {
+        let across = self.forward.perpendicular();
         let points = [
             self.ground,
+            self.body_center - self.forward * 40.0 - across * 18.0,
+            self.body_center - self.forward * 38.0 + across * 26.0,
+            self.body_center + self.forward * 34.0 + across * 24.0,
+            self.body_center - across * 28.0,
             self.body_center,
             self.underbody_center,
             self.neck_base,
@@ -145,7 +150,7 @@ impl Rig {
             self.feet.right,
         ];
         // `points` is non-empty, so `bounding` always returns `Some`.
-        Rect::bounding(points, BODY_RADIUS).expect("rig always has points")
+        Rect::bounding(points, 12.0).expect("rig always has points")
     }
 }
 

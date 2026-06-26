@@ -2,8 +2,8 @@
 //!
 //! The original engine runs a fixed 120 Hz simulation tick driven by a `Stopwatch`;
 //! all locomotion/step constants are tuned to that rate, so the sim must never couple
-//! to the redraw rate. Round 1 (M0) ships only the constants and a thin [`Clock`]; the
-//! accumulator run-loop that consumes them is M2.
+//! to the redraw rate. The accumulator below is used by the desktop runtime to run the
+//! platform-free engine at 120 Hz while presentation happens at its own capped cadence.
 
 /// Simulation tick rate, in Hz.
 pub const FRAMERATE: u32 = 120;

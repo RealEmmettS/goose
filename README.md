@@ -8,10 +8,12 @@ FOR REFERENCE:
 
 ---
 
-## Status — the decided plan
+## Status
 
-**Stage:** planning. No application code yet (no `Cargo.toml` / `src/`); implementation starts at
-milestone **M0**.
+**Stage:** implementation in progress. Milestones **M0-M7** are complete; **M8 foreign-window
+drag + perch & ride** is active. The current Windows build renders the procedural goose on the
+desktop, walks it, leaves mud, plays sounds, reacts to pat/click input, and can perform bounded
+cursor nabbing when cursor warping is enabled. There is no installer or release artifact yet.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
@@ -20,6 +22,10 @@ load-bearing claims against the original's shipped C# source and the `*300` sibl
 drafts are now **superseded reference only**; where the three conflict, `honk300_plan.md` wins.
 (Why the hybrid is lopsided: `claude_plan.md`'s engine constants match `Exports.cs` verbatim,
 while `codex_plan.md`'s guessed speed values were wrong.)
+
+**Architecture decisions → [`docs/adr/`](./docs/adr/README.md).** ADRs record durable decisions
+that should survive individual task-board updates. The first ADR closes M7's cursor-mischief
+contract, cross-platform guardrails, and Renderer V2 direction.
 
 **Decided direction (see `honk300_plan.md` for the full detail):**
 
@@ -37,7 +43,7 @@ while `codex_plan.md`'s guessed speed values were wrong.)
 - **No external mods** (Autumn is built-in; extensibility via documented internal seams) and
   **no system tray** (quit via hold-ESC or any stop command over a single-instance IPC channel).
 - **Built for every OS + architecture:** Windows x64 **and ARM64**, macOS Intel **and Apple
-  Silicon** (universal2), Linux x64 **and ARM** (gnu + musl). Native + CLI installers like
-  TR300/ND300/WB300; **no crates.io**.
+  Silicon** (universal2), Linux x64 **and ARM** (gnu + musl where packaging supports it).
+  Native + CLI installers like TR300/ND300/WB300; **no crates.io**.
 - Linux is **X11-first** (runs under XWayland); native Wayland is an opt-in `--wayland` mode with
   reduced mischief.

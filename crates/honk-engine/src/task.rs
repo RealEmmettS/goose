@@ -7,10 +7,12 @@
 //!
 //! This `Task` trait is the documented internal extension seam (plan §18) — adding a
 //! behavior means adding a `Task` impl and registering it; there is no external mod ABI.
-//! Richer tasks (nab, attack, collect-window, off-screen bolt) land in M7–M9.
+//! Richer tasks (attack, collect-window, off-screen bolt) land in M8+.
 
+use crate::cursor::{CursorCommand, MouseStealOptions};
 use crate::entity::GooseEntity;
-use crate::math::{Rect, Vec2};
+use crate::interaction::Pointer;
+use crate::math::{clamp, Rect, Vec2};
 use crate::rng::{RandomSource, SplitMix64};
 use crate::sound::Sound;
 
@@ -35,6 +37,12 @@ pub struct TaskCtx<'a> {
     pub rng: &'a mut SplitMix64,
     /// Sound requests a task wants played this frame.
     pub sounds: &'a mut Vec<Sound>,
+    /// Cursor commands a task wants the platform backend to apply this frame.
+    pub cursor_commands: &'a mut Vec<CursorCommand>,
+    /// Last pointer snapshot in world/desktop coordinates.
+    pub pointer: Pointer,
+    /// Mouse-stealing tuning and backend support.
+    pub mouse_steal: MouseStealOptions,
     /// The goose is in its post-pat calm window (suppresses spontaneous honks; M6 §5.9).
     pub calm: bool,
 }
@@ -55,6 +63,13 @@ fn random_point(ctx: &mut TaskCtx) -> Vec2 {
     Vec2::new(
         ctx.rng.range(ctx.bounds.min.x, ctx.bounds.max.x),
         ctx.rng.range(ctx.bounds.min.y, ctx.bounds.max.y),
+    )
+}
+
+fn clamp_point(p: Vec2, bounds: Rect) -> Vec2 {
+    Vec2::new(
+        clamp(p.x, bounds.min.x, bounds.max.x),
+        clamp(p.y, bounds.min.y, bounds.max.y),
     )
 }
 
@@ -141,6 +156,113 @@ impl Task for HyperTask {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum NabState {
+    SeekingMouse,
+    DraggingMouseAway {
+        original_vector_to_mouse: Vec2,
+        grabbed_at: f32,
+        target: Vec2,
+    },
+}
+
+/// Cursor-stealing behavior (M7): chase the live pointer, grab it at the beak, then run a
+/// bounded hyper-style burst while emitting platform-free cursor-warp commands.
+pub struct NabMouseTask {
+    state: NabState,
+    bite_played: bool,
+}
+
+impl Default for NabMouseTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl NabMouseTask {
+    pub fn new() -> Self {
+        Self {
+            state: NabState::SeekingMouse,
+            bite_played: false,
+        }
+    }
+
+    fn hyper_target(ctx: &mut TaskCtx) -> Vec2 {
+        random_point(ctx)
+    }
+}
+
+impl Task for NabMouseTask {
+    fn id(&self) -> &'static str {
+        "nab_mouse"
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        if !ctx.mouse_steal.active() || !ctx.pointer.present {
+            return true;
+        }
+
+        goose.current_speed = goose.parameters.charge_speed;
+        goose.current_acceleration = goose.parameters.acceleration_charged;
+        goose.extending_neck = true;
+
+        match self.state {
+            NabState::SeekingMouse => {
+                goose.target_pos = clamp_point(ctx.pointer.pos, ctx.bounds);
+
+                if Vec2::distance(goose.rig.beak_tip, ctx.pointer.pos)
+                    <= ctx.mouse_steal.grab_distance
+                {
+                    let original_vector_to_mouse = ctx.pointer.pos - goose.rig.beak_tip;
+                    let target = Self::hyper_target(ctx);
+                    self.state = NabState::DraggingMouseAway {
+                        original_vector_to_mouse,
+                        grabbed_at: ctx.now,
+                        target,
+                    };
+                    if !self.bite_played {
+                        self.bite_played = true;
+                        ctx.sounds.push(Sound::Bite);
+                    }
+                    ctx.cursor_commands.push(CursorCommand::WarpTo(
+                        goose.rig.beak_tip + original_vector_to_mouse,
+                    ));
+                }
+                false
+            }
+            NabState::DraggingMouseAway {
+                original_vector_to_mouse,
+                grabbed_at,
+                mut target,
+            } => {
+                if arrived(goose, 3.0) {
+                    target = Self::hyper_target(ctx);
+                    self.state = NabState::DraggingMouseAway {
+                        original_vector_to_mouse,
+                        grabbed_at,
+                        target,
+                    };
+                    if ctx.rng.next_f64() < 0.5 {
+                        ctx.sounds.push(Sound::Honk);
+                    }
+                }
+
+                goose.target_pos = target;
+                let desired_cursor =
+                    clamp_point(goose.rig.beak_tip + original_vector_to_mouse, ctx.bounds);
+
+                if Vec2::distance(ctx.pointer.pos, desired_cursor) > ctx.mouse_steal.drop_distance {
+                    return true;
+                }
+
+                ctx.cursor_commands
+                    .push(CursorCommand::WarpTo(desired_cursor));
+                ctx.now - grabbed_at >= ctx.mouse_steal.succ_time
+            }
+        }
+    }
+}
+
 /// The scripted first-run intro: the goose walks in to centre stage, pauses to "introduce
 /// itself" for [`FIRST_WANDER_TIME`], then yields to roaming. (`FirstUX_FirstTask` /
 /// `FirstUX_SecondTask` in the original; text/honk flourishes arrive with M5 audio + notes.)
@@ -182,6 +304,25 @@ impl Task for FirstUxTask {
 mod tests {
     use super::*;
 
+    fn base_ctx<'a>(
+        now: f32,
+        rng: &'a mut SplitMix64,
+        sounds: &'a mut Vec<Sound>,
+        cursor_commands: &'a mut Vec<CursorCommand>,
+    ) -> TaskCtx<'a> {
+        TaskCtx {
+            now,
+            dt: 1.0 / 120.0,
+            bounds: ctx_bounds(),
+            rng,
+            sounds,
+            cursor_commands,
+            pointer: Pointer::default(),
+            mouse_steal: MouseStealOptions::default(),
+            calm: false,
+        }
+    }
+
     fn ctx_bounds() -> Rect {
         Rect {
             min: Vec2::new(0.0, 0.0),
@@ -193,31 +334,23 @@ mod tests {
     fn wander_picks_in_bounds_targets_and_finishes() {
         let mut rng = SplitMix64::seed(1);
         let mut sounds: Vec<Sound> = Vec::new();
+        let mut cursor_commands: Vec<CursorCommand> = Vec::new();
         let b = ctx_bounds();
         let mut goose = GooseEntity::new();
         let mut task = WanderTask::new();
         // First run sets a target inside bounds and arms the dwell timer.
-        let mut ctx = TaskCtx {
-            now: 0.0,
-            dt: 1.0 / 120.0,
-            bounds: b,
-            rng: &mut rng,
-            sounds: &mut sounds,
-            calm: false,
-        };
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
         assert!(!task.run(&mut goose, &mut ctx));
         assert!(goose.target_pos.x >= b.min.x && goose.target_pos.x <= b.max.x);
         assert!(goose.target_pos.y >= b.min.y && goose.target_pos.y <= b.max.y);
         assert_eq!(goose.current_speed, goose.parameters.walk_speed);
         // Well past the max dwell it reports finished.
-        let mut ctx = TaskCtx {
-            now: MAX_WANDERING_TIME + 1.0,
-            dt: 1.0 / 120.0,
-            bounds: b,
-            rng: &mut rng,
-            sounds: &mut sounds,
-            calm: false,
-        };
+        let mut ctx = base_ctx(
+            MAX_WANDERING_TIME + 1.0,
+            &mut rng,
+            &mut sounds,
+            &mut cursor_commands,
+        );
         assert!(task.run(&mut goose, &mut ctx));
     }
 
@@ -225,21 +358,15 @@ mod tests {
     fn wander_arrival_honks(calm: bool, seed: u64, iters: usize) -> usize {
         let mut rng = SplitMix64::seed(seed);
         let mut sounds: Vec<Sound> = Vec::new();
-        let b = ctx_bounds();
+        let mut cursor_commands: Vec<CursorCommand> = Vec::new();
         let mut goose = GooseEntity::new();
         let mut task = WanderTask::new();
         let mut now = 0.0;
         for _ in 0..iters {
             // Snap onto the current target so the next run sees an arrival.
             goose.position = goose.target_pos;
-            let mut ctx = TaskCtx {
-                now,
-                dt: 1.0 / 120.0,
-                bounds: b,
-                rng: &mut rng,
-                sounds: &mut sounds,
-                calm,
-            };
+            let mut ctx = base_ctx(now, &mut rng, &mut sounds, &mut cursor_commands);
+            ctx.calm = calm;
             task.run(&mut goose, &mut ctx);
             now += 0.1;
         }
@@ -262,30 +389,16 @@ mod tests {
     fn wander_reasserts_speed_each_run() {
         let mut rng = SplitMix64::seed(99);
         let mut sounds: Vec<Sound> = Vec::new();
-        let b = ctx_bounds();
+        let mut cursor_commands: Vec<CursorCommand> = Vec::new();
         let mut goose = GooseEntity::new();
         let mut task = WanderTask::new();
         // First run arms the task and sets walk speed.
-        let mut ctx = TaskCtx {
-            now: 0.0,
-            dt: 1.0 / 120.0,
-            bounds: b,
-            rng: &mut rng,
-            sounds: &mut sounds,
-            calm: false,
-        };
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
         task.run(&mut goose, &mut ctx);
         // Simulate a hyper burst having left charge-tier speed on the goose.
         goose.current_speed = 999.0;
         goose.current_acceleration = 999.0;
-        let mut ctx = TaskCtx {
-            now: 1.0,
-            dt: 1.0 / 120.0,
-            bounds: b,
-            rng: &mut rng,
-            sounds: &mut sounds,
-            calm: false,
-        };
+        let mut ctx = base_ctx(1.0, &mut rng, &mut sounds, &mut cursor_commands);
         task.run(&mut goose, &mut ctx);
         assert_eq!(
             goose.current_speed, goose.parameters.walk_speed,
@@ -301,17 +414,10 @@ mod tests {
     fn hyper_sets_charge_tier_and_finishes() {
         let mut rng = SplitMix64::seed(4);
         let mut sounds: Vec<Sound> = Vec::new();
-        let b = ctx_bounds();
+        let mut cursor_commands: Vec<CursorCommand> = Vec::new();
         let mut goose = GooseEntity::new();
         let mut task = HyperTask::new();
-        let mut ctx = TaskCtx {
-            now: 0.0,
-            dt: 1.0 / 120.0,
-            bounds: b,
-            rng: &mut rng,
-            sounds: &mut sounds,
-            calm: false,
-        };
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
         assert!(!task.run(&mut goose, &mut ctx), "still hyper at t=0");
         assert_eq!(goose.current_speed, goose.parameters.charge_speed);
         assert_eq!(
@@ -319,14 +425,12 @@ mod tests {
             goose.parameters.acceleration_charged
         );
         // Well past the burst it reports finished.
-        let mut ctx = TaskCtx {
-            now: HYPER_DURATION + 0.1,
-            dt: 1.0 / 120.0,
-            bounds: b,
-            rng: &mut rng,
-            sounds: &mut sounds,
-            calm: false,
-        };
+        let mut ctx = base_ctx(
+            HYPER_DURATION + 0.1,
+            &mut rng,
+            &mut sounds,
+            &mut cursor_commands,
+        );
         assert!(
             task.run(&mut goose, &mut ctx),
             "hyper ends after its duration"
@@ -337,17 +441,10 @@ mod tests {
     fn hyper_honks_excitedly_on_enter() {
         let mut rng = SplitMix64::seed(8);
         let mut sounds: Vec<Sound> = Vec::new();
-        let b = ctx_bounds();
+        let mut cursor_commands: Vec<CursorCommand> = Vec::new();
         let mut goose = GooseEntity::new();
         let mut task = HyperTask::new();
-        let mut ctx = TaskCtx {
-            now: 0.0,
-            dt: 1.0 / 120.0,
-            bounds: b,
-            rng: &mut rng,
-            sounds: &mut sounds,
-            calm: false,
-        };
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
         task.run(&mut goose, &mut ctx);
         assert!(
             sounds.contains(&Sound::Honk),
@@ -356,9 +453,15 @@ mod tests {
     }
 
     #[test]
+    fn mouse_steal_default_drag_time_matches_hyper_burst() {
+        assert_eq!(MouseStealOptions::default().succ_time, HYPER_DURATION);
+    }
+
+    #[test]
     fn first_ux_walks_in_then_finishes_after_intro() {
         let mut rng = SplitMix64::seed(2);
         let mut sounds: Vec<Sound> = Vec::new();
+        let mut cursor_commands: Vec<CursorCommand> = Vec::new();
         let b = ctx_bounds();
         let center = (b.min + b.max) * 0.5;
         let mut goose = GooseEntity::new();
@@ -366,36 +469,207 @@ mod tests {
         let mut task = FirstUxTask::new();
 
         // Before arriving at centre, never finished.
-        let mut ctx = TaskCtx {
-            now: 0.0,
-            dt: 1.0 / 120.0,
-            bounds: b,
-            rng: &mut rng,
-            sounds: &mut sounds,
-            calm: false,
-        };
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
         assert!(!task.run(&mut goose, &mut ctx));
         assert_eq!(goose.target_pos, center);
 
         // Snap to centre → the intro pause arms; still not finished until it elapses.
         goose.position = center;
-        let mut ctx = TaskCtx {
-            now: 1.0,
-            dt: 1.0 / 120.0,
-            bounds: b,
-            rng: &mut rng,
-            sounds: &mut sounds,
-            calm: false,
-        };
+        let mut ctx = base_ctx(1.0, &mut rng, &mut sounds, &mut cursor_commands);
         assert!(!task.run(&mut goose, &mut ctx));
-        let mut ctx = TaskCtx {
-            now: 1.0 + FIRST_WANDER_TIME + 0.1,
-            dt: 1.0 / 120.0,
-            bounds: b,
-            rng: &mut rng,
-            sounds: &mut sounds,
-            calm: false,
-        };
+        let mut ctx = base_ctx(
+            1.0 + FIRST_WANDER_TIME + 0.1,
+            &mut rng,
+            &mut sounds,
+            &mut cursor_commands,
+        );
         assert!(task.run(&mut goose, &mut ctx));
+    }
+
+    #[test]
+    fn nab_finishes_without_cursor_capability() {
+        let mut rng = SplitMix64::seed(10);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = NabMouseTask::new();
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.pointer = Pointer {
+            pos: goose.rig.beak_tip,
+            present: true,
+            left_down: false,
+        };
+        ctx.mouse_steal.enabled = true;
+        ctx.mouse_steal.warp_supported = false;
+
+        assert!(task.run(&mut goose, &mut ctx));
+        assert!(ctx.cursor_commands.is_empty());
+        assert!(ctx.sounds.is_empty());
+    }
+
+    #[test]
+    fn nab_seeks_live_pointer_at_charge_speed() {
+        let mut rng = SplitMix64::seed(11);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = NabMouseTask::new();
+        let pointer = Vec2::new(700.0, 500.0);
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.pointer = Pointer {
+            pos: pointer,
+            present: true,
+            left_down: false,
+        };
+        ctx.mouse_steal = MouseStealOptions::with_backend_support(true);
+
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(goose.target_pos, pointer);
+        assert_eq!(goose.current_speed, goose.parameters.charge_speed);
+        assert_eq!(
+            goose.current_acceleration,
+            goose.parameters.acceleration_charged
+        );
+        assert!(ctx.cursor_commands.is_empty(), "not grabbed yet");
+    }
+
+    #[test]
+    fn nab_grabs_with_one_bite_and_cursor_warp() {
+        let mut rng = SplitMix64::seed(12);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = NabMouseTask::new();
+        let pointer = goose.rig.beak_tip + Vec2::new(3.0, 0.0);
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.pointer = Pointer {
+            pos: pointer,
+            present: true,
+            left_down: false,
+        };
+        ctx.mouse_steal = MouseStealOptions::with_backend_support(true);
+
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(&*ctx.sounds, &[Sound::Bite]);
+        assert_eq!(&*ctx.cursor_commands, &[CursorCommand::WarpTo(pointer)]);
+
+        ctx.sounds.clear();
+        ctx.cursor_commands.clear();
+        ctx.now = 0.5;
+        ctx.pointer.pos = pointer;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert!(
+            ctx.sounds.is_empty(),
+            "the bite sound should play only when the cursor is first grabbed"
+        );
+        assert_eq!(ctx.cursor_commands.len(), 1);
+    }
+
+    #[test]
+    fn nab_drag_preserves_beak_cursor_offset_and_times_out() {
+        let mut rng = SplitMix64::seed(13);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = NabMouseTask::new();
+        let offset = Vec2::new(9.0, -4.0);
+        let pointer = goose.rig.beak_tip + offset;
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.pointer = Pointer {
+            pos: pointer,
+            present: true,
+            left_down: false,
+        };
+        ctx.mouse_steal = MouseStealOptions::with_backend_support(true);
+
+        task.run(&mut goose, &mut ctx);
+        ctx.cursor_commands.clear();
+        ctx.sounds.clear();
+
+        goose.rig.beak_tip = goose.rig.beak_tip + Vec2::new(25.0, 10.0);
+        let expected = goose.rig.beak_tip + offset;
+        ctx.pointer.pos = expected;
+        ctx.now = 0.25;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(&*ctx.cursor_commands, &[CursorCommand::WarpTo(expected)]);
+
+        ctx.cursor_commands.clear();
+        ctx.pointer.pos = expected;
+        ctx.now = ctx.mouse_steal.succ_time + 0.01;
+        assert!(task.run(&mut goose, &mut ctx), "nab ends after succ_time");
+    }
+
+    #[test]
+    fn nab_drag_retargets_like_hyper_when_it_arrives() {
+        let mut rng = SplitMix64::seed(15);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = NabMouseTask::new();
+        let offset = Vec2::new(6.0, 2.0);
+        let pointer = goose.rig.beak_tip + offset;
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.pointer = Pointer {
+            pos: pointer,
+            present: true,
+            left_down: false,
+        };
+        ctx.mouse_steal = MouseStealOptions::with_backend_support(true);
+
+        assert!(!task.run(&mut goose, &mut ctx));
+        let first_target = match task.state {
+            NabState::DraggingMouseAway { target, .. } => target,
+            NabState::SeekingMouse => panic!("nab should be dragging after the grab"),
+        };
+
+        ctx.cursor_commands.clear();
+        ctx.sounds.clear();
+        goose.position = first_target;
+        goose.target_pos = first_target;
+        ctx.pointer.pos = goose.rig.beak_tip + offset;
+        ctx.now = 0.25;
+
+        assert!(!task.run(&mut goose, &mut ctx));
+        let second_target = match task.state {
+            NabState::DraggingMouseAway { target, .. } => target,
+            NabState::SeekingMouse => panic!("nab should still be dragging after retarget"),
+        };
+        assert_ne!(
+            second_target, first_target,
+            "dragging should retarget like hyper instead of pulling in one straight line"
+        );
+        assert_eq!(goose.target_pos, second_target);
+        assert_eq!(
+            &*ctx.cursor_commands,
+            &[CursorCommand::WarpTo(goose.rig.beak_tip + offset)]
+        );
+    }
+
+    #[test]
+    fn nab_drops_when_cursor_is_pulled_far_away() {
+        let mut rng = SplitMix64::seed(14);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = NabMouseTask::new();
+        let pointer = goose.rig.beak_tip;
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.pointer = Pointer {
+            pos: pointer,
+            present: true,
+            left_down: false,
+        };
+        ctx.mouse_steal = MouseStealOptions::with_backend_support(true);
+
+        task.run(&mut goose, &mut ctx);
+        ctx.cursor_commands.clear();
+        ctx.pointer.pos = pointer + Vec2::new(ctx.mouse_steal.drop_distance + 20.0, 0.0);
+        ctx.now = 0.25;
+
+        assert!(
+            task.run(&mut goose, &mut ctx),
+            "manual pull-away drops the cursor"
+        );
+        assert!(ctx.cursor_commands.is_empty());
     }
 }

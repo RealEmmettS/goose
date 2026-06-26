@@ -1,10 +1,8 @@
 //! honk300 — the binary entry point.
 //!
-//! Round 1's M1+M2 slice: open the Windows overlay and run the fixed-timestep loop so a
-//! procedurally-rendered goose roams the desktop. Three clocks (plan §7.2): the sim ticks
-//! at a fixed 120 Hz via [`Accumulator`], and we present at ~60 Hz, only the goose's
-//! bounding box. The CLI grammar, IPC, config TUI, and the macOS/Linux backends arrive in
-//! later rounds.
+//! Windows desktop runtime for the current honk300 milestone slice: overlay, fixed-step
+//! simulation, sounds, hit-testing, and M7 cursor mischief. The CLI grammar, IPC, config
+//! TUI, and the macOS/Linux backends arrive in later rounds.
 
 #[cfg(windows)]
 mod audio;
@@ -13,11 +11,14 @@ mod audio;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use honk_engine::render::{render_footmarks, render_hearts, render_rig};
     use honk_engine::tiny_skia::{Color, Pixmap};
-    use honk_engine::{Accumulator, Clock, Pointer, Vec2, World};
-    use honk_platform_windows::{pointer_state, Overlay};
+    use honk_engine::{
+        Accumulator, Clock, CursorCommand, MouseStealOptions, Pointer, Vec2, World, WorldOptions,
+    };
+    use honk_platform_windows::{pointer_state, warp_cursor, Overlay};
 
     // `--no-sound` / `--silent` runs the goose mute (the original's SilenceSounds).
     let no_sound = std::env::args().any(|a| a == "--no-sound" || a == "--silent");
+    let no_mouse_steal = std::env::args().any(|a| a == "--no-mouse-steal");
     let mut audio = if no_sound { None } else { audio::Audio::new() };
 
     let mut overlay = Overlay::new()?;
@@ -29,7 +30,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let width = bounds.width().ceil().max(1.0) as u32;
     let height = bounds.height().ceil().max(1.0) as u32;
 
-    let mut world = World::new(bounds, seed_from_clock());
+    let mut world = World::with_options(
+        bounds,
+        seed_from_clock(),
+        WorldOptions {
+            mouse_steal: MouseStealOptions {
+                enabled: !no_mouse_steal,
+                warp_supported: !no_mouse_steal,
+                ..MouseStealOptions::default()
+            },
+        },
+    );
     let mut canvas = Pixmap::new(width, height).ok_or("could not allocate the overlay canvas")?;
     let mut accumulator = Accumulator::new();
     let clock = Clock::start();
@@ -37,6 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut last_present = f32::NEG_INFINITY;
     // Fullscreen present is heavier than a tiny window, so cap it a little lower.
     const PRESENT_INTERVAL: f32 = 1.0 / 40.0;
+    let mut warned_cursor_warp = false;
 
     println!("honk300: a goose is loose on your desktop. Press Ctrl+C here to send it home.");
 
@@ -48,19 +60,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let now = clock.elapsed_secs();
         let dt = now - last;
         last = now;
-        for _ in 0..accumulator.pump(dt) {
-            world.tick();
-        }
 
-        // Feed the cursor for hit-testing: hover-sweeps pat the goose (hearts + calm),
-        // a left-click on it sends it hyper (plan §5.9 / §6). The overlay origin is the
-        // monitor's top-left, so desktop cursor coordinates are world coordinates.
+        // Feed the cursor before ticking: tasks such as nab_mouse chase the newest pointer
+        // sample, then emit platform-free cursor commands for the backend to apply below.
         let (mx, my, left_down) = pointer_state();
         world.set_pointer(Pointer {
             pos: Vec2::new(mx, my),
             present: true,
             left_down,
         });
+
+        for _ in 0..accumulator.pump(dt) {
+            world.tick();
+        }
+
+        // Apply at most the newest warp request. If the OS/session rejects cursor warping,
+        // degrade honestly and stop registering further mouse-steal behavior.
+        if let Some(CursorCommand::WarpTo(pos)) = world.take_cursor_commands().last().copied() {
+            if let Err(err) = warp_cursor(pos) {
+                world.set_cursor_warp_supported(false);
+                if !warned_cursor_warp {
+                    warned_cursor_warp = true;
+                    eprintln!("honk300: cursor warp unavailable; disabling mouse stealing ({err})");
+                }
+            }
+        }
 
         // Drain and play any sounds the sim requested this frame (silently dropped if muted).
         let sounds = world.take_sounds();

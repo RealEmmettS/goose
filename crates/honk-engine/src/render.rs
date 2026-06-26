@@ -1,17 +1,16 @@
 //! Clean-room procedural renderer: a [`Rig`] (and its footmarks) → a `tiny_skia::Pixmap`.
 //!
 //! Reproduces the *technique* of the original (`GooseRenderData`) and is tuned against
-//! direct observation of the running goose: a soft rounded **blob** built from overlapping
-//! white stadium/capsule forms (under-body, body, neck, head) with a thin grey outline, a
-//! short rounded **orange beak**, a small dark eye, orange webbed feet, and a **stippled**
-//! ground shadow. Drawn back-to-front. Platform-free and offscreen — the same routine
+//! direct observation of the running goose and local preview iteration: a compact rounded
+//! white body, tucked head, thin grey outline, short **orange beak**, small dark eye, tiny
+//! orange feet, and a soft ground shadow. Drawn back-to-front. Platform-free and offscreen
+//! — the same routine
 //! feeds the overlay and the golden-frame tests.
 //!
-//! Overlap trick: each white form is drawn as [outline-disc-then-white]; where forms
-//! overlap, the front form's white covers the back form's outline, leaving only the outer
-//! silhouette outlined — the same single-outline blob the original shows. World→pixmap is
-//! a translation by `origin`. Colours are the verified defaults (`#ffffff` / `#ffa500` /
-//! `#d3d3d3`); eye/shadow/mud tones are clean-room render details.
+//! Overlap trick: each white form is drawn as [outline-then-white]; where forms overlap,
+//! the front form's white covers the back form's outline, leaving only the outer silhouette
+//! outlined. World->pixmap is a translation by `origin`. Colours are the verified defaults
+//! (`#ffffff` / `#ffa500` / `#d3d3d3`); eye/shadow/mud tones are clean-room render details.
 
 use crate::footmarks::FootMarks;
 use crate::math::Vec2;
@@ -20,13 +19,13 @@ use tiny_skia::{Color, FillRule, LineCap, Paint, PathBuilder, Pixmap, Stroke, Tr
 
 const WHITE: (u8, u8, u8) = (0xff, 0xff, 0xff);
 const ORANGE: (u8, u8, u8) = (0xff, 0xa5, 0x00);
+const ORANGE_DARK: (u8, u8, u8) = (0xd8, 0x78, 0x00);
 const OUTLINE: (u8, u8, u8) = (0xd3, 0xd3, 0xd3);
 const EYE: (u8, u8, u8) = (0x1a, 0x1a, 0x1a);
 const MUD: (u8, u8, u8) = (0x5a, 0x40, 0x28);
 
 /// Extra radius drawn underneath each white part to give it a `#d3d3d3` outline.
 const OUTLINE_WIDTH: f32 = 1.6;
-
 fn paint(rgb: (u8, u8, u8), alpha: u8) -> Paint<'static> {
     let mut p = Paint::default();
     p.set_color_rgba8(rgb.0, rgb.1, rgb.2, alpha);
@@ -34,26 +33,46 @@ fn paint(rgb: (u8, u8, u8), alpha: u8) -> Paint<'static> {
     p
 }
 
-/// Stroke a round-capped capsule from `a` to `b` (pixmap space) of the given radius.
+fn local(origin: Vec2, fwd: Vec2, across: Vec2, x: f32, y: f32) -> Vec2 {
+    origin + fwd * x + across * y
+}
+
+fn cubic_to(pb: &mut PathBuilder, p1: Vec2, p2: Vec2, p3: Vec2) {
+    pb.cubic_to(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+}
+
+fn fill_path(pixmap: &mut Pixmap, path: tiny_skia::Path, p: &Paint) {
+    pixmap.fill_path(&path, p, FillRule::Winding, Transform::identity(), None);
+}
+
+fn stroke_path(pixmap: &mut Pixmap, path: &tiny_skia::Path, p: &Paint, width: f32) {
+    let stroke = Stroke {
+        width,
+        line_cap: LineCap::Round,
+        ..Stroke::default()
+    };
+    pixmap.stroke_path(path, p, &stroke, Transform::identity(), None);
+}
+
 fn capsule(pixmap: &mut Pixmap, a: Vec2, b: Vec2, radius: f32, p: &Paint) {
     let mut pb = PathBuilder::new();
     pb.move_to(a.x, a.y);
     pb.line_to(b.x, b.y);
     if let Some(path) = pb.finish() {
-        let stroke = Stroke {
-            width: radius * 2.0,
-            line_cap: LineCap::Round,
-            ..Stroke::default()
-        };
-        pixmap.stroke_path(&path, p, &stroke, Transform::identity(), None);
+        stroke_path(pixmap, &path, p, radius * 2.0);
     }
 }
 
-/// A white capsule with a `#d3d3d3` outline underneath (internal outlines are covered by
-/// overlapping white forms, leaving only the outer silhouette).
 fn white_capsule(pixmap: &mut Pixmap, a: Vec2, b: Vec2, radius: f32) {
     capsule(pixmap, a, b, radius + OUTLINE_WIDTH, &paint(OUTLINE, 255));
     capsule(pixmap, a, b, radius, &paint(WHITE, 255));
+}
+
+fn white_shape(pixmap: &mut Pixmap, pb: PathBuilder) {
+    if let Some(path) = pb.finish() {
+        stroke_path(pixmap, &path, &paint(OUTLINE, 255), OUTLINE_WIDTH * 2.0);
+        fill_path(pixmap, path, &paint(WHITE, 255));
+    }
 }
 
 /// Fill a circle at `c` (pixmap space).
@@ -75,31 +94,59 @@ fn triangle(pixmap: &mut Pixmap, a: Vec2, b: Vec2, c: Vec2, p: &Paint) {
     }
 }
 
-/// A stippled (dotted) elliptical ground shadow, matching the original's dither-brush look.
+/// Dotted elliptical ground shadow, matching the original's dithered shadow brush.
 fn stipple_shadow(pixmap: &mut Pixmap, ground: Vec2) {
-    let rx = rig::BODY_RADIUS * 0.95;
-    let ry = rx * 0.32;
-    let dot = paint((0x20, 0x20, 0x20), 70);
+    let rx = rig::BODY_RADIUS * 1.12;
+    let ry = rx * 0.25;
+    let dot = paint((0x20, 0x20, 0x20), 42);
     let step = 3.0;
     let mut dy = -ry;
     while dy <= ry {
-        let mut dx = -rx;
-        // Offset alternate rows for a denser dither.
         let row_off = if ((dy / step) as i32) % 2 == 0 {
             0.0
         } else {
             step * 0.5
         };
+        let mut dx = -rx;
         while dx <= rx {
             let nx = (dx + row_off) / rx;
             let ny = dy / ry;
             if nx * nx + ny * ny <= 1.0 {
-                disc(pixmap, ground + Vec2::new(dx + row_off, dy), 0.95, &dot);
+                disc(pixmap, ground + Vec2::new(dx + row_off, dy), 0.85, &dot);
             }
             dx += step;
         }
         dy += step;
     }
+}
+
+fn original_foot(pixmap: &mut Pixmap, foot: Vec2, fwd: Vec2, across: Vec2) {
+    let p = |x, y| local(foot, fwd, across, x, y);
+    let mut web = PathBuilder::new();
+    let heel = p(-2.2, 0.0);
+    web.move_to(heel.x, heel.y);
+    web.line_to(p(3.2, -3.3).x, p(3.2, -3.3).y);
+    web.line_to(p(8.2, -0.8).x, p(8.2, -0.8).y);
+    web.line_to(p(5.3, 3.4).x, p(5.3, 3.4).y);
+    web.line_to(p(1.4, 2.1).x, p(1.4, 2.1).y);
+    web.line_to(heel.x, heel.y);
+    web.close();
+    if let Some(path) = web.finish() {
+        fill_path(pixmap, path, &paint(ORANGE, 255));
+    }
+}
+
+fn original_body(pixmap: &mut Pixmap, center: Vec2, fwd: Vec2, across: Vec2) {
+    let p = |x, y| local(center, fwd, across, x, y);
+    let mut body = PathBuilder::new();
+    let start = p(-36.0, 0.0);
+    body.move_to(start.x, start.y);
+    cubic_to(&mut body, p(-36.0, -12.0), p(-20.0, -20.0), p(2.0, -19.0));
+    cubic_to(&mut body, p(20.0, -18.0), p(30.0, -8.0), p(29.0, 2.0));
+    cubic_to(&mut body, p(28.0, 13.0), p(15.0, 20.0), p(-5.0, 20.0));
+    cubic_to(&mut body, p(-27.0, 20.0), p(-38.0, 12.0), start);
+    body.close();
+    white_shape(pixmap, body);
 }
 
 /// Render the muddy footprints into `pixmap` (call before the goose so it sits on top).
@@ -146,42 +193,74 @@ pub fn render_rig(pixmap: &mut Pixmap, rig: &Rig, origin: Vec2) {
 
     stipple_shadow(pixmap, t(rig.ground));
 
-    // Body blob: belly behind, main body on top (both white stadiums).
-    let ub = t(rig.underbody_center);
-    white_capsule(
-        pixmap,
-        ub - fwd * (rig::UNDERBODY_LENGTH * 0.5),
-        ub + fwd * (rig::UNDERBODY_LENGTH * 0.5),
-        rig::UNDERBODY_RADIUS,
-    );
-    let bc = t(rig.body_center);
-    white_capsule(
-        pixmap,
-        bc - fwd * (rig::BODY_LENGTH * 0.5),
-        bc + fwd * (rig::BODY_LENGTH * 0.5),
-        rig::BODY_RADIUS,
-    );
+    let drawn_feet = [
+        t(rig.feet.left) + across * 1.8,
+        t(rig.feet.right) + across * 1.8,
+    ];
 
-    // Neck (thinner) → head (a rounded stadium ending at the snout). When tucked these sit
-    // inside/atop the body and merge into the blob; raising the neck lifts the head out.
+    let neck_base = t(rig.neck_base);
     let neck_head = t(rig.neck_head);
     let snout = t(rig.snout_center);
-    white_capsule(pixmap, t(rig.neck_base), neck_head, rig::NECC_RADIUS * 0.82);
-    white_capsule(pixmap, neck_head, snout, rig::HEAD_RADIUS_2 + 2.0);
 
-    // Beak: a short, rounded orange stub forward of the snout.
-    capsule(pixmap, snout, t(rig.beak_tip), 5.0, &paint(ORANGE, 255));
+    // Put the neck under the body/head so the joints do not read as exposed construction
+    // circles. The original's charm is a compact silhouette with only soft interior hints.
+    white_capsule(pixmap, neck_base, neck_head, rig::NECC_RADIUS * 0.50);
 
-    // Eye: a small dark disc on the upper-front of the head.
-    disc(pixmap, t(rig.eye), rig::EYE_RADIUS + 0.6, &paint(EYE, 255));
+    // Original-style compact body: one cohesive silhouette instead of stacked capsules.
+    let bc = t(rig.body_center);
+    original_body(pixmap, bc, fwd, across);
+    white_capsule(
+        pixmap,
+        neck_head - fwd * 2.4,
+        snout - fwd * 1.7,
+        rig::HEAD_RADIUS_2 + 0.2,
+    );
 
-    // Feet: orange webbed triangles pointing forward (drawn last, at the bottom-front).
-    for foot in [t(rig.feet.left), t(rig.feet.right)] {
-        let heel = foot - fwd * 2.0;
-        let toe_a = foot + fwd * 5.0 + across * 3.5;
-        let toe_b = foot + fwd * 5.0 - across * 3.5;
-        triangle(pixmap, heel, toe_a, toe_b, &paint(ORANGE, 255));
+    // Tiny orange feet, as in the original desktop goose.
+    for foot in drawn_feet {
+        original_foot(pixmap, foot, fwd, across);
     }
+
+    // Beak: short rounded orange wedge.
+    let beak_base = snout - fwd * 0.6;
+    let beak_tip = t(rig.beak_tip) - fwd * 0.8;
+    let mut beak = PathBuilder::new();
+    let b0 = beak_base - across * 3.5;
+    beak.move_to(b0.x, b0.y);
+    cubic_to(
+        &mut beak,
+        beak_base + fwd * 4.4 - across * 4.3,
+        beak_tip - fwd * 1.0 - across * 2.4,
+        beak_tip,
+    );
+    cubic_to(
+        &mut beak,
+        beak_tip - fwd * 1.0 + across * 2.8,
+        beak_base + fwd * 4.4 + across * 4.0,
+        beak_base + across * 3.5,
+    );
+    beak.close();
+    if let Some(path) = beak.finish() {
+        stroke_path(pixmap, &path, &paint(ORANGE_DARK, 230), 1.3);
+        fill_path(pixmap, path, &paint(ORANGE, 255));
+    }
+
+    disc(
+        pixmap,
+        beak_base + fwd * 4.2 - across * 1.8,
+        0.75,
+        &paint(ORANGE_DARK, 150),
+    );
+
+    // Eye: the original reads as a tiny dark dot, not a ringed cartoon eye.
+    let eye = t(rig.eye);
+    disc(pixmap, eye, rig::EYE_RADIUS * 0.92, &paint(EYE, 255));
+    disc(
+        pixmap,
+        eye - fwd * 0.25 - across * 0.25,
+        0.35,
+        &paint(WHITE, 230),
+    );
 }
 
 /// Convenience for tests/tools: allocate a `width`×`height` transparent pixmap and render

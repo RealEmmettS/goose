@@ -4,14 +4,48 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: implementation in progress (M0–M2).** The goose now renders and walks
-> on a Windows overlay; there is no release yet. The entries below track planning and build
-> work. A plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and
-> must stay in lockstep (see `CLAUDE.md` → "Changelog rule").
+> **Project stage: implementation in progress.** Milestones M0-M7 are complete and M8 is
+> active. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, and can
+> perform bounded cursor-nab mischief on Windows; there is no release yet. A plain-English companion lives in
+> [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
 
 ### Added
+- **Cursor mischief: warp + nab sub-states (milestone M7, complete)** — the goose can now steal
+  the real cursor on Windows in a bounded, recoverable way. `honk-engine` remains platform-free:
+  it owns `CursorCommand::WarpTo(Vec2)`, `MouseStealOptions`, `WorldOptions`, and the
+  `NabMouseTask` state machine; platform backends drain cursor commands after each fixed-tick
+  update. `TaskCtx` now carries the current platform-neutral pointer plus a cursor-command
+  queue, so tasks can request cursor motion without importing Win32/CoreGraphics/X11/Wayland
+  APIs. `NabMouseTask` is randomly pickable only when mouse stealing is enabled and the backend
+  reports cursor-warp support. A click on the goose also starts `NabMouseTask` when supported;
+  when mouse stealing is disabled or unsupported, the older M6 click-to-hyper burst remains the
+  fallback. The nab lifecycle seeks the live pointer at charge speed, bites once when the beak
+  reaches `grab_distance`, captures the beak-to-cursor offset, then runs a bounded HYPR-style
+  retargeting burst while keeping the cursor anchored to the beak until `succ_time` or a
+  pull-away/drop threshold ends the grab. While nab owns the cursor, M6 pat/click handling is
+  suppressed so synthetic cursor movement does not spawn hearts or interrupt into `HyperTask`.
+  The Windows backend now exposes a cursor-warp wrapper, applies only the newest warp command
+  after ticking, warns once if warping fails, marks cursor warp unavailable on failure, and the
+  binary adds `--no-mouse-steal` as an opt-out. M7 added regression coverage for disabled and
+  unsupported paths, click-to-nab, fallback click-to-hyper, seek/grab/drag/drop/timeout, one bite
+  sound, drag-offset preservation, HYPR-style retargeting, deterministic command draining, and
+  M6 interaction suppression during nab. The full local gate and release build passed before M7
+  was moved to Done.
+- **M7.0/M7.1/M7.2 completion work** — M7 now includes the completed-milestone audit, the
+  mandatory cross-platform `honk-engine` readiness pass, and the renderer/runtime architecture
+  spike. The M7.0 audit rechecked M0-M6 against `honk300_plan.md`, fixed stale status docs, and
+  created follow-up `#p4d` for fullscreen overlay present-cost measurement. The M7.1 readiness
+  pass confirmed the engine stayed platform-free and that current target coverage still respects
+  Windows x64/ARM64, macOS Intel/Apple Silicon, Linux x64/ARM GNU, and Linux x64/ARM musl
+  expectations. The M7.2 spike selected a future custom CPU sprite/atlas renderer and split that
+  implementation into backlog task `#r2v`.
+- **Architecture decision records** — added `docs/adr/` with ADR 0001, recording the accepted M7
+  cursor-mischief contract, Windows runtime behavior, cross-platform guardrails, renderer
+  direction, consequences, verification, and follow-up tasks. `AGENTS.md` and `CLAUDE.md` now
+  include ADR maintenance rules so future architecture changes update ADRs, task memory, docs,
+  and both changelogs together.
 - **Hit-testing: pat (hover-streak + hearts) + click→hyper (milestone M6)** — the goose
   reacts to the cursor. Two distinct interactions (plan §5.9 / §6), built on a new per-frame
   pointer feed (`World::set_pointer` taking a platform-free `interaction::Pointer`; the
@@ -52,16 +86,18 @@ All notable changes to this project are documented here. Format based on
   a dirty-rect optimization (`UpdateLayeredWindowIndirect` + `prcDirty`) is a future perf task.
 
 ### Improved
-- **Goose look reworked to match the real original — from direct observation.** The published
-  modding API documents the rig *model* but not the `updateRig`/`Render` maths (closed binary;
-  not decompiled, per the clean-room rule), so the goose was re-grounded by **running the
-  original Desktop Goose and observing it**: the real procedural goose is a soft rounded
-  **blob** of overlapping white capsule forms with the head **tucked into the front-top of the
-  body** (short neck, raised by the neck-lerp), a short **rounded orange beak**, a small dark
-  eye, orange webbed feet, a thin `#d3d3d3` outline, and a **stippled** ground shadow (the
-  original's dither `shadowBrush`). The earlier tall-necked silhouette (drawn from the stylized
-  donate-page illustration) was corrected. Renderer reworked accordingly (`render.rs`,
-  `rig.rs`); golden frames re-blessed.
+- **Goose look reworked toward the real original — from direct observation and review.** The
+  published modding API documents the rig *model* but not the `updateRig`/`Render` maths (closed
+  binary; not decompiled, per the clean-room rule), so the goose was re-grounded by running the
+  original Desktop Goose and capturing a local reference screenshot, then iterating against
+  golden-frame previews and visual-smoke captures. A generated-sprite-style wing-panel/tall-neck
+  pass was saved only as a local visual backup and rejected because it drifted from the original's
+  charm. The accepted M7 renderer now uses a deliberate single Bezier body silhouette instead of
+  stacked capsules, a flatter/thinner oval body closer to the original side-profile mass, the
+  neck drawn under the body/head to hide construction seams, a small plain eye instead of a
+  ringed cartoon eye, a short rounded orange beak, fuller tiny orange feet, a subtle dotted
+  ground shadow, and updated golden frames for rest/reaching/mid-stride. This remains a
+  clean-room procedural renderer; Renderer V2 owns the future atlas-based art pipeline.
 - **Windows overlay + walking goose (milestones M1 + M2)** — `honk300` now renders the
   procedural goose on a transparent, always-on-top, click-through-where-transparent overlay
   and walks it around the desktop.
@@ -75,7 +111,9 @@ All notable changes to this project are documented here. Format based on
     Windows layered window). The small window is repositioned every frame, so it *is* the
     dirty rect — present cost stays proportional to the goose, not the screen. `WS_EX_LAYERED`
     **without** `WS_EX_TRANSPARENT` gives natural per-pixel-alpha click-through (opaque goose
-    clickable, transparent margins fall through).
+    clickable, transparent margins fall through). This presenter shape was superseded by the
+    M3 fullscreen primary-monitor overlay so mud/heart/world-space props can render in-place;
+    the M7.0 audit tracks dirty-rect/per-monitor optimization as follow-up work.
   - **Renderer reworked to the original's technique:** capsule body / neck / two-segment
     head, an orange beak and webbed feet, a grey outline, and a ground shadow — tuned to
     resemble the real side-profile goose, animated by the neck-lerp + gait + body bob.
@@ -129,6 +167,11 @@ All notable changes to this project are documented here. Format based on
 - `CLAUDE.md` — repository guidance for future Claude Code sessions.
 
 ### Changed
+- M7 is now Done, M8 is now Active, and Renderer V2 is tracked separately as backlog task `#r2v`
+  instead of remaining an unfinished M7 subtask. The M7 rich task record now preserves the audit,
+  readiness pass, renderer spike, verification, visual acceptance, and follow-up split.
+- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M7 complete, M8 active, and
+  the new ADR location/maintenance rules.
 - `claude_plan.md` and `codex_plan.md` are now **superseded reference drafts**; `honk300_plan.md`
   is canonical. The "Read these first" pointers in **both** `CLAUDE.md` and its Codex twin
   `AGENTS.md` were updated in lockstep (canonical plan, milestone range M0–M19, workspace
@@ -138,6 +181,11 @@ All notable changes to this project are documented here. Format based on
   TUI, new autonomous behaviors, no external mods / no tray, all-OS/all-arch builds).
 
 ### Decided
+- **Renderer V2 direction:** use a custom CPU sprite/atlas blitter that outputs premultiplied
+  pixels for each platform backend. Keep `tiny-skia`/`resvg` for vector effects or
+  asset-rasterization helpers, but do not make Vello/wgpu, Skia, Bevy, Macroquad, or ggez the
+  main runtime renderer for the desktop-pet overlay. Future atlas metadata should include stable
+  anchors, beak/cursor attach points, hit masks, frame bounds, and animation tags.
 - **Three invocation names** (`honk300` / `honk` / `goose`) with a finite, deterministic
   "goose-speak" grammar (e.g. `goose plz` to start, `honk bad` / `goose no honk` to stop,
   `goose do honk` to poke, `<name> config`, `<name> help`) — a fixed phrase map, **not** runtime
@@ -172,6 +220,7 @@ All notable changes to this project are documented here. Format based on
   `crates-publish.yml` intentionally dropped from the family pipeline.
 
 ### Notes
-- No `Cargo.toml` / `src/` exists yet — implementation is a later round (starts at plan
-  milestone M0). `DESKTOP-GOOSE/` is **reference-only** and contains third-party
-  copyrighted assets that are not for redistribution.
+- There is still no public release or installer artifact. The workspace now builds locally, but
+  release packaging remains a later milestone. `DESKTOP-GOOSE/` remains the reference copy of the
+  original app and contains third-party copyrighted assets; handle redistribution according to the
+  current project asset policy before any public release.

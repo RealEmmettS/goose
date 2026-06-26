@@ -5,6 +5,7 @@
 //! [`Deck`](crate::rng::Deck). Tasks set targets/params; [`crate::locomotion`] moves the
 //! goose; the gait + footmark logic here is mechanical.
 
+use crate::cursor::{CursorCommand, WorldOptions};
 use crate::hearts::Hearts;
 use crate::interaction::{PatTracker, Pointer};
 use crate::locomotion;
@@ -12,7 +13,7 @@ use crate::math::{Rect, Vec2};
 use crate::rig::Rig;
 use crate::rng::{Deck, RandomSource, SplitMix64};
 use crate::sound::Sound;
-use crate::task::{FirstUxTask, HyperTask, Task, TaskCtx, WanderTask};
+use crate::task::{FirstUxTask, HyperTask, NabMouseTask, Task, TaskCtx, WanderTask};
 use crate::time::DT;
 
 /// Distance travelled per full walking-gait cycle (radians of `gait_phase` per `TAU`).
@@ -33,6 +34,10 @@ pub struct World {
     last_step: i64,
     /// Sound requests produced this tick, drained by the platform audio backend.
     pending_sounds: Vec<Sound>,
+    /// Cursor requests produced this tick, drained by the platform backend.
+    pending_cursor_commands: Vec<CursorCommand>,
+    /// Runtime options/capabilities that must stay platform-free.
+    options: WorldOptions,
     /// Detects pats from hovering cursor sweeps and tracks the happy/calm streak (M6 §5.9).
     pat: PatTracker,
     /// Heart particles emitted while being patted.
@@ -43,6 +48,9 @@ pub struct World {
     prev_left_down: bool,
     /// A click landed on the goose; the next tick installs the hyper burst.
     pending_hyper: bool,
+    /// A click landed on the goose while mouse stealing is available; the next tick installs
+    /// the nab task.
+    pending_nab: bool,
     /// The task that was running before a transient interrupt (hyper), restored when it ends.
     interrupted: Option<Box<dyn Task>>,
 }
@@ -53,6 +61,11 @@ impl World {
     /// A world bounded by `bounds`, with the goose entering from just off the bottom edge
     /// for the FirstUX intro. `seed` makes the whole simulation deterministic.
     pub fn new(bounds: Rect, seed: u64) -> Self {
+        Self::with_options(bounds, seed, WorldOptions::default())
+    }
+
+    /// Build a world with explicit runtime options/capabilities.
+    pub fn with_options(bounds: Rect, seed: u64, options: WorldOptions) -> Self {
         let center = (bounds.min + bounds.max) * 0.5;
         let mut goose = GooseEntity::new();
         // Enter from just off the bottom edge; FirstUX walks the goose on-stage.
@@ -62,8 +75,11 @@ impl World {
         goose.current_acceleration = goose.parameters.acceleration_normal;
         goose.rig = Rig::update(goose.position, goose.direction, 0.0, 0.0);
 
-        let pickable: Vec<fn() -> Box<dyn Task>> =
+        let mut pickable: Vec<fn() -> Box<dyn Task>> =
             vec![|| Box::new(WanderTask::new()) as Box<dyn Task>];
+        if options.mouse_steal.active() {
+            pickable.push(|| Box::new(NabMouseTask::new()) as Box<dyn Task>);
+        }
         let deck = Deck::new(pickable.len(), SplitMix64::seed(seed ^ 0x9E37_79B9));
 
         Self {
@@ -76,11 +92,14 @@ impl World {
             elapsed: 0.0,
             last_step: 0,
             pending_sounds: Vec::new(),
+            pending_cursor_commands: Vec::new(),
+            options,
             pat: PatTracker::new(),
             hearts: Hearts::new(),
             pointer: Pointer::default(),
             prev_left_down: false,
             pending_hyper: false,
+            pending_nab: false,
             interrupted: None,
         }
     }
@@ -93,6 +112,16 @@ impl World {
     /// Take the sound requests produced since the last call (for the audio backend).
     pub fn take_sounds(&mut self) -> Vec<Sound> {
         std::mem::take(&mut self.pending_sounds)
+    }
+
+    /// Take cursor commands emitted since the last call (for the platform backend).
+    pub fn take_cursor_commands(&mut self) -> Vec<CursorCommand> {
+        std::mem::take(&mut self.pending_cursor_commands)
+    }
+
+    /// Reflect a backend capability change after startup, e.g. cursor warp failed.
+    pub fn set_cursor_warp_supported(&mut self, supported: bool) {
+        self.options.mouse_steal.warp_supported = supported;
     }
 
     /// The live heart particles (for the renderer).
@@ -110,9 +139,20 @@ impl World {
         self.goose.rig.bounding_box().contains(point)
     }
 
+    /// Whether the active task is controlling the real cursor.
+    pub fn is_cursor_mischief_active(&self) -> bool {
+        self.current.id() == "nab_mouse"
+    }
+
     /// Feed one frame of pointer state (cursor + buttons, world space). Detects pats
     /// (hover sweeps → hearts + calm) and a click on the goose (→ a hyper burst next tick).
     pub fn set_pointer(&mut self, pointer: Pointer) {
+        if self.is_cursor_mischief_active() {
+            self.pointer = pointer;
+            self.prev_left_down = pointer.left_down;
+            return;
+        }
+
         let hovering = pointer.present && self.goose_hit(pointer.pos);
 
         // Pat = hovering hover-sweeps. Each registered pat spawns a heart above the goose.
@@ -129,7 +169,11 @@ impl World {
         // Click = left-button rising edge while hovering → a hyper burst on the next tick.
         let clicked = hovering && pointer.left_down && !self.prev_left_down;
         if clicked {
-            self.pending_hyper = true;
+            if self.options.mouse_steal.active() {
+                self.pending_nab = true;
+            } else {
+                self.pending_hyper = true;
+            }
         }
 
         self.prev_left_down = pointer.left_down;
@@ -142,6 +186,15 @@ impl World {
             return; // already mid-burst; don't stack
         }
         let prev = std::mem::replace(&mut self.current, Box::new(HyperTask::new()));
+        self.interrupted = Some(prev);
+    }
+
+    /// Interrupt the current task with a cursor nab, saving the prior task to resume later.
+    fn start_nab(&mut self) {
+        if self.current.id() == "nab_mouse" {
+            return; // already stealing the cursor
+        }
+        let prev = std::mem::replace(&mut self.current, Box::new(NabMouseTask::new()));
         self.interrupted = Some(prev);
     }
 
@@ -160,10 +213,22 @@ impl World {
     pub fn tick(&mut self) {
         self.elapsed += DT;
 
-        // A click landed last frame: install the hyper burst, saving the prior task.
-        if self.pending_hyper {
+        // A click landed last frame: when cursor stealing is available it takes precedence
+        // over the older M6 hyper reaction; otherwise fall back to hyper.
+        if self.pending_nab {
+            self.pending_nab = false;
+            if self.options.mouse_steal.active() && !self.is_cursor_mischief_active() {
+                self.pending_hyper = false;
+                self.start_nab();
+            }
+        }
+
+        // Install the hyper burst only when nab did not consume the click.
+        if self.pending_hyper && !self.is_cursor_mischief_active() {
             self.pending_hyper = false;
             self.start_hyper();
+        } else if self.pending_hyper {
+            self.pending_hyper = false;
         }
 
         // Run the current task (it only sets targets/params); pick the next when it's done.
@@ -175,6 +240,9 @@ impl World {
                 bounds: self.bounds,
                 rng: &mut self.rng,
                 sounds: &mut self.pending_sounds,
+                cursor_commands: &mut self.pending_cursor_commands,
+                pointer: self.pointer,
+                mouse_steal: self.options.mouse_steal,
                 calm,
             };
             self.current.run(&mut self.goose, &mut ctx)
@@ -232,6 +300,7 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cursor::MouseStealOptions;
 
     fn bounds() -> Rect {
         Rect {
@@ -377,7 +446,8 @@ mod tests {
         }
         assert_eq!(w.current_task(), "wander");
 
-        // A left-press on the goose: a release/idle baseline frame, then the press edge.
+        // Default engine options do not assume cursor warp support, so click falls back to
+        // the M6 hyper behavior: release/idle baseline frame, then the press edge.
         let anchor = w.goose.rig.body_center;
         w.set_pointer(Pointer {
             pos: anchor,
@@ -400,6 +470,53 @@ mod tests {
             w.current_task(),
             "wander",
             "the hyper burst resumes the prior task"
+        );
+    }
+
+    #[test]
+    fn clicking_the_goose_triggers_nab_when_mouse_steal_is_supported() {
+        let mut w = World::with_options(
+            bounds(),
+            8,
+            WorldOptions {
+                mouse_steal: MouseStealOptions::with_backend_support(true),
+            },
+        );
+        // Warm up into roaming so this verifies a normal user click, not first-run setup.
+        for _ in 0..6_000 {
+            w.tick();
+            if w.current_task() == "wander" {
+                break;
+            }
+        }
+        assert_eq!(w.current_task(), "wander");
+
+        let anchor = w.goose.rig.body_center;
+        w.set_pointer(Pointer {
+            pos: anchor,
+            present: true,
+            left_down: false,
+        });
+        w.set_pointer(Pointer {
+            pos: anchor,
+            present: true,
+            left_down: true,
+        });
+        w.tick();
+
+        assert_eq!(
+            w.current_task(),
+            "nab_mouse",
+            "with cursor warp support, clicking the goose should steal the cursor instead of hyper"
+        );
+        assert!(
+            !w.take_cursor_commands().is_empty(),
+            "click-triggered nab should emit a cursor warp command"
+        );
+        assert_eq!(
+            w.take_sounds(),
+            vec![Sound::Bite],
+            "click-triggered nab bites when it catches the cursor"
         );
     }
 
@@ -440,6 +557,115 @@ mod tests {
         assert!(
             heard,
             "the goose should request sounds (honk/mud) while roaming"
+        );
+    }
+
+    #[test]
+    fn nab_is_pickable_only_when_enabled_and_supported() {
+        let default_world = World::new(bounds(), 1);
+        assert_eq!(
+            default_world.pickable.len(),
+            1,
+            "default engine options do not assume cursor warp support"
+        );
+
+        let disabled = World::with_options(
+            bounds(),
+            1,
+            WorldOptions {
+                mouse_steal: MouseStealOptions {
+                    enabled: false,
+                    warp_supported: true,
+                    ..MouseStealOptions::default()
+                },
+            },
+        );
+        assert_eq!(disabled.pickable.len(), 1);
+
+        let supported = World::with_options(
+            bounds(),
+            1,
+            WorldOptions {
+                mouse_steal: MouseStealOptions::with_backend_support(true),
+            },
+        );
+        assert_eq!(
+            supported.pickable.len(),
+            2,
+            "nab_mouse joins roaming only when the backend can warp the cursor"
+        );
+    }
+
+    #[test]
+    fn cursor_commands_are_queued_and_drained_once() {
+        let mut w = World::with_options(
+            bounds(),
+            9,
+            WorldOptions {
+                mouse_steal: MouseStealOptions::with_backend_support(true),
+            },
+        );
+        w.current = Box::new(NabMouseTask::new());
+        let pointer = w.goose.rig.beak_tip;
+        w.set_pointer(Pointer {
+            pos: pointer,
+            present: true,
+            left_down: false,
+        });
+        w.tick();
+
+        assert_eq!(
+            w.take_sounds(),
+            vec![Sound::Bite],
+            "nab emits the bite sound when it grabs"
+        );
+        assert_eq!(
+            w.take_cursor_commands(),
+            vec![CursorCommand::WarpTo(pointer)],
+            "nab emits a platform-free cursor warp"
+        );
+        assert!(
+            w.take_cursor_commands().is_empty(),
+            "cursor commands drain exactly once"
+        );
+    }
+
+    #[test]
+    fn nab_suppresses_pat_and_click_hyper_interactions() {
+        let mut w = World::with_options(
+            bounds(),
+            10,
+            WorldOptions {
+                mouse_steal: MouseStealOptions::with_backend_support(true),
+            },
+        );
+        w.current = Box::new(NabMouseTask::new());
+
+        let anchor = w.goose.rig.body_center;
+        for i in 0..12 {
+            let dx = if i % 2 == 0 { 6.0 } else { -6.0 };
+            w.set_pointer(Pointer {
+                pos: anchor + Vec2::new(dx, 0.0),
+                present: true,
+                left_down: false,
+            });
+        }
+        assert_eq!(
+            w.hearts().alive_count(w.now()),
+            0,
+            "synthetic cursor movement during nab must not pat the goose"
+        );
+
+        w.set_pointer(Pointer {
+            pos: anchor,
+            present: true,
+            left_down: true,
+        });
+        w.tick();
+        assert_ne!(
+            w.current_task(),
+            "hyper",
+            "click edges during nab must not interrupt into hyper"
         );
     }
 }

@@ -1,15 +1,15 @@
 //! Windows overlay backend for honk300.
 //!
-//! A single **layered popup window**, sized to the goose's bounding box and repositioned
-//! every frame by [`Overlay::present`] (via `UpdateLayeredWindow`'s destination point).
-//! Because `UpdateLayeredWindow` replaces the entire layered surface, a small moving
-//! window IS the dirty-rect optimisation — present cost stays proportional to the goose,
-//! not the screen (mitigates the fullscreen-redraw CPU risk, plan §15 E1).
+//! A single **fullscreen primary-monitor layered popup window** presented via
+//! [`Overlay::present`] and `UpdateLayeredWindow`. The fullscreen surface is the current
+//! M3+ shape so world-space footmarks/hearts render where they belong; per-monitor windows
+//! and tighter dirty-rect presentation remain planned performance work.
 //!
 //! Click-through is natural per-pixel alpha: we set `WS_EX_LAYERED` but **not**
 //! `WS_EX_TRANSPARENT`, so opaque goose pixels receive clicks while transparent margins
 //! fall through (plan §6). tiny-skia produces premultiplied RGBA; we feed
-//! `UpdateLayeredWindow` premultiplied BGRA with `AC_SRC_ALPHA`.
+//! `UpdateLayeredWindow` premultiplied BGRA with `AC_SRC_ALPHA`. M7 also exposes a thin
+//! `SetCursorPos` wrapper for the engine's platform-free cursor commands.
 
 #![cfg(windows)]
 
@@ -28,7 +28,7 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetCursorPos, GetSystemMetrics,
-    PeekMessageW, PostQuitMessage, RegisterClassExW, ShowWindow, TranslateMessage,
+    PeekMessageW, PostQuitMessage, RegisterClassExW, SetCursorPos, ShowWindow, TranslateMessage,
     UpdateLayeredWindow, MSG, PM_REMOVE, SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN,
     SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, ULW_ALPHA,
     WM_DESTROY, WM_QUIT, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
@@ -47,6 +47,11 @@ pub fn pointer_state() -> (f32, f32, bool) {
         let left_down = (GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000) != 0;
         (pt.x as f32, pt.y as f32, left_down)
     }
+}
+
+/// Warp the global cursor to a desktop/world-space coordinate.
+pub fn warp_cursor(pos: Vec2) -> Result<()> {
+    unsafe { SetCursorPos(pos.x.round() as i32, pos.y.round() as i32) }
 }
 
 /// A reusable top-down 32-bpp DIB section we blit the goose into each frame.

@@ -8,9 +8,10 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: planning. There is no application code yet** — no `Cargo.toml`, no `src/`.
-The repo holds the brief, the original app's files as reference, and three planning docs (one
-canonical hybrid plus the two superseded drafts it was synthesized from).
+**Current stage: implementation in progress.** M0-M7 are complete and M8 (foreign-window
+drag + perch & ride) is active. The repo now has a Cargo workspace, a platform-free
+`honk-engine`, a Windows platform crate, the `honk300` binary, the original app's files as
+reference, the canonical planning docs, and ADRs under `docs/adr/`.
 
 ## Read these first (source-of-truth pointers)
 
@@ -31,6 +32,9 @@ canonical hybrid plus the two superseded drafts it was synthesized from).
 - Sibling repos `C:\Users\hey\git\qube-{machine-report,network-diagnostics,workbranch-view}`
   — the conventions to mirror: Cargo layout, `src/install/*`, `src/update.rs`, `build.rs`,
   `.github/workflows/windows-installers.yml`, and the dual-changelog discipline.
+- `docs/adr/` — architecture decision records. Read these when a task touches platform
+  boundaries, renderer architecture, capability traits, packaging targets, or milestone scope.
+  ADR 0001 records the accepted M7 cursor-mischief contract and Renderer V2 direction.
 
 ## Big-picture architecture (original → planned port)
 
@@ -57,6 +61,17 @@ canonical hybrid plus the two superseded drafts it was synthesized from).
 - Packaging: Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) + shell/PowerShell
   installers + macOS `.app`/`.dmg` + Linux `.desktop`. **No crates.io.**
 
+## Architecture decision records
+
+- Add or update ADRs in `docs/adr/` whenever a change affects platform boundaries, the
+  engine/backend contract, renderer architecture, deployment targets, packaging shape,
+  permissions, or milestone scope.
+- Use a new numbered ADR for changed decisions instead of rewriting history. Mark older ADRs
+  as superseded only when a new accepted ADR replaces them.
+- Keep ADRs in sync with `README.md`, this file, `CLAUDE.md`, `.tasks/`, `CHANGELOG.md`, and
+  `HUMAN_CHANGELOG.md` when they change current guidance.
+- M7's accepted decisions live in `docs/adr/0001-m7-cursor-mischief-renderer-and-platform-guardrails.md`.
+
 ## Gotchas (cross-platform overlay / desktop-pet)
 
 - **softbuffer cannot do per-pixel alpha on a Windows layered window** — present via
@@ -73,8 +88,8 @@ canonical hybrid plus the two superseded drafts it was synthesized from).
 
 ## Commands
 
-No build system exists yet. When implementation begins it is a Rust **1.95** cargo workspace
-(edition 2021, the TR300/ND300 family default). The family's local gate:
+This is a Rust **1.95** cargo workspace (edition 2021, the TR300/ND300 family default). The
+family's local gate:
 
 - `cargo fmt --all -- --check`
 - `cargo clippy --all-targets --workspace -- -D warnings`

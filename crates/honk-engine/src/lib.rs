@@ -5,10 +5,10 @@
 //! tiny-skia renderer. It has **no** windowing, OS, audio, or input-device dependency
 //! and is fully headless-testable — `#![forbid(unsafe_code)]` is enforced below.
 //!
-//! Scope is milestone **M0** (see `honk300_plan.md` §14): the data, the constants, the
-//! Deck, and the renderer, all pinned by tests. Locomotion + the 120 Hz accumulator
-//! (M2), the task/AI state machine (M4+), moods, schedule, and every platform backend
-//! arrive in later rounds and build on the types defined here.
+//! Scope through milestone **M7** (see `honk300_plan.md` §14): data/constants, the Deck,
+//! renderer, locomotion, task/AI state machine, pointer interactions, sound/cursor intent
+//! queues, and cursor-mischief task state. Moods, schedule, IPC/config, and the non-Windows
+//! platform backends arrive in later rounds and build on the types defined here.
 //!
 //! Engine constants are ported verbatim from the verified modding-API source
 //! (`GooseModdingAPI/Exports.cs`, `SamEngine.cs`); the `updateRig` placement math and
@@ -21,6 +21,7 @@
 // a specific tiny-skia version themselves.
 pub use tiny_skia;
 
+pub mod cursor;
 pub mod entity;
 pub mod feet;
 pub mod footmarks;
@@ -37,6 +38,7 @@ pub mod time;
 pub mod world;
 
 // A curated surface for downstream crates (the platform backends, the eventual binary).
+pub use cursor::{CursorCommand, MouseStealOptions, WorldOptions};
 pub use entity::{GooseEntity, ParametersTable, SpeedTier};
 pub use feet::Feet;
 pub use footmarks::{FootMark, FootMarks};
@@ -46,6 +48,6 @@ pub use math::{Rect, Vec2};
 pub use rig::Rig;
 pub use rng::{Deck, RandomSource, SplitMix64};
 pub use sound::Sound;
-pub use task::{FirstUxTask, HyperTask, Task, WanderTask};
+pub use task::{FirstUxTask, HyperTask, NabMouseTask, Task, WanderTask};
 pub use time::{Accumulator, Clock, DT, FRAMERATE};
 pub use world::World;
