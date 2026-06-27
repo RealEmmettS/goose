@@ -48,7 +48,9 @@ M7 also exposed two renderer facts:
 - macOS, X11, and Wayland backends must report capabilities honestly.
 - macOS cursor/window mischief will need permission-aware integration, especially Accessibility and a real app bundle.
 - Linux X11 can support more of the original prank model.
-- Native Wayland should degrade explicitly for cursor warping, synthetic input, global key grabs, and foreign-window control.
+- Native Wayland should degrade explicitly for cursor warping, synthetic input, and foreign-window
+  control. Runtime start/stop/configuration control is handled separately by local IPC; see ADR
+  0004.
 - Engine math continues to use signed desktop coordinates so negative monitors, mixed DPI, and future per-monitor overlays remain possible.
 
 ### Renderer Direction

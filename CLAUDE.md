@@ -8,12 +8,13 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M9 are complete and M10 (single-instance
-IPC) is next. The Cargo workspace exists: `honk-engine` (platform-free
+**Current stage: implementation in progress.** M0-M10 are complete and M11 (CLI grammar) is
+next. The Cargo workspace exists: `honk-engine` (platform-free
 core), `honk-platform-windows` (the layered overlay), and the root `honk300` binary — a
 procedurally-rendered goose roams a transparent Windows overlay, leaves mud trails, runs the
 task/FirstUX AI, honks, reacts to pat/click input, can perform bounded cursor nabbing, and can
 perch on a user-dragged foreign window, and can collect Notepad/meme windows on Windows.
+M10 adds single-instance local control for `start`, `stop`, `reload`, and `do <action>` pokes.
 `honk300_plan.md` is the canonical plan (milestones M0–M19); the two superseded drafts remain as
 reference.
 
@@ -40,7 +41,8 @@ reference.
   boundaries, renderer architecture, capability traits, packaging targets, or milestone scope.
   ADR 0001 records the accepted M7 cursor-mischief contract and Renderer V2 direction; ADR 0002
   records the M8 foreign-window watch-and-ride contract; ADR 0003 records the M9 collect-window,
-  asset, and no-donate decisions.
+  asset, and no-donate decisions; ADR 0004 records the M10 CLI/TUI-only control plane, local IPC,
+  and terminal-window protection rule.
 
 ## Big-picture architecture (original → planned port)
 
@@ -69,6 +71,11 @@ reference.
   flag (reduced mischief).
 - Packaging: Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) + shell/PowerShell
   installers + macOS `.app`/`.dmg` + Linux `.desktop`. **No crates.io.**
+- Starting, stopping, and configuration are **CLI/TUI-only over local IPC**. There is no system
+  tray and no global quit key.
+- Terminal windows are protected: the goose may visually overlay them, but must never move,
+  focus, type into, drag, ride, collect, or otherwise manipulate terminal windows, including in
+  spicy/default-off modes.
 
 ## Architecture decision records
 
@@ -82,6 +89,7 @@ reference.
 - M7's accepted decisions live in `docs/adr/0001-m7-cursor-mischief-renderer-and-platform-guardrails.md`.
 - M8's accepted decisions live in `docs/adr/0002-m8-foreign-window-watch-and-ride.md`.
 - M9's accepted decisions live in `docs/adr/0003-m9-collect-window-assets-and-no-donate.md`.
+- M10's accepted decisions live in `docs/adr/0004-m10-cli-tui-control-plane-and-terminal-protection.md`.
 
 ## Gotchas (cross-platform overlay / desktop-pet)
 
@@ -90,8 +98,10 @@ reference.
 - **Click-through vs. clickable** — use per-pixel-alpha natural hit-testing (do *not* set
   `WS_EX_TRANSPARENT`); on X11 set the XShape input region to the goose bbox each frame.
 - **Native Wayland makes the core mischief impossible** (moving other windows, warping the
-  cursor, synthesizing keystrokes, global key grab) — by design. These degrade to no-ops;
+  cursor, synthesizing keystrokes) — by design. These degrade to no-ops;
   document, don't fight.
+- **Terminal windows are never mischief targets.** Backend filters must exclude terminal windows
+  before foreign-window ride, collect-window, or future spicy behavior code can target them.
 - **macOS needs a real `.app` bundle** (stable bundle-id) for a durable Accessibility grant;
   a bare `~/.cargo/bin` binary can't hold one.
 - The original `Deck` shuffle is **biased** (`System.Random`, low-bound 0 / exclusive high).

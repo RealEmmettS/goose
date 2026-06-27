@@ -6,6 +6,7 @@
 //! goose; the gait + footmark logic here is mechanical.
 
 use crate::collect_window::{CollectWindowCommand, CollectWindowKind, CollectWindowSnapshot};
+use crate::command::{PokeAction, PokeOutcome};
 use crate::cursor::{CursorCommand, WorldOptions};
 use crate::foreign_window::ForeignWindowSnapshot;
 use crate::hearts::Hearts;
@@ -88,14 +89,7 @@ impl World {
         goose.current_acceleration = goose.parameters.acceleration_normal;
         goose.rig = Rig::update(goose.position, goose.direction, 0.0, 0.0);
 
-        let mut pickable: Vec<fn() -> Box<dyn Task>> =
-            vec![|| Box::new(WanderTask::new()) as Box<dyn Task>];
-        if options.mouse_steal.active() {
-            pickable.push(|| Box::new(NabMouseTask::new()) as Box<dyn Task>);
-        }
-        if options.collect_window.active() {
-            pickable.push(|| Box::new(CollectWindowTask::new()) as Box<dyn Task>);
-        }
+        let pickable = Self::pickable_for(options);
         let deck = Deck::new(pickable.len(), SplitMix64::seed(seed ^ 0x9E37_79B9));
 
         Self {
@@ -127,6 +121,86 @@ impl World {
     /// The world's monotonic clock (seconds), the time base for footmark fade.
     pub fn now(&self) -> f32 {
         self.elapsed
+    }
+
+    fn pickable_for(options: WorldOptions) -> Vec<fn() -> Box<dyn Task>> {
+        let mut pickable: Vec<fn() -> Box<dyn Task>> =
+            vec![|| Box::new(WanderTask::new()) as Box<dyn Task>];
+        if options.mouse_steal.active() {
+            pickable.push(|| Box::new(NabMouseTask::new()) as Box<dyn Task>);
+        }
+        if options.collect_window.active() {
+            pickable.push(|| Box::new(CollectWindowTask::new()) as Box<dyn Task>);
+        }
+        pickable
+    }
+
+    /// Atomically apply a complete runtime option set from the control plane.
+    pub fn apply_options(&mut self, options: WorldOptions) {
+        self.options = options;
+        self.pickable = Self::pickable_for(options);
+        self.deck = Deck::new(
+            self.pickable.len(),
+            SplitMix64::seed(
+                (self.elapsed.to_bits() as u64)
+                    ^ ((self.pickable.len() as u64) << 32)
+                    ^ 0xA076_1D64_78BD_642F,
+            ),
+        );
+
+        if self.is_cursor_mischief_active() && !options.mouse_steal.active() {
+            self.resume_or_wander();
+        }
+        if self.is_perch_ride_active() && !options.foreign_window.watch_active() {
+            self.dragged_window = None;
+            self.resume_or_wander();
+        }
+        if self.is_collect_window_active() && !options.collect_window.active() {
+            self.abandon_collect_window();
+        }
+    }
+
+    /// Apply a live CLI/TUI poke to the world without exposing OS details to the engine.
+    pub fn poke(&mut self, action: PokeAction) -> PokeOutcome {
+        match action {
+            PokeAction::Honk => {
+                self.pending_sounds.push(Sound::Honk);
+                PokeOutcome::Applied
+            }
+            PokeAction::Mud => {
+                self.goose.track_mud_end_time =
+                    self.elapsed + self.goose.parameters.duration_to_track_mud;
+                PokeOutcome::Applied
+            }
+            PokeAction::Wander => {
+                if self.is_collect_window_active() {
+                    return PokeOutcome::Busy;
+                }
+                self.pending_hyper = false;
+                self.pending_nab = false;
+                self.pending_collect = None;
+                self.interrupted = None;
+                self.current = Box::new(WanderTask::new());
+                PokeOutcome::Applied
+            }
+            PokeAction::Meme => self.poke_collect(CollectWindowKind::Meme),
+            PokeAction::Note => self.poke_collect(CollectWindowKind::Note),
+            PokeAction::Nab => {
+                if !self.options.mouse_steal.active() {
+                    return PokeOutcome::Unsupported;
+                }
+                if self.is_cursor_mischief_active()
+                    || self.is_perch_ride_active()
+                    || self.is_collect_window_active()
+                    || self.interrupted.is_some()
+                {
+                    return PokeOutcome::Busy;
+                }
+                self.pending_hyper = false;
+                self.pending_nab = true;
+                PokeOutcome::Applied
+            }
+        }
     }
 
     /// Take the sound requests produced since the last call (for the audio backend).
@@ -165,7 +239,11 @@ impl World {
         self.options.collect_window.capabilities.set_passthrough = supported;
         self.options.collect_window.capabilities.synthesize_text = supported;
         if !supported {
-            self.collect_window_snapshot = None;
+            if self.is_collect_window_active() {
+                self.abandon_collect_window();
+            } else {
+                self.collect_window_snapshot = None;
+            }
         }
     }
 
@@ -187,6 +265,21 @@ impl World {
         if self.options.collect_window.kind_active(kind) {
             self.pending_collect = Some(kind);
         }
+    }
+
+    fn poke_collect(&mut self, kind: CollectWindowKind) -> PokeOutcome {
+        if !self.options.collect_window.kind_active(kind) {
+            return PokeOutcome::Unsupported;
+        }
+        if self.is_cursor_mischief_active()
+            || self.is_perch_ride_active()
+            || self.is_collect_window_active()
+            || self.interrupted.is_some()
+        {
+            return PokeOutcome::Busy;
+        }
+        self.pending_collect = Some(kind);
+        PokeOutcome::Applied
     }
 
     /// The live heart particles (for the renderer).
@@ -298,6 +391,33 @@ impl World {
         }
         let prev = std::mem::replace(&mut self.current, Box::new(PerchRideTask::new()));
         self.interrupted = Some(prev);
+    }
+
+    fn resume_or_wander(&mut self) {
+        self.current = self
+            .interrupted
+            .take()
+            .unwrap_or_else(|| Box::new(WanderTask::new()));
+    }
+
+    fn abandon_collect_window(&mut self) {
+        if let Some(snapshot) = self
+            .collect_window_snapshot
+            .filter(|snapshot| snapshot.alive)
+        {
+            self.pending_collect_window_commands
+                .push(CollectWindowCommand::SetPassthrough {
+                    id: snapshot.id,
+                    passthrough: false,
+                });
+            if snapshot.kind == CollectWindowKind::Meme {
+                self.pending_collect_window_commands
+                    .push(CollectWindowCommand::Close { id: snapshot.id });
+            }
+        }
+        self.collect_window_snapshot = None;
+        self.pending_collect = None;
+        self.resume_or_wander();
     }
 
     /// The id of the currently running task (e.g. `"first_ux"`, `"wander"`).
@@ -1022,5 +1142,149 @@ mod tests {
         w.set_collect_window_supported(false);
         w.tick();
         assert_eq!(w.current_task(), "wander");
+    }
+
+    #[test]
+    fn poke_honk_queues_sound_without_ticking() {
+        let mut w = World::new(bounds(), 19);
+        assert_eq!(w.poke(PokeAction::Honk), PokeOutcome::Applied);
+        assert_eq!(w.take_sounds(), vec![Sound::Honk]);
+        assert!(w.take_sounds().is_empty());
+    }
+
+    #[test]
+    fn poke_mud_extends_tracking_window() {
+        let mut w = World::new(bounds(), 20);
+        assert!(w.goose.track_mud_end_time < w.now());
+        assert_eq!(w.poke(PokeAction::Mud), PokeOutcome::Applied);
+        assert!(w.goose.track_mud_end_time > w.now());
+    }
+
+    #[test]
+    fn poke_note_uses_collect_window_path() {
+        let mut w = world_with_collect(21);
+        assert_eq!(w.poke(PokeAction::Note), PokeOutcome::Applied);
+        w.tick();
+        assert_eq!(w.current_task(), "collect_window");
+        assert!(matches!(
+            w.take_collect_window_commands().as_slice(),
+            [CollectWindowCommand::Spawn { .. }]
+        ));
+    }
+
+    #[test]
+    fn poke_unsupported_collect_reports_unsupported() {
+        let mut w = World::new(bounds(), 22);
+        assert_eq!(w.poke(PokeAction::Meme), PokeOutcome::Unsupported);
+        w.tick();
+        assert_ne!(w.current_task(), "collect_window");
+    }
+
+    #[test]
+    fn poke_collect_reports_busy_during_collect_window() {
+        let mut w = world_with_collect(23);
+        assert_eq!(w.poke(PokeAction::Meme), PokeOutcome::Applied);
+        w.tick();
+        assert_eq!(w.current_task(), "collect_window");
+        assert_eq!(w.poke(PokeAction::Note), PokeOutcome::Busy);
+    }
+
+    #[test]
+    fn poke_nab_reports_unsupported_without_cursor_capability() {
+        let mut w = World::new(bounds(), 24);
+        assert_eq!(w.poke(PokeAction::Nab), PokeOutcome::Unsupported);
+    }
+
+    #[test]
+    fn poke_nab_starts_on_next_tick_when_supported() {
+        let mut w = World::with_options(
+            bounds(),
+            25,
+            WorldOptions {
+                mouse_steal: MouseStealOptions::with_backend_support(true),
+                ..WorldOptions::default()
+            },
+        );
+        w.current = Box::new(WanderTask::new());
+        let pointer = w.goose.rig.beak_tip;
+        w.set_pointer(Pointer {
+            pos: pointer,
+            present: true,
+            left_down: false,
+        });
+        assert_eq!(w.poke(PokeAction::Nab), PokeOutcome::Applied);
+        w.tick();
+        assert_eq!(w.current_task(), "nab_mouse");
+    }
+
+    #[test]
+    fn apply_options_rebuilds_pickable_tasks() {
+        let mut w = World::new(bounds(), 26);
+        assert_eq!(w.pickable.len(), 1);
+        w.apply_options(WorldOptions {
+            mouse_steal: MouseStealOptions::with_backend_support(true),
+            collect_window: CollectWindowOptions::with_backend_support(
+                CollectWindowCapabilities {
+                    spawn_note: true,
+                    spawn_image: true,
+                    move_window: true,
+                    set_passthrough: true,
+                    synthesize_text: true,
+                },
+                1,
+                1,
+            ),
+            ..WorldOptions::default()
+        });
+        assert_eq!(w.pickable.len(), 3);
+    }
+
+    #[test]
+    fn apply_options_abandons_unsupported_active_nab() {
+        let mut w = World::with_options(
+            bounds(),
+            27,
+            WorldOptions {
+                mouse_steal: MouseStealOptions::with_backend_support(true),
+                ..WorldOptions::default()
+            },
+        );
+        w.current = Box::new(NabMouseTask::new());
+        w.apply_options(WorldOptions::default());
+        assert_eq!(w.current_task(), "wander");
+    }
+
+    #[test]
+    fn apply_options_releases_active_collect_window() {
+        let mut w = world_with_collect(28);
+        assert_eq!(w.poke(PokeAction::Meme), PokeOutcome::Applied);
+        w.tick();
+        let request = match w.take_collect_window_commands().as_slice() {
+            [CollectWindowCommand::Spawn { request, .. }] => *request,
+            other => panic!("unexpected commands: {other:?}"),
+        };
+        let id = CollectWindowId(7);
+        w.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id,
+            request,
+            kind: CollectWindowKind::Meme,
+            rect: Rect {
+                min: Vec2::new(300.0, 200.0),
+                max: Vec2::new(500.0, 320.0),
+            },
+            alive: true,
+        }));
+        w.apply_options(WorldOptions::default());
+        assert_eq!(w.current_task(), "wander");
+        assert_eq!(
+            w.take_collect_window_commands(),
+            vec![
+                CollectWindowCommand::SetPassthrough {
+                    id,
+                    passthrough: false
+                },
+                CollectWindowCommand::Close { id }
+            ]
+        );
     }
 }

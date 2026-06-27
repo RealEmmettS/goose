@@ -9,7 +9,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > **Where the project is:** the goose is alive on screen. It appears on your desktop, walks
 > around, reacts to your mouse, makes sounds, can steal the cursor in a short, bounded prank,
 > can hop onto a window while you drag it around, and can now bring in note and meme windows.
-> The next milestone is making the running goose controllable through a local command channel.
+> It can now be controlled through a local command channel for starting, stopping, reloading, and
+> simple poke commands. The next milestone is the friendly three-name command grammar.
 > There's no installer yet — that comes later.
 
 ---
@@ -17,6 +18,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Latest — June 2026
 
 **Added**
+- You can now control the running goose from commands. Starting a second goose is blocked, and
+  commands can tell the current goose to stop, reload its options, honk, wander, track mud, or
+  bring in a note or meme. This is also the foundation for the future settings screen.
+- Terminal windows are now protected. The goose can wander over them visually like any other part
+  of the desktop, but it is not allowed to move them, focus them, type into them, drag them, ride
+  them, collect them, or target them for future prank behavior.
 - The goose can now bring things onto your desktop: a real Notepad window for little goose notes,
   and separate meme image windows that it drags around. This is built so the goose's core logic
   still stays separate from Windows-specific window handles and typing tricks, which keeps future
@@ -70,6 +77,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   saved as a local comparison, then replaced because it did not feel as much like the original.
 
 **Behind the scenes**
+- The control milestone now has its own architecture record. It says control is handled by the
+  command line and future terminal settings screen only, with no tray menu and no separate stop
+  shortcut. It also records the permanent terminal-window protection rule.
 - The window-riding milestone now has its own architecture record. It says the goose's brain
   only sees an anonymous window target and a place to ride, while Windows-specific hooks and
   window handles stay in the Windows layer. That keeps the next window tricks from leaking
@@ -78,9 +88,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   fixed stale status notes, confirmed the goose's core logic still stays separate from
   Windows-only behavior, and created follow-up work for improving the fullscreen overlay's
   performance before packaging.
-- The task board now shows the window-collecting milestone as done and moves the command-channel
-  milestone into the active slot. The future sprite-sheet renderer remains tracked as its own
-  follow-up task instead of being treated as unfinished cursor-stealing work.
+- The task board now shows the command-channel milestone as done and moves the friendly command
+  grammar milestone into the active slot. The future sprite-sheet renderer remains tracked as its
+  own follow-up task instead of being treated as unfinished cursor-stealing work.
 - The project guidance for future agents now says when to add or update architecture decision
   records, and it repeats the rule that the technical and human changelogs must stay in sync.
 
@@ -88,6 +98,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - The next major renderer should be a small, custom sprite-sheet system rather than a full game
   engine or heavy graphics framework. That should make the goose easier to customize while still
   fitting the transparent desktop overlay used on Windows and the future Mac and Linux versions.
+- Starting, stopping, and changing settings will be done through commands and the future terminal
+  settings screen. There is no tray menu and no separate stop shortcut.
+- Terminal windows are off-limits for goose mischief, even for optional prank modes.
 
 **Added (earlier this session)**
 - The goose now actually appears on your screen and walks around! It floats on top of

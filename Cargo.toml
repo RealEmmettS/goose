@@ -29,7 +29,8 @@ repository = "https://github.com/RealEmmettS/goose"
 tiny-skia = { version = "0.11", features = ["png-format"] }
 
 # The root package is also the shipped `honk300` binary (the plan puts `src/main.rs` at the
-# workspace root). M1/M2 wire the engine to the Windows overlay; the CLI/IPC/TUI come later.
+# workspace root). M1/M2 wire the engine to the Windows overlay; M10 adds CLI/IPC control,
+# and M12 owns the full config TUI.
 [package]
 name = "honk300"
 version = "0.0.0"
@@ -46,6 +47,7 @@ name = "honk300"
 path = "src/main.rs"
 
 [dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
 honk-engine = { path = "crates/honk-engine" }
 
 [target.'cfg(windows)'.dependencies]
@@ -53,6 +55,14 @@ honk-platform-windows = { path = "crates/honk-platform-windows" }
 # Audio playback (honks/bite/mud/pat). Pure-Rust decode via symphonia; cpal backend.
 # Windows-scoped for now; the macOS/Linux backends wire audio in M16/M17.
 rodio = "0.20"
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
 
 # The profile cargo-dist will build with in the later packaging round.
 [profile.dist]

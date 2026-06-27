@@ -1,257 +1,94 @@
 //! honk300 — the binary entry point.
 //!
-//! Windows desktop runtime for the current honk300 milestone slice: overlay, fixed-step
-//! simulation, sounds, hit-testing, cursor mischief, and M8 window ride. The CLI grammar,
-//! IPC, config TUI, and the macOS/Linux backends arrive in later rounds.
+//! M10 adds the local control plane around the current Windows runtime. The root
+//! process parses CLI commands, sends stop/do/reload over IPC, or starts the one
+//! allowed desktop goose instance.
+
+mod cli;
+mod control;
+mod runtime;
 
 #[cfg(windows)]
 mod assets;
 #[cfg(windows)]
 mod audio;
 
+use clap::Parser;
+use cli::{Cli, Command};
 #[cfg(windows)]
+use control::CommandServer;
+use control::{send_command, ControlCommand, ControlResponse, Singleton};
+#[cfg(windows)]
+use runtime::RuntimeOptions;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use honk_engine::render::{render_footmarks, render_hearts, render_rig};
-    use honk_engine::tiny_skia::{Color, Pixmap};
-    use honk_engine::{
-        Accumulator, Clock, CollectWindowCapabilities, CollectWindowCommand, CollectWindowOptions,
-        CollectWindowPayload, CursorCommand, ForeignWindowOptions, MouseStealOptions, Pointer,
-        Vec2, World, WorldOptions,
+    let cli = Cli::parse();
+
+    if !cli.is_start() {
+        return run_client_command(cli);
+    }
+
+    run_start(cli)
+}
+
+fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+    let command = match cli.command {
+        Some(Command::Stop) => ControlCommand::Stop,
+        Some(Command::Reload) => ControlCommand::Reload,
+        Some(Command::Do { action }) => ControlCommand::Do(action.into_engine()),
+        Some(Command::Start) | None => unreachable!("start commands are handled separately"),
     };
-    use honk_platform_windows::{
-        pointer_state, warp_cursor, CollectWindowController, ForeignWindowWatcher, Overlay,
-    };
-
-    // `--no-sound` / `--silent` runs the goose mute (the original's SilenceSounds).
-    let no_sound = std::env::args().any(|a| a == "--no-sound" || a == "--silent");
-    let no_mouse_steal = std::env::args().any(|a| a == "--no-mouse-steal");
-    let no_window_ride = std::env::args().any(|a| a == "--no-window-ride");
-    let mut audio = if no_sound { None } else { audio::Audio::new() };
-    let assets = assets::AssetCatalog::load();
-    println!("honk300: loaded {}", assets.summary());
-
-    let mut overlay = Overlay::new()?;
-    // Fullscreen primary-monitor overlay so world-space props (footmarks, later
-    // meme/notepad windows) render where they belong. World origin maps to the
-    // monitor's top-left, so the canvas is the monitor and `origin` is its min corner.
-    let bounds = Overlay::primary_bounds();
-    let origin = bounds.min;
-    let width = bounds.width().ceil().max(1.0) as u32;
-    let height = bounds.height().ceil().max(1.0) as u32;
-
-    let mut warned_window_ride = false;
-    let mut window_watcher = if no_window_ride {
-        None
-    } else {
-        match ForeignWindowWatcher::new(&overlay) {
-            Ok(watcher) => Some(watcher),
-            Err(err) => {
-                warned_window_ride = true;
-                eprintln!("honk300: window ride unavailable; disabling perch-and-ride ({err})");
-                None
-            }
+    let response = match send_command(command) {
+        Ok(response) => response,
+        Err(err)
+            if matches!(
+                err.kind(),
+                std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused
+            ) =>
+        {
+            return Err("honk300: no running goose instance.".into());
         }
+        Err(err) => return Err(err.into()),
     };
-    let window_watch_supported = window_watcher.is_some();
-    let mut foreign_window = ForeignWindowOptions::with_backend_support(
-        window_watch_supported,
-        !no_window_ride, // Windows has SetWindowPos; M8 reports but does not use it.
-    );
-    foreign_window.enabled = !no_window_ride;
-    let collect_capabilities = CollectWindowCapabilities {
-        spawn_note: true,
-        spawn_image: true,
-        move_window: true,
-        set_passthrough: true,
-        synthesize_text: true,
-    };
-    let collect_window = CollectWindowOptions::with_backend_support(
-        collect_capabilities,
-        assets.note_count(),
-        assets.meme_count(),
-    );
 
-    let mut world = World::with_options(
-        bounds,
-        seed_from_clock(),
-        WorldOptions {
-            mouse_steal: MouseStealOptions {
-                enabled: !no_mouse_steal,
-                warp_supported: !no_mouse_steal,
-                ..MouseStealOptions::default()
-            },
-            foreign_window,
-            collect_window,
+    match response {
+        ControlResponse::Ok => {
+            println!("honk300: command accepted.");
+            Ok(())
+        }
+        ControlResponse::Err(code) => Err(format!("honk300 command rejected: {code}").into()),
+    }
+}
+
+#[cfg(windows)]
+fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+    let (_singleton, status) = Singleton::acquire()?;
+    if status == control::SingletonStatus::AlreadyRunning {
+        println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
+        return Ok(());
+    }
+
+    let server = CommandServer::start()?;
+    runtime::windows::run(
+        RuntimeOptions {
+            no_sound: cli.no_sound,
+            no_mouse_steal: cli.no_mouse_steal,
+            no_window_ride: cli.no_window_ride,
         },
-    );
-    if let Some(kind) = smoke_collect_kind() {
-        world.force_collect_window(kind);
-    }
-    let mut collect_controller = CollectWindowController::new(bounds);
-    let mut canvas = Pixmap::new(width, height).ok_or("could not allocate the overlay canvas")?;
-    let mut accumulator = Accumulator::new();
-    let clock = Clock::start();
-    let mut last = clock.elapsed_secs();
-    let mut last_present = f32::NEG_INFINITY;
-    // Fullscreen present is heavier than a tiny window, so cap it a little lower.
-    const PRESENT_INTERVAL: f32 = 1.0 / 40.0;
-    let mut warned_cursor_warp = false;
-    let mut warned_collect_window = false;
-
-    println!("honk300: a goose is loose on your desktop. Press Ctrl+C here to send it home.");
-
-    loop {
-        if !overlay.pump() {
-            break;
-        }
-
-        let now = clock.elapsed_secs();
-        let dt = now - last;
-        last = now;
-
-        // Feed the cursor before ticking: tasks such as nab_mouse chase the newest pointer
-        // sample, then emit platform-free cursor commands for the backend to apply below.
-        let (mx, my, left_down) = pointer_state();
-        world.set_pointer(Pointer {
-            pos: Vec2::new(mx, my),
-            present: true,
-            left_down,
-        });
-
-        let mut disable_window_watcher = false;
-        let dragged_window = match window_watcher.as_mut() {
-            Some(watcher) => match watcher.active_drag() {
-                Ok(snapshot) => snapshot,
-                Err(err) => {
-                    disable_window_watcher = true;
-                    if !warned_window_ride {
-                        warned_window_ride = true;
-                        eprintln!(
-                            "honk300: window ride polling failed; disabling perch-and-ride ({err})"
-                        );
-                    }
-                    None
-                }
-            },
-            None => None,
-        };
-        if disable_window_watcher {
-            window_watcher = None;
-            world.set_foreign_window_watch_supported(false);
-        }
-        world.set_foreign_window_drag(dragged_window);
-        world.set_collect_window_snapshot(collect_controller.snapshot());
-
-        for _ in 0..accumulator.pump(dt) {
-            world.tick();
-        }
-
-        for command in world.take_collect_window_commands() {
-            let result = match command {
-                CollectWindowCommand::Spawn { request, payload } => match payload {
-                    CollectWindowPayload::Note { .. } => {
-                        collect_controller.spawn_note(request).map(|_| ())
-                    }
-                    CollectWindowPayload::Meme { index } => {
-                        if let Some(meme) = assets.meme(index) {
-                            collect_controller
-                                .spawn_image(request, &meme.title, &meme.pixmap)
-                                .map(|_| ())
-                        } else {
-                            Ok(())
-                        }
-                    }
-                },
-                CollectWindowCommand::Move { id, top_left } => {
-                    collect_controller.move_window(id, top_left)
-                }
-                CollectWindowCommand::SetPassthrough { id, passthrough } => {
-                    collect_controller.set_passthrough(id, passthrough)
-                }
-                CollectWindowCommand::Focus { id } => collect_controller.focus(id),
-                CollectWindowCommand::TypeNote { id, note_index } => {
-                    if let Some(text) = assets.note_text(note_index) {
-                        collect_controller.type_text(id, text)
-                    } else {
-                        Ok(())
-                    }
-                }
-                CollectWindowCommand::Close { id } => {
-                    collect_controller.close(id);
-                    Ok(())
-                }
-            };
-            if let Err(err) = result {
-                world.set_collect_window_supported(false);
-                if !warned_collect_window {
-                    warned_collect_window = true;
-                    eprintln!("honk300: collect-window unavailable; disabling it ({err})");
-                }
-            }
-        }
-
-        // Apply at most the newest warp request. If the OS/session rejects cursor warping,
-        // degrade honestly and stop registering further mouse-steal behavior.
-        if let Some(CursorCommand::WarpTo(pos)) = world.take_cursor_commands().last().copied() {
-            if let Err(err) = warp_cursor(pos) {
-                world.set_cursor_warp_supported(false);
-                if !warned_cursor_warp {
-                    warned_cursor_warp = true;
-                    eprintln!("honk300: cursor warp unavailable; disabling mouse stealing ({err})");
-                }
-            }
-        }
-
-        // Drain and play any sounds the sim requested this frame (silently dropped if muted).
-        let sounds = world.take_sounds();
-        if let Some(a) = audio.as_mut() {
-            for s in sounds {
-                a.play(s);
-            }
-        }
-
-        if now - last_present >= PRESENT_INTERVAL {
-            last_present = now;
-            canvas.fill(Color::TRANSPARENT);
-            render_footmarks(&mut canvas, &world.goose.foot_marks, world.now(), origin);
-            render_rig(&mut canvas, world.rig(), origin);
-            render_hearts(&mut canvas, world.hearts(), world.now(), origin);
-            overlay.present(&canvas, origin.x.floor() as i32, origin.y.floor() as i32)?;
-        }
-
-        // Yield so the loop doesn't busy-spin; the accumulator keeps the sim at 120 Hz.
-        std::thread::sleep(std::time::Duration::from_millis(2));
-    }
-
-    Ok(())
-}
-
-#[cfg(windows)]
-fn smoke_collect_kind() -> Option<honk_engine::CollectWindowKind> {
-    match std::env::var("HONK300_SMOKE_COLLECT")
-        .ok()?
-        .to_ascii_lowercase()
-        .as_str()
-    {
-        "note" => Some(honk_engine::CollectWindowKind::Note),
-        "meme" => Some(honk_engine::CollectWindowKind::Meme),
-        _ => None,
-    }
-}
-
-/// A non-deterministic seed for the roam driver, derived from the wall clock.
-#[cfg(windows)]
-fn seed_from_clock() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u64)
-        .unwrap_or(0x9E37_79B9_7F4A_7C15)
+        &server,
+    )
 }
 
 #[cfg(not(windows))]
-fn main() {
+fn run_start(_cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+    let (_singleton, status) = Singleton::acquire()?;
+    if status == control::SingletonStatus::AlreadyRunning {
+        println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
+        return Ok(());
+    }
     eprintln!(
         "honk300: the desktop overlay is Windows-only for now \
          (the macOS and Linux backends land in milestones M16/M17)."
     );
+    Ok(())
 }

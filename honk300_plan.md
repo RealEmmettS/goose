@@ -66,7 +66,8 @@ still build the full installer matrix because matching the `*300` family is an e
 | **Notes** | Copy screened original notepad messages 1:1 for personal-use builds and add **one custom goose-voiced counterpart per original**. |
 | **Config** | **TOML** (`config.toml`), original keys preserved at verified values, versioned + tolerant loader. No `EnableMods` key. |
 | **Modding** | **No external mods** (no DLL/`.so`/`.dylib`, no WASM, no third-party data mods). Autumn becomes a **built-in** season/task. Extensibility = **documented internal seams**. |
-| **Control** | **No system tray.** Quit via hold-ESC (where the OS allows) or any stop command. **Single-instance + IPC command channel** (`stop` / `do` / `reload`). |
+| **Control** | **No system tray and no global quit key.** Starting, stopping, and configuration are handled by the CLI and TUI over a **single-instance + IPC command channel** (`stop` / `do` / `reload`). |
+| **Protected windows** | The goose may visually overlay terminal windows, but must never move, focus, type into, ride, drag, collect, or otherwise manipulate terminal windows — even in spicy/default-off modes. |
 | **Default behavior** | Full original **prank, always-on**. `--no-mouse-steal` is opt-in; `pause_on_fullscreen` default on; a **Calm goose** TUI toggle is the opposite pole. |
 | **Config UI** | A **ratatui** Claude-Code/QubeTX-family-style TUI at `<name> config`, toggling every behavior incl. Autumn; **hot-apply where cheap**, restart-note otherwise. |
 | **Linux** | **X11-first** (runs under XWayland). **Native Wayland** behind an opt-in `--wayland` flag (reduced mischief). |
@@ -103,9 +104,9 @@ grammar is a fixed, finite phrase map — no model at runtime); networked featur
    available on all of that OS's arches; feature differences come only from OS + display server +
    permissions (the `Cap<T>` model). "Build for all arches" is a CI/packaging concern.
 5. **Distribution mirrors the QubeTX line, minus the crates.io end-user path.**
-6. **User sovereignty.** The goose is a guest: ESC or any stop command evicts it; uninstall is
+6. **User sovereignty.** The goose is a guest: CLI/TUI stop commands evict it; uninstall is
    total; nothing happens the user didn't opt into. Default chaos is bounded by quiet-hours,
-   fullscreen-pause, `--no-mouse-steal`, and Calm goose.
+   fullscreen-pause, `--no-mouse-steal`, protected terminal windows, and Calm goose.
 7. **Asset/IP rules are first-class** (see §12): sounds, screened memes, and screened notes are
    bundled 1:1 for personal use; every copied meme/note original gets one complete custom
    in-house counterpart; old donate pages and old developer references do not ship.
@@ -243,7 +244,7 @@ TUI **Poke** panel.
 | Move **other** apps' windows | ✅ `SetWindowPos` | ✅ AXUIElement (A11y) | ✅ EWMH `_NET_MOVERESIZE_WINDOW` (X11 windows) | ❌ impossible by design |
 | Detect window move-start/end (perch & ride) | ✅ `SetWinEventHook(MOVESIZESTART/END)` | ✅ AX observers | ✅ ConfigureNotify / `_NET_WM_STATE` | ❌ self-skips |
 | Synthesize keystrokes (Notepad) | ✅ SendInput/enigo | ✅ CGEvent (A11y/Input Mon.) | ✅ XTEST/enigo | ❌ blocked |
-| Global key (hold-ESC) | ✅ RegisterHotKey/raw input | ⚠️ CGEventTap (Input Mon.) | ✅ XGrabKey | ❌ no global grab → use stop cmd |
+| CLI/TUI control (`start`/`stop`/`config`) | ✅ named pipe | ✅ unix socket | ✅ unix socket | ✅ unix socket |
 | DND/fullscreen detect (quiet hours) | ✅ `SHQueryUserNotificationState` | ✅ NSWorkspace / Focus | ✅ EWMH fullscreen / idle | ⚠️ best-effort |
 | Single-instance + IPC (stop/do/reload) | ✅ named pipe/event | ✅ unix socket | ✅ unix socket | ✅ unix socket |
 | Audio | ✅ `rodio` | ✅ | ✅ | ✅ |
@@ -251,7 +252,7 @@ TUI **Poke** panel.
 **Chosen crates:** `winit` (window/event loop + monitor enumeration), `tiny-skia` (CPU vector
 raster of the procedural goose), `softbuffer` (present on **X11/Wayland only**), `windows` crate
 (layered window + `UpdateLayeredWindow` + `GetCursorPos`/`SetWindowPos`/`EnumWindows` +
-`SetWinEventHook` + `RegisterHotKey` + named pipe/event), `objc2`/`objc2-app-kit` (+ Accessibility/
+`SetWinEventHook` + named pipe/event), `objc2`/`objc2-app-kit` (+ Accessibility/
 CoreGraphics + AX observers) on macOS, `x11rb` (X11 + XShape + EWMH + XRecord), `smithay-client-
 toolkit`/`gtk4-layer-shell` (`--wayland`), `enigo` (cursor warp + keystrokes), `device_query`
 (X11 polling), `rodio` (+ `symphonia` MP3 decode) audio, `rust-embed` (assets), `serde` + `toml`
@@ -260,7 +261,7 @@ toolkit`/`gtk4-layer-shell` (`--wayland`), `enigo` (cursor warp + keystrokes), `
 `color-eyre` (TUI, matching WB300).
 
 **Hard impossibilities (documented, not fought):** native-Wayland foreign-window move;
-native-Wayland cursor-warp / keystroke-synth / global-key-grab; softbuffer per-pixel-alpha on a
+native-Wayland cursor-warp / keystroke-synth; softbuffer per-pixel-alpha on a
 Windows layered window (use `UpdateLayeredWindow`); a bare (un-bundled) macOS binary holding a
 durable Accessibility grant (a real `.app` with a stable bundle-id is mandatory).
 
@@ -274,7 +275,7 @@ Procedural goose; Walk/Run/Charge; autonomous wander with config timing; fading 
 attack/bite (`Task_CanAttackMouse`/`AttackRandomly`); collect-window dispatcher (Notepad / meme)
 with drag-to-beak + passthru; off-screen bolt; honks (4) + bite + mud-squish (+ pat); pat
 on interaction; Autumn (now built-in); always-on-top transparent overlay spanning monitors;
-hold-ESC quit.
+CLI/TUI start, stop, and configuration control.
 
 ### 5.2 New autonomous behaviors — feasibility guardrail
 > The goose is drawn each frame from a geometric rig in tiny-skia. It "emotes" **only** through
@@ -424,7 +425,6 @@ trait ForeignWindows {
 }
 trait Synth { fn type_text(&self,s:&str)->Cap<()>; fn launch_text_editor(&self)->Cap<EditorHandle>; }
 trait Audio { fn play(&self, clip: ClipId); }
-trait GlobalKeys { fn poll(&self)->Vec<KeyEvent>; }    // focus-independent (hold-ESC)
 trait Presence { fn dnd_or_fullscreen(&self)->Cap<bool>; fn idle_secs(&self)->Cap<u64>; }
 trait Control {                                        // single-instance + IPC command channel
     fn acquire_singleton(&self)->Result<Singleton>;    // fails if a goose already runs
@@ -436,7 +436,7 @@ trait Control {                                        // single-instance + IPC 
 ### 7.2 The loop — three clocks
 - **Sim = fixed 120 Hz** accumulator (`while acc >= dt { world.tick(dt) }`, clamp catch-up to
   ~5 ticks to avoid spiral-of-death).
-- **Input poll = 120 Hz** (cursor pos + buttons + global keys + presence flags + IPC commands).
+- **Input poll = 120 Hz** (cursor pos + buttons + presence flags + IPC commands).
 - **Present = on-dirty, rate-capped (~60)** — render only the **dirty rect** around the goose +
   active props into a `Pixmap`; idle goose ≈ near-zero present cost.
 - Driven by winit 0.30 `about_to_wait` + `ControlFlow::WaitUntil(next_tick)` (precise sleep, no
@@ -481,13 +481,13 @@ carrying:
 - **`Reload`** — hot-apply config (§9).
 
 `<name> stop` / `<name> do …` / saving in `<name> config` send these. This is the universal,
-**Wayland-safe** quit/poke transport (Wayland lacks a global hold-ESC grab). The channel is
+**Wayland-safe** quit/poke transport. The channel is
 local-only, no network, authenticated to the same user (pipe/socket permissions).
 
-### 8.3 Quit paths (no tray)
-- **hold-ESC** where the OS allows a global key: `RegisterHotKey` (Win), `XGrabKey` (X11),
-  `CGEventTap` + Input Monitoring (mac). **Not** available on native Wayland.
-- **Any stop command** (`<name> stop` / `honk bad` / `goose no honk`) — works everywhere via IPC.
+### 8.3 Control paths (no tray, no global quit key)
+- **Start** uses the CLI (`<name>` / `<name> start`) and later the config TUI entry point.
+- **Stop** uses CLI/TUI commands over IPC (`<name> stop` / `honk bad` / `goose no honk`).
+- **Configure** uses `<name> config`; saves hot-apply via IPC `Reload` where possible.
 
 ---
 
@@ -726,7 +726,7 @@ being implemented three more times.
 | M7 | Cursor mischief (warp + nab sub-states) | goose drags the real cursor |
 | M8 | Foreign-window dragging + **perch & ride** (move-start → ride / smooth-abandon) | goose rides a dragged window; abandons cleanly |
 | M9 | Collect-window dispatcher: Notepad (faithful keystroke synth) + meme | goose types a note; drags meme windows |
-| M10 | **Single-instance + IPC command channel** (stop/do/reload) + hold-ESC; **no tray** | second launch refused; `honk300 stop` quits; ESC quits |
+| M10 | **Single-instance + IPC command channel** (stop/do/reload); **no tray, no global quit key** | second launch refused; `honk300 stop` quits; CLI pokes reach the running goose |
 | M11 | **CLI grammar** (3 names + goose-speak phrase-map) + `do <action>` pokes + `help` | `goose plz` starts, `honk bad` stops, `goose do honk` honks |
 | M12 | **Config TUI** (ratatui reducer; groups + Poke panel; TOML I/O; hot-apply via IPC) | toggling Autumn live stops the leaves; save persists |
 | M13 | **Dynamic moods** (param-modulation FSM) + **on-hour double honk** | goose spontaneously shifts mood; honks the hour |
@@ -746,12 +746,12 @@ being implemented three more times.
 |---|---|---|---|
 | W1 | softbuffer can't do per-pixel alpha on a Windows layered window | HIGH | winit owns the `WS_EX_LAYERED` HWND; tiny-skia → premultiplied BGRA; present via `UpdateLayeredWindow` directly. softbuffer = X11/Wayland only. |
 | W2 | Click-through vs clickable conflict | HIGH | Per-pixel-alpha natural hit-test (no `WS_EX_TRANSPARENT`); fallback ex-style toggle; X11 XShape input region. (§6) |
-| G1 | AV/SmartScreen flags an unsigned app that warps cursor + synth keys + moves windows | HIGH | Personal use: document "Run anyway"; prefer `RegisterHotKey`/raw-input over `WH_KEYBOARD_LL`; ship source. Optional Authenticode later. |
+| G1 | AV/SmartScreen flags an unsigned app that warps cursor + synth keys + moves windows | HIGH | Personal use: document "Run anyway"; keep runtime control on local IPC; ship source. Optional Authenticode later. |
 | M_perm | macOS Accessibility/Input-Monitoring gates; a bare binary can't hold a stable grant | HIGH | universal2 `.app` (stable bundle-id) mandatory; `AXIsProcessTrusted()`, deep-link to Settings, degrade. |
 | E1 | 120 Hz full-screen layered redraw = CPU/battery killer | HIGH→mit | Per-monitor windows + present only the dirty rect; sim 120 Hz, present on-dirty ~60. Idle ≈ near-zero. |
 | W_dpi | Per-monitor DPI + signed/negative multi-monitor coords | MED-HIGH | Per-monitor windows (single-DPI each); Per-Monitor-V2 awareness; signed virtual space; handle `WM_DPICHANGED`. |
 | L_xwl | XWayland window-move no-ops on native-Wayland windows | MED | `enumerate()`/`watch_move()` return only X11 windows; tasks targeting non-enumerable windows self-skip. |
-| Q_global | Hold-ESC needs a global listener (AV-suspicious / permission-gated / impossible on Wayland) | MED | `RegisterHotKey`/`XGrabKey`/`CGEventTap`; **`<name> stop` IPC is the universal quit** (esp. Wayland). |
+| T_term | Goose mischief targets a terminal window and disrupts active CLI/TUI work | HIGH | Backend protected-window filters exclude terminal windows before foreign-window ride, collect-window, or spicy behavior code can target them. |
 | E_rng | Original Deck shuffle is biased | LOW | Port faithfully with a `// faithful-to-original (biased)` note; M0 pins it. Verify `gooseTaskWeightedList`. |
 
 **Operational / distribution (grafted):**
@@ -767,7 +767,7 @@ being implemented three more times.
 | O_mood | Mood-system scope creep | Bounded by the procedural-rig guardrail (§5.2): parameter modulation only, no new art/animation systems. |
 
 **Genuinely impossible (documented, not fought):** native-Wayland foreign-window move /
-cursor-warp / keystroke / global-key; softbuffer per-pixel alpha on a Windows layered window;
+cursor-warp / keystroke; softbuffer per-pixel alpha on a Windows layered window;
 durable macOS Accessibility for an un-bundled binary.
 
 ---
@@ -778,8 +778,7 @@ durable macOS Accessibility for an un-bundled binary.
 - **C3** — Edition: TR/ND = 2021, WB = 2024. honk300 matches the family at **2021** (1.95
   supports either). The **workspace** is an intentional divergence from the single-crate `*300`
   repos.
-- **C4** — Quit is **hold-ESC + any stop command via IPC, no tray** (global hook is
-  AV/permission/Wayland-limited; `<name> stop` is the universal path).
+- **C4** — Start, stop, and configuration are **CLI/TUI-only over IPC, no tray, no global quit key**.
 - **C5** — `<name> install` ≠ "PATH + shell-autorun alias." For a GUI app it means autostart +
   shortcut/.desktop/LaunchAgent + `InstallSource` marker; install all three aliases.
 - **C6** — Reconsider `install-path`: dedicated install dirs over `CARGO_HOME`; keep
@@ -790,7 +789,10 @@ durable macOS Accessibility for an un-bundled binary.
 - **C10** — **No external mods**; Autumn is built-in; extensibility = documented internal seams.
 - **C11** — Single-instance + **IPC command channel** (stop/do/reload) underpins quit, pokes, and
   the TUI's hot-apply; a **ratatui** config TUI replaces any tray/GUI settings.
-- **C12** — Build **every OS + arch** (Win x64+ARM64, mac universal2, Linux x64/ARM gnu+musl);
+- **C12** — Terminal windows are protected from all goose mischief, including default-off spicy
+  behaviors; overlay rendering may cover them visually, but platform backends must never move,
+  focus, type into, ride, drag, collect, or otherwise manipulate them.
+- **C13** — Build **every OS + arch** (Win x64+ARM64, mac universal2, Linux x64/ARM gnu+musl);
   arch is a build axis, capability is an OS axis.
 
 ---
@@ -806,10 +808,13 @@ durable macOS Accessibility for an un-bundled binary.
   `collect_window` spawns the right window kind, `nab` issues cursor moves, `Reload` re-applies
   config — without touching the real OS. **Config round-trip + hot-apply IPC test.** **TUI reducer
   tests** (key → action → state).
+- **Protected-window tests:** platform backends must classify terminal windows and prove foreign-
+  window ride, collect-window, and spicy behavior paths do not target them.
 - **Per-platform manual matrix** (`TESTING.md`): overlay transparency + click-through + clickable
   goose; wander; footmarks; honk/mute; cursor-grab; window-drag + perch-ride; notepad-type;
-  meme-drop; pat-hover hearts; moods; seasonal; multi-monitor + mixed-DPI; **stop grammar**
-  (`stop`/`honk bad`/`goose no honk`) + hold-ESC; **`goose config` hot-apply**; autostart on/off.
+  meme-drop; pat-hover hearts; moods; seasonal; multi-monitor + mixed-DPI; **start/stop grammar**
+  (`start`/`stop`/`honk bad`/`goose no honk`); **`goose config` hot-apply**; autostart on/off;
+  terminal windows are visually overlaid but not manipulated.
 - **Degradation tests:** macOS without Accessibility; Wayland (`--wayland` and default XWayland);
   X11 with a native-Wayland window present (perch-ride/window-drag self-skip).
 - **Packaging smoke across every target/arch:** install → `--version` → `<name> stop` on Win
@@ -854,7 +859,7 @@ intentionally limited.
   files must change **together with** `update.rs::detect_install_origin()` and `uninstall.rs` in
   the same commit (family discipline).
 - **CLI grammar / goose-speak alias table:** §8.1.
-- **Quit / poke / IPC matrix per OS:** §4 table + §8.
+- **Control / poke / IPC matrix per OS:** §4 table + §8.
 
 ### Document control
 - **This round:** produce this plan only. **No goose code written.**

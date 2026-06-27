@@ -4,15 +4,30 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: implementation in progress.** Milestones M0-M9 are complete and M10 is
+> **Project stage: implementation in progress.** Milestones M0-M10 are complete and M11 is
 > next. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
-> Notepad/meme windows on Windows; there is no release yet. A plain-English companion lives in
-> [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
+> Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
+> channel; there is no release yet. A plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md)
+> and must stay in lockstep.
 
 ## [Unreleased]
 
 ### Added
+- **CLI/TUI control plane (milestone M10, complete)** — the root binary is now split into
+  `src/cli.rs`, `src/control/`, and `src/runtime/windows.rs`. `honk300` defaults to `start`;
+  `honk300 start` refuses to create a second goose; and `honk300 stop`, `honk300 reload`, and
+  `honk300 do <honk|wander|mud|meme|note|nab>` send finite local IPC commands to the running
+  instance. Windows uses a per-user named mutex plus a per-user named pipe. Unix-family readiness
+  uses the same protocol over a UID-scoped lock file and Unix domain socket shape for later macOS
+  and Linux overlay backends. `honk-engine` gained `PokeAction`, `PokeOutcome`, `World::poke`,
+  and `World::apply_options` so stop/reload/poke plumbing stays structured and platform-neutral.
+  The protocol rejects malformed, unknown, and oversized payloads. ADR 0004 records the
+  CLI/TUI-only control model: no system tray, no global quit key, and no non-IPC stop path.
+- **Terminal-window protection** — Windows foreign-window discovery now classifies common terminal
+  hosts and excludes them before the goose can ride, collect, move, focus, type into, drag, or
+  otherwise manipulate them. The protection rule is documented as permanent and applies to future
+  spicy/default-off behavior too; visual overlay over terminal windows remains allowed.
 - **Collect-window dispatcher (milestone M9, complete)** — the goose can now drag in Notepad and
   meme windows on Windows. `honk-engine` gained a platform-neutral collect-window contract
   (`CollectWindowId`, `CollectWindowRequestId`, `CollectWindowKind::{Note,Meme}`,
@@ -202,11 +217,12 @@ All notable changes to this project are documented here. Format based on
 - `CLAUDE.md` — repository guidance for future Claude Code sessions.
 
 ### Changed
-- M9 is now Done, M10 is now Active, and Renderer V2 remains tracked separately as backlog task
+- M10 is now Done, M11 is now Active, and Renderer V2 remains tracked separately as backlog task
   `#r2v`. The task records now preserve M7's audit/readiness/renderer work, M8's foreign-window
-  readiness pass, and M9's collect-window asset/ADR/target-readiness work.
-- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M9 complete, M10 next, and
-  the ADR 0001/0002/0003 location and maintenance rules.
+  readiness pass, M9's collect-window asset/ADR/target-readiness work, and M10's IPC/control
+  readiness work.
+- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M10 complete, M11 next,
+  and the ADR 0001/0002/0003/0004 location and maintenance rules.
 - `claude_plan.md` and `codex_plan.md` are now **superseded reference drafts**; `honk300_plan.md`
   is canonical. The "Read these first" pointers in **both** `CLAUDE.md` and its Codex twin
   `AGENTS.md` were updated in lockstep (canonical plan, milestone range M0–M19, workspace
@@ -229,9 +245,11 @@ All notable changes to this project are documented here. Format based on
   verified values, versioned + tolerant loader.
 - **No external mod system** (no DLL/WASM/data mods). Autumn becomes a **built-in** season/task;
   extensibility is via documented internal seams (`ARCHITECTURE.md` + rustdoc).
-- **No system tray.** Quit via hold-ESC (where the OS allows) or any stop command, over a new
-  **single-instance + IPC command channel** (`stop` / `do` / `reload`) that is also the
-  Wayland-safe quit and the TUI's hot-apply transport.
+- **No system tray and no global quit key.** Start, stop, reload, pokes, and future configuration
+  are CLI/TUI-only over the **single-instance + IPC command channel** (`start` / `stop` / `do` /
+  `reload`) that is also the Wayland-safe control path and the TUI's hot-apply transport.
+- **Terminal windows are protected.** The goose may visually overlay terminals, but terminal
+  windows are never valid ride, collect, movement, focus, typing, drag, or spicy-behavior targets.
 - A **ratatui** config TUI at `<name> config` (QubeTX-family architecture: reducer + crossterm +
   `tokio::select!`) toggling every behavior incl. Autumn; **hot-apply where cheap, restart-note
   otherwise**.

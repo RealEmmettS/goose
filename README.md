@@ -10,12 +10,13 @@ FOR REFERENCE:
 
 ## Status
 
-**Stage:** implementation in progress. Milestones **M0-M9** are complete; **M10 single-instance
-IPC** is next. The current Windows build renders the procedural goose on the desktop,
+**Stage:** implementation in progress. Milestones **M0-M10** are complete; **M11 CLI grammar**
+is next. The current Windows build renders the procedural goose on the desktop,
 walks it, leaves mud, plays sounds, reacts to pat/click input, can perform bounded cursor
 nabbing when cursor warping is enabled, and can perch on a user-dragged foreign window until
-release. It can also drag in Notepad and meme windows through the M9 collect-window dispatcher.
-There is no installer or release artifact yet.
+release. It can also drag in Notepad and meme windows through the M9 collect-window dispatcher,
+and M10 adds a single-instance local control channel for `start`, `stop`, `reload`, and
+`do <action>` pokes. There is no installer or release artifact yet.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
@@ -44,8 +45,11 @@ contract, cross-platform guardrails, and Renderer V2 direction.
   procedural rig (no new art): dynamic moods, seasonal moods, multi-monitor chase, on-the-hour
   double honk, perch-&-ride windows, hover-sweep pat streak + hearts, quiet-hours/DND respect, a
   Calm-goose valve. Default = full original prank, always-on.
-- **No external mods** (Autumn is built-in; extensibility via documented internal seams) and
-  **no system tray** (quit via hold-ESC or any stop command over a single-instance IPC channel).
+- **No external mods** (Autumn is built-in; extensibility via documented internal seams),
+  **no system tray**, and **no global quit key**. Starting, stopping, and configuration are
+  CLI/TUI-only over the single-instance IPC channel.
+- **Terminal windows are protected:** the goose may visually pass over terminals, but it must
+  never move, focus, type into, drag, ride, collect, or otherwise manipulate terminal windows.
 - **Built for every OS + architecture:** Windows x64 **and ARM64**, macOS Intel **and Apple
   Silicon** (universal2), Linux x64 **and ARM** (gnu + musl where packaging supports it).
   Native + CLI installers like TR300/ND300/WB300; **no crates.io**.

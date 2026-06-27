@@ -45,15 +45,16 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EnumWindows, GetAncestor,
-    GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowLongPtrW, GetWindowRect,
-    GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, PeekMessageW, PostQuitMessage,
-    RegisterClassExW, SetCursorPos, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
-    ShowWindow, TranslateMessage, UpdateLayeredWindow, EVENT_SYSTEM_MOVESIZEEND,
-    EVENT_SYSTEM_MOVESIZESTART, GA_ROOT, GWL_EXSTYLE, MSG, OBJID_WINDOW, PM_REMOVE, SM_CXSCREEN,
-    SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
-    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_SHOWNOACTIVATE,
-    ULW_ALPHA, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_DESTROY, WM_QUIT, WNDCLASSEXW,
-    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    GetClassNameW, GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowLongPtrW,
+    GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
+    PeekMessageW, PostQuitMessage, RegisterClassExW, SetCursorPos, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowPos, ShowWindow, TranslateMessage, UpdateLayeredWindow,
+    EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART, GA_ROOT, GWL_EXSTYLE, MSG, OBJID_WINDOW,
+    PM_REMOVE, SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+    SM_YVIRTUALSCREEN, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+    SW_SHOWNOACTIVATE, ULW_ALPHA, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_DESTROY,
+    WM_QUIT, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_EX_TRANSPARENT, WS_POPUP,
 };
 
 /// Poll the global cursor position (desktop coordinates) and the left-button state.
@@ -73,6 +74,13 @@ pub fn pointer_state() -> (f32, f32, bool) {
 /// Warp the global cursor to a desktop/world-space coordinate.
 pub fn warp_cursor(pos: Vec2) -> Result<()> {
     unsafe { SetCursorPos(pos.x.round() as i32, pos.y.round() as i32) }
+}
+
+/// Windows-side protected-window classes. These windows may be visually overlaid, but
+/// goose mischief must not move, focus, type into, drag, ride, or otherwise manipulate them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProtectedWindowClass {
+    Terminal,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -210,7 +218,9 @@ fn is_foreign_top_level_window(hwnd: HWND, overlay_hwnd: HWND) -> bool {
             return false;
         }
         let root = GetAncestor(hwnd, GA_ROOT);
-        !root.0.is_null() && hwnd_key(root) == hwnd_key(hwnd)
+        !root.0.is_null()
+            && hwnd_key(root) == hwnd_key(hwnd)
+            && protected_window_class(hwnd).is_none()
     }
 }
 
@@ -220,6 +230,62 @@ fn window_rect(hwnd: HWND) -> Result<Rect> {
         GetWindowRect(hwnd, &mut rect)?;
         Ok(rect_from_win32(rect))
     }
+}
+
+fn protected_window_class(hwnd: HWND) -> Option<ProtectedWindowClass> {
+    classify_protected_window(&window_class_name(hwnd), &window_title(hwnd))
+}
+
+fn window_class_name(hwnd: HWND) -> String {
+    let mut buf = [0u16; 256];
+    let len = unsafe { GetClassNameW(hwnd, &mut buf) };
+    String::from_utf16_lossy(&buf[..len.max(0) as usize])
+}
+
+fn window_title(hwnd: HWND) -> String {
+    let mut buf = [0u16; 512];
+    let len = unsafe { GetWindowTextW(hwnd, &mut buf) };
+    String::from_utf16_lossy(&buf[..len.max(0) as usize])
+}
+
+pub fn classify_protected_window(class_name: &str, title: &str) -> Option<ProtectedWindowClass> {
+    let class = class_name.to_ascii_lowercase();
+    let title = title.to_ascii_lowercase();
+
+    let terminal_class = [
+        "consolewindowclass",
+        "cascadia_hosting_window_class",
+        "virtualconsoleclass",
+        "mintty",
+        "wezterm",
+        "alacritty",
+        "kitty",
+        "tabby",
+    ]
+    .iter()
+    .any(|needle| class.contains(needle));
+    let terminal_title = [
+        "windows terminal",
+        "terminal",
+        "command prompt",
+        "cmd.exe",
+        "powershell",
+        "pwsh",
+        "git bash",
+        "mingw64",
+        "msys2",
+        "wsl",
+        "ubuntu",
+        "debian",
+        "kali",
+        "alacritty",
+        "wezterm",
+        "mintty",
+    ]
+    .iter()
+    .any(|needle| title.contains(needle));
+
+    (terminal_class || terminal_title).then_some(ProtectedWindowClass::Terminal)
 }
 
 fn rect_from_win32(rect: RECT) -> Rect {
@@ -483,6 +549,14 @@ impl CollectWindowController {
         self.windows
             .iter()
             .find_map(|(id, window)| (window.request() == request).then_some(*id))
+    }
+}
+
+impl Drop for CollectWindowController {
+    fn drop(&mut self) {
+        for window in self.windows.values() {
+            let _ = set_passthrough(window.hwnd(), false);
+        }
     }
 }
 
@@ -918,5 +992,30 @@ mod tests {
 
         let fake = HWND(std::ptr::dangling_mut::<c_void>());
         assert!(!is_foreign_top_level_window(fake, fake));
+    }
+
+    #[test]
+    fn terminal_windows_are_protected_by_class_or_title() {
+        for (class_name, title) in [
+            ("ConsoleWindowClass", "Command Prompt"),
+            ("CASCADIA_HOSTING_WINDOW_CLASS", "Windows Terminal"),
+            ("mintty", "MINGW64:/c/Users/hey/git/goose"),
+            ("org.wezfurlong.wezterm", "pwsh"),
+            ("GLFW30", "Alacritty"),
+            ("Chrome_WidgetWin_1", "Ubuntu - WSL"),
+            ("ApplicationFrameWindow", "PowerShell 7"),
+            ("Notepad", "notes.txt - Notepad"),
+        ] {
+            let protected = classify_protected_window(class_name, title);
+            if title.contains("Notepad") {
+                assert_eq!(protected, None, "{class_name} / {title}");
+            } else {
+                assert_eq!(
+                    protected,
+                    Some(ProtectedWindowClass::Terminal),
+                    "{class_name} / {title}"
+                );
+            }
+        }
     }
 }

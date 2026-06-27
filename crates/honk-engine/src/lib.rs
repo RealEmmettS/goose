@@ -24,6 +24,7 @@
 pub use tiny_skia;
 
 pub mod collect_window;
+pub mod command;
 pub mod cursor;
 pub mod entity;
 pub mod feet;
@@ -46,6 +47,7 @@ pub use collect_window::{
     CollectWindowCapabilities, CollectWindowCommand, CollectWindowId, CollectWindowKind,
     CollectWindowOptions, CollectWindowPayload, CollectWindowRequestId, CollectWindowSnapshot,
 };
+pub use command::{PokeAction, PokeOutcome};
 pub use cursor::{CursorCommand, MouseStealOptions, WorldOptions};
 pub use entity::{GooseEntity, ParametersTable, SpeedTier};
 pub use feet::Feet;
