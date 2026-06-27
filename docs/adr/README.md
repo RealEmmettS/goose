@@ -12,3 +12,4 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 ## Index
 
 - [0001 — M7 Cursor Mischief, Renderer Direction, And Cross-Platform Guardrails](./0001-m7-cursor-mischief-renderer-and-platform-guardrails.md)
+- [0002 — M8 Foreign-Window Watch-And-Ride Contract](./0002-m8-foreign-window-watch-and-ride.md)

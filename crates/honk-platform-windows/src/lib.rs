@@ -9,30 +9,40 @@
 //! `WS_EX_TRANSPARENT`, so opaque goose pixels receive clicks while transparent margins
 //! fall through (plan §6). tiny-skia produces premultiplied RGBA; we feed
 //! `UpdateLayeredWindow` premultiplied BGRA with `AC_SRC_ALPHA`. M7 also exposes a thin
-//! `SetCursorPos` wrapper for the engine's platform-free cursor commands.
+//! `SetCursorPos` wrapper for the engine's platform-free cursor commands. M8 adds a
+//! foreign-window move/size watcher that feeds platform-free perch-and-ride snapshots to
+//! the engine without exposing HWNDs.
 
 #![cfg(windows)]
 
 use honk_engine::math::Rect;
 use honk_engine::Vec2;
+use honk_engine::{ForeignWindowId, ForeignWindowSnapshot};
+use std::collections::VecDeque;
 use std::ffi::c_void;
+use std::sync::{Mutex, OnceLock};
 use tiny_skia::Pixmap;
-use windows::core::{w, Result};
-use windows::Win32::Foundation::{COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
+use windows::core::{w, Error, Result};
+use windows::Win32::Foundation::{
+    COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM,
+};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject,
     AC_SRC_ALPHA, AC_SRC_OVER, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, DIB_RGB_COLORS,
     HBITMAP, HDC, HGDIOBJ,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetCursorPos, GetSystemMetrics,
-    PeekMessageW, PostQuitMessage, RegisterClassExW, SetCursorPos, ShowWindow, TranslateMessage,
-    UpdateLayeredWindow, MSG, PM_REMOVE, SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN,
-    SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, ULW_ALPHA,
-    WM_DESTROY, WM_QUIT, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetAncestor, GetCursorPos, GetSystemMetrics,
+    GetWindowRect, IsIconic, IsWindow, IsWindowVisible, PeekMessageW, PostQuitMessage,
+    RegisterClassExW, SetCursorPos, ShowWindow, TranslateMessage, UpdateLayeredWindow,
+    EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART, GA_ROOT, MSG, OBJID_WINDOW, PM_REMOVE,
+    SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+    SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, ULW_ALPHA, WINEVENT_OUTOFCONTEXT,
+    WINEVENT_SKIPOWNPROCESS, WM_DESTROY, WM_QUIT, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
 /// Poll the global cursor position (desktop coordinates) and the left-button state.
@@ -52,6 +62,160 @@ pub fn pointer_state() -> (f32, f32, bool) {
 /// Warp the global cursor to a desktop/world-space coordinate.
 pub fn warp_cursor(pos: Vec2) -> Result<()> {
     unsafe { SetCursorPos(pos.x.round() as i32, pos.y.round() as i32) }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RawMoveEvent {
+    hwnd: isize,
+    started: bool,
+}
+
+static MOVE_EVENTS: OnceLock<Mutex<VecDeque<RawMoveEvent>>> = OnceLock::new();
+
+fn move_events() -> &'static Mutex<VecDeque<RawMoveEvent>> {
+    MOVE_EVENTS.get_or_init(|| Mutex::new(VecDeque::new()))
+}
+
+fn hwnd_key(hwnd: HWND) -> isize {
+    hwnd.0 as isize
+}
+
+fn hwnd_from_key(key: isize) -> HWND {
+    HWND(key as *mut c_void)
+}
+
+unsafe extern "system" fn move_event_proc(
+    _hook: HWINEVENTHOOK,
+    event: u32,
+    hwnd: HWND,
+    idobject: i32,
+    _idchild: i32,
+    _ideventthread: u32,
+    _dwmseventtime: u32,
+) {
+    if hwnd.0.is_null() || idobject != OBJID_WINDOW.0 {
+        return;
+    }
+
+    let started = match event {
+        EVENT_SYSTEM_MOVESIZESTART => true,
+        EVENT_SYSTEM_MOVESIZEEND => false,
+        _ => return,
+    };
+
+    if let Ok(mut events) = move_events().lock() {
+        events.push_back(RawMoveEvent {
+            hwnd: hwnd_key(hwnd),
+            started,
+        });
+        while events.len() > 64 {
+            events.pop_front();
+        }
+    }
+}
+
+/// Watches user-initiated foreign-window move/resize operations for M8 perch-and-ride.
+pub struct ForeignWindowWatcher {
+    hook: HWINEVENTHOOK,
+    overlay_hwnd: HWND,
+    active: Option<isize>,
+}
+
+impl ForeignWindowWatcher {
+    /// Register an out-of-context move/size WinEvent hook.
+    pub fn new(overlay: &Overlay) -> Result<Self> {
+        let hook = unsafe {
+            SetWinEventHook(
+                EVENT_SYSTEM_MOVESIZESTART,
+                EVENT_SYSTEM_MOVESIZEEND,
+                None,
+                Some(move_event_proc),
+                0,
+                0,
+                WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+            )
+        };
+
+        if hook.0.is_null() {
+            return Err(Error::from_win32());
+        }
+
+        Ok(Self {
+            hook,
+            overlay_hwnd: overlay.hwnd,
+            active: None,
+        })
+    }
+
+    /// Drain queued move/size events and return the current active drag snapshot, if any.
+    pub fn active_drag(&mut self) -> Result<Option<ForeignWindowSnapshot>> {
+        self.drain_events();
+        let Some(hwnd) = self.active.map(hwnd_from_key) else {
+            return Ok(None);
+        };
+        if !is_foreign_top_level_window(hwnd, self.overlay_hwnd) {
+            self.active = None;
+            return Ok(None);
+        }
+
+        let rect = window_rect(hwnd)?;
+        Ok(Some(ForeignWindowSnapshot::top_center(
+            ForeignWindowId(hwnd_key(hwnd) as u64),
+            rect,
+        )))
+    }
+
+    fn drain_events(&mut self) {
+        if let Ok(mut events) = move_events().lock() {
+            while let Some(event) = events.pop_front() {
+                let hwnd = hwnd_from_key(event.hwnd);
+                if event.started {
+                    if is_foreign_top_level_window(hwnd, self.overlay_hwnd) {
+                        self.active = Some(event.hwnd);
+                    }
+                } else if self.active == Some(event.hwnd) {
+                    self.active = None;
+                }
+            }
+        }
+    }
+}
+
+impl Drop for ForeignWindowWatcher {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = UnhookWinEvent(self.hook);
+        }
+    }
+}
+
+fn is_foreign_top_level_window(hwnd: HWND, overlay_hwnd: HWND) -> bool {
+    unsafe {
+        if hwnd.0.is_null() || hwnd_key(hwnd) == hwnd_key(overlay_hwnd) {
+            return false;
+        }
+        if !IsWindow(hwnd).as_bool() || !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool()
+        {
+            return false;
+        }
+        let root = GetAncestor(hwnd, GA_ROOT);
+        !root.0.is_null() && hwnd_key(root) == hwnd_key(hwnd)
+    }
+}
+
+fn window_rect(hwnd: HWND) -> Result<Rect> {
+    unsafe {
+        let mut rect = RECT::default();
+        GetWindowRect(hwnd, &mut rect)?;
+        Ok(rect_from_win32(rect))
+    }
+}
+
+fn rect_from_win32(rect: RECT) -> Rect {
+    Rect {
+        min: Vec2::new(rect.left as f32, rect.top as f32),
+        max: Vec2::new(rect.right as f32, rect.bottom as f32),
+    }
 }
 
 /// A reusable top-down 32-bpp DIB section we blit the goose into each frame.
@@ -272,5 +436,32 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
             }
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn win32_rect_conversion_preserves_signed_coordinates() {
+        let rect = rect_from_win32(RECT {
+            left: -900,
+            top: -40,
+            right: -300,
+            bottom: 360,
+        });
+
+        assert_eq!(rect.min, Vec2::new(-900.0, -40.0));
+        assert_eq!(rect.max, Vec2::new(-300.0, 360.0));
+    }
+
+    #[test]
+    fn null_or_own_window_is_not_foreign_top_level() {
+        let null = HWND(std::ptr::null_mut());
+        assert!(!is_foreign_top_level_window(null, null));
+
+        let fake = HWND(std::ptr::dangling_mut::<c_void>());
+        assert!(!is_foreign_top_level_window(fake, fake));
     }
 }

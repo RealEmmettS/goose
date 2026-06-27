@@ -1,8 +1,8 @@
 //! honk300 — the binary entry point.
 //!
 //! Windows desktop runtime for the current honk300 milestone slice: overlay, fixed-step
-//! simulation, sounds, hit-testing, and M7 cursor mischief. The CLI grammar, IPC, config
-//! TUI, and the macOS/Linux backends arrive in later rounds.
+//! simulation, sounds, hit-testing, cursor mischief, and M8 window ride. The CLI grammar,
+//! IPC, config TUI, and the macOS/Linux backends arrive in later rounds.
 
 #[cfg(windows)]
 mod audio;
@@ -12,13 +12,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use honk_engine::render::{render_footmarks, render_hearts, render_rig};
     use honk_engine::tiny_skia::{Color, Pixmap};
     use honk_engine::{
-        Accumulator, Clock, CursorCommand, MouseStealOptions, Pointer, Vec2, World, WorldOptions,
+        Accumulator, Clock, CursorCommand, ForeignWindowOptions, MouseStealOptions, Pointer, Vec2,
+        World, WorldOptions,
     };
-    use honk_platform_windows::{pointer_state, warp_cursor, Overlay};
+    use honk_platform_windows::{pointer_state, warp_cursor, ForeignWindowWatcher, Overlay};
 
     // `--no-sound` / `--silent` runs the goose mute (the original's SilenceSounds).
     let no_sound = std::env::args().any(|a| a == "--no-sound" || a == "--silent");
     let no_mouse_steal = std::env::args().any(|a| a == "--no-mouse-steal");
+    let no_window_ride = std::env::args().any(|a| a == "--no-window-ride");
     let mut audio = if no_sound { None } else { audio::Audio::new() };
 
     let mut overlay = Overlay::new()?;
@@ -30,6 +32,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let width = bounds.width().ceil().max(1.0) as u32;
     let height = bounds.height().ceil().max(1.0) as u32;
 
+    let mut warned_window_ride = false;
+    let mut window_watcher = if no_window_ride {
+        None
+    } else {
+        match ForeignWindowWatcher::new(&overlay) {
+            Ok(watcher) => Some(watcher),
+            Err(err) => {
+                warned_window_ride = true;
+                eprintln!("honk300: window ride unavailable; disabling perch-and-ride ({err})");
+                None
+            }
+        }
+    };
+    let window_watch_supported = window_watcher.is_some();
+    let mut foreign_window = ForeignWindowOptions::with_backend_support(
+        window_watch_supported,
+        !no_window_ride, // Windows has SetWindowPos; M8 reports but does not use it.
+    );
+    foreign_window.enabled = !no_window_ride;
+
     let mut world = World::with_options(
         bounds,
         seed_from_clock(),
@@ -39,6 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 warp_supported: !no_mouse_steal,
                 ..MouseStealOptions::default()
             },
+            foreign_window,
         },
     );
     let mut canvas = Pixmap::new(width, height).ok_or("could not allocate the overlay canvas")?;
@@ -69,6 +92,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             present: true,
             left_down,
         });
+
+        let mut disable_window_watcher = false;
+        let dragged_window = match window_watcher.as_mut() {
+            Some(watcher) => match watcher.active_drag() {
+                Ok(snapshot) => snapshot,
+                Err(err) => {
+                    disable_window_watcher = true;
+                    if !warned_window_ride {
+                        warned_window_ride = true;
+                        eprintln!(
+                            "honk300: window ride polling failed; disabling perch-and-ride ({err})"
+                        );
+                    }
+                    None
+                }
+            },
+            None => None,
+        };
+        if disable_window_watcher {
+            window_watcher = None;
+            world.set_foreign_window_watch_supported(false);
+        }
+        world.set_foreign_window_drag(dragged_window);
 
         for _ in 0..accumulator.pump(dt) {
             world.tick();

@@ -4,14 +4,27 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: implementation in progress.** Milestones M0-M7 are complete and M8 is
-> active. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, and can
-> perform bounded cursor-nab mischief on Windows; there is no release yet. A plain-English companion lives in
+> **Project stage: implementation in progress.** Milestones M0-M8 are complete and M9 is
+> next. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
+> perform bounded cursor-nab mischief, and can perch on user-dragged windows on Windows; there is no release yet. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
 
 ### Added
+- **Foreign-window perch & ride (milestone M8, complete)** — the goose now reacts when the
+  user drags another application's window on Windows. `honk-engine` gained a platform-neutral
+  foreign-window contract (`ForeignWindowId`, `ForeignWindowSnapshot`,
+  `ForeignWindowCapabilities`, and `ForeignWindowOptions`) and a transient `PerchRideTask`
+  that interrupts the current task, runs to the dragged window's ride anchor, pins to the
+  moving anchor if it arrives before release, and resumes the interrupted task on release or
+  capability loss. The Windows backend now watches move/size drags with an out-of-context
+  `SetWinEventHook`, queues hook events only, polls live geometry via `GetWindowRect`, filters
+  the app overlay and invalid/non-root/invisible/minimized windows, unhooks on drop, and exposes
+  a temporary `--no-window-ride` opt-out until M12 config exists. `move_window` is reported as
+  future capability data only; M8 does not autonomously move windows or start M9
+  collect-window/notepad/meme/donate behavior. Added ADR 0002 to pin the engine/backend
+  contract and cross-platform guardrails.
 - **Cursor mischief: warp + nab sub-states (milestone M7, complete)** — the goose can now steal
   the real cursor on Windows in a bounded, recoverable way. `honk-engine` remains platform-free:
   it owns `CursorCommand::WarpTo(Vec2)`, `MouseStealOptions`, `WorldOptions`, and the
@@ -167,11 +180,11 @@ All notable changes to this project are documented here. Format based on
 - `CLAUDE.md` — repository guidance for future Claude Code sessions.
 
 ### Changed
-- M7 is now Done, M8 is now Active, and Renderer V2 is tracked separately as backlog task `#r2v`
-  instead of remaining an unfinished M7 subtask. The M7 rich task record now preserves the audit,
-  readiness pass, renderer spike, verification, visual acceptance, and follow-up split.
-- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M7 complete, M8 active, and
-  the new ADR location/maintenance rules.
+- M8 is now Done, M9 is now Active, and Renderer V2 remains tracked separately as backlog task
+  `#r2v`. The task records now preserve M7's audit/readiness/renderer work and M8's
+  foreign-window readiness pass, verification, ADR, and cross-target checks.
+- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M8 complete, M9 next, and
+  the ADR 0001/0002 location and maintenance rules.
 - `claude_plan.md` and `codex_plan.md` are now **superseded reference drafts**; `honk300_plan.md`
   is canonical. The "Read these first" pointers in **both** `CLAUDE.md` and its Codex twin
   `AGENTS.md` were updated in lockstep (canonical plan, milestone range M0–M19, workspace

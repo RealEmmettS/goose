@@ -1,0 +1,1872 @@
+ ▐▛███▜▌   Claude Code v2.1.191
+▝▜█████▛▘  Opus 4.8 · Claude Max
+  ▘▘ ▝▝    ~\git\goose
+
+
+> Don't act on anything yet, but examine the two plan files that are in the     
+  repo, analyze them thoroughly, and tell me which one you think would be best  
+  to execute on or if a hybrid approach would be best. After thorough and       
+  exhaustive analysis and investigation, if you determine a hybrid approach to  
+  the plans is best, create a new hybrid plan file that is comprehensive and    
+  exhaustive in detail, and combines what you feel is the most valuable of the  
+  two.                                                                          
+
+● I'll start by examining the repository structure and the two plan files
+  thoroughly. Let me first get a lay of the land.
+
+  Listed 1 directory (ctrl+o to expand)
+
+● Both plans are substantial (claude_plan.md: 353 lines, codex_plan.md: 770
+  lines). These two documents are the heart of the task, so I'll read them in
+  full myself. Let me read both plans plus the supporting context.
+
+  Read 1 file (ctrl+o to expand)
+
+● Now let me read the Codex plan in full.
+
+  Read 1 file (ctrl+o to expand)
+
+● Both plans are now fully read. The single most important factual question for
+  deciding between them is whether the engine constants are grounded in real 
+  source or guessed. claude_plan claims exact constants from readable C#
+  (WalkSpeed=80, AccelerationNormal=1300, etc.); codex_plan says it extracted
+  symbol names from binaries and its config Appendix shows clearly
+  different/placeholder values (walk=30, run=90). Let me verify this against the
+  actual source, and gather the rest of the context in parallel.
+
+  Read 1 file (ctrl+o to expand)
+
+● Now let me locate and read the actual C# engine source to verify the constants
+  claim — this is the decisive factual check.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Let me read the decisive ground-truth source files directly, and in parallel
+  dispatch an Explore agent to verify the sibling-repo conventions both plans
+  claim to mirror.
+
+  Read 1 file (ctrl+o to expand)
+
+● This is decisive. The actual Exports.cs confirms claude_plan's constants
+  verbatim — WalkSpeed=80, RunSpeed=200, ChargeSpeed=400,
+  AccelerationNormal=1300, AccelerationCharged=2300, StepTimeNormal=0.2,
+  DurationToTrackMud=15, and every rig constant (Body 22/11/14, Necc
+  13/20/3/10/16, Head 15/3/10/5, Eyes 2/3/5/5, Feet 6/5/0.4, FootMark Lifetime
+  8.5/Shrink 1). claude_plan §2.3–2.4 is exact.
+
+  By contrast, codex_plan's Appendix B invents wrong values (walk=30, run=90, 
+  charge=200, acceleration_normal=120). codex extracted symbol names from the
+  stripped binary but missed the literal constants in the readable C# source.
+
+  Let me verify the engine-loop / Deck / task-model claims and the sibling
+  conventions in parallel.
+
+  Read 1 file (ctrl+o to expand)
+  ⎿  Interrupted · What should Claude do instead?
+
+> use /critical-thinking and /logical-reasoning                                 
+
+● The user wants me to apply these two structured-thinking skills to the
+  plan-evaluation decision. Let me load both.
+
+● Skill(shaughv-code:critical-thinking)
+  ⎿  Successfully loaded skill
+
+● Skill(shaughv-code:logical-reasoning)
+  ⎿  Successfully loaded skill
+
+● Both skills loaded. This is a Decision-Making problem (pick claude_plan,
+  codex_plan, or hybrid) where the load-bearing arguments are disputed factual
+  claims — exactly where logical-reasoning's claim-testing discipline earns its
+  keep. I've already confirmed the most important one (engine constants). Two
+  factual disputes remain before I converge:
+
+  1. Deck bias (claude_plan claims biased shuffle; codex claims weighted picker)
+  — partly resolved already by SamEngine.cs.
+  2. Sibling-repo conventions (edition 2021 vs 2024; 6 vs 7 targets incl. ARM64
+  Windows; cargo-dist version) — the two plans disagree, and this is a checkable
+  fact.
+
+  Let me resolve the sibling-repo dispute with an Explore agent, and round out
+  the behavioral inventory in parallel.
+
+● Explore(Verify sibling qube repo conventions)
+  ⎿  Done (55 tool uses · 73.6k tokens · 2m 9s)
+  (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+● I now have everything needed to resolve the disputes. Let me apply the two
+  frameworks and reach a verdict. The decisive moves were claim-testing each
+  plan's load-bearing factual assertions against ground truth
+  (logical-reasoning), then running a Decision with explicit divergence and
+  steel-manned dissent (critical-thinking).
+
+  Claim-tests (verdicts against the actual source)
+
+  Disputed claim: Engine constants
+  claude_plan: WalkSpeed=80, RunSpeed=200, ChargeSpeed=400, AccelNormal=1300, 
+    AccelCharged=2300, StepTime 0.2/0.1, Mud=15, full rig geometry
+  codex_plan: Appendix B invents walk=30, run=90, charge=200, accel=120/400, 
+    mud=6
+  Ground truth: Exports.cs ParametersTable = 80/200/400/1300/2300/0.2/0.1/15 +
+    every rig const
+  Verdict: claude exact; codex wrong. codex read binary symbol names but not the
+
+    readable C# values
+  ────────────────────────────────────────
+  Disputed claim: Deck RNG
+  claude_plan: "biased shuffle (RandomRange(0,j), System.Random), not
+    Fisher–Yates"
+  codex_plan: "weighted picker (gooseTaskWeightedList)"
+  Ground truth: SamEngine.cs: otherIndex=(int)RandomRange(0,j) — biased, 
+    unweighted; API has canBePickedRandomly bool, no weights
+  Verdict: claude correct. codex's "weighted" unverified (a real binary symbol
+    worth checking → open question)
+  ────────────────────────────────────────
+  Disputed claim: Family edition
+  claude_plan: "TR/ND = 2021, WB = 2024; match family at 2021"
+  codex_plan: "edition 2024"
+  Ground truth: TR300=2021, ND300=2021, WB300=2024
+  Verdict: claude precise; codex generalized the minority case
+  ────────────────────────────────────────
+  Disputed claim: Family targets
+  claude_plan: "6 triples" (lists them; no ARM64 Win)
+  codex_plan: proposes adding aarch64-pc-windows-msvc "like the family"
+  Ground truth: All 3 repos: identical 6 targets, no ARM64 Windows
+  Verdict: claude accurate; codex's ARM64 is a deviation (fine, but not
+    "mirroring")
+  ────────────────────────────────────────
+  Disputed claim: cargo-dist / ICE / allow-dirty
+  claude_plan: 0.31.0, ICE38/64/91, allow-dirty=["msi"]
+  codex_plan: unversioned
+  Ground truth: 0.31.0, ICE38/64/91, WB allow-dirty=["msi"]
+  Verdict: claude verbatim-correct
+
+  Logical finding (codex internal contradiction): codex specs the goose overlay
+  as WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST (globally click-through)
+  — yet also lists pat-on-click as a feature. A WS_EX_TRANSPARENT window
+  receives no clicks on the goose, so "click to pet" is unreachable. The two are
+  contradictory. claude_plan resolves this correctly (§6: don't set
+  WS_EX_TRANSPARENT; use per-pixel-alpha natural hit-testing). This is the
+  hardest platform problem, and claude has it right.
+
+  Decision
+
+  A hybrid is best — but an asymmetric one: claude_plan is the spine; codex_plan
+  is grafted in.
+
+  claude_plan wins as the base on the things that are expensive to get wrong:
+  exact physics/rig constants, the Windows UpdateLayeredWindow-not-softbuffer
+  rendering reality, the click-through-vs-clickable crux, per-monitor windows +
+  dirty-rect present, the Cap<T> degradation model, and — critically — it
+  already encodes your locked decisions (clean-room procedural goose, sounds
+  bundled 1:1, memes→codex.md, fresh notes). codex_plan's §8.4 instead leaves
+  licensing "undecided" and defaults to a different-looking goose + synthesized
+  honks — off-target for your actual choices.
+
+  But codex_plan contributes genuine value claude_plan lacks (this is the
+  divergence pass — I went looking for codex's wins and found real ones):
+
+  1. Richer task inventory — real binary symbols: Task_NabMouse
+  (MouseGrabDistance/DropDistance/SuccTime…), Task_CollectWindow dispatcher →
+  Notepad/Meme/Donate sub-types with windowOffsetToBeak/SetWindowPassthru,
+  Task_TrackMud fields. A better Phase-3 spec than claude's coarser task list.
+  2. FirstUX scripted intro — the goose introduces itself before going random.
+  claude_plan missed this entirely. Real feature.
+  3. Pat sounds + pat-on-click as a first-class interaction (Pat1-3.wav).
+  4. Safety improvements over the original: pause_on_fullscreen (don't wreck
+  games/streams), --no-mouse-steal safe mode, always-present tray Quit.
+  5. TOML config (the qube-family convention — claude_plan even references
+  "WB300's tolerant TOML loader" while inconsistently specifying .ini).
+  6. Stronger test strategy: golden-frame PNG tests + a mock_host integration
+  harness + statistical picker test.
+  7. Uninstall --purge completeness + automated "leave-nothing-behind" scan;
+  explicit no-telemetry principle; crisp Non-Goals; data-driven/WASM mod surface
+  as the documented future (claude ships in-tree Rust mods for v1 — keep that,
+  adopt WASM as the v2 vision).
+  8. macOS AppleScript .sdef surface (scoped as v2) and optional ARM64 Windows
+  target.
+
+  Steel-manned dissent — "just execute claude_plan as-is." Rejected: it leaves
+  real value on the table (FirstUX is a missing feature; codex's task
+  sub-fields, pause-on-fullscreen, --purge, and golden-frame/mock_host tests are
+  cheap, high-value grafts; TOML is the better config). "Just execute 
+  codex_plan." Rejected harder: wrong constants, the click-through bug, and
+  conflict with your locked asset decisions.
+
+  Confidence: HIGH that hybrid-with-claude-as-spine is correct (the decisive
+  facts are checkable and I checked them — they held). MEDIUM on two graft
+  details I'd like your call on below.
+
+  Before I write the comprehensive hybrid file, three genuine forks are yours to
+  decide:
+
+● User answered Claude's questions:
+  ⎿  · What should the new hybrid plan file be named, and what happens to the 
+     two source plans? → New honk300_plan.md, keep both
+     · Which config format should the hybrid lock in? → TOML (Recommended)
+     · Which codex-originated modernizations should the hybrid adopt (vs. 
+     document as future/out-of-scope)? Pick all you want in v1. → 
+     pause-on-fullscreen, ARM64 Windows target, For our version, I don't want 
+     modding, but I do want extensive internal documentation within the repos, 
+     that way when I want to add new features, I can easily, um, but no external
+     modding. As for option two there, choice two, the no mouse steal safe 
+     mode, I do like that as a feature flag when you launch it via terminal, 
+     although I do not want the always-present tray. The stop command in the 
+     terminal should be something like honk300 stop or goose stop, but no tray. 
+     If it's open, it should act like the original, kind of like a prank almost,
+     but just always on. And then, as far as the targets go, all of the same 
+     targets as the standard Cube family, although, yeah, add ARM support as 
+     well. That'd be fantastic for Windows, Linux, Mac, et cetera.  
+
+● Your answers are captured. Three of them meaningfully reshape both source
+  plans, so let me restate the derived implications precisely before I write the
+  blueprint:
+
+  - No external modding at all (no DLL loading, no WASM, no data-driven
+  third-party mods). Autumn's falling-leaves becomes a built-in task, not a
+  "mod." In its place: extensive internal documentation (doc-comments + an
+  ARCHITECTURE.md + a "how to add a task" guide) so you extend by editing
+  source. → Drops claude_plan's mod-ABI/injection-point external surface and all
+  of codex's §9/Phase-7 mod system.
+  - No system tray. Quit becomes: hold-ESC where the OS allows a global key + a
+  new honk300 stop terminal command (single-instance lock + IPC) that works
+  everywhere — including Wayland, where hold-ESC can't. This is a genuinely new
+  piece neither plan had, and it cleanly solves claude_plan's C4 "hold-ESC can't
+  be the only quit path."
+  - Default = full original prank, always-on. --no-mouse-steal is an opt-in
+  launch flag (calmer mode); pause-on-fullscreen stays on as a politeness valve
+  for games/streams.
+  - TOML config; 7 targets = the 6 family triples + aarch64-pc-windows-msvc
+  (mac-ARM and linux-ARM are already in the family set, so this completes ARM
+  across all three OSes).
+
+  Let me write the plan file (the executable blueprint for honk300_plan.md).
+
+● Updated plan
+  ⎿  /plan to preview
+
+> Also, let's brainstorm some new minor behaviors or features that kind of      
+  continue on the vibe of the original but build off of it in a new modern way. 
+  Investigate, explore, and brainstorm first, and then ask me questions with    
+  all the details you've come up with.                                          
+  ⎿  Interrupted · What should Claude do instead?
+
+> /superpowers:brainstorming                                                    
+
+● I've written the plan-file blueprint for the hybrid honk300_plan.md. Now to
+  the new ask: brainstorming modern minor features that extend the original's 
+  vibe. Following the brainstorming flow, I'll first ground myself in the
+  original's actual texture (its voice, its existing toggles, its own "command"
+  surface) so the new ideas build on it rather than duplicate it — then bring
+  you a developed menu and questions.
+
+  Let me explore the remaining original artifacts in parallel.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+> and then i want a full ratatui claude-code architecture style terminal config 
+  under honk300 config and goose config                                         
+
+> that should allow you to toggle behaviours, features, and other settings      
+  (including autumn)                                                            
+
+● Two more substantial asks just landed, and they reshape the plan:
+  - A ratatui, Claude-Code-architecture-style terminal config TUI launched via
+  honk300 config (and goose config) that toggles behaviors/features/settings
+  including Autumn.
+  - The earlier feature brainstorm.
+
+  That config TUI is actually a great fit — it's exactly the family idiom (WB300
+  is already a ratatui TUI), and it cleanly replaces the rejected "GUI settings
+  app / tray" with a CLI-native settings surface. Let me finish grounding: the
+  goose's voice (for any new text features), its full existing toggle list, its
+  own command surface, what Autumn does — and in parallel study WB300's TUI
+  architecture so the config TUI mirrors the family.
+
+  Read 1 file (ctrl+o to expand)
+
+> And by new features, I mean optional toggles as well in the terminal thing,   
+  but also behaviors and new things that the goose can do or will do            
+  autonomously.                                                                 
+
+● Understood — the new features are autonomous goose behaviors, each surfaced as
+  an optional toggle in the config TUI. Let me finish grounding (the goose's
+  voice, its command surface, what Autumn does) and study the family's TUI in
+  parallel.
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● Explore(Study WB300 ratatui TUI architecture)
+  ⎿  Done (16 tool uses · 72.1k tokens · 2m 4s)
+  (ctrl+o to expand)
+
+● I now have the full texture I needed. Three findings shape the brainstorm:
+
+  - The goose's voice (from the real notes): terse, lowercase, self-aware
+  menace-but-cute — "am goose hjonk", "i cause problems on purpose", "peace was 
+  never an option — the goose (me)", "hard to type withh feet", ASCII >o). Any
+  new text the goose "writes" must live in that register.
+  - The original's own command surface (the macOS .sdef): honk · wander · nab 
+  mouse · track mud · collect meme · collect note · collect donations · open 
+  memes folder. That's effectively the original's own list of "pokeable" actions
+  — a perfect basis for manual triggers in the TUI.
+  - The family TUI is a perfect template. WB300 is ratatui 0.30 + crossterm + a
+  tokio::select! loop + a pure reducer (AppState/Action/apply()), ui/ render
+  modules, a central theme.rs palette, overlay modals, and an always-visible
+  footer hint bar. A honk300 config settings TUI drops straight into that shape
+  (Overlay::Settings { SettingsForm }, j/k nav, Enter toggle, S save →
+  config.toml).
+
+  The config TUI (honk300 config / goose config)
+
+  A ratatui, reducer-driven settings editor mirroring WB300's architecture:
+  grouped categories down the left (General · Behaviors · Mischief · Appearance 
+  · Audio · Schedule), a scrollable form on the right, cyan-accent theme, footer
+  hints (j/k move · Enter toggle · ←/→ adjust · S save · q quit). It
+  reads/writes the versioned config.toml, validates ranges, and shows transient
+  ✓ saved / ⚠ couldn't write status. Every behavior below — including Autumn —
+  is a toggle here; numeric ones (wander times, quiet-hours, idle timeout) are
+  inline editable. Open question for you in Q4: should saving hot-apply to a 
+  running goose (reuse the honk300 stop IPC channel) or just take effect next
+  launch (WB300 is next-launch).
+
+  Brainstormed behaviors — each a toggle, each builds on the original's vibe
+
+  Legend: 🟢 = I'd default ON · ⚪ = ship but default OFF (spicy/privacy) · all
+  are toggles.
+
+  A — Mischief extensions (build on the steal/drag/notepad gags)
+  - 🟢 Perch & ride — goose hops onto your active window's title bar and rides
+  it as you drag the window. Modern multi-window twist on "drag your windows."
+  (reuses foreign-window tracking)
+  - 🟢 Speech-bubble notes — instead of only hijacking Notepad, the goose pops a
+  small in-overlay bubble above itself with a goose-voiced one-liner.
+  Cross-platform, less intrusive, same gag. (Notepad stays as the louder
+  version.)
+  - ⚪ Clipboard honk — rarely swaps your clipboard for "HONK"/ASCII goose, then
+  restores your real clipboard seconds later (never permanently clobbers).
+  Spicy but safe.
+  - ⚪ Fake photo — goose "takes a screenshot" (flash + shutter) that captures
+  nothing. Pure prank, zero privacy cost.
+
+  B — Ambient autonomous life (make it feel alive & modern-considerate)
+  - 🟢 Idle sleep — after N minutes of no input the goose curls up (Zzz);
+  stretches & wakes when you return.
+  - 🟢 Quiet hours + DND respect — honks dim / mischief calms at night and when
+  the OS is in Do-Not-Disturb / presentation mode (extends pause-on-fullscreen).
+  - 🟢 Seasonal moods — by system date only (no network): Autumn leaves (the
+  built-in Autumn!), winter snow-tracks, etc. Generalizes Autumn into a
+  year-round system.
+  - 🟢 Multi-monitor chase — goose runs off one monitor's edge and reappears on
+  the adjacent one (true traversal; the original was single-screen-ish).
+  - ⚪ On-the-hour cuckoo — honks the hour like a clock (3pm → 3 honks).
+  - ⚪ Goose gifts — occasionally drops a tiny procedural worm/bread/pebble near
+  your cursor that fades. Wholesome counterweight.
+  - ⚪ Dynamic moods — hungry/playful/sleepy state that biases task selection &
+  pat reactions.
+
+  C — Interaction & delight (let you engage back)
+  - 🟢 Pat streak + hearts — repeated petting builds a happy streak, emits heart
+  particles (the original ships heart.png!), briefly calms mischief.
+  - 🟢 Manual poke commands — honk300 do honk|wander|mud|meme|note|nab from the
+  terminal + a "Poke" panel in the TUI (straight from the .sdef surface).
+  Dev-friendly, on-brand for the *300 family.
+  - ⚪ Gaggle cameo — very rarely a second goose wanders in, honks, and leaves.
+  Easter egg.
+  - ⚪ Konami / "honk" easter eggs — type honk → it honks back; Konami code →
+  confetti.
+
+  D — Calm valve (modern accessibility, complements --no-mouse-steal)
+  - 🟢 Calm goose — a master toggle that slows motion and disables jarring
+  mischief while keeping wander/honk/ambient. The opposite pole to the always-on
+  prank default.
+
+  Everything is local, no telemetry, no network (except honk300 update), and
+  safe-by-default. Now the questions to converge:
+
+● User answered Claude's questions:
+  ⎿  · You keep typing `goose config` / `goose stop`. The locked binary is 
+     `honk300` (with a `honk` alias). Should `goose` become a real third 
+     invocation name? → honk300 honk and goose. to start, any of them by 
+     themselves, or "honk plz" or "goose do honk". to stop, [any] stop or "honk 
+     bad" or "goose no honk". to launch custom tui config, [any] config. all of 
+     this and all other commands should be viewable from inside the tui, or via 
+     [any] help
+     · Ambient autonomous-life behaviors to include (all become TUI toggles). 
+     Pick the ones you want; I'll default the calmer ones ON and spicier ones 
+     OFF. → Quiet hours + DND respect, Seasonal moods (extends Autumn), 
+     Multi-monitor chase, on the hour double honk and dynamic moods with 
+     behavior changes would also be good. Kind of like how he has a hyper mode 
+     when you click on him. It'd be funny if he goes hyper or really sad or I 
+     don't know, does some other random shit sometimes. Although know your 
+     limitations on what you're able to configure and animate in like the 
+     framework and how we've built it and also just yourself as Claude. Don't 
+     overcommit. 
+     · Mischief & interaction behaviors to include (all become TUI toggles). → 
+     Perch & ride windows, Pat streak + hearts, Manual poke commands, For the 
+     perch and ride windows, similar to how the goose chases when you click him,
+     when you start to drag a window, have him have the goose run from wherever
+     it currently is to the top of that window and then sit down while you drag
+     it. And if you stop dragging before he gets there, then he just resumes 
+     what he was doing before, smoothly. And then for Pat streak, that would be 
+     not clicking him, but just like moving your cursor over the top of him 
+     repeatedly. 
+     · Should saving in the config TUI hot-apply to a running goose, or take 
+     effect next launch? → Hot-apply where cheap, restart-note otherwise
+
+● Excellent, detailed answers — and the "know your limitations, don't
+  overcommit" steer is exactly right for a procedurally-rendered goose. Let me
+  lock in the implications honestly before I fold them into the plan:
+
+  - Three names (honk300 / honk / goose) with a small, finite goose-speak
+  grammar — start: bare name or honk plz; stop: <any> stop / honk bad / goose no
+  honk; poke: <any> do honk; settings: <any> config; everything discoverable
+  via <any> help and a Commands panel in the TUI. This is a fixed phrase-map
+  (deterministic clap normalization), not runtime NL parsing — no model at
+  runtime.
+  - Dynamic moods are parameter-modulation, not new art. A procedural rig
+  (tiny-skia capsules) can only "emote" through things the engine already
+  exposes: posture (neck/head height via the existing neck-lerp), speed/accel
+  tier, step cadence, honk frequency/pitch, color tint, and task-weight bias. So
+  moods = {content · hyper · sad · sleepy · mischievous} driving those knobs
+  (hyper already exists as the click→charge reaction). No hand-drawn frames.
+  That's the honest ceiling, and it's still expressive.
+  - Perch & ride = on window-drag-start, set the goose's target to that window's
+  title bar; it locomotes there; arrives → rides; you release first → it
+  smoothly abandons and resumes (existing task-interrupt/resume). Hooks:
+  SetWinEventHook(MOVESIZESTART/END) (Win), AX observers (mac), configure-notify
+  (X11); Cap-degrades on Wayland.
+  - Pat = repeated cursor-hover-sweeps over the goose (not clicks) → heart
+  particles + brief calm; click stays the hyper reaction.
+  - Hot-apply where cheap via the same IPC channel as stop/do (now a small
+  command channel, not just a kill signal); structural changes get a "restart to
+  apply" note.
+
+  Let me fold all of this into the plan file.
+
+● Updated plan
+  ⎿  /plan to preview
+
+> And make sure we're building all of these things out for all platforms, OSes, 
+  and architectures as we advertise (windows (the main architectures plus arm)  
+  macos linux (both standard and arm)                                           
+
+● Good — that's an important scope nail-down. Let me fold the full
+  build-everywhere matrix into the plan, with one clarifying principle that
+  keeps it honest: architecture (x64 vs ARM) is a build/packaging axis, not a 
+  capability axis — every feature that runs on Windows-x64 runs on Windows-ARM;
+  real feature differences come only from OS + display server (Win / macOS / X11
+  / Wayland) + permissions, which the Cap<T> model already handles.
+
+● Updated plan
+  ⎿  /plan to preview
+
+● Updated plan
+  ⎿  /plan to preview
+● Now a compact parity matrix making explicit that each new behavior is built
+  for every OS (with honest Cap degradation), plus verification/milestone
+  updates.
+
+● Updated plan
+  ⎿  /plan to preview
+
+● Updated plan
+  ⎿  /plan to preview
+
+● Updated plan
+  ⎿  /plan to preview
+
+● The plan file is now comprehensive and covers all four asks — the hybrid
+  analysis/verdict, the new autonomous behaviors (honestly scoped to the
+  procedural rig), the ratatui config TUI + goose-speak CLI, and the full
+  build-everywhere matrix. Let me load the exit tool and present the plan for
+  approval.
+
+● User approved Claude's plan
+  ⎿  Plan saved to: ~\.claude\plans\don-t-act-on-anything-keen-milner.md · /plan
+     to edit
+     Plan: Author honk300_plan.md — hybrid Desktop-Goose plan + new behaviors + 
+     config TUI
+
+     Context — why this change is being made
+
+     goose/ is at the planning stage of a from-scratch, cross-platform Rust
+     reimplementation
+     of Desktop Goose (binary honk300). Two competing planning drafts exist —
+     claude_plan.md
+     (353 lines) and codex_plan.md (770 lines). The user asked for (1) an
+     exhaustive analysis +
+     a pick/hybrid decision, (2) a brainstorm of new autonomous goose behaviors
+     that extend the
+     original's vibe in a modern way — each exposed as a toggle, and (3) a
+     ratatui, Claude-Code/
+     QubeTX-family-style terminal config TUI (honk300 config / goose config)
+     that toggles
+     behaviors/features/settings, including Autumn.
+
+     After reading both drafts in full and claim-testing their load-bearing 
+     facts against the
+     actual shipped C# source and the three sibling qube repos, the verdict is a
+     hybrid. This
+     file is the executable blueprint for a single new goose/honk300_plan.md,
+     with the two source
+     drafts kept as provenance.
+
+     Recommendation (verdict, evidence-backed)
+
+     Asymmetric hybrid: claude_plan.md is the spine; codex_plan.md is grafted 
+     in. Verified,
+     not asserted:
+
+     - Engine constants — claude exact, codex wrong. Exports.cs ParametersTable
+     literally =
+     WalkSpeed 80 / RunSpeed 200 / ChargeSpeed 400 / AccelNormal 1300 / 
+     AccelCharged 2300 / StepTime 0.2,0.1 / Mud 15 + full rig geometry (Body
+     22/11/14, Necc 13/20/3/10/16, Head
+     15/3/10/5, Eyes 2/3/5/5, Feet 6/5/0.4, FootMark 8.5/1, pos (300,300),
+     dir 90). claude
+     reproduces verbatim; codex's Appendix B invents wrong values (walk 30/run 
+     90/charge 200/…) — it read binary symbol names but not the C# values.
+     - Deck RNG — claude right. SamEngine.cs: biased shuffle
+     (otherIndex=(int)RandomRange(0,j),
+     System.Random); picks by canBePickedRandomly bool, not weights. codex's
+     "weighted
+     picker" is unverified (flagged as an open question, not a fact).
+     - Family conventions — claude precise. Verified across TR300/ND300/WB300:
+     editions
+     2021/2021/2024 (claude said exactly this, chose 2021); identical 6 targets,
+     no ARM64
+     Windows; cargo-dist 0.31.0, ICE38/64/91, allow-dirty=["msi"]; TR/ND
+     thiserror, WB
+     color-eyre; all build.rs+clap_mangen; all carry a crates-publish.yml to
+     drop.
+     - Hardest platform problem — claude correct, codex self-contradictory.
+     codex specs the
+     overlay WS_EX_LAYERED|WS_EX_TRANSPARENT|WS_EX_TOPMOST (globally
+     click-through) and lists
+     pat-on-click — impossible together. claude is right: no WS_EX_TRANSPARENT;
+     per-pixel-alpha
+     hit-test (Win) / XShape input region (X11). Same for
+     UpdateLayeredWindow-not-softbuffer,
+     per-monitor windows, dirty-rect present, Cap<T> degradation.
+     - Locked-decision alignment — claude on-target. claude already encodes the
+     user's choices
+     (clean-room procedural goose, sounds 1:1, memes→codex.md, fresh notes);
+     codex leaves
+     licensing "undecided" and defaults to a different-looking goose +
+     synthesized honks.
+
+     codex's genuine grafts: richer task inventory
+     (Task_NabMouse/Task_CollectWindow
+     dispatcher fields, off-screen bolt), FirstUX scripted intro (claude missed
+     it), pat
+     sounds, pause_on_fullscreen, --no-mouse-steal, TOML config, golden-frame +
+     mock_host tests, uninstall --purge + leave-nothing-behind, no-telemetry
+     principle, crisp
+     Non-Goals, ARM64 Windows, macOS AppleScript .sdef (future).
+
+     Confidence: HIGH (decisive facts are checkable and held).
+
+     Decisions locked across this session (override both drafts on conflict)
+
+     Document & config
+     1. New goose/honk300_plan.md; keep claude_plan.md + codex_plan.md; update
+     CLAUDE.md
+     "Read these first" pointers to name honk300_plan.md canonical (same
+     commit).
+     2. TOML config (config.toml), original keys preserved at the correct 
+     §-verified values,
+     versioned (goose_config_version), tolerant loader
+     (missing/malformed/wrong-version→defaults,
+     unknown keys ignored). No EnableMods key (no mods).
+
+     Identity & control
+     3. Three invocation names: honk300, honk, goose (all installed/aliased). A
+     finite,
+        deterministic goose-speak grammar (a fixed phrase→subcommand map in the
+     CLI parser — not
+        runtime NL/LLM):
+     - Start: <name> (bare) · <name> start · <name> plz · honk plz · goose plz
+     - Stop: <name> stop · honk bad · goose no honk · <name> no · <name> bad
+     - Poke an action: <name> do <honk|wander|mud|meme|note|nab|donate> (honk 
+     plz ⇒ do honk)
+     - Config TUI: <name> config
+     - Help (lists every command incl. goose-speak): <name> help / --help
+     - Lifecycle: <name> install|uninstall|update|setup|--version
+     - Every command + alias is discoverable from <name> help and a "Commands"
+     panel in the TUI.
+     4. No system tray. Quit = hold-ESC (global where the OS allows) or any stop
+     command.
+     5. Single-instance + a small IPC command channel (new): named event/pipe
+     (Win) · unix
+     socket / PID-file+signal (mac/Linux). Carries stop, do <action>, and reload
+     (hot-apply config). Universal/Wayland-safe quit + the live-poke + hot-apply
+     transport.
+     6. Default = full original prank, always-on. --no-mouse-steal opt-in flag;
+     pause_on_full screen default on; a TUI Calm goose master toggle is the
+     opposite pole.
+
+     Config TUI (<name> config)
+     7. ratatui 0.30 + crossterm + tokio::select! loop + reducer
+     (AppState/Action/apply()),
+        ui/ render modules, central theme.rs, overlay modals, footer hint bar —
+     mirroring WB300
+        (qube-workbranch-view/src/{app,ui}). Grouped categories: General · 
+     Behaviors · Mischief ·
+        Schedule · Appearance · Audio · Commands(ref) · About, plus a Poke panel
+     (triggers
+        do <action> live over IPC). j/k nav · Enter toggle · ←/→ adjust numerics
+     · S save · q quit.
+        Reads/writes config.toml via serde+toml; transient ✓ saved / ⚠ write 
+     failed.
+     8. Hot-apply where cheap, restart-note otherwise:
+     behavior/mischief/audio/schedule/mood/
+        appearance toggles push to a running goose via the IPC reload;
+     structural ones (overlay
+        backend, monitor topology, --wayland) show "restart to apply."
+
+     Extensibility (no external mods)
+     9. No external modding (no DLL/.so/.dylib, no WASM, no third-party data
+     mods). Autumn's
+        leaf-pile becomes a built-in task/season. Internal extension seams stay
+     clean and are
+        documented (rustdoc + ARCHITECTURE.md + "Adding a task/sound/season"
+     guide) so the user
+        extends by editing source.
+
+     Targets — build everywhere we advertise, every OS + arch
+     10. Full target matrix (≥7 triples), ARM on all three OSes:
+         - Windows: x86_64-pc-windows-msvc + aarch64-pc-windows-msvc (ARM64)
+         - macOS: x86_64-apple-darwin (Intel) + aarch64-apple-darwin (Apple
+     Silicon),
+           shipped as a universal2 .app/.dmg (one bundle runs both)
+         - Linux: x86_64-unknown-linux-gnu + aarch64-unknown-linux-gnu (ARM) +
+           x86_64-unknown-linux-musl (static); optional
+     aarch64-unknown-linux-musl for ARM-static parity
+         - Principle (load-bearing): architecture is a build/packaging axis, NOT
+     a capability
+           axis. Every feature available on an OS is available on all of that
+     OS's arches; the only
+           real feature differences come from OS + display server (Win / macOS /
+     X11 / Wayland) +
+           granted permissions — exactly what the Cap<T> model captures. So
+     "build for all arches" is
+           a CI/installer concern; "all features everywhere they're possible" is
+     the Cap-parity goal
+           (full on Win/mac/X11; permission-gated on macOS; documented
+     degradation on Wayland).
+
+     11. Carry over claude's other locked decisions (name/GUIDs, procedural
+     clean-room goose, sounds
+     1:1 embedded, memes→codex.md, fresh notes, X11-first + --wayland,
+     4-installer Windows
+     matrix, no crates.io).
+
+     New autonomous behaviors (each a TUI toggle; scoped honestly for a 
+     procedural rig)
+
+     ▎ Feasibility guardrail (per user "don't overcommit"): the goose is drawn 
+     ▎ each frame from a
+     ▎ geometric rig in tiny-skia. It "emotes" only through parameters the 
+     ▎ engine already exposes —
+     ▎ posture (neck/head height via the existing neck-lerp), body tilt, 
+     ▎ speed/accel tier, step
+     ▎ cadence, honk frequency/pitch, color tint, footmark behavior, and 
+     ▎ task-weight bias. No
+     ▎ hand-drawn frames, no sprite art. Every behavior below stays inside that 
+     ▎ envelope.
+
+     Selected (default ON unless noted):
+     - Quiet hours + DND/presentation respect — dim honks / calm mischief during
+     a config quiet
+     window and when the OS reports Do-Not-Disturb / presentation / fullscreen
+     (extends
+     pause_on_fullscreen). Config: quiet_start/quiet_end, dnd_respect.
+     - Seasonal moods (generalizes Autumn) — system-date-driven, no network:
+     autumn =
+     leaf-piles (the built-in Autumn), winter = snow-tracks/breath, etc. Master
+     seasonal toggle +
+     per-season sub-toggles; Autumn ships as the reference season.
+     - Multi-monitor chase — goose exits one monitor's edge and re-enters the
+     adjacent monitor
+     (true traversal; builds on per-monitor windows + the signed virtual space).
+     - On-the-hour double honk — two honks at the top of each hour. Toggle.
+     - Dynamic moods (parameter-modulation state machine) — spontaneous,
+     weighted-timer
+     transitions among {content, hyper, sad, sleepy, mischievous}, each
+     modulating posture +
+     speed/accel + honk cadence/pitch + tint + task weights (hyper = the
+     existing click→charge
+     reaction, now also self-triggered; sad = droopy low neck + desaturated tint
+     + sparse low
+     honks; sleepy = slow + Zzz). Toggle + a "calm/normal/spicy" intensity
+     setting.
+     - Perch & ride windows — on foreign-window move-start, target = that
+     window's title-bar
+     top; goose locomotes there; arrives while still dragging → rides; drag 
+     released first →
+     smoothly abandons, resumes prior task (existing task-interrupt/resume).
+     Hooks:
+     SetWinEventHook(EVENT_SYSTEM_MOVESIZESTART/END) (Win), AX observers (mac),
+     configure-notify/
+     _NET_WM_STATE (X11); Cap-degrades on Wayland.
+     - Pat streak + hearts — repeated cursor hover-sweeps over the goose (not
+     clicks) build a
+     happy streak → heart particles (procedural / original heart.png) +
+     temporary calm. Distinct
+     from click → hyper. Uses the per-frame cursor-over-bbox test we already
+     need for hit-testing.
+     - Manual poke commands — <name> do <action> from the terminal + the TUI
+     Poke panel
+     (sourced from the original .sdef: honk/wander/mud/meme/note/nab/donate).
+     - Calm goose master toggle + --no-mouse-steal (accessibility/anti-chaos
+     pole).
+
+     Available but default OFF (ship as toggles, low priority): clipboard honk
+     (backs up &
+     restores the real clipboard), fake-photo flash (captures nothing), gaggle
+     cameo (rare 2nd
+     goose), honk/Konami easter eggs, goose gifts, speech-bubble notes,
+     standalone idle-sleep.
+
+     New-behavior cross-platform parity (arch-independent; built for x64 and ARM
+     on each OS).
+     Capability differences are OS/display-server-driven, handled by Cap<T>:
+
+     New behavior: Config TUI (<name> config) + goose-speak CLI + help
+     Win: ✅
+     macOS: ✅
+     X11/XWayland: ✅
+     Wayland: ✅
+     ────────────────────────────────────────
+     New behavior: Single-instance + IPC (stop / do / reload, hot-apply)
+     Win: ✅ named pipe/event
+     macOS: ✅ unix socket
+     X11/XWayland: ✅ unix socket
+     Wayland: ✅ unix socket
+     ────────────────────────────────────────
+     New behavior: Dynamic moods · on-hour honk · seasonal · pat-hover + hearts
+     ·
+       multi-monitor chase
+     Win: ✅
+     macOS: ✅
+     X11/XWayland: ✅
+     Wayland: ✅ (render/sim only)
+     ────────────────────────────────────────
+     New behavior: Quiet-hours / DND-fullscreen respect
+     Win: ✅ SHQueryUserNotificationState
+     macOS: ✅ NSWorkspace/Focus
+     X11/XWayland: ✅ EWMH/idle
+     Wayland: ⚠️ best-effort
+     ────────────────────────────────────────
+     New behavior: Perch & ride (needs window move-start/end hooks)
+     Win: ✅ SetWinEventHook
+     macOS: ✅ AX observers
+     X11/XWayland: ✅ configure-notify
+     Wayland: ❌ self-skips
+     ────────────────────────────────────────
+     New behavior: Manual pokes that move windows/cursor (nab/donate)
+     Win: ✅
+     macOS: ✅ (Accessibility)
+     X11/XWayland: ✅
+     Wayland: ❌ self-disable
+
+     Engine-side behaviors (moods, seasonal, hearts, multi-monitor) are
+     platform-free and identical
+     everywhere; only the OS-interaction ones degrade, and they degrade honestly
+     (toggle reports
+     "unavailable on this session" in the TUI rather than silently failing).
+
+     Deliverable: honk300_plan.md — section blueprint
+
+     Spine = claude_plan order, enriched with codex grafts + this session's
+     decisions. Source tags:
+     [C]=claude, [X]=codex, [N]=new-this-session.
+
+     1. Title + status banner [C].
+     2. §1 Context & locked decisions [C+N] — README brief; full
+     locked-decisions table updated
+     with all 11 decisions above (3 names + goose-speak grammar, no tray, IPC
+     channel, TOML, no
+     mods→internal docs, config TUI, hot-apply policy, prank-always-on, 7
+     targets).
+     3. §2 Mission / Non-Goals / Principles [X] — feel+feature parity;
+     safe-by-default; no
+     telemetry / no network except <name> update; Non-Goals: bit-for-bit compat,
+     .NET mod
+     loading, any external mod surface, mobile, system tray,
+     multi-goose-as-service,
+     runtime NL parsing.
+     4. §3 Source analysis [C spine + X graft] — claude's exact constant tables
+     verbatim; graft
+     codex's task field inventory; add FirstUX, pat sounds, off-screen bolt;
+     .sdef command set
+     (→ poke commands); the goose's voice samples (for fresh original
+     notes/bubbles).
+     5. §4 Engine model [C] — 120 Hz fixed timestep, Vector2/SamMath, biased
+     Deck
+     (faithful-port, test-pinned), Input/ButtonState. Open question: verify
+     gooseTaskWeightedList in binary strings.
+     6. §5 Behavior/feature parity + new behaviors [C+X+N] — original set
+     (wander/mud/nab/attack/
+     collect-window dispatcher/honk/pat/Autumn) + the new-behaviors spec above,
+     with the
+     procedural-rig feasibility guardrail stated up front. Per-task →
+     per-platform Cap table.
+     7. §6 Cross-platform landscape + stack [C] — capability matrix; hard
+     impossibilities; crate
+     list (drop mod-loader; add ureq+sha2+serde_json for update;
+     ratatui+crossterm+toml for
+     the TUI).
+     8. §7 Target architecture [C spine + N] — workspace: honk-engine
+     (#![forbid(unsafe_code)],
+     owns mood state machine as pure params) + honk-platform traits + 4 backends
+     + honk-assets
+       - honk-config/TUI module (ratatui) + src/main.rs (clap + goose-speak
+     normalization).
+     Remove external mod ABI; documented internal task-registry seams. Add
+     Control/Ipc trait
+     (single-instance + command channel: stop / do / reload) and a
+     Schedule/Presence source
+     (clock, idle, DND/fullscreen) feeding engine flags.
+     9. §8 The loop — three clocks [C] — sim 120 Hz fixed accumulator, input
+     poll 120 Hz, present
+     on-dirty dirty-rect rate-capped; per-monitor windows in one signed virtual
+     space.
+     10. §9 Click-through vs clickable — resolved [C] — per-pixel-alpha (no
+     WS_EX_TRANSPARENT),
+     XShape region, macOS ignoresMouseEvents toggle; explicitly flags codex's
+     contradiction.
+     11. §10 CLI grammar, control & quit model [N] — the 3 names + finite
+     goose-speak phrase-map
+     (deterministic, clap-normalized); subcommands; hold-ESC per-OS + any-stop;
+     **single-instance
+       - IPC command channel** (stop/do/reload) design per OS; graceful shutdown
+     (restore cursor,
+     close spawned windows). No tray.
+     12. §11 Config TUI [N] — ratatui/reducer architecture mirroring WB300;
+     category groups + Poke
+     panel; theme; footer hints; TOML read/write; hot-apply-where-cheap via IPC
+     reload,
+     restart-note otherwise; toggles every behavior incl. Autumn + the new ones;
+     Commands
+     reference panel.
+     13. §12 Asset strategy [C] — embed sounds 1:1 (excluded from include=[…]);
+     atomic extract;
+     precedence user>extracted>embedded; memes→codex.md; notes→fresh originals 
+     in the goose
+     voice; hearts/leaves procedural; missing slot→skip.
+     14. §13 Config schema (TOML) [X format + C+N keys] — original keys at
+     correct values, plus
+     [schedule](quiet_hours/dnd_respect/seasonal),
+     [moods](dynamic_moods+intensity+weights),
+     [mischief](perch_and_ride/nab/attack), [interaction](pat_streak),
+     [behaviors]
+     (on_hour_double_honk/multi_monitor_chase), [appearance](colors/calm),
+     [safety]
+     (pause_on_fullscreen/no_mouse_steal). Versioned + tolerant.
+     15. §14 Packaging & distribution — all OSes + arches [C+X+N] — cargo-dist
+     0.31.0, the full
+     target matrix (§10), fresh WiX/Inno GUIDs, [profile.dist] inherits=release 
+     lto=thin, no
+     crates-publish. Per-OS/arch packaging:
+       - Windows (x64 + ARM64): the 4-installer matrix (Global/Corporate ×
+     MSI/EXE) built for
+     both arches (WiX + Inno both support ARM64) → 8 Windows installer artifacts
+     +
+     InstallSource markers; port windows-installers.yml (workflow_run after
+     Release,
+     ICE38/64/91, .sha256, torn-release guard), matrixed over arch. CI builds
+     ARM64 via the
+     MSVC ARM64 toolchain (native ARM runner or cross), honestly noting any
+     emulation-only test gaps.
+       - macOS (Intel + Apple Silicon): a universal2 .app (stable bundle-id)
+     inside one
+     .dmg; one download runs both arches.
+       - Linux (x64 + ARM, gnu + musl): per-arch tarballs + .desktop + optional
+     per-arch
+     AppImage (and optional .deb/.rpm via cargo-dist extras).
+       - <name> install = autostart + shortcut/.desktop/LaunchAgent + asset
+     extraction + marker
+     (not shell-autorun); installs all three name aliases (honk300/honk/goose).
+     Self-update from GitHub Releases, SHA-256-verified, install-origin- and 
+     arch-matched
+     (download the installer for the running arch), msiexec-3010-aware,
+     post-install --version;
+     never cargo install.
+     16. §15 Uninstall [X] — channel-aware; --yes/--purge/--json; --purge backs
+     up user
+     memes/notes first; automated leave-nothing-behind scan.
+     17. §16 Build milestones [C+X+N] — table below.
+     18. §17 Adversarial red-team [C technical + X operational + N] — merge
+     claude's 12 ranked
+     technical risks with codex's operational risks; add: IPC-channel security
+     (local-only,
+     no network; auth the pipe/socket to the same user), perch-ride hook
+     availability per OS,
+     mood-system scope creep (mitigated by the rig guardrail), TUI/engine config
+     races (the
+     reducer + versioned config + hot-apply protocol). Drop mod-security risks.
+     19. §18 Corrections (C1–C12) [C+N] — keep C1–C8; revise C4 (quit = ESC +
+     any-stop, no tray),
+     C5; add C9 TOML, C10 no-mods→internal-docs, C11 IPC+TUI, C12 ARM64 Windows.
+     20. §19 Verification & testing [C+X+N] — engine constant/Deck tests;
+     golden-frame PNG +
+     mock_host intent tests; mood-state transition tests; perch-ride
+     arrive/abandon test;
+     pat-streak hover test; config round-trip + hot-apply IPC test; TUI reducer
+     tests;
+     per-platform manual matrix incl. stop-grammar + Wayland; packaging smoke 
+     across every
+     target/arch (Win x64+ARM64, mac Intel+Apple-Silicon universal2, Linux
+     x64+ARM gnu+musl) —
+     install → --version → <name> stop on each; local gate (fmt/clippy
+     -Dwarnings/test/build).
+     21. §20 Internal extensibility guide [N] — ARCHITECTURE.md + "Adding a
+     task/sound/season"
+       - thorough rustdoc as the supported extension path (replaces a mod
+     system).
+     22. §21 Out of scope / future [C+X] — signing/notarization; macOS .sdef
+     AppleScript;
+     external/WASM mods (explicitly future, low priority); store distribution;
+     the default-OFF
+     spicy behaviors as opt-in extras.
+     23. Appendices — engine/family source paths; constants tables; file/path
+     lockstep [X-A];
+     full config.toml [X-B, corrected + new sections]; CLI grammar / goose-speak
+     alias table
+     [N]; quit/poke/IPC matrix per OS [N].
+
+     Milestone table (§16)
+
+     ┌─────┬───────────────────────────────────────────────────────────┬────────
+     ┐
+     │  #  │                         Milestone                         │ Source
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M0  │ Workspace + honk-engine (math/time/Deck/entity/rig/feet)  │ C+X
+     │
+     │     │ 1:1; unit tests + golden-frame harness                    │
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M1  │ Win transparent click-through topmost overlay, static     │ C
+     │
+     │     │ procedural goose                                          │
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M2  │ 120 Hz accumulator + locomotion + dirty-rect present +    │ C
+     │
+     │     │ feet                                                      │
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M3  │ Footmarks + mud (8.5/1, 15s)                              │ C
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M4  │ Task state machine + wander + config timing + FirstUX     │ C+X
+     │
+     │     │ intro                                                     │
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M5  │ Audio: honks + bite + mud + pat + SilenceSounds           │ C+X
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M6  │ Hit-testing: pat = hover-streak + hearts; click → hyper   │ X+N
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M7  │ Cursor mischief (warp + nab sub-states)                   │ C+X
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M8  │ Foreign-window dragging + perch & ride                    │ X+N
+     │
+     │     │ (move-start→ride/abandon)                                 │
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M9  │ Collect-window dispatcher: Notepad (faithful) + meme +    │ C+X
+     │
+     │     │ donate                                                    │
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M10 │ Single-instance + IPC command channel (stop/do/reload) +  │ N
+     │
+     │     │ hold-ESC; no tray                                         │
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M11 │ CLI grammar (3 names + goose-speak phrase-map) + do       │ N
+     │
+     │     │ <action> pokes + help                                     │
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M12 │ Config TUI (ratatui reducer; groups + Poke panel; TOML    │ N
+     │
+     │     │ I/O; hot-apply via IPC)                                   │
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M13 │ Dynamic moods (param-modulation state machine) + on-hour  │ N
+     │
+     │     │ double honk                                               │
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M14 │ Schedule: quiet hours + DND/fullscreen respect; seasonal  │ N
+     │
+     │     │ (Autumn built-in)                                         │
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M15 │ Multi-monitor chase + full recolor/appearance             │ N
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M16 │ macOS backend + .app + permission-gated degradation       │ C
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M17 │ Linux X11 backend (XShape + EWMH + device_query)          │ C
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │ M18 │ --wayland layer-shell degraded mode (stop/poke via IPC)   │ C+N
+     │
+     ├─────┼───────────────────────────────────────────────────────────┼────────
+     ┤
+     │     │ install/update/uninstall(--purge)/setup + packaging for   │
+     │
+     │ M19 │ all targets (Win x64+ARM64 ×4 installers, mac universal2  │ C+X+N
+     │
+     │     │ .dmg, Linux x64/ARM gnu+musl) + 3 aliases                 │
+     │
+     └─────┴───────────────────────────────────────────────────────────┴────────
+     ┘
+
+     Verification (of the deliverable + the eventual build)
+
+     - Deliverable check: honk300_plan.md exists; both source drafts retained;
+     every session
+     decision reflected (3 names + goose-speak, TOML, no-mods+internal-docs,
+     no-tray + IPC, config
+     TUI + hot-apply, prank-always-on + calm/pause valves, new behaviors with
+     the rig guardrail, 7
+     targets); all engine constants match Exports.cs/SamEngine.cs; codex's wrong
+     numbers absent;
+     CLAUDE.md pointers updated.
+     - Changelog discipline: update CHANGELOG.md and HUMAN_CHANGELOG.md in
+     lockstep, same
+     commit (repo rule), recording the merged plan + new-behaviors/TUI scope.
+     - Implementation round (later): family local gate (cargo fmt --all -- 
+     --check,
+     cargo clippy --all-targets --workspace -- -D warnings, cargo test 
+     --workspace,
+     cargo build --release) + the §19 test set + per-platform manual matrix.
+
+     Out of scope for THIS task
+
+     No application code, Cargo.toml, or src/ — implementation is a later,
+     separate round. This
+     task produces only: the merged honk300_plan.md, the CLAUDE.md pointer
+     update, and the
+     lockstep CHANGELOG.md + HUMAN_CHANGELOG.md entries.
+
+● Plan approved. Executing now — this task produces three things: the
+  comprehensive honk300_plan.md, a CLAUDE.md pointer update, and lockstep
+  changelog entries. No application code. Let me write the main deliverable
+  first.
+
+● Write(honk300_plan.md)
+  ⎿  Wrote 852 lines to honk300_plan.md
+       1 # honk300 — Cross-Platform Rust Desktop Goose: Hybrid Research &
+       2 
+         h + implementation plan for
+       4 > `honk300`. It is an adversarially-reviewed *hybrid* that merge
+       5 > `claude_plan.md` (the structural spine) and `codex_plan.md` (g
+       6 > in a round of new, user-approved scope (new autonomous behavio
+       7 > three-name CLI grammar, and a full all-OS/all-arch build matri
+         x). **No application code is
+         nd, starting at milestone M0.
+      10 > `claude_plan.md` and `codex_plan.md` are *
+     … +1351 lines (ctrl+o to expand)
+
+● Main deliverable written. Now the CLAUDE.md pointer update — let me read the
+  exact current text to edit it precisely.
+
+  Read 1 file (ctrl+o to expand)
+
+● Now updating the canonical pointers in CLAUDE.md.
+
+● Update(CLAUDE.md)
+  ⎿  Added 11 lines, removed 5 lines
+       9  `*300` tool family (siblings: TR300, ND300, WB300). `README.md`
+           holds the one-paragraph brief.
+      10  
+      11  **Current stage: planning. There is no application code yet** —
+           no `Cargo.toml`, no `src/`.
+      12 -The repo holds the brief, the original app's files as reference
+         -, and two planning docs.                                       
+      12 +The repo holds the brief, the original app's files as reference
+         +, and three planning docs (one                                 
+      13 +canonical hybrid plus the two superseded drafts it was synthesi
+         +zed from).                                                     
+      14  
+      15  ## Read these first (source-of-truth pointers)
+      16  
+      16 -- `claude_plan.md` — **the authoritative implementation plan**:
+         - architecture, build                                           
+      17 -  milestones M0–M17, packaging pipeline, locked decisions, and 
+         -a ranked risk table. Start here.                               
+      18 -- `codex_plan.md` — a parallel plan written by Codex. Cross-ref
+         -erence it, but `claude_plan.md`                                
+      19 -  is canonical for this assistant.                             
+      17 +- `honk300_plan.md` — **the canonical, authoritative plan.** A 
+         +claim-tested hybrid of the two                                 
+      18 +  drafts below, plus the approved new scope: architecture, buil
+         +d milestones **M0–M19**, the new                               
+      19 +  autonomous behaviors, the ratatui `<name> config` TUI, the th
+         +ree-name (`honk300`/`honk`/`goose`)                            
+      20 +  goose-speak CLI, the full all-OS/all-arch build matrix, packa
+         +ging pipeline, locked decisions,                               
+      21 +  and a ranked risk table. **Start here; where the three plans 
+         +conflict, this one wins.**                                     
+      22 +- `claude_plan.md` — **superseded draft** (the structural spine
+         + of the hybrid). Reference only;                               
+      23 +  its exact engine constants and Windows-overlay analysis were 
+         +verified correct.                                              
+      24 +- `codex_plan.md` — **superseded draft** (grafts: richer task i
+         +nventory, FirstUX, TOML, tests,                                
+      25 +  `--purge`). Reference only; its Appendix-B speed *values* are
+         + wrong — use `honk300_plan.md`/`Exports.cs`.                   
+      26  - `DESKTOP-GOOSE/` — the **original closed-source app**, kept a
+          s reference (Windows
+      27    `DesktopGoose v0.31/`, macOS `Desktop Goose for Mac v0.22/`).
+      28  - `DESKTOP-GOOSE/DesktopGoose v0.31/FOR MOD-MAKERS/GooseMod_Def
+          aultSolution/GooseModdingAPI/{SamEngine.cs, Exports.cs}`
+
+● Let me check for any other stale plan cross-references in CLAUDE.md before
+  moving to the changelogs.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Update(CLAUDE.md)
+  ⎿  Added 1 line, removed 1 line
+      41  - **Engine = fixed 120 Hz tick + a Task state machine.** A defa
+          ult "roaming" state picks
+      42    random tasks via a shuffle-bag (`Deck`); a task only sets `ta
+          rgetPos`/acceleration and the
+      43    engine auto-locomotes toward it. Mod hooks fire Pre/Post Tick
+           / UpdateRig / Render.
+      44 -- **Planned Rust layout (plan §5): a Cargo workspace** — a plat
+         -form-agnostic `honk-engine`                                    
+      44 +- **Planned Rust layout (`honk300_plan.md` §7): a Cargo workspa
+         +ce** — a platform-agnostic `honk-engine`                       
+      45    crate (`#![forbid(unsafe_code)]`, no OS deps) plus capability
+          -trait platform backends
+      46    (`windows`/`macos`/`x11`/`wayland`). **One overlay window per
+           monitor** (not one
+      47    virtual-screen window); sim runs at 120 Hz, present is on-dir
+          ty/rate-capped.
+
+● Now the lockstep changelogs. Let me read both to match their existing format.
+
+  Read 2 files (ctrl+o to expand)
+
+● Now the lockstep changelog entries. Adding to CHANGELOG.md [Unreleased]:
+
+● Update(CHANGELOG.md)
+  ⎿  Added 8 lines
+      12  ## [Unreleased]
+      13  
+      14  ### Added
+      15 +- `honk300_plan.md` — **the canonical, authoritative plan.** A 
+         +claim-tested *hybrid* that                                     
+      16 +  synthesizes `claude_plan.md` (structural spine) and `codex_pl
+         +an.md` (grafts), then folds in an                              
+      17 +  approved round of new scope. Each draft's load-bearing claims
+         + were verified against ground                                  
+      18 +  truth: engine constants checked against `…/GooseModdingAPI/Ex
+         +ports.cs` (claude exact; codex's                               
+      19 +  Appendix-B speeds wrong), the biased `Deck` against `SamEngin
+         +e.cs`, and the QubeTX conventions                              
+      20 +  (editions, the 6 base targets, `cargo-dist 0.31.0`, ICE flags
+         +) across TR300/ND300/WB300. Adds:                              
+      21 +  the new autonomous behaviors, a ratatui `<name> config` TUI, 
+         +a three-name goose-speak CLI, and                              
+      22 +  a full all-OS/all-arch build matrix. Build milestones now **M
+         +0–M19**.                                                       
+      23  - `claude_plan.md` — comprehensive, adversarially-reviewed plan
+           for **honk300**, a
+      24    cross-platform (Windows/macOS/Linux) Rust reimplementation of
+           Desktop Goose. Derived
+      25    from analysis of `DESKTOP-GOOSE/` (the original v0.31 Windows
+           + v0.22 macOS builds) and
+
+● Update(CHANGELOG.md)
+  ⎿  Added 26 lines
+      34    convention.
+      35  - `CLAUDE.md` — repository guidance for future Claude Code sess
+          ions.
+      36  
+      37 +### Changed                                                    
+      38 +- `claude_plan.md` and `codex_plan.md` are now **superseded ref
+         +erence drafts**; `honk300_plan.md`                             
+      39 +  is canonical. `CLAUDE.md` "Read these first" pointers updated
+         + accordingly (canonical plan,                                  
+      40 +  milestone range M0–M19, workspace cross-reference → `honk300_
+         +plan.md` §7).                                                  
+      41 +                                                               
+      42  ### Decided
+      43 +- **Three invocation names** (`honk300` / `honk` / `goose`) wit
+         +h a finite, deterministic                                      
+      44 +  "goose-speak" grammar (e.g. `goose plz` to start, `honk bad` 
+         +/ `goose no honk` to stop,                                     
+      45 +  `goose do honk` to poke, `<name> config`, `<name> help`) — a 
+         +fixed phrase map, **not** runtime                              
+      46 +  NL parsing.                                                  
+      47 +- **TOML config** (`config.toml`) replacing the original `.ini`
+         +, original keys preserved at the                               
+      48 +  verified values, versioned + tolerant loader.                
+      49 +- **No external mod system** (no DLL/WASM/data mods). Autumn be
+         +comes a **built-in** season/task;                              
+      50 +  extensibility is via documented internal seams (`ARCHITECTURE
+         +.md` + rustdoc).                                               
+      51 +- **No system tray.** Quit via hold-ESC (where the OS allows) o
+         +r any stop command, over a new                                 
+      52 +  **single-instance + IPC command channel** (`stop` / `do` / `r
+         +eload`) that is also the                                       
+      53 +  Wayland-safe quit and the TUI's hot-apply transport.         
+      54 +- A **ratatui** config TUI at `<name> config` (QubeTX-family ar
+         +chitecture: reducer + crossterm +                              
+      55 +  `tokio::select!`) toggling every behavior incl. Autumn; **hot
+         +-apply where cheap, restart-note                               
+      56 +  otherwise**.                                                 
+      57 +- **New autonomous behaviors** (each a toggle, scoped to parame
+         +ter-modulation of the procedural                               
+      58 +  rig — no new art): dynamic moods, seasonal moods, multi-monit
+         +or chase, on-the-hour double honk,                             
+      59 +  perch-&-ride windows, hover-sweep pat streak + hearts, quiet-
+         +hours/DND-fullscreen respect, a                                
+      60 +  Calm-goose valve, and manual poke commands. Default = full pr
+         +ank, always-on.                                                
+      61 +- **Build for every advertised OS and architecture:** Windows x
+         +64 **and ARM64**, macOS Intel                                  
+      62 +  **and Apple Silicon** (universal2 `.app`/`.dmg`), Linux x64 *
+         +*and ARM** (gnu + musl) — arch is a                            
+      63 +  build/packaging axis, capability is an OS/display-server axis
+         + (`Cap<T>`).                                                   
+      64  - App name **honk300** (binary `honk300`, optional `honk` alias
+          ); fresh permanent WiX/Inno
+      65    GUIDs (never reuse the sibling repos').
+      66  - Clean-room **procedural** goose renderer — no sprite extracti
+          on. Original sound effects
+● Now the plain-English lockstep entry in HUMAN_CHANGELOG.md:
+
+● Update(HUMAN_CHANGELOG.md)
+  ⎿  Added 31 lines
+      14  ## Latest — June 2026
+      15  
+      16  **Added**
+      17 +- One master build plan that combines the two earlier plans int
+         +o a single source of truth. Both                               
+      18 +  earlier plans were fact-checked against the original goose's 
+         +own files; the more accurate one                               
+      19 +  was used as the foundation and the best ideas from the other 
+         +were merged in. (For example, one                              
+      20 +  plan had the goose's exact speed and size numbers right, whil
+         +e the other had guessed them wrong                             
+      21 +  — so the correct numbers won.)                               
+      22 +                                                               
+      23 +**Decided**                                                    
+      24 +- A batch of new, optional things the goose can do on its own —
+         + all switch-on/switch-off — that                               
+      25 +  build on the original's spirit: little moods (it might get hy
+         +per, sad, or sleepy and act                                    
+      26 +  differently), gentle season changes through the year (the aut
+         +umn leaves become a year-round                                 
+      27 +  idea), chasing across multiple monitors, a double honk at the
+         + top of each hour, hopping up to                               
+      28 +  ride a window while you drag it, happy hearts when you pet it
+         + by sweeping your cursor over it,                              
+      29 +  and quiet manners (it calms down at night, during Do-Not-Dist
+         +urb, and while you're in a                                     
+      30 +  full-screen game or call). Out of the box it still behaves li
+         +ke the original prank, always on.                              
+      31 +- A built-in settings screen you open in the terminal to flip a
+         +ny of these on or off (including                               
+      32 +  the autumn leaves), with changes that mostly take effect inst
+         +antly on the running goose.                                    
+      33 +- Three names to launch and control it (you can type "honk300,"
+         + "honk," or "goose"), with playful                             
+      34 +  commands like "goose plz" to start it, "honk bad" to stop it,
+         + and "goose do honk" to make it                                
+      35 +  honk on demand. A help screen and the settings screen both li
+         +st everything.                                                 
+      36 +- It will be built and packaged for every system and chip type 
+         +it's advertised on — Windows, Mac,                             
+      37 +  and Linux, on both the standard and the newer ARM processors.
+      38 +                                                               
+      39 +**Changed**                                                    
+      40 +- The two earlier plans are now kept only as background referen
+         +ce; the new combined plan is the                               
+      41 +  one to follow.                                               
+      42 +                                                               
+      43 +---                                                            
+      44 +                                                               
+      45 +## Earlier — June 2026                                         
+      46 +                                                               
+      47 +**Added**                                                      
+      48  - A detailed build plan for "honk300," a brand-new version of D
+          esktop Goose (the prank app
+      49    where a goose wanders around your screen and causes mischief)
+          , rebuilt to run on Windows,
+      50    Mac, and Linux. The plan works out how the original goose act
+          ually behaves and lays out
+
+● All four deliverables are written. Let me run a quick verification pass —
+  confirm the file set, that the verified constants are present (and codex's
+  wrong values are absent), and that no stray code was created.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The "wrong values absent" grep correctly returned no matches (that's the good
+  result — it just stopped the && chain). Let me finish the remaining checks,
+  and I noticed an unexpected untracked AGENTS.md I didn't create — let me
+  inspect that.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Everything checks out. Verification summary:
+
+  - ✅ honk300_plan.md created (852 lines, comprehensive)
+  - ✅ Verified engine constants present (80/200/400, 1300/2300); codex's wrong
+  values (30/90/120) absent
+  - ✅ No stray code (no root Cargo.toml / src/) — this round is planning only
+  - ✅ CLAUDE.md pointers, CHANGELOG.md, and HUMAN_CHANGELOG.md updated in
+  lockstep
+
+  ⚠️ One thing to surface: there's an untracked AGENTS.md (a Codex-facing twin
+  of CLAUDE.md, timestamped mid-session) that I did not create — likely from a
+  concurrent Codex session or your setup. It still carries the old pointers I
+  just corrected in CLAUDE.md (names claude_plan.md canonical, "two planning
+  docs", "M0–M17"). I left it untouched since it isn't mine. Say the word and
+  I'll sync it to match CLAUDE.md.
+
+  ---
+  What I concluded and did
+
+  Verdict: a hybrid — and the evidence made it one-sided about which way. I
+  claim-tested both drafts against the actual shipped C# source and the three
+  sibling repos (this is where /logical-reasoning earned its keep):
+
+  - claude_plan.md is the spine. Its engine constants are verbatim correct
+  (Exports.cs: WalkSpeed=80, RunSpeed=200, ChargeSpeed=400, Accel 1300/2300,
+  full rig geometry); it resolves the Windows click-through-vs-clickable crux
+  correctly; and it already matches your locked asset decisions. codex_plan.md 
+  got the core physics numbers wrong (it read binary symbol names but invented
+  the values) and contains a self-contradiction (WS_EX_TRANSPARENT overlay and
+  pat-on-click — mutually exclusive).
+  - codex_plan.md contributed real grafts: the richer task-field inventory, the
+  FirstUX scripted intro (claude missed it), TOML config, golden-frame +
+  mock_host tests, --purge uninstall, and ARM64 Windows.
+
+  Then I folded in everything from our back-and-forth: the three-name 
+  goose-speak CLI (goose plz / honk bad / goose do honk), the ratatui <name> 
+  config TUI (QubeTX-family reducer architecture, hot-apply where cheap), new 
+  autonomous behaviors scoped honestly to parameter-modulation of the procedural
+  rig (moods, seasonal, multi-monitor chase, on-hour double-honk, perch-&-ride,
+  hover-pat + hearts, quiet-hours/DND), no external mods → built-in Autumn + 
+  documented internal seams, no tray → single-instance IPC (stop/do/reload), and
+  the full all-OS/all-arch build matrix (Win x64+ARM64, mac universal2, Linux
+  x64/ARM gnu+musl).
+
+  The full reasoning trail (claim-test table, steel-manned dissent, confidence)
+  lives in the approved plan at
+  C:\Users\hey\.claude\plans\don-t-act-on-anything-keen-milner.md.
+
+  Nothing is committed (you didn't ask). The changelogs are staged in lockstep
+  and ready whenever you want a commit — and I can sync AGENTS.md in the same
+  one if you'd like.
+
+✻ Cogitated for 19m 55s
+
+> yuh sync the agents.md                                                        
+
+  Read 1 file (ctrl+o to expand)
+
+● AGENTS.md is a near-identical Codex twin of the project CLAUDE.md, so syncing
+  it means applying the same three edits. Doing that now.
+
+● Update(AGENTS.md)
+  ⎿  Added 11 lines, removed 5 lines
+       9  `*300` tool family (siblings: TR300, ND300, WB300). `README.md`
+           holds the one-paragraph brief.
+      10  
+      11  **Current stage: planning. There is no application code yet** —
+           no `Cargo.toml`, no `src/`.
+      12 -The repo holds the brief, the original app's files as reference
+         -, and two planning docs.                                       
+      12 +The repo holds the brief, the original app's files as reference
+         +, and three planning docs (one                                 
+      13 +canonical hybrid plus the two superseded drafts it was synthesi
+         +zed from).                                                     
+      14  
+      15  ## Read these first (source-of-truth pointers)
+      16  
+      16 -- `claude_plan.md` — **the authoritative implementation plan**:
+         - architecture, build                                           
+      17 -  milestones M0–M17, packaging pipeline, locked decisions, and 
+         -a ranked risk table. Start here.                               
+      18 -- `codex_plan.md` — a parallel plan written by Codex. Cross-ref
+         -erence it, but `claude_plan.md`                                
+      19 -  is canonical for this assistant.                             
+      17 +- `honk300_plan.md` — **the canonical, authoritative plan.** A 
+         +claim-tested hybrid of the two                                 
+      18 +  drafts below, plus the approved new scope: architecture, buil
+         +d milestones **M0–M19**, the new                               
+      19 +  autonomous behaviors, the ratatui `<name> config` TUI, the th
+         +ree-name (`honk300`/`honk`/`goose`)                            
+      20 +  goose-speak CLI, the full all-OS/all-arch build matrix, packa
+         +ging pipeline, locked decisions,                               
+      21 +  and a ranked risk table. **Start here; where the three plans 
+         +conflict, this one wins.**                                     
+      22 +- `claude_plan.md` — **superseded draft** (the structural spine
+         + of the hybrid). Reference only;                               
+      23 +  its exact engine constants and Windows-overlay analysis were 
+         +verified correct.                                              
+      24 +- `codex_plan.md` — **superseded draft** (grafts: richer task i
+         +nventory, FirstUX, TOML, tests,                                
+      25 +  `--purge`). Reference only; its Appendix-B speed *values* are
+         + wrong — use `honk300_plan.md`/`Exports.cs`.                   
+      26  - `DESKTOP-GOOSE/` — the **original closed-source app**, kept a
+          s reference (Windows
+      27    `DesktopGoose v0.31/`, macOS `Desktop Goose for Mac v0.22/`).
+      28  - `DESKTOP-GOOSE/DesktopGoose v0.31/FOR MOD-MAKERS/GooseMod_Def
+          aultSolution/GooseModdingAPI/{SamEngine.cs, Exports.cs}`
+
+● Update(AGENTS.md)
+  ⎿  Added 1 line, removed 1 line
+      41  - **Engine = fixed 120 Hz tick + a Task state machine.** A defa
+          ult "roaming" state picks
+      42    random tasks via a shuffle-bag (`Deck`); a task only sets `ta
+          rgetPos`/acceleration and the
+      43    engine auto-locomotes toward it. Mod hooks fire Pre/Post Tick
+           / UpdateRig / Render.
+      44 -- **Planned Rust layout (plan §5): a Cargo workspace** — a plat
+         -form-agnostic `honk-engine`                                    
+      44 +- **Planned Rust layout (`honk300_plan.md` §7): a Cargo workspa
+         +ce** — a platform-agnostic `honk-engine`                       
+      45    crate (`#![forbid(unsafe_code)]`, no OS deps) plus capability
+          -trait platform backends
+      46    (`windows`/`macos`/`x11`/`wayland`). **One overlay window per
+           monitor** (not one
+      47    virtual-screen window); sim runs at 120 Hz, present is on-dir
+          ty/rate-capped.
+
+● Let me verify the two files are now back in sync (should differ only in the
+  Claude/Codex header line), then reflect the AGENTS.md edit in the changelog.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Perfect — AGENTS.md and the project CLAUDE.md now differ only in the two
+  header lines (the intended Codex-vs-Claude distinction). Everything else is
+  identical, so they're fully in sync. Let me reflect this in the technical
+  changelog.
+
+● Update(CHANGELOG.md)
+  ⎿  Added 3 lines, removed 2 lines
+      36  
+      37  ### Changed
+      38  - `claude_plan.md` and `codex_plan.md` are now **superseded ref
+          erence drafts**; `honk300_plan.md`
+      39 -  is canonical. `CLAUDE.md` "Read these first" pointers updated
+         - accordingly (canonical plan,                                  
+      40 -  milestone range M0–M19, workspace cross-reference → `honk300_
+         -plan.md` §7).                                                  
+      39 +  is canonical. The "Read these first" pointers in **both** `CL
+         +AUDE.md` and its Codex twin                                    
+      40 +  `AGENTS.md` were updated in lockstep (canonical plan, milesto
+         +ne range M0–M19, workspace                                     
+      41 +  cross-reference → `honk300_plan.md` §7).                     
+      42  
+      43  ### Decided
+      44  - **Three invocation names** (`honk300` / `honk` / `goose`) wit
+          h a finite, deterministic
+
+● Done. AGENTS.md is synced.
+
+  What changed in AGENTS.md (the same three edits I made to CLAUDE.md):
+  - "two planning docs" → "three planning docs (one canonical hybrid plus the
+  two superseded drafts)"
+  - "Read these first" pointer block → honk300_plan.md is now canonical (M0–M19,
+  with the new behaviors / TUI / goose-speak CLI / all-OS-arch matrix called
+  out); claude_plan.md and codex_plan.md demoted to superseded reference, each
+  annotated with what it got right/wrong
+  - "Planned Rust layout (plan §5)" → "(honk300_plan.md §7)"
+
+  Verified: diff AGENTS.md CLAUDE.md shows only the two header lines differ (the
+  deliberate "Codex" vs "Claude Code" framing) — everything else is
+  byte-identical, so the two guidance files are back in lockstep. I also updated
+  the CHANGELOG.md "Changed" entry to note that both files were synced.
+
+  Current working tree (nothing committed):
+  - ?? honk300_plan.md — new canonical plan
+  - ?? AGENTS.md — now synced (still untracked, since it arrived mid-session
+  from outside)
+  - M CLAUDE.md, M CHANGELOG.md, M HUMAN_CHANGELOG.md
+
+  Want me to commit it all? If so I'll branch first (you're on main) and put
+  honk300_plan.md, the AGENTS.md/CLAUDE.md pointer sync, and the lockstep
+  changelog entries in one commit.
+
+✻ Cogitated for 1m 24s
+
+> add notes to the readme that record the decided plan (hon300_plan is new      
+  canonical)                                                                    
+
+● Let me read the README's exact current bytes, then append the decided-plan
+  notes.
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(README.md)
+  ⎿  Added 36 lines
+       5  "C:\Users\hey\git\qube-machine-report"
+       6  "C:\Users\hey\git\qube-network-diagnostics"
+       7  "C:\Users\hey\git\qube-workbranch-view"
+       8 +                                                               
+       9 +---                                                            
+      10 +                                                               
+      11 +## Status — the decided plan                                   
+      12 +                                                               
+      13 +**Stage:** planning. No application code yet (no `Cargo.toml` /
+         + `src/`); implementation starts at                             
+      14 +milestone **M0**.                                              
+      15 +                                                               
+      16 +**Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Star
+         +t here.** It is a claim-tested                                 
+      17 +*hybrid* that synthesizes the two earlier drafts — [`claude_pla
+         +n.md`](./claude_plan.md) (the                                  
+      18 +structural spine) and [`codex_plan.md`](./codex_plan.md) (graft
+         +s) — after verifying each draft's                              
+      19 +load-bearing claims against the original's shipped C# source an
+         +d the `*300` sibling repos. Both                               
+      20 +drafts are now **superseded reference only**; where the three c
+         +onflict, `honk300_plan.md` wins.                               
+      21 +(Why the hybrid is lopsided: `claude_plan.md`'s engine constant
+         +s match `Exports.cs` verbatim,                                 
+      22 +while `codex_plan.md`'s guessed speed values were wrong.)      
+      23 +                                                               
+      24 +**Decided direction (see `honk300_plan.md` for the full detail)
+         +:**                                                            
+      25 +                                                               
+      26 +- **Binary `honk300`**, installed under three names — `honk300`
+         + / `honk` / `goose` — with a                                   
+      27 +  finite "goose-speak" CLI (`goose plz` to start, `honk bad` / 
+         +`goose no honk` to stop,                                       
+      28 +  `goose do honk` to poke, `<name> config`, `<name> help`).    
+      29 +- **Clean-room procedural goose** (no sprite extraction); engin
+         +e ported 1:1 from the verified                                 
+      30 +  constants. Sounds bundled 1:1 (personal use); memes regenerat
+         +ed originally; notes authored fresh.                           
+      31 +- **TOML config** + a **ratatui terminal config TUI** at `<name
+         +> config` that toggles every                                   
+      32 +  behavior (including Autumn), hot-applying changes to a runnin
+         +g goose where cheap.                                           
+      33 +- **New autonomous behaviors**, each an optional toggle, scoped
+         + to parameter-modulation of the                                
+      34 +  procedural rig (no new art): dynamic moods, seasonal moods, m
+         +ulti-monitor chase, on-the-hour                                
+      35 +  double honk, perch-&-ride windows, hover-sweep pat streak + h
+         +earts, quiet-hours/DND respect, a                              
+      36 +  Calm-goose valve. Default = full original prank, always-on.  
+      37 +- **No external mods** (Autumn is built-in; extensibility via d
+         +ocumented internal seams) and                                  
+      38 +  **no system tray** (quit via hold-ESC or any stop command ove
+         +r a single-instance IPC channel).                              
+      39 +- **Built for every OS + architecture:** Windows x64 **and ARM6
+         +4**, macOS Intel **and Apple                                   
+      40 +  Silicon** (universal2), Linux x64 **and ARM** (gnu + musl). N
+         +ative + CLI installers like                                    
+      41 +  TR300/ND300/WB300; **no crates.io**.                         
+      42 +- Linux is **X11-first** (runs under XWayland); native Wayland 
+         +is an opt-in `--wayland` mode with                             
+      43 +  reduced mischief.                                            
+
+● Per the repo's changelog rule, let me record the README update in both
+  changelogs in lockstep.
+● Update(CHANGELOG.md)
+  ⎿  Added 3 lines
+      39    is canonical. The "Read these first" pointers in **both** `CL
+          AUDE.md` and its Codex twin
+      40    `AGENTS.md` were updated in lockstep (canonical plan, milesto
+          ne range M0–M19, workspace
+      41    cross-reference → `honk300_plan.md` §7).
+      42 +- `README.md` gained a **"Status — the decided plan"** section 
+         +recording `honk300_plan.md` as                                 
+      43 +  canonical and summarizing the decided direction (three-name g
+         +oose-speak CLI, ratatui config                                 
+      44 +  TUI, new autonomous behaviors, no external mods / no tray, al
+         +l-OS/all-arch builds).                                         
+      45  
+      46  ### Decided
+      47  - **Three invocation names** (`honk300` / `honk` / `goose`) wit
+          h a finite, deterministic
+
+● Update(HUMAN_CHANGELOG.md)
+  ⎿  Added 2 lines, removed 1 line
+      38  
+      39  **Changed**
+      40  - The two earlier plans are now kept only as background referen
+          ce; the new combined plan is the
+      41 -  one to follow.                                               
+      41 +  one to follow. The project's front-page notes now say this to
+         +o, with a short summary of what was                            
+      42 +  decided.                                                     
+      43  
+      44  ---
+      45  
+
+● Done. The README now records the decided plan.
+
+  Added to README.md — a ## Status — the decided plan section (below the
+  original brief) that:
+  - Names honk300_plan.md as the canonical plan ("Start here"), with relative
+  links to it and both superseded drafts.
+  - Explains it's a claim-tested hybrid and why it's lopsided (claude's
+  constants matched Exports.cs; codex's guessed speeds were wrong).
+  - Summarizes the decided direction in compact bullets: three-name goose-speak
+  CLI, clean-room procedural goose + verified constants, TOML config + ratatui
+  config TUI, the new opt-in autonomous behaviors (scoped to the procedural
+  rig), no external mods / no tray, and all-OS/all-arch builds with X11-first
+  Linux.
+
+  I kept the original one-paragraph brief and FOR REFERENCE block intact, and
+  recorded the change in both CHANGELOG.md and HUMAN_CHANGELOG.md in lockstep.
+
+  Working tree now (still nothing committed):
+  - ?? honk300_plan.md, ?? AGENTS.md (synced)
+  - M README.md, M CLAUDE.md, M CHANGELOG.md, M HUMAN_CHANGELOG.md
+
+  Want me to commit everything? You're on main, so I'd branch first, then land
+  the new plan, the README/CLAUDE/AGENTS pointer updates, and the lockstep
+  changelog entries in one commit.
+
+✻ Baked for 1m 16s
+
+> Yes, commit everything.                                                       
+  ⎿  Interrupted · What should Claude do instead?
+
+> no branch                                                                     
+
+● Committing everything directly on main, as you asked.
+
+  Committed 980cebd (ctrl+o to expand)
+
+● Committed on main — 980cebd, 6 files changed (+1078 / −6).
+
+  - New: honk300_plan.md (canonical hybrid plan), AGENTS.md (now tracked +
+  synced)
+  - Updated: README.md, CLAUDE.md, CHANGELOG.md, HUMAN_CHANGELOG.md
+
+  The LF→CRLF warnings are just Git's normal line-ending notices on Windows (per
+  your .gitattributes) — harmless. Working tree is clean.
+
+  Not pushed (you didn't ask). Say the word if you want me to git push.
+
+✻ Crunched for 34s
+
+> sure push                                                                     
+
+  Pushed to main (ctrl+o to expand)
+
+● Pushed. c22c6c5..980cebd is now on origin/main (github.com/RealEmmettS/goose),
+  and the local branch is in sync with the remote — ## main...origin/main with
+  nothing ahead/behind.
+
+  That wraps up the full task: the two plans analyzed and claim-tested, the
+  canonical honk300_plan.md written, the new behaviors + ratatui config TUI +
+  goose-speak CLI + all-OS/arch scope folded in, and the README/CLAUDE/AGENTS
+  pointers plus lockstep changelogs all committed and pushed.
+
+✻ Brewed for 13s
+
+> Now create a remote branch off of this called original starting archive, and  
+  we'll just keep that branch exactly how the repo currently is. Any future     
+  work that we do on main is perfectly fine, but that branch will kind of stay  
+  in Git as a reference. I know it's non-standard, but let's do it that way.    
+
+● Git branch names can't contain spaces, so I'll create it as
+  original-starting-archive (hyphenated), pointing at the current commit — and
+  stay on main.
+
+  Pushed to original-starting-archive (ctrl+o to expand)
+
+● Done. The archive branch is created and pushed.
+
+  - original-starting-archive now exists locally and on origin, pinned at
+  980cebd — the exact current state of the repo.
+  - You're still on main (git branch doesn't switch), so future work continues
+  on main untouched.
+  - Both branches point at the same commit for now; main will move forward as
+  you work, while original-starting-archive stays frozen as the reference
+  snapshot.
+
+  One note (named it as you'd expect, just flagging the deviation): I used
+  original-starting-archive with hyphens because Git rejects spaces in branch
+  names. If you'd rather it read differently (e.g. original-archive,
+  archive/original-start), say so and I'll rename + repush.
+
+  To keep it as a pure reference, just don't commit to it — and nothing forces
+  it to stay frozen, so if you ever want belt-and-suspenders protection I can
+  add a GitHub branch-protection rule against pushes/deletion. Otherwise it'll
+  happily sit there as-is.
+
+✻ Churned for 19s
+
+> Like a snapshot of exactly how we are now.                                    
+
+● Exactly right — that's what it is. Let me confirm it's a byte-for-byte
+  snapshot.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Confirmed — it's an exact snapshot. git diff main original-starting-archive is
+  empty, and both branches share the identical tree hash (ce620bd), meaning
+  every file and byte is captured precisely as the repo stands right now.
+
+  original-starting-archive will stay frozen at 980cebd forever unless someone
+  commits to it (which we won't). As main moves forward with future work, this
+  branch remains the reference snapshot of this moment — exactly what you
+  wanted. It's live on origin, so it's safe even if local state changes.
+
+✻ Cogitated for 18s
+
+> Yeah, I'd get branch protection to it. You can pull and fetch from it, but no 
+  push or deletion.                                                             
+
+● Branch protection on a personal (non-org) repo can't restrict pushes via
+  classic protection — that needs a repository ruleset. I'll use one targeting
+  just that branch with three rules: restrict updates (no push), block
+  force-pushes, and restrict deletions. Fetch/pull (read) is unaffected. First
+  let me confirm gh auth and the repo.
+
+  Ran 1 shell command (ctrl+o to expand)
+● Authenticated as RealEmmettS with ADMIN on the repo. Creating the ruleset that
+  freezes original-starting-archive.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Ruleset created (current_user_can_bypass: "never" — so it's frozen even for
+  you/me, exactly as asked). Let me verify it applies to the archive branch and
+  leaves main free — without pushing anything to the frozen branch (which would
+  defeat the purpose).
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Branch protection is live and correctly scoped.
+
+  original-starting-archive → rules ["deletion", "non_fast_forward", "update"]:
+  - update — no pushes accepted (the branch can't be changed)
+  - non_fast_forward — no force-pushes
+  - deletion — can't be deleted
+  - Fetch/pull (read) is untouched — anyone can still clone, fetch, and check it
+  out.
+
+  main → [] (no rules) — future work continues there completely unrestricted.
+
+  The ruleset is enforcement: active with no bypass actors
+  (current_user_can_bypass: "never"), so it's a true frozen snapshot — even you
+  and I can't push or delete it without first editing the rule. It's fully
+  server-side on GitHub, so the freeze holds regardless of local state.
+
+  If you ever need to change or retire it, it's reversible:
+  - View/edit: https://github.com/RealEmmettS/goose/rules/18099994
+  - Remove via CLI: gh api -X DELETE repos/RealEmmettS/goose/rulesets/18099994
+
+✻ Churned for 1m 11s
+
+> Is that a workaround that we just did? If it's a workaround, then go ahead    
+  and revert it and just add something to that branch's readme that says don't  
+  edit this branch. Otherwise, we can keep it. I just don't want any weird      
+  workarounds.                                                                  
+
+● Honest answer: it's not a workaround — keep it. GitHub repository rulesets are
+  the official, purpose-built feature for exactly this. "Restrict updates" (no
+  push), "Block force pushes," and "Restrict deletions" are named, first-class
+  rule types in GitHub's own UI/API — rulesets are the modern successor to
+  classic branch-protection rules. I used the documented POST /rulesets endpoint
+  with those exact rule types; there's no trick, hook hack, or abuse of an
+  unrelated feature involved. So per your "otherwise we can keep it," I'm
+  leaving it in place and not touching the branch README.
+
+  The only thing that was ever "non-standard" is the part you already flagged
+  and chose deliberately: using a branch as a permanent immutable snapshot. The
+  rule enforcing it is standard; the snapshot-as-branch concept is the unusual
+  bit.
+
+  If you want the most idiomatic Git form of "a frozen snapshot," that's
+  actually a tag — tags are immutable points-in-time by convention, which is
+  precisely what a snapshot is. I'm not pushing it, just flagging the option:
+
+  - Keep as-is (branch + ruleset) — done, nothing more to do.
+  - Or also add a tag like original-start at the same commit (980cebd) as the
+  conventional snapshot marker — I can protect tags from deletion/update with a
+  ruleset too. The branch can stay alongside it.
+
+  Your call. As it stands, the archive is frozen and correct.
+
+✻ Worked for 37s
+
+> also add a tag                                                                
+
+● On it — and since the whole point is an immutable reference, I'll make it an
+  annotated tag (carries tagger/date/message, the right form for a snapshot) and
+  protect it from update/deletion with a tag ruleset so it can't drift either.
+  First the tag.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Tag is live and points at 980cebd. Now the tag-protection ruleset so it can't
+  be moved or deleted.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Done — the snapshot now exists in both idiomatic forms, both frozen.
+
+  Snapshot of 980cebd (the canonical-plan commit), two ways:
+
+  Ref: original-start
+  Type: annotated tag (the idiomatic snapshot marker)
+  Protection (ruleset): freeze-original-start-tag (id 18100742)
+  Rules: no update · no force · no delete
+  ────────────────────────────────────────
+  Ref: original-starting-archive
+  Type: branch
+  Protection (ruleset): freeze-original-starting-archive (id 18099994)
+  Rules: no push · no force · no delete
+
+  Both enforcement: active, no bypass (current_user_can_bypass: "never"), so
+  neither can drift or be deleted — a true frozen reference. Fetch/pull/clone of
+  both is unaffected, and main stays completely free for future work.
+
+  Everything here is standard GitHub tooling (annotated tag + rulesets), no
+  workarounds. All reversible if you ever want to retire a piece:
+  - Tag rule: gh api -X DELETE repos/RealEmmettS/goose/rulesets/18100742
+  - Branch rule: gh api -X DELETE repos/RealEmmettS/goose/rulesets/18099994
+  - The tag itself: git push origin :refs/tags/original-start (only works after
+  removing its rule)
+
+  Manage in the UI: https://github.com/RealEmmettS/goose/rules
+
+✻ Baked for 1m 2s

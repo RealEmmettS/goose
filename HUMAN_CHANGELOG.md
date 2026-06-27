@@ -7,15 +7,21 @@ what changed and why.
 For the technical version with file paths and exact details, see CHANGELOG.md.
 
 > **Where the project is:** the goose is alive on screen. It appears on your desktop, walks
-> around, reacts to your mouse, makes sounds, and can steal the cursor in a short, bounded prank.
-> The next milestone is teaching it to interact with windows. There's no installer yet — that
-> comes later.
+> around, reacts to your mouse, makes sounds, can steal the cursor in a short, bounded prank,
+> and can hop onto a window while you drag it around. The next milestone is making it collect
+> windows for notes, memes, and donate prompts. There's no installer yet — that comes later.
 
 ---
 
 ## Latest — June 2026
 
 **Added**
+- The goose can now run toward a window while you are dragging it and ride along if it gets
+  there before you let go. When the drag ends, or if the computer says window watching is not
+  available, it drops the trick and goes back to what it was doing. There is also a temporary
+  no-window-riding option for running without that prank. Behind the scenes, this keeps Windows
+  support separate from the goose's core logic so Mac, Linux, and limited Wayland support can
+  report what they can honestly do later.
 - The goose can steal your mouse cursor now, and that milestone is complete. When mouse stealing
   is available, clicking the goose makes it charge toward the pointer, bite when it catches it,
   and run around in its startled zooming mode for a short, bounded moment while holding the cursor
@@ -54,13 +60,17 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   saved as a local comparison, then replaced because it did not feel as much like the original.
 
 **Behind the scenes**
+- The window-riding milestone now has its own architecture record. It says the goose's brain
+  only sees an anonymous window target and a place to ride, while Windows-specific hooks and
+  window handles stay in the Windows layer. That keeps the next window tricks from leaking
+  operating-system details into the shared engine.
 - The earlier milestones were reviewed before closing the cursor-stealing milestone. That review
   fixed stale status notes, confirmed the goose's core logic still stays separate from
   Windows-only behavior, and created follow-up work for improving the fullscreen overlay's
   performance before packaging.
-- The task board now shows the cursor-stealing milestone as done and moves the window-dragging
-  milestone into the active slot. The future sprite-sheet renderer is tracked as its own follow-up
-  task instead of being treated as unfinished cursor-stealing work.
+- The task board now shows the window-riding milestone as done and moves the next window-collecting
+  milestone into the active slot. The future sprite-sheet renderer remains tracked as its own
+  follow-up task instead of being treated as unfinished cursor-stealing work.
 - The project guidance for future agents now says when to add or update architecture decision
   records, and it repeats the rule that the technical and human changelogs must stay in sync.
 

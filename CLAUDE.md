@@ -8,13 +8,13 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M7 are complete and M8 (foreign-window
-drag + perch & ride) is active. The Cargo workspace exists: `honk-engine` (platform-free
+**Current stage: implementation in progress.** M0-M8 are complete and M9 (collect-window
+dispatcher) is next. The Cargo workspace exists: `honk-engine` (platform-free
 core), `honk-platform-windows` (the layered overlay), and the root `honk300` binary — a
 procedurally-rendered goose roams a transparent Windows overlay, leaves mud trails, runs the
-task/FirstUX AI, honks, reacts to pat/click input, and can perform bounded cursor nabbing on
-Windows. `honk300_plan.md` is the canonical plan (milestones M0–M19); the two superseded drafts
-remain as reference.
+task/FirstUX AI, honks, reacts to pat/click input, can perform bounded cursor nabbing, and can
+perch on a user-dragged foreign window on Windows. `honk300_plan.md` is the canonical plan
+(milestones M0–M19); the two superseded drafts remain as reference.
 
 ## Read these first (source-of-truth pointers)
 
@@ -37,7 +37,8 @@ remain as reference.
   `.github/workflows/windows-installers.yml`, and the dual-changelog discipline.
 - `docs/adr/` — architecture decision records. Read these when a task touches platform
   boundaries, renderer architecture, capability traits, packaging targets, or milestone scope.
-  ADR 0001 records the accepted M7 cursor-mischief contract and Renderer V2 direction.
+  ADR 0001 records the accepted M7 cursor-mischief contract and Renderer V2 direction; ADR 0002
+  records the M8 foreign-window watch-and-ride contract.
 
 ## Big-picture architecture (original → planned port)
 
@@ -76,6 +77,7 @@ remain as reference.
 - Keep ADRs in sync with `README.md`, this file, `AGENTS.md`, `.tasks/`, `CHANGELOG.md`, and
   `HUMAN_CHANGELOG.md` when they change current guidance.
 - M7's accepted decisions live in `docs/adr/0001-m7-cursor-mischief-renderer-and-platform-guardrails.md`.
+- M8's accepted decisions live in `docs/adr/0002-m8-foreign-window-watch-and-ride.md`.
 
 ## Gotchas (cross-platform overlay / desktop-pet)
 

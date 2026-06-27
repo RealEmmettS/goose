@@ -10,10 +10,11 @@ FOR REFERENCE:
 
 ## Status
 
-**Stage:** implementation in progress. Milestones **M0-M7** are complete; **M8 foreign-window
-drag + perch & ride** is active. The current Windows build renders the procedural goose on the
-desktop, walks it, leaves mud, plays sounds, reacts to pat/click input, and can perform bounded
-cursor nabbing when cursor warping is enabled. There is no installer or release artifact yet.
+**Stage:** implementation in progress. Milestones **M0-M8** are complete; **M9 collect-window
+dispatcher** is next. The current Windows build renders the procedural goose on the desktop,
+walks it, leaves mud, plays sounds, reacts to pat/click input, can perform bounded cursor
+nabbing when cursor warping is enabled, and can perch on a user-dragged foreign window until
+release. There is no installer or release artifact yet.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the

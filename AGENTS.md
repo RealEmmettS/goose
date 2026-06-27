@@ -8,8 +8,8 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M7 are complete and M8 (foreign-window
-drag + perch & ride) is active. The repo now has a Cargo workspace, a platform-free
+**Current stage: implementation in progress.** M0-M8 are complete and M9 (collect-window
+dispatcher) is next. The repo now has a Cargo workspace, a platform-free
 `honk-engine`, a Windows platform crate, the `honk300` binary, the original app's files as
 reference, the canonical planning docs, and ADRs under `docs/adr/`.
 
@@ -34,7 +34,8 @@ reference, the canonical planning docs, and ADRs under `docs/adr/`.
   `.github/workflows/windows-installers.yml`, and the dual-changelog discipline.
 - `docs/adr/` — architecture decision records. Read these when a task touches platform
   boundaries, renderer architecture, capability traits, packaging targets, or milestone scope.
-  ADR 0001 records the accepted M7 cursor-mischief contract and Renderer V2 direction.
+  ADR 0001 records the accepted M7 cursor-mischief contract and Renderer V2 direction; ADR 0002
+  records the M8 foreign-window watch-and-ride contract.
 
 ## Big-picture architecture (original → planned port)
 
@@ -71,6 +72,7 @@ reference, the canonical planning docs, and ADRs under `docs/adr/`.
 - Keep ADRs in sync with `README.md`, this file, `CLAUDE.md`, `.tasks/`, `CHANGELOG.md`, and
   `HUMAN_CHANGELOG.md` when they change current guidance.
 - M7's accepted decisions live in `docs/adr/0001-m7-cursor-mischief-renderer-and-platform-guardrails.md`.
+- M8's accepted decisions live in `docs/adr/0002-m8-foreign-window-watch-and-ride.md`.
 
 ## Gotchas (cross-platform overlay / desktop-pet)
 

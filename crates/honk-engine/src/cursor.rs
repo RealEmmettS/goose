@@ -4,6 +4,7 @@
 //! in world/desktop coordinates; platform backends decide whether they can honor them
 //! (Windows now, macOS/X11 later, native Wayland as an honest no-op).
 
+use crate::foreign_window::ForeignWindowOptions;
 use crate::math::Vec2;
 
 /// A cursor operation requested by the simulation for the platform backend to apply.
@@ -59,4 +60,5 @@ impl MouseStealOptions {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct WorldOptions {
     pub mouse_steal: MouseStealOptions,
+    pub foreign_window: ForeignWindowOptions,
 }

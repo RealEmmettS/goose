@@ -6,6 +6,7 @@
 //! goose; the gait + footmark logic here is mechanical.
 
 use crate::cursor::{CursorCommand, WorldOptions};
+use crate::foreign_window::ForeignWindowSnapshot;
 use crate::hearts::Hearts;
 use crate::interaction::{PatTracker, Pointer};
 use crate::locomotion;
@@ -13,7 +14,7 @@ use crate::math::{Rect, Vec2};
 use crate::rig::Rig;
 use crate::rng::{Deck, RandomSource, SplitMix64};
 use crate::sound::Sound;
-use crate::task::{FirstUxTask, HyperTask, NabMouseTask, Task, TaskCtx, WanderTask};
+use crate::task::{FirstUxTask, HyperTask, NabMouseTask, PerchRideTask, Task, TaskCtx, WanderTask};
 use crate::time::DT;
 
 /// Distance travelled per full walking-gait cycle (radians of `gait_phase` per `TAU`).
@@ -44,6 +45,8 @@ pub struct World {
     hearts: Hearts,
     /// Last pointer state fed in via [`World::set_pointer`].
     pointer: Pointer,
+    /// Last platform-reported user-dragged foreign window.
+    dragged_window: Option<ForeignWindowSnapshot>,
     /// Left button held on the previous pointer update (for click rising-edge detection).
     prev_left_down: bool,
     /// A click landed on the goose; the next tick installs the hyper burst.
@@ -97,6 +100,7 @@ impl World {
             pat: PatTracker::new(),
             hearts: Hearts::new(),
             pointer: Pointer::default(),
+            dragged_window: None,
             prev_left_down: false,
             pending_hyper: false,
             pending_nab: false,
@@ -124,6 +128,19 @@ impl World {
         self.options.mouse_steal.warp_supported = supported;
     }
 
+    /// Reflect a backend capability change after startup, e.g. move-size hook setup failed.
+    pub fn set_foreign_window_watch_supported(&mut self, supported: bool) {
+        self.options.foreign_window.capabilities.watch_drag = supported;
+        if !supported {
+            self.dragged_window = None;
+        }
+    }
+
+    /// Feed one frame of foreign-window drag state in world/desktop coordinates.
+    pub fn set_foreign_window_drag(&mut self, dragged_window: Option<ForeignWindowSnapshot>) {
+        self.dragged_window = dragged_window;
+    }
+
     /// The live heart particles (for the renderer).
     pub fn hearts(&self) -> &Hearts {
         &self.hearts
@@ -144,10 +161,15 @@ impl World {
         self.current.id() == "nab_mouse"
     }
 
+    /// Whether the active task is reacting to a foreign-window drag.
+    pub fn is_perch_ride_active(&self) -> bool {
+        self.current.id() == "perch_ride"
+    }
+
     /// Feed one frame of pointer state (cursor + buttons, world space). Detects pats
     /// (hover sweeps → hearts + calm) and a click on the goose (→ a hyper burst next tick).
     pub fn set_pointer(&mut self, pointer: Pointer) {
-        if self.is_cursor_mischief_active() {
+        if self.is_cursor_mischief_active() || self.is_perch_ride_active() {
             self.pointer = pointer;
             self.prev_left_down = pointer.left_down;
             return;
@@ -198,6 +220,15 @@ impl World {
         self.interrupted = Some(prev);
     }
 
+    /// Interrupt the current task with a foreign-window perch/ride.
+    fn start_perch_ride(&mut self) {
+        if self.current.id() == "perch_ride" || self.interrupted.is_some() {
+            return; // do not stack transient interrupts
+        }
+        let prev = std::mem::replace(&mut self.current, Box::new(PerchRideTask::new()));
+        self.interrupted = Some(prev);
+    }
+
     /// The id of the currently running task (e.g. `"first_ux"`, `"wander"`).
     pub fn current_task(&self) -> &'static str {
         self.current.id()
@@ -231,6 +262,14 @@ impl World {
             self.pending_hyper = false;
         }
 
+        if self.options.foreign_window.watch_active()
+            && self.dragged_window.is_some()
+            && !self.is_cursor_mischief_active()
+            && !self.is_perch_ride_active()
+        {
+            self.start_perch_ride();
+        }
+
         // Run the current task (it only sets targets/params); pick the next when it's done.
         let calm = self.pat.is_calm(self.elapsed);
         let done = {
@@ -243,12 +282,14 @@ impl World {
                 cursor_commands: &mut self.pending_cursor_commands,
                 pointer: self.pointer,
                 mouse_steal: self.options.mouse_steal,
+                foreign_window: self.options.foreign_window,
+                dragged_window: self.dragged_window,
                 calm,
             };
             self.current.run(&mut self.goose, &mut ctx)
         };
         if done {
-            // A finished interrupt (hyper) resumes the task it suspended; otherwise draw next.
+            // A finished interrupt resumes the task it suspended; otherwise draw next.
             self.current = match self.interrupted.take() {
                 Some(prev) => prev,
                 None => self.next_task(),
@@ -301,12 +342,36 @@ impl World {
 mod tests {
     use super::*;
     use crate::cursor::MouseStealOptions;
+    use crate::foreign_window::{ForeignWindowId, ForeignWindowOptions};
 
     fn bounds() -> Rect {
         Rect {
             min: Vec2::new(0.0, 0.0),
             max: Vec2::new(1000.0, 800.0),
         }
+    }
+
+    fn window_snapshot(id: u64, anchor: Vec2) -> ForeignWindowSnapshot {
+        ForeignWindowSnapshot::top_center(
+            ForeignWindowId(id),
+            Rect {
+                min: Vec2::new(anchor.x - 150.0, anchor.y),
+                max: Vec2::new(anchor.x + 150.0, anchor.y + 180.0),
+            },
+        )
+    }
+
+    fn world_with_window_watch(seed: u64) -> World {
+        let mut w = World::with_options(
+            bounds(),
+            seed,
+            WorldOptions {
+                foreign_window: ForeignWindowOptions::with_backend_support(true, false),
+                ..WorldOptions::default()
+            },
+        );
+        w.current = Box::new(WanderTask::new());
+        w
     }
 
     #[test]
@@ -480,6 +545,7 @@ mod tests {
             8,
             WorldOptions {
                 mouse_steal: MouseStealOptions::with_backend_support(true),
+                ..WorldOptions::default()
             },
         );
         // Warm up into roaming so this verifies a normal user click, not first-run setup.
@@ -578,6 +644,7 @@ mod tests {
                     warp_supported: true,
                     ..MouseStealOptions::default()
                 },
+                ..WorldOptions::default()
             },
         );
         assert_eq!(disabled.pickable.len(), 1);
@@ -587,6 +654,7 @@ mod tests {
             1,
             WorldOptions {
                 mouse_steal: MouseStealOptions::with_backend_support(true),
+                ..WorldOptions::default()
             },
         );
         assert_eq!(
@@ -603,6 +671,7 @@ mod tests {
             9,
             WorldOptions {
                 mouse_steal: MouseStealOptions::with_backend_support(true),
+                ..WorldOptions::default()
             },
         );
         w.current = Box::new(NabMouseTask::new());
@@ -637,6 +706,7 @@ mod tests {
             10,
             WorldOptions {
                 mouse_steal: MouseStealOptions::with_backend_support(true),
+                ..WorldOptions::default()
             },
         );
         w.current = Box::new(NabMouseTask::new());
@@ -666,6 +736,109 @@ mod tests {
             w.current_task(),
             "hyper",
             "click edges during nab must not interrupt into hyper"
+        );
+    }
+
+    #[test]
+    fn foreign_window_drag_does_not_start_without_watch_capability() {
+        let mut w = World::new(bounds(), 11);
+        w.current = Box::new(WanderTask::new());
+        w.set_foreign_window_drag(Some(window_snapshot(1, Vec2::new(600.0, 100.0))));
+        w.tick();
+        assert_ne!(
+            w.current_task(),
+            "perch_ride",
+            "default engine options do not assume foreign-window watch support"
+        );
+    }
+
+    #[test]
+    fn foreign_window_drag_interrupts_and_release_before_arrival_resumes() {
+        let mut w = world_with_window_watch(12);
+        assert_eq!(w.current_task(), "wander");
+
+        w.set_foreign_window_drag(Some(window_snapshot(2, Vec2::new(900.0, 80.0))));
+        w.tick();
+        assert_eq!(w.current_task(), "perch_ride");
+
+        w.set_foreign_window_drag(None);
+        w.tick();
+        assert_eq!(
+            w.current_task(),
+            "wander",
+            "releasing before arrival resumes the interrupted task"
+        );
+    }
+
+    #[test]
+    fn foreign_window_drag_rides_moving_anchor_until_release() {
+        let mut w = world_with_window_watch(13);
+        let first_anchor = Vec2::new(420.0, 90.0);
+        w.goose.position = first_anchor + Vec2::new(1.0, 1.0);
+
+        w.set_foreign_window_drag(Some(window_snapshot(3, first_anchor)));
+        w.tick();
+        assert_eq!(w.current_task(), "perch_ride");
+        assert_eq!(w.goose.position, first_anchor);
+
+        let moved_anchor = Vec2::new(500.0, 110.0);
+        w.set_foreign_window_drag(Some(window_snapshot(3, moved_anchor)));
+        w.tick();
+        assert_eq!(w.current_task(), "perch_ride");
+        assert_eq!(w.goose.position, moved_anchor);
+        assert_eq!(w.goose.velocity, Vec2::ZERO);
+
+        w.set_foreign_window_drag(None);
+        w.tick();
+        assert_eq!(w.current_task(), "wander");
+    }
+
+    #[test]
+    fn foreign_window_watch_capability_loss_abandons_cleanly() {
+        let mut w = world_with_window_watch(14);
+        let anchor = Vec2::new(430.0, 100.0);
+        w.goose.position = anchor + Vec2::new(1.0, 0.0);
+        w.set_foreign_window_drag(Some(window_snapshot(4, anchor)));
+        w.tick();
+        assert_eq!(w.current_task(), "perch_ride");
+
+        w.set_foreign_window_watch_supported(false);
+        w.tick();
+        assert_eq!(w.current_task(), "wander");
+    }
+
+    #[test]
+    fn perch_ride_suppresses_pat_and_click_hyper_interactions() {
+        let mut w = world_with_window_watch(15);
+        let anchor = w.goose.rig.body_center;
+        w.set_foreign_window_drag(Some(window_snapshot(5, anchor)));
+        w.tick();
+        assert_eq!(w.current_task(), "perch_ride");
+
+        for i in 0..12 {
+            let dx = if i % 2 == 0 { 6.0 } else { -6.0 };
+            w.set_pointer(Pointer {
+                pos: anchor + Vec2::new(dx, 0.0),
+                present: true,
+                left_down: false,
+            });
+        }
+        assert_eq!(
+            w.hearts().alive_count(w.now()),
+            0,
+            "cursor motion during perch/ride must not pat the goose"
+        );
+
+        w.set_pointer(Pointer {
+            pos: anchor,
+            present: true,
+            left_down: true,
+        });
+        w.tick();
+        assert_eq!(
+            w.current_task(),
+            "perch_ride",
+            "click edges during perch/ride must not interrupt into hyper"
         );
     }
 }

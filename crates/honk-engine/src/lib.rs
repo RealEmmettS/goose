@@ -5,9 +5,10 @@
 //! tiny-skia renderer. It has **no** windowing, OS, audio, or input-device dependency
 //! and is fully headless-testable — `#![forbid(unsafe_code)]` is enforced below.
 //!
-//! Scope through milestone **M7** (see `honk300_plan.md` §14): data/constants, the Deck,
+//! Scope through milestone **M8** (see `honk300_plan.md` §14): data/constants, the Deck,
 //! renderer, locomotion, task/AI state machine, pointer interactions, sound/cursor intent
-//! queues, and cursor-mischief task state. Moods, schedule, IPC/config, and the non-Windows
+//! queues, cursor-mischief task state, and the platform-neutral foreign-window perch/ride
+//! contract. Moods, schedule, IPC/config, autonomous window collection, and the non-Windows
 //! platform backends arrive in later rounds and build on the types defined here.
 //!
 //! Engine constants are ported verbatim from the verified modding-API source
@@ -25,6 +26,7 @@ pub mod cursor;
 pub mod entity;
 pub mod feet;
 pub mod footmarks;
+pub mod foreign_window;
 pub mod hearts;
 pub mod interaction;
 pub mod locomotion;
@@ -42,12 +44,15 @@ pub use cursor::{CursorCommand, MouseStealOptions, WorldOptions};
 pub use entity::{GooseEntity, ParametersTable, SpeedTier};
 pub use feet::Feet;
 pub use footmarks::{FootMark, FootMarks};
+pub use foreign_window::{
+    ForeignWindowCapabilities, ForeignWindowId, ForeignWindowOptions, ForeignWindowSnapshot,
+};
 pub use hearts::{Heart, Hearts};
 pub use interaction::{PatTracker, Pointer};
 pub use math::{Rect, Vec2};
 pub use rig::Rig;
 pub use rng::{Deck, RandomSource, SplitMix64};
 pub use sound::Sound;
-pub use task::{FirstUxTask, HyperTask, NabMouseTask, Task, WanderTask};
+pub use task::{FirstUxTask, HyperTask, NabMouseTask, PerchRideTask, Task, WanderTask};
 pub use time::{Accumulator, Clock, DT, FRAMERATE};
 pub use world::World;

@@ -7,10 +7,11 @@
 //!
 //! This `Task` trait is the documented internal extension seam (plan §18) — adding a
 //! behavior means adding a `Task` impl and registering it; there is no external mod ABI.
-//! Richer tasks (attack, collect-window, off-screen bolt) land in M8+.
+//! Richer autonomous tasks (collect-window/notepad/meme/donate, off-screen bolt) land in M9+.
 
 use crate::cursor::{CursorCommand, MouseStealOptions};
 use crate::entity::GooseEntity;
+use crate::foreign_window::{ForeignWindowOptions, ForeignWindowSnapshot};
 use crate::interaction::Pointer;
 use crate::math::{clamp, Rect, Vec2};
 use crate::rng::{RandomSource, SplitMix64};
@@ -43,6 +44,10 @@ pub struct TaskCtx<'a> {
     pub pointer: Pointer,
     /// Mouse-stealing tuning and backend support.
     pub mouse_steal: MouseStealOptions,
+    /// Foreign-window tuning and backend support.
+    pub foreign_window: ForeignWindowOptions,
+    /// The user-dragged foreign window currently being watched, if any.
+    pub dragged_window: Option<ForeignWindowSnapshot>,
     /// The goose is in its post-pat calm window (suppresses spontaneous honks; M6 §5.9).
     pub calm: bool,
 }
@@ -263,6 +268,83 @@ impl Task for NabMouseTask {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PerchRideState {
+    Seeking,
+    Riding,
+}
+
+/// Foreign-window perch-and-ride behavior (M8): run to a user-dragged window's title-bar
+/// anchor, then ride it until the drag ends. Window discovery and geometry stay in the
+/// platform backend; the engine only receives opaque IDs and world-space anchors.
+pub struct PerchRideTask {
+    window: Option<ForeignWindowSnapshot>,
+    state: PerchRideState,
+}
+
+impl Default for PerchRideTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PerchRideTask {
+    pub fn new() -> Self {
+        Self {
+            window: None,
+            state: PerchRideState::Seeking,
+        }
+    }
+}
+
+impl Task for PerchRideTask {
+    fn id(&self) -> &'static str {
+        "perch_ride"
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        if !ctx.foreign_window.watch_active() {
+            return true;
+        }
+
+        let Some(snapshot) = ctx.dragged_window else {
+            return true;
+        };
+
+        if let Some(current) = self.window {
+            if current.id != snapshot.id {
+                return true;
+            }
+        } else {
+            self.window = Some(snapshot);
+        }
+
+        match self.state {
+            PerchRideState::Seeking => {
+                goose.current_speed = goose.parameters.run_speed;
+                goose.current_acceleration = goose.parameters.acceleration_normal;
+                goose.target_pos = snapshot.ride_anchor;
+
+                if Vec2::distance(goose.position, snapshot.ride_anchor) <= 6.0 {
+                    self.state = PerchRideState::Riding;
+                    goose.position = snapshot.ride_anchor;
+                    goose.target_pos = snapshot.ride_anchor;
+                    goose.velocity = Vec2::ZERO;
+                }
+                false
+            }
+            PerchRideState::Riding => {
+                goose.position = snapshot.ride_anchor;
+                goose.target_pos = snapshot.ride_anchor;
+                goose.velocity = Vec2::ZERO;
+                goose.current_speed = 0.0;
+                goose.current_acceleration = 0.0;
+                false
+            }
+        }
+    }
+}
+
 /// The scripted first-run intro: the goose walks in to centre stage, pauses to "introduce
 /// itself" for [`FIRST_WANDER_TIME`], then yields to roaming. (`FirstUX_FirstTask` /
 /// `FirstUX_SecondTask` in the original; text/honk flourishes arrive with M5 audio + notes.)
@@ -319,6 +401,8 @@ mod tests {
             cursor_commands,
             pointer: Pointer::default(),
             mouse_steal: MouseStealOptions::default(),
+            foreign_window: ForeignWindowOptions::default(),
+            dragged_window: None,
             calm: false,
         }
     }
@@ -328,6 +412,16 @@ mod tests {
             min: Vec2::new(0.0, 0.0),
             max: Vec2::new(1000.0, 800.0),
         }
+    }
+
+    fn dragged_window(anchor: Vec2) -> ForeignWindowSnapshot {
+        ForeignWindowSnapshot::top_center(
+            crate::foreign_window::ForeignWindowId(42),
+            Rect {
+                min: Vec2::new(anchor.x - 100.0, anchor.y),
+                max: Vec2::new(anchor.x + 100.0, anchor.y + 120.0),
+            },
+        )
     }
 
     #[test]
@@ -671,5 +765,83 @@ mod tests {
             "manual pull-away drops the cursor"
         );
         assert!(ctx.cursor_commands.is_empty());
+    }
+
+    #[test]
+    fn perch_ride_finishes_without_window_watch_capability() {
+        let mut rng = SplitMix64::seed(16);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = PerchRideTask::new();
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.dragged_window = Some(dragged_window(Vec2::new(500.0, 200.0)));
+
+        assert!(task.run(&mut goose, &mut ctx));
+    }
+
+    #[test]
+    fn perch_ride_seeks_window_anchor_at_run_speed() {
+        let mut rng = SplitMix64::seed(17);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = PerchRideTask::new();
+        let anchor = Vec2::new(800.0, 120.0);
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.foreign_window = ForeignWindowOptions::with_backend_support(true, false);
+        ctx.dragged_window = Some(dragged_window(anchor));
+
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(goose.target_pos, anchor);
+        assert_eq!(goose.current_speed, goose.parameters.run_speed);
+        assert_eq!(
+            goose.current_acceleration,
+            goose.parameters.acceleration_normal
+        );
+    }
+
+    #[test]
+    fn perch_ride_abandons_when_drag_releases_before_arrival() {
+        let mut rng = SplitMix64::seed(18);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = PerchRideTask::new();
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.foreign_window = ForeignWindowOptions::with_backend_support(true, false);
+        ctx.dragged_window = Some(dragged_window(Vec2::new(900.0, 120.0)));
+        assert!(!task.run(&mut goose, &mut ctx));
+
+        ctx.dragged_window = None;
+        ctx.now = 0.25;
+        assert!(task.run(&mut goose, &mut ctx));
+    }
+
+    #[test]
+    fn perch_ride_pins_to_moving_anchor_after_arrival() {
+        let mut rng = SplitMix64::seed(19);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = PerchRideTask::new();
+        let first_anchor = Vec2::new(-400.0, -20.0);
+        goose.position = first_anchor + Vec2::new(2.0, 2.0);
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.foreign_window = ForeignWindowOptions::with_backend_support(true, false);
+        ctx.dragged_window = Some(dragged_window(first_anchor));
+
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(goose.position, first_anchor);
+        assert_eq!(goose.velocity, Vec2::ZERO);
+
+        let moved_anchor = Vec2::new(-360.0, -16.0);
+        ctx.dragged_window = Some(dragged_window(moved_anchor));
+        ctx.now = 0.25;
+        goose.velocity = Vec2::new(40.0, 5.0);
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(goose.position, moved_anchor);
+        assert_eq!(goose.target_pos, moved_anchor);
+        assert_eq!(goose.velocity, Vec2::ZERO);
     }
 }
