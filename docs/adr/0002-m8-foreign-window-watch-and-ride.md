@@ -5,7 +5,7 @@ Date: 2026-06-26
 
 ## Context
 
-M8 teaches the goose to react when the user drags another application's window. The behavior is intentionally scoped to watch-and-ride: run to the dragged window's title-bar anchor, ride it if the goose arrives before release, and resume the interrupted task when the drag ends. Autonomous window collection, notepad/meme/donate dispatch, and backend-issued window movement remain M9+ work.
+M8 teaches the goose to react when the user drags another application's window. The behavior is intentionally scoped to watch-and-ride: run to the dragged window's title-bar anchor, ride it if the goose arrives before release, and resume the interrupted task when the drag ends. Autonomous window collection, notepad/meme dispatch, and backend-issued window movement remain M9+ work.
 
 M7 established the rule this milestone must preserve: `honk-engine` owns platform-neutral behavior and backend capability gates, while OS-specific handles and calls stay in platform crates. M8 also has to keep signed desktop coordinates viable for negative-position monitors, future per-monitor overlays, and mixed-DPI polish.
 

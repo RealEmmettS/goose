@@ -5,6 +5,7 @@
 //! [`Deck`](crate::rng::Deck). Tasks set targets/params; [`crate::locomotion`] moves the
 //! goose; the gait + footmark logic here is mechanical.
 
+use crate::collect_window::{CollectWindowCommand, CollectWindowKind, CollectWindowSnapshot};
 use crate::cursor::{CursorCommand, WorldOptions};
 use crate::foreign_window::ForeignWindowSnapshot;
 use crate::hearts::Hearts;
@@ -14,7 +15,10 @@ use crate::math::{Rect, Vec2};
 use crate::rig::Rig;
 use crate::rng::{Deck, RandomSource, SplitMix64};
 use crate::sound::Sound;
-use crate::task::{FirstUxTask, HyperTask, NabMouseTask, PerchRideTask, Task, TaskCtx, WanderTask};
+use crate::task::{
+    CollectWindowTask, FirstUxTask, HyperTask, NabMouseTask, PerchRideTask, Task, TaskCtx,
+    WanderTask,
+};
 use crate::time::DT;
 
 /// Distance travelled per full walking-gait cycle (radians of `gait_phase` per `TAU`).
@@ -37,6 +41,8 @@ pub struct World {
     pending_sounds: Vec<Sound>,
     /// Cursor requests produced this tick, drained by the platform backend.
     pending_cursor_commands: Vec<CursorCommand>,
+    /// Collect-window requests produced this tick, drained by the platform backend.
+    pending_collect_window_commands: Vec<CollectWindowCommand>,
     /// Runtime options/capabilities that must stay platform-free.
     options: WorldOptions,
     /// Detects pats from hovering cursor sweeps and tracks the happy/calm streak (M6 §5.9).
@@ -47,6 +53,8 @@ pub struct World {
     pointer: Pointer,
     /// Last platform-reported user-dragged foreign window.
     dragged_window: Option<ForeignWindowSnapshot>,
+    /// Last platform-reported controlled collect-window state.
+    collect_window_snapshot: Option<CollectWindowSnapshot>,
     /// Left button held on the previous pointer update (for click rising-edge detection).
     prev_left_down: bool,
     /// A click landed on the goose; the next tick installs the hyper burst.
@@ -54,6 +62,8 @@ pub struct World {
     /// A click landed on the goose while mouse stealing is available; the next tick installs
     /// the nab task.
     pending_nab: bool,
+    /// A smoke/manual collect action requested by the runtime.
+    pending_collect: Option<CollectWindowKind>,
     /// The task that was running before a transient interrupt (hyper), restored when it ends.
     interrupted: Option<Box<dyn Task>>,
 }
@@ -83,6 +93,9 @@ impl World {
         if options.mouse_steal.active() {
             pickable.push(|| Box::new(NabMouseTask::new()) as Box<dyn Task>);
         }
+        if options.collect_window.active() {
+            pickable.push(|| Box::new(CollectWindowTask::new()) as Box<dyn Task>);
+        }
         let deck = Deck::new(pickable.len(), SplitMix64::seed(seed ^ 0x9E37_79B9));
 
         Self {
@@ -96,14 +109,17 @@ impl World {
             last_step: 0,
             pending_sounds: Vec::new(),
             pending_cursor_commands: Vec::new(),
+            pending_collect_window_commands: Vec::new(),
             options,
             pat: PatTracker::new(),
             hearts: Hearts::new(),
             pointer: Pointer::default(),
             dragged_window: None,
+            collect_window_snapshot: None,
             prev_left_down: false,
             pending_hyper: false,
             pending_nab: false,
+            pending_collect: None,
             interrupted: None,
         }
     }
@@ -123,6 +139,11 @@ impl World {
         std::mem::take(&mut self.pending_cursor_commands)
     }
 
+    /// Take collect-window commands emitted since the last call.
+    pub fn take_collect_window_commands(&mut self) -> Vec<CollectWindowCommand> {
+        std::mem::take(&mut self.pending_collect_window_commands)
+    }
+
     /// Reflect a backend capability change after startup, e.g. cursor warp failed.
     pub fn set_cursor_warp_supported(&mut self, supported: bool) {
         self.options.mouse_steal.warp_supported = supported;
@@ -136,9 +157,36 @@ impl World {
         }
     }
 
+    /// Reflect backend collect-window movement/spawn/input capability changes.
+    pub fn set_collect_window_supported(&mut self, supported: bool) {
+        self.options.collect_window.capabilities.spawn_note = supported;
+        self.options.collect_window.capabilities.spawn_image = supported;
+        self.options.collect_window.capabilities.move_window = supported;
+        self.options.collect_window.capabilities.set_passthrough = supported;
+        self.options.collect_window.capabilities.synthesize_text = supported;
+        if !supported {
+            self.collect_window_snapshot = None;
+        }
+    }
+
     /// Feed one frame of foreign-window drag state in world/desktop coordinates.
     pub fn set_foreign_window_drag(&mut self, dragged_window: Option<ForeignWindowSnapshot>) {
         self.dragged_window = dragged_window;
+    }
+
+    /// Feed one frame of controlled collect-window state in world/desktop coordinates.
+    pub fn set_collect_window_snapshot(
+        &mut self,
+        collect_window_snapshot: Option<CollectWindowSnapshot>,
+    ) {
+        self.collect_window_snapshot = collect_window_snapshot;
+    }
+
+    /// Force a collect-window action for smoke tests before M10/M11 public pokes exist.
+    pub fn force_collect_window(&mut self, kind: CollectWindowKind) {
+        if self.options.collect_window.kind_active(kind) {
+            self.pending_collect = Some(kind);
+        }
     }
 
     /// The live heart particles (for the renderer).
@@ -166,10 +214,18 @@ impl World {
         self.current.id() == "perch_ride"
     }
 
+    /// Whether the active task is controlling a collected desktop window.
+    pub fn is_collect_window_active(&self) -> bool {
+        self.current.id() == "collect_window"
+    }
+
     /// Feed one frame of pointer state (cursor + buttons, world space). Detects pats
     /// (hover sweeps → hearts + calm) and a click on the goose (→ a hyper burst next tick).
     pub fn set_pointer(&mut self, pointer: Pointer) {
-        if self.is_cursor_mischief_active() || self.is_perch_ride_active() {
+        if self.is_cursor_mischief_active()
+            || self.is_perch_ride_active()
+            || self.is_collect_window_active()
+        {
             self.pointer = pointer;
             self.prev_left_down = pointer.left_down;
             return;
@@ -204,7 +260,10 @@ impl World {
 
     /// Interrupt the current task with a hyper burst, saving the prior task to resume later.
     fn start_hyper(&mut self) {
-        if self.current.id() == "hyper" {
+        if self.current.id() == "hyper"
+            || self.is_collect_window_active()
+            || self.interrupted.is_some()
+        {
             return; // already mid-burst; don't stack
         }
         let prev = std::mem::replace(&mut self.current, Box::new(HyperTask::new()));
@@ -213,10 +272,22 @@ impl World {
 
     /// Interrupt the current task with a cursor nab, saving the prior task to resume later.
     fn start_nab(&mut self) {
-        if self.current.id() == "nab_mouse" {
+        if self.current.id() == "nab_mouse"
+            || self.is_collect_window_active()
+            || self.interrupted.is_some()
+        {
             return; // already stealing the cursor
         }
         let prev = std::mem::replace(&mut self.current, Box::new(NabMouseTask::new()));
+        self.interrupted = Some(prev);
+    }
+
+    /// Interrupt the current task with a forced collect-window task.
+    fn start_collect_window(&mut self, kind: CollectWindowKind) {
+        if self.current.id() == "collect_window" || self.interrupted.is_some() {
+            return; // do not stack long-running desktop-mischief tasks
+        }
+        let prev = std::mem::replace(&mut self.current, Box::new(CollectWindowTask::forced(kind)));
         self.interrupted = Some(prev);
     }
 
@@ -244,18 +315,34 @@ impl World {
     pub fn tick(&mut self) {
         self.elapsed += DT;
 
+        if let Some(kind) = self.pending_collect.take() {
+            if self.options.collect_window.kind_active(kind)
+                && !self.is_cursor_mischief_active()
+                && !self.is_perch_ride_active()
+                && !self.is_collect_window_active()
+            {
+                self.start_collect_window(kind);
+            }
+        }
+
         // A click landed last frame: when cursor stealing is available it takes precedence
         // over the older M6 hyper reaction; otherwise fall back to hyper.
         if self.pending_nab {
             self.pending_nab = false;
-            if self.options.mouse_steal.active() && !self.is_cursor_mischief_active() {
+            if self.options.mouse_steal.active()
+                && !self.is_cursor_mischief_active()
+                && !self.is_collect_window_active()
+            {
                 self.pending_hyper = false;
                 self.start_nab();
             }
         }
 
         // Install the hyper burst only when nab did not consume the click.
-        if self.pending_hyper && !self.is_cursor_mischief_active() {
+        if self.pending_hyper
+            && !self.is_cursor_mischief_active()
+            && !self.is_collect_window_active()
+        {
             self.pending_hyper = false;
             self.start_hyper();
         } else if self.pending_hyper {
@@ -266,6 +353,7 @@ impl World {
             && self.dragged_window.is_some()
             && !self.is_cursor_mischief_active()
             && !self.is_perch_ride_active()
+            && !self.is_collect_window_active()
         {
             self.start_perch_ride();
         }
@@ -280,10 +368,13 @@ impl World {
                 rng: &mut self.rng,
                 sounds: &mut self.pending_sounds,
                 cursor_commands: &mut self.pending_cursor_commands,
+                collect_window_commands: &mut self.pending_collect_window_commands,
                 pointer: self.pointer,
                 mouse_steal: self.options.mouse_steal,
                 foreign_window: self.options.foreign_window,
+                collect_window: self.options.collect_window,
                 dragged_window: self.dragged_window,
+                collect_window_snapshot: self.collect_window_snapshot,
                 calm,
             };
             self.current.run(&mut self.goose, &mut ctx)
@@ -341,6 +432,10 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::collect_window::{
+        CollectWindowCapabilities, CollectWindowId, CollectWindowKind, CollectWindowOptions,
+        CollectWindowRequestId, CollectWindowSnapshot,
+    };
     use crate::cursor::MouseStealOptions;
     use crate::foreign_window::{ForeignWindowId, ForeignWindowOptions};
 
@@ -367,6 +462,29 @@ mod tests {
             seed,
             WorldOptions {
                 foreign_window: ForeignWindowOptions::with_backend_support(true, false),
+                ..WorldOptions::default()
+            },
+        );
+        w.current = Box::new(WanderTask::new());
+        w
+    }
+
+    fn world_with_collect(seed: u64) -> World {
+        let mut w = World::with_options(
+            bounds(),
+            seed,
+            WorldOptions {
+                collect_window: CollectWindowOptions::with_backend_support(
+                    CollectWindowCapabilities {
+                        spawn_note: true,
+                        spawn_image: true,
+                        move_window: true,
+                        set_passthrough: true,
+                        synthesize_text: true,
+                    },
+                    1,
+                    1,
+                ),
                 ..WorldOptions::default()
             },
         );
@@ -840,5 +958,69 @@ mod tests {
             "perch_ride",
             "click edges during perch/ride must not interrupt into hyper"
         );
+    }
+
+    #[test]
+    fn forced_collect_window_queues_spawn_and_drains_once() {
+        let mut w = world_with_collect(16);
+        w.force_collect_window(CollectWindowKind::Note);
+        w.tick();
+        assert_eq!(w.current_task(), "collect_window");
+        assert!(matches!(
+            w.take_collect_window_commands().as_slice(),
+            [CollectWindowCommand::Spawn { .. }]
+        ));
+        assert!(w.take_collect_window_commands().is_empty());
+    }
+
+    #[test]
+    fn collect_window_suppresses_pat_and_click_hyper_interactions() {
+        let mut w = world_with_collect(17);
+        w.force_collect_window(CollectWindowKind::Meme);
+        w.tick();
+        assert_eq!(w.current_task(), "collect_window");
+
+        let anchor = w.goose.rig.body_center;
+        for i in 0..12 {
+            let dx = if i % 2 == 0 { 6.0 } else { -6.0 };
+            w.set_pointer(Pointer {
+                pos: anchor + Vec2::new(dx, 0.0),
+                present: true,
+                left_down: false,
+            });
+        }
+        assert_eq!(w.hearts().alive_count(w.now()), 0);
+
+        w.set_pointer(Pointer {
+            pos: anchor,
+            present: true,
+            left_down: true,
+        });
+        w.tick();
+        assert_eq!(w.current_task(), "collect_window");
+    }
+
+    #[test]
+    fn collect_window_capability_loss_abandons_cleanly() {
+        let mut w = world_with_collect(18);
+        w.force_collect_window(CollectWindowKind::Meme);
+        w.tick();
+        let request = match w.take_collect_window_commands().as_slice() {
+            [CollectWindowCommand::Spawn { request, .. }] => *request,
+            other => panic!("unexpected commands: {other:?}"),
+        };
+        w.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id: CollectWindowId(1),
+            request: CollectWindowRequestId(request.0),
+            kind: CollectWindowKind::Meme,
+            rect: Rect {
+                min: Vec2::new(200.0, 100.0),
+                max: Vec2::new(500.0, 300.0),
+            },
+            alive: true,
+        }));
+        w.set_collect_window_supported(false);
+        w.tick();
+        assert_eq!(w.current_task(), "wander");
     }
 }

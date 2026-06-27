@@ -8,13 +8,14 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M8 are complete and M9 (collect-window
-dispatcher) is next. The Cargo workspace exists: `honk-engine` (platform-free
+**Current stage: implementation in progress.** M0-M9 are complete and M10 (single-instance
+IPC) is next. The Cargo workspace exists: `honk-engine` (platform-free
 core), `honk-platform-windows` (the layered overlay), and the root `honk300` binary — a
 procedurally-rendered goose roams a transparent Windows overlay, leaves mud trails, runs the
 task/FirstUX AI, honks, reacts to pat/click input, can perform bounded cursor nabbing, and can
-perch on a user-dragged foreign window on Windows. `honk300_plan.md` is the canonical plan
-(milestones M0–M19); the two superseded drafts remain as reference.
+perch on a user-dragged foreign window, and can collect Notepad/meme windows on Windows.
+`honk300_plan.md` is the canonical plan (milestones M0–M19); the two superseded drafts remain as
+reference.
 
 ## Read these first (source-of-truth pointers)
 
@@ -38,7 +39,8 @@ perch on a user-dragged foreign window on Windows. `honk300_plan.md` is the cano
 - `docs/adr/` — architecture decision records. Read these when a task touches platform
   boundaries, renderer architecture, capability traits, packaging targets, or milestone scope.
   ADR 0001 records the accepted M7 cursor-mischief contract and Renderer V2 direction; ADR 0002
-  records the M8 foreign-window watch-and-ride contract.
+  records the M8 foreign-window watch-and-ride contract; ADR 0003 records the M9 collect-window,
+  asset, and no-donate decisions.
 
 ## Big-picture architecture (original → planned port)
 
@@ -58,10 +60,11 @@ perch on a user-dragged foreign window on Windows. `honk300_plan.md` is the cano
 
 - Name `honk300` (binary `honk300`, optional `honk` alias); fresh permanent WiX/Inno GUIDs.
 - Procedural/clean-room goose (no sprite extraction — the visual is drawn from the rig).
-  **All other original assets are bundled 1:1 and committed** to `Assets/` (sounds now;
-  memes + notes at M9): this is a **personal tool the owner self-distributes to his own
-  machines only**, so the earlier "regenerate memes / author fresh notes" plan is
-  **superseded — copy the originals.** (Not for public redistribution.)
+  Original sounds, screened original memes, and screened original notes are bundled 1:1 for
+  personal-use builds. M9 also adds **one complete custom in-house counterpart per copied
+  meme/note original** in the clumsy MS Paint house style. User-supplied `Meme8.png` is approved.
+  Old developer donation pages, Patreon links, social handles, and old-project branding do not
+  ship.
 - Linux: **X11-first** (runs under XWayland); native Wayland behind an opt-in `--wayland`
   flag (reduced mischief).
 - Packaging: Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) + shell/PowerShell
@@ -78,6 +81,7 @@ perch on a user-dragged foreign window on Windows. `honk300_plan.md` is the cano
   `HUMAN_CHANGELOG.md` when they change current guidance.
 - M7's accepted decisions live in `docs/adr/0001-m7-cursor-mischief-renderer-and-platform-guardrails.md`.
 - M8's accepted decisions live in `docs/adr/0002-m8-foreign-window-watch-and-ride.md`.
+- M9's accepted decisions live in `docs/adr/0003-m9-collect-window-assets-and-no-donate.md`.
 
 ## Gotchas (cross-platform overlay / desktop-pet)
 
@@ -109,10 +113,11 @@ from a sibling repo); **`crates-publish.yml` is intentionally dropped** (no crat
 ## Asset & IP rule
 
 This is a **personal tool the owner builds for and self-distributes to his own machines
-only** — not a public release. On that basis the original assets in `DESKTOP-GOOSE/` are
-**bundled 1:1 into `Assets/` and committed** (sounds done in M5; memes + notes copied at M9).
-The goose **visual** is still clean-room procedural (drawn from the rig, no sprite art exists
-to extract). Do **not** publicly redistribute these bundled third-party assets.
+only** — not a public release. On that basis screened original sounds, memes, and notes from
+`DESKTOP-GOOSE/` are bundled 1:1 into `Assets/`, with one complete custom in-house counterpart per
+copied meme/note original. The goose **visual** is still clean-room procedural (drawn from the
+rig, no sprite art exists to extract). Do **not** publicly redistribute these bundled third-party
+assets, and do not ship old donate pages or old developer references.
 
 ## Changelog rule
 

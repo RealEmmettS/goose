@@ -62,8 +62,8 @@ still build the full installer matrix because matching the `*300` family is an e
 | **Names** | Three installed names: `honk300` (primary), `honk`, `goose`. Fresh **permanent** WiX/Inno GUIDs (never reuse TR/ND/WB). |
 | **Goose visual** | **Procedural** clean-room render from the public modding-API constants — no sprite extraction. |
 | **Sounds** | Bundle original honk/bite/mud (+ Mac pat) audio **1:1**, embedded (personal use). Kept out of any source/package artifact. |
-| **Memes** | **Do not copy.** Ship `Assets/Images/Memes/codex.md` with per-slot briefs to regenerate each meme **originally**. Absent slots skipped at runtime. |
-| **Notes** | Author **brand-new, original** goose-voiced notepad/bubble messages in the original's register — **not** paraphrases. |
+| **Memes** | Copy screened originals 1:1 for personal-use builds, add **one complete custom in-house counterpart per original** in the clumsy MS Paint house style, and keep user-supplied `Meme8.png`. Absent/unsupported slots skip at runtime. |
+| **Notes** | Copy screened original notepad messages 1:1 for personal-use builds and add **one custom goose-voiced counterpart per original**. |
 | **Config** | **TOML** (`config.toml`), original keys preserved at verified values, versioned + tolerant loader. No `EnableMods` key. |
 | **Modding** | **No external mods** (no DLL/`.so`/`.dylib`, no WASM, no third-party data mods). Autumn becomes a **built-in** season/task. Extensibility = **documented internal seams**. |
 | **Control** | **No system tray.** Quit via hold-ESC (where the OS allows) or any stop command. **Single-instance + IPC command channel** (`stop` / `do` / `reload`). |
@@ -80,7 +80,7 @@ still build the full installer matrix because matching the `*300` family is an e
 ### 2.1 Mission
 Rebuild Desktop Goose as a modern, maintainable, cross-platform desktop companion that
 reproduces the *feel* and feature set of the original (wandering, mud, mouse stealing/biting,
-honking, patting, meme/notepad/donation windows, config-driven behavior, Autumn leaves), runs
+honking, patting, meme/notepad windows, config-driven behavior, Autumn leaves), runs
 natively on Windows/macOS/Linux, ships via native installers/builds/scripts only, and is **safe
 by default**: no telemetry, no network on its own, clean uninstall, explicit user control.
 
@@ -106,8 +106,9 @@ grammar is a fixed, finite phrase map — no model at runtime); networked featur
 6. **User sovereignty.** The goose is a guest: ESC or any stop command evicts it; uninstall is
    total; nothing happens the user didn't opt into. Default chaos is bounded by quiet-hours,
    fullscreen-pause, `--no-mouse-steal`, and Calm goose.
-7. **Asset/IP rules are first-class** (see §12): sounds 1:1 embedded (personal), memes regenerated
-   originally, notes authored fresh, goose clean-room procedural.
+7. **Asset/IP rules are first-class** (see §12): sounds, screened memes, and screened notes are
+   bundled 1:1 for personal use; every copied meme/note original gets one complete custom
+   in-house counterpart; old donate pages and old developer references do not ship.
 
 ---
 
@@ -191,7 +192,8 @@ tiers, step cadence, tint, and task weights — **never** by adding art.
     `DraggingMouseAway`, `originalVectorToMouse`, `grabbedOriginalTime`, `WaitingToBringWindowBack`).
   - `Task_CanAttackMouse` / `AttackRandomly` (bite the cursor; `BITE.mp3`).
   - `Task_CollectWindow` dispatcher → `CollectWindow_Notepad` (runs `notepad.exe` with a random
-    message), `CollectWindow_Meme`, `CollectWindow_Donate`; fields `windowOffsetToBeak`,
+    message), `CollectWindow_Meme`; the original donation task is intentionally excluded from
+    honk300. Relevant fields include `windowOffsetToBeak`,
     `SetWindowPassthru`, `DraggingWindowBack`, `ExitWindow`, `OriginalWindowStyle`,
     `PassthruWindowStyle`.
   - `FirstUX_FirstTask` / `FirstUX_SecondTask` — a **scripted first-run intro** (the goose
@@ -204,13 +206,14 @@ tiers, step cadence, tint, and task weights — **never** by adding art.
 ### 3.6 The original's command surface (macOS `.sdef`) → our poke commands
 The Mac AppleScript dictionary enumerates the original's own "things you can tell the goose to
 do": `honk`, `wander [duration]`, `nab mouse`, `track mud`, `collect meme [path] [title]`,
-`collect note [text] [title]`, `collect donations`, `open memes folder`, `open notes folder`.
-This is the basis for our **`<name> do <action>`** pokes and the TUI **Poke** panel.
+`collect note [text] [title]`, `open memes folder`, `open notes folder`. The original donation
+command is not carried forward. This is the basis for our **`<name> do <action>`** pokes and the
+TUI **Poke** panel.
 
 ### 3.7 Sounds & the goose's voice
 - **Sounds:** `Honk1-4.mp3`, `BITE.mp3`, `MudSquith.mp3`, optional `Music.mp3`; Mac adds
   `Pat1-3.wav`. → bundle 1:1, embedded.
-- **Voice** (real notes, for authoring fresh originals in-register): terse, lowercase,
+- **Voice** (real notes, for custom counterparts in-register): terse, lowercase,
   self-aware menace-but-cute — *"am goose hjonk"*, *"good work"*, *"i cause problems on
   purpose"*, *"peace was never an option" — the goose (me)*, *"nsfdafdsaafsdjl … sorry … hard to
   type withh feet"*, ASCII `>o)` / `(_>`.
@@ -218,10 +221,12 @@ This is the basis for our **`<name> do <action>`** pokes and the TUI **Poke** pa
 ### 3.8 Asset inventory
 - **Sounds** → bundle 1:1, embedded (excluded from the source package `include`).
 - **Images/Memes** (`Meme1-7.png`, `GooseDance.gif`, `MemeAttributions.txt` — third-party) →
-  **regenerate originally** via `codex.md`; do not copy.
-- **Images/OtherGfx** (`DonatePage.png`, `heart.png`) → recreate originally / procedural (hearts
-  for the pat-streak feature).
-- **Text/NotepadMessages** → author fresh originals in the goose voice.
+  copy screened originals for personal-use builds and add one complete custom clumsy-paint
+  counterpart per original. User-supplied `Meme8.png` is approved as an extra meme prop.
+- **Images/OtherGfx** (`DonatePage.png`, `heart.png`) → exclude old donate pages; hearts are
+  procedural for the pat-streak feature.
+- **Text/NotepadMessages** → copy screened originals and add one custom goose-voiced counterpart
+  per original.
 - **Mods/Autumn/Autumn.dll** + `Autumn.txt` (adds leaf piles to "play in") → reimplement as a
   **built-in** Autumn season/task.
 - **Icons** → design an original `honk300` icon.
@@ -266,8 +271,8 @@ durable Accessibility grant (a real `.app` with a stable bundle-id is mandatory)
 ### 5.1 Original parity set (all reproduced)
 Procedural goose; Walk/Run/Charge; autonomous wander with config timing; fading muddy footprints
 (8.5 s / 1 s, 15 s duration); recolorable; FirstUX scripted intro; nab/drag the user's cursor;
-attack/bite (`Task_CanAttackMouse`/`AttackRandomly`); collect-window dispatcher (Notepad / meme /
-donate) with drag-to-beak + passthru; off-screen bolt; honks (4) + bite + mud-squish (+ pat); pat
+attack/bite (`Task_CanAttackMouse`/`AttackRandomly`); collect-window dispatcher (Notepad / meme)
+with drag-to-beak + passthru; off-screen bolt; honks (4) + bite + mud-squish (+ pat); pat
 on interaction; Autumn (now built-in); always-on-top transparent overlay spanning monitors;
 hold-ESC quit.
 
@@ -323,7 +328,7 @@ the goose repeatedly builds a happy streak → emits heart particles (procedural
 needed for hit-testing. **Click stays the hyper reaction** — the two interactions are distinct.
 
 ### 5.10 Manual poke commands *(default ON)*
-`<name> do <honk|wander|mud|meme|note|nab|donate>` from the terminal, and a **Poke** panel in
+`<name> do <honk|wander|mud|meme|note|nab>` from the terminal, and a **Poke** panel in
 the config TUI, both routing through the IPC channel to the running goose. Sourced from the
 `.sdef` surface (§3.6).
 
@@ -347,7 +352,7 @@ OS/display-server-driven, handled by `Cap<T>`:
 | Dynamic moods · on-hour honk · seasonal · pat-hover+hearts · multi-monitor chase | ✅ | ✅ | ✅ | ✅ (render/sim only) |
 | Quiet-hours / DND-fullscreen respect | ✅ | ✅ | ✅ | ⚠️ best-effort |
 | Perch & ride | ✅ | ✅ | ✅ | ❌ self-skips |
-| Pokes that move windows/cursor (nab/donate) | ✅ | ✅ (A11y) | ✅ | ❌ self-disable |
+| Pokes that move windows/cursor (nab/meme/note) | ✅ | ✅ (A11y) | ✅ | ❌ self-disable |
 
 Engine-side behaviors (moods, seasonal, hearts, multi-monitor) are platform-free and identical
 everywhere; only OS-interaction behaviors degrade, and they degrade **honestly** (the TUI marks
@@ -456,7 +461,7 @@ LLM). `<name>` below = any of the three.
 |---|---|
 | **Start** (default) | `<name>` · `<name> start` · `<name> plz` · `honk plz` · `goose plz` |
 | **Stop** | `<name> stop` · `honk bad` · `goose no honk` · `<name> no` · `<name> bad` |
-| **Poke an action** | `<name> do <honk\|wander\|mud\|meme\|note\|nab\|donate>` (and `honk plz` ⇒ `do honk`) |
+| **Poke an action** | `<name> do <honk\|wander\|mud\|meme\|note\|nab>` (and `honk plz` ⇒ `do honk`) |
 | **Config TUI** | `<name> config` |
 | **Help** (lists every command incl. goose-speak) | `<name> help` · `<name> --help` |
 | **Lifecycle** | `<name> install` · `uninstall` · `update` · `setup` · `--version` |
@@ -523,16 +528,19 @@ Support/honk300/`). **Override precedence:** user-override dir **>** extracted d
 fallback. **Update safety:** store a content-hash manifest; on app update, re-extract only assets
 the user hasn't modified (never clobber edits). Missing meme/note → skip, never crash.
 
-### 10.2 Memes → `codex.md` (no copying)
-Ship `Assets/Images/Memes/codex.md` enumerating slots `Meme1…Meme7` + `GooseDance` (animated),
-each with a short brief instructing image-gen tools to produce an **original** image in the same
-role/format. Runtime treats any present `MemeN.png`/`.gif` as a draggable prop; absent slots
-skipped.
+### 10.2 Memes → originals plus custom counterparts
+Ship screened original meme assets under `Assets/Images/Memes/originals/` for personal-use builds
+and one complete custom in-house counterpart per original under `Assets/Images/Memes/custom/`.
+The custom images use the clumsy MS Paint house prompt recorded with the assets. Runtime treats
+present PNG meme assets as draggable props; GIF animation can be skipped until supported.
+User-supplied `Assets/Images/Memes/user/Meme8.png` is approved as an extra prop.
+Original meme candidates that fail the no-old-dev/no-donate/no-social-handle screen are excluded
+rather than redacted; the reference `Meme2.png` is excluded for a visible handle watermark.
 
-### 10.3 Notes → original goose-voiced messages
-Author a fresh set of **original** one-liners in the sarcastic, honking register (§3.7) — not
-paraphrases. Stored as `.txt` in `Assets/Text/NotepadMessages/`, picked via the `Deck`; reused
-for the optional speech-bubble feature.
+### 10.3 Notes → originals plus custom counterparts
+Ship screened original notepad messages under `Assets/Text/NotepadMessages/originals/` and one
+custom goose-voiced counterpart per original under `Assets/Text/NotepadMessages/custom/`. Runtime
+picks across all present notes via the `Deck`; missing files skip.
 
 ---
 
@@ -620,10 +628,12 @@ no_mouse_steal      = false                # --no-mouse-steal sets this true
 
 ## 12. Asset & IP rule
 
-`DESKTOP-GOOSE/` contains Samperson's / third-party copyrighted assets — **reference only; do not
-redistribute** in source or public builds. The goose visual is clean-room procedural; sounds are
-bundled 1:1 **for personal use** and kept out of the source-package `include = […]`; memes are
-regenerated originally via `codex.md`; notepad/bubble messages are authored fresh. No crates.io.
+`DESKTOP-GOOSE/` contains Samperson's / third-party copyrighted assets and old developer donation
+material. This is a personal-use project, so screened original sounds, memes, and notes are
+bundled 1:1 for the owner's machines, and each copied meme/note original gets one complete custom
+in-house counterpart. Do not publicly redistribute these bundled assets. The goose visual remains
+clean-room procedural. Old donate pages, Patreon links, social handles, and old-project branding
+do not ship. No crates.io.
 
 ---
 
@@ -715,7 +725,7 @@ being implemented three more times.
 | M6 | Hit-testing: **pat = hover-streak + hearts**; **click → hyper** | hover pets, click hypes, empty passes through |
 | M7 | Cursor mischief (warp + nab sub-states) | goose drags the real cursor |
 | M8 | Foreign-window dragging + **perch & ride** (move-start → ride / smooth-abandon) | goose rides a dragged window; abandons cleanly |
-| M9 | Collect-window dispatcher: Notepad (faithful keystroke synth) + meme + donate | goose types an original taunt; drags a meme/donate window |
+| M9 | Collect-window dispatcher: Notepad (faithful keystroke synth) + meme | goose types a note; drags meme windows |
 | M10 | **Single-instance + IPC command channel** (stop/do/reload) + hold-ESC; **no tray** | second launch refused; `honk300 stop` quits; ESC quits |
 | M11 | **CLI grammar** (3 names + goose-speak phrase-map) + `do <action>` pokes + `help` | `goose plz` starts, `honk bad` stops, `goose do honk` honks |
 | M12 | **Config TUI** (ratatui reducer; groups + Poke panel; TOML I/O; hot-apply via IPC) | toggling Autumn live stops the leaves; save persists |

@@ -5,11 +5,12 @@
 //! tiny-skia renderer. It has **no** windowing, OS, audio, or input-device dependency
 //! and is fully headless-testable — `#![forbid(unsafe_code)]` is enforced below.
 //!
-//! Scope through milestone **M8** (see `honk300_plan.md` §14): data/constants, the Deck,
+//! Scope through milestone **M9** (see `honk300_plan.md` §14): data/constants, the Deck,
 //! renderer, locomotion, task/AI state machine, pointer interactions, sound/cursor intent
-//! queues, cursor-mischief task state, and the platform-neutral foreign-window perch/ride
-//! contract. Moods, schedule, IPC/config, autonomous window collection, and the non-Windows
-//! platform backends arrive in later rounds and build on the types defined here.
+//! queues, cursor-mischief task state, the platform-neutral foreign-window perch/ride
+//! contract, and the platform-neutral collect-window command/snapshot contract. Moods,
+//! schedule, IPC/config, and the non-Windows platform backends arrive in later rounds and build
+//! on the types defined here.
 //!
 //! Engine constants are ported verbatim from the verified modding-API source
 //! (`GooseModdingAPI/Exports.cs`, `SamEngine.cs`); the `updateRig` placement math and
@@ -22,6 +23,7 @@
 // a specific tiny-skia version themselves.
 pub use tiny_skia;
 
+pub mod collect_window;
 pub mod cursor;
 pub mod entity;
 pub mod feet;
@@ -40,6 +42,10 @@ pub mod time;
 pub mod world;
 
 // A curated surface for downstream crates (the platform backends, the eventual binary).
+pub use collect_window::{
+    CollectWindowCapabilities, CollectWindowCommand, CollectWindowId, CollectWindowKind,
+    CollectWindowOptions, CollectWindowPayload, CollectWindowRequestId, CollectWindowSnapshot,
+};
 pub use cursor::{CursorCommand, MouseStealOptions, WorldOptions};
 pub use entity::{GooseEntity, ParametersTable, SpeedTier};
 pub use feet::Feet;
@@ -53,6 +59,8 @@ pub use math::{Rect, Vec2};
 pub use rig::Rig;
 pub use rng::{Deck, RandomSource, SplitMix64};
 pub use sound::Sound;
-pub use task::{FirstUxTask, HyperTask, NabMouseTask, PerchRideTask, Task, WanderTask};
+pub use task::{
+    CollectWindowTask, FirstUxTask, HyperTask, NabMouseTask, PerchRideTask, Task, WanderTask,
+};
 pub use time::{Accumulator, Clock, DT, FRAMERATE};
 pub use world::World;

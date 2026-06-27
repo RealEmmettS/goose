@@ -10,11 +10,12 @@ FOR REFERENCE:
 
 ## Status
 
-**Stage:** implementation in progress. Milestones **M0-M8** are complete; **M9 collect-window
-dispatcher** is next. The current Windows build renders the procedural goose on the desktop,
+**Stage:** implementation in progress. Milestones **M0-M9** are complete; **M10 single-instance
+IPC** is next. The current Windows build renders the procedural goose on the desktop,
 walks it, leaves mud, plays sounds, reacts to pat/click input, can perform bounded cursor
 nabbing when cursor warping is enabled, and can perch on a user-dragged foreign window until
-release. There is no installer or release artifact yet.
+release. It can also drag in Notepad and meme windows through the M9 collect-window dispatcher.
+There is no installer or release artifact yet.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
@@ -34,7 +35,9 @@ contract, cross-platform guardrails, and Renderer V2 direction.
   finite "goose-speak" CLI (`goose plz` to start, `honk bad` / `goose no honk` to stop,
   `goose do honk` to poke, `<name> config`, `<name> help`).
 - **Clean-room procedural goose** (no sprite extraction); engine ported 1:1 from the verified
-  constants. Sounds bundled 1:1 (personal use); memes regenerated originally; notes authored fresh.
+  constants. Sounds, screened original memes, and screened original notes are bundled 1:1 for
+  personal use; M9 adds one complete custom in-house counterpart per copied meme/note original.
+  Old donate pages and old developer references do not ship.
 - **TOML config** + a **ratatui terminal config TUI** at `<name> config` that toggles every
   behavior (including Autumn), hot-applying changes to a running goose where cheap.
 - **New autonomous behaviors**, each an optional toggle, scoped to parameter-modulation of the

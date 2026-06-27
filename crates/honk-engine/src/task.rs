@@ -7,8 +7,12 @@
 //!
 //! This `Task` trait is the documented internal extension seam (plan §18) — adding a
 //! behavior means adding a `Task` impl and registering it; there is no external mod ABI.
-//! Richer autonomous tasks (collect-window/notepad/meme/donate, off-screen bolt) land in M9+.
+//! Richer autonomous tasks (off-screen bolt and later moods) land after M9.
 
+use crate::collect_window::{
+    CollectWindowCommand, CollectWindowKind, CollectWindowOptions, CollectWindowPayload,
+    CollectWindowRequestId, CollectWindowSnapshot,
+};
 use crate::cursor::{CursorCommand, MouseStealOptions};
 use crate::entity::GooseEntity;
 use crate::foreign_window::{ForeignWindowOptions, ForeignWindowSnapshot};
@@ -25,6 +29,10 @@ pub const MAX_WANDERING_TIME: f32 = 40.0;
 
 /// How long the click→charge "hyper" burst lasts, in seconds (M6, plan §5.6 hyper).
 pub const HYPER_DURATION: f32 = 2.5;
+const COLLECT_SPAWN_TIMEOUT: f32 = 3.0;
+const COLLECT_VISIBLE_DWELL: f32 = 4.0;
+const COLLECT_PICKUP_DISTANCE: f32 = 42.0;
+const COLLECT_RELEASE_DISTANCE: f32 = 5.0;
 
 /// Per-tick context handed to a running task.
 pub struct TaskCtx<'a> {
@@ -40,14 +48,20 @@ pub struct TaskCtx<'a> {
     pub sounds: &'a mut Vec<Sound>,
     /// Cursor commands a task wants the platform backend to apply this frame.
     pub cursor_commands: &'a mut Vec<CursorCommand>,
+    /// Collect-window commands a task wants the platform backend to apply this frame.
+    pub collect_window_commands: &'a mut Vec<CollectWindowCommand>,
     /// Last pointer snapshot in world/desktop coordinates.
     pub pointer: Pointer,
     /// Mouse-stealing tuning and backend support.
     pub mouse_steal: MouseStealOptions,
     /// Foreign-window tuning and backend support.
     pub foreign_window: ForeignWindowOptions,
+    /// Collect-window tuning/content and backend support.
+    pub collect_window: CollectWindowOptions,
     /// The user-dragged foreign window currently being watched, if any.
     pub dragged_window: Option<ForeignWindowSnapshot>,
+    /// The backend-reported state of the active collect window, if any.
+    pub collect_window_snapshot: Option<CollectWindowSnapshot>,
     /// The goose is in its post-pat calm window (suppresses spontaneous honks; M6 §5.9).
     pub calm: bool,
 }
@@ -282,6 +296,248 @@ pub struct PerchRideTask {
     state: PerchRideState,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum CollectState {
+    Choose,
+    WaitForSpawn {
+        request: CollectWindowRequestId,
+        payload: CollectWindowPayload,
+        deadline: f32,
+    },
+    RunToPickup {
+        request: CollectWindowRequestId,
+        payload: CollectWindowPayload,
+    },
+    DraggingBack {
+        request: CollectWindowRequestId,
+        payload: CollectWindowPayload,
+        window_offset_to_beak: Vec2,
+        release_at: Vec2,
+    },
+    Release {
+        request: CollectWindowRequestId,
+        payload: CollectWindowPayload,
+        typed: bool,
+        visible_until: f32,
+    },
+}
+
+/// Autonomous collect-window dispatcher (M9): drag in a Note or Meme prop using only
+/// platform-neutral commands and snapshots.
+pub struct CollectWindowTask {
+    state: CollectState,
+    forced: Option<CollectWindowKind>,
+}
+
+impl Default for CollectWindowTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CollectWindowTask {
+    pub fn new() -> Self {
+        Self {
+            state: CollectState::Choose,
+            forced: None,
+        }
+    }
+
+    pub fn forced(kind: CollectWindowKind) -> Self {
+        Self {
+            state: CollectState::Choose,
+            forced: Some(kind),
+        }
+    }
+
+    fn choose_payload(&mut self, ctx: &mut TaskCtx) -> Option<CollectWindowPayload> {
+        let mut kinds = [None, None];
+        let mut len = 0usize;
+        for kind in [CollectWindowKind::Note, CollectWindowKind::Meme] {
+            if self.forced.is_some_and(|forced| forced != kind) {
+                continue;
+            }
+            if ctx.collect_window.kind_active(kind) {
+                kinds[len] = Some(kind);
+                len += 1;
+            }
+        }
+        if len == 0 {
+            return None;
+        }
+        let kind = kinds[(ctx.rng.range(0.0, len as f32) as usize).min(len - 1)].unwrap();
+        match kind {
+            CollectWindowKind::Note => Some(CollectWindowPayload::Note {
+                index: (ctx
+                    .rng
+                    .range(0.0, ctx.collect_window.available_notes as f32)
+                    as u32)
+                    .min(ctx.collect_window.available_notes.saturating_sub(1)),
+            }),
+            CollectWindowKind::Meme => Some(CollectWindowPayload::Meme {
+                index: (ctx
+                    .rng
+                    .range(0.0, ctx.collect_window.available_memes as f32)
+                    as u32)
+                    .min(ctx.collect_window.available_memes.saturating_sub(1)),
+            }),
+        }
+    }
+
+    fn request_id(ctx: &TaskCtx, payload: CollectWindowPayload) -> CollectWindowRequestId {
+        let kind_bit = match payload.kind() {
+            CollectWindowKind::Note => 0x10_0000,
+            CollectWindowKind::Meme => 0x20_0000,
+        };
+        CollectWindowRequestId(((ctx.now * 120.0).round() as u64) ^ kind_bit)
+    }
+
+    fn live_snapshot(
+        ctx: &TaskCtx,
+        request: CollectWindowRequestId,
+        payload: CollectWindowPayload,
+    ) -> Option<CollectWindowSnapshot> {
+        let snapshot = ctx.collect_window_snapshot?;
+        if snapshot.request == request && snapshot.kind == payload.kind() && snapshot.alive {
+            Some(snapshot)
+        } else {
+            None
+        }
+    }
+}
+
+impl Task for CollectWindowTask {
+    fn id(&self) -> &'static str {
+        "collect_window"
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        if !ctx.collect_window.active() {
+            return true;
+        }
+
+        goose.current_speed = goose.parameters.run_speed;
+        goose.current_acceleration = goose.parameters.acceleration_normal;
+
+        match self.state {
+            CollectState::Choose => {
+                let Some(payload) = self.choose_payload(ctx) else {
+                    return true;
+                };
+                let request = Self::request_id(ctx, payload);
+                ctx.collect_window_commands
+                    .push(CollectWindowCommand::Spawn { request, payload });
+                self.state = CollectState::WaitForSpawn {
+                    request,
+                    payload,
+                    deadline: ctx.now + COLLECT_SPAWN_TIMEOUT,
+                };
+                false
+            }
+            CollectState::WaitForSpawn {
+                request,
+                payload,
+                deadline,
+            } => {
+                if let Some(snapshot) = Self::live_snapshot(ctx, request, payload) {
+                    goose.target_pos = snapshot.center();
+                    self.state = CollectState::RunToPickup { request, payload };
+                    false
+                } else {
+                    ctx.now >= deadline
+                }
+            }
+            CollectState::RunToPickup { request, payload } => {
+                let Some(snapshot) = Self::live_snapshot(ctx, request, payload) else {
+                    return true;
+                };
+                let pickup = snapshot.center();
+                goose.target_pos = clamp_point(pickup, ctx.bounds);
+                if Vec2::distance(goose.rig.beak_tip, pickup) <= COLLECT_PICKUP_DISTANCE {
+                    let offset = snapshot.rect.min - goose.rig.beak_tip;
+                    let release_at = (ctx.bounds.min + ctx.bounds.max) * 0.5;
+                    ctx.collect_window_commands
+                        .push(CollectWindowCommand::SetPassthrough {
+                            id: snapshot.id,
+                            passthrough: true,
+                        });
+                    self.state = CollectState::DraggingBack {
+                        request,
+                        payload,
+                        window_offset_to_beak: offset,
+                        release_at,
+                    };
+                }
+                false
+            }
+            CollectState::DraggingBack {
+                request,
+                payload,
+                window_offset_to_beak,
+                release_at,
+            } => {
+                let Some(snapshot) = Self::live_snapshot(ctx, request, payload) else {
+                    return true;
+                };
+                goose.target_pos = clamp_point(release_at, ctx.bounds);
+                ctx.collect_window_commands
+                    .push(CollectWindowCommand::Move {
+                        id: snapshot.id,
+                        top_left: goose.rig.beak_tip + window_offset_to_beak,
+                    });
+                if Vec2::distance(goose.position, release_at) <= COLLECT_RELEASE_DISTANCE {
+                    self.state = CollectState::Release {
+                        request,
+                        payload,
+                        typed: false,
+                        visible_until: ctx.now + COLLECT_VISIBLE_DWELL,
+                    };
+                }
+                false
+            }
+            CollectState::Release {
+                request,
+                payload,
+                typed,
+                visible_until,
+            } => {
+                let Some(snapshot) = Self::live_snapshot(ctx, request, payload) else {
+                    return true;
+                };
+                if !typed {
+                    ctx.collect_window_commands
+                        .push(CollectWindowCommand::SetPassthrough {
+                            id: snapshot.id,
+                            passthrough: false,
+                        });
+                    if let CollectWindowPayload::Note { index } = payload {
+                        ctx.collect_window_commands
+                            .push(CollectWindowCommand::Focus { id: snapshot.id });
+                        ctx.collect_window_commands
+                            .push(CollectWindowCommand::TypeNote {
+                                id: snapshot.id,
+                                note_index: index,
+                            });
+                    }
+                    self.state = CollectState::Release {
+                        request,
+                        payload,
+                        typed: true,
+                        visible_until,
+                    };
+                } else if ctx.now >= visible_until {
+                    if payload.kind() == CollectWindowKind::Meme {
+                        ctx.collect_window_commands
+                            .push(CollectWindowCommand::Close { id: snapshot.id });
+                    }
+                    return true;
+                }
+                false
+            }
+        }
+    }
+}
+
 impl Default for PerchRideTask {
     fn default() -> Self {
         Self::new()
@@ -392,6 +648,7 @@ mod tests {
         sounds: &'a mut Vec<Sound>,
         cursor_commands: &'a mut Vec<CursorCommand>,
     ) -> TaskCtx<'a> {
+        let collect_window_commands = Box::leak(Box::new(Vec::new()));
         TaskCtx {
             now,
             dt: 1.0 / 120.0,
@@ -399,10 +656,13 @@ mod tests {
             rng,
             sounds,
             cursor_commands,
+            collect_window_commands,
             pointer: Pointer::default(),
             mouse_steal: MouseStealOptions::default(),
             foreign_window: ForeignWindowOptions::default(),
+            collect_window: CollectWindowOptions::default(),
             dragged_window: None,
+            collect_window_snapshot: None,
             calm: false,
         }
     }
@@ -422,6 +682,34 @@ mod tests {
                 max: Vec2::new(anchor.x + 100.0, anchor.y + 120.0),
             },
         )
+    }
+
+    fn collect_options(notes: u32, memes: u32) -> CollectWindowOptions {
+        CollectWindowOptions::with_backend_support(
+            crate::collect_window::CollectWindowCapabilities {
+                spawn_note: true,
+                spawn_image: true,
+                move_window: true,
+                set_passthrough: true,
+                synthesize_text: true,
+            },
+            notes,
+            memes,
+        )
+    }
+
+    fn collect_snapshot(
+        request: CollectWindowRequestId,
+        kind: CollectWindowKind,
+        rect: Rect,
+    ) -> CollectWindowSnapshot {
+        CollectWindowSnapshot {
+            id: crate::collect_window::CollectWindowId(99),
+            request,
+            kind,
+            rect,
+            alive: true,
+        }
     }
 
     #[test]
@@ -843,5 +1131,157 @@ mod tests {
         assert_eq!(goose.position, moved_anchor);
         assert_eq!(goose.target_pos, moved_anchor);
         assert_eq!(goose.velocity, Vec2::ZERO);
+    }
+
+    #[test]
+    fn collect_window_finishes_without_capable_content() {
+        let mut rng = SplitMix64::seed(20);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = CollectWindowTask::forced(CollectWindowKind::Note);
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+
+        assert!(task.run(&mut goose, &mut ctx));
+        assert!(ctx.collect_window_commands.is_empty());
+    }
+
+    #[test]
+    fn collect_window_spawns_forced_note_payload() {
+        let mut rng = SplitMix64::seed(21);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = CollectWindowTask::forced(CollectWindowKind::Note);
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.collect_window = collect_options(2, 0);
+
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(ctx.collect_window_commands.len(), 1);
+        match ctx.collect_window_commands[0] {
+            CollectWindowCommand::Spawn {
+                payload: CollectWindowPayload::Note { index },
+                ..
+            } => assert!(index < 2),
+            other => panic!("unexpected collect command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn collect_window_drags_note_then_focuses_and_types_in_order() {
+        let mut rng = SplitMix64::seed(22);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = CollectWindowTask::forced(CollectWindowKind::Note);
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.collect_window = collect_options(1, 0);
+
+        assert!(!task.run(&mut goose, &mut ctx));
+        let (request, payload) = match ctx.collect_window_commands[0] {
+            CollectWindowCommand::Spawn { request, payload } => (request, payload),
+            other => panic!("unexpected collect command: {other:?}"),
+        };
+        ctx.collect_window_commands.clear();
+
+        let rect = Rect {
+            min: Vec2::new(200.0, 100.0),
+            max: Vec2::new(500.0, 300.0),
+        };
+        ctx.collect_window_snapshot =
+            Some(collect_snapshot(request, CollectWindowKind::Note, rect));
+        ctx.now = 0.1;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(goose.target_pos, Vec2::new(350.0, 200.0));
+
+        ctx.collect_window_commands.clear();
+        goose.rig.beak_tip = Vec2::new(350.0, 200.0);
+        ctx.now = 0.2;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(
+            ctx.collect_window_commands.as_slice(),
+            &[CollectWindowCommand::SetPassthrough {
+                id: crate::collect_window::CollectWindowId(99),
+                passthrough: true
+            }]
+        );
+
+        ctx.collect_window_commands.clear();
+        goose.position = (ctx.bounds.min + ctx.bounds.max) * 0.5;
+        goose.rig.beak_tip = goose.position;
+        ctx.now = 0.3;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert!(matches!(
+            ctx.collect_window_commands.as_slice(),
+            [CollectWindowCommand::Move { .. }]
+        ));
+
+        ctx.collect_window_commands.clear();
+        ctx.now = 0.4;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(
+            ctx.collect_window_commands.as_slice(),
+            &[
+                CollectWindowCommand::SetPassthrough {
+                    id: crate::collect_window::CollectWindowId(99),
+                    passthrough: false
+                },
+                CollectWindowCommand::Focus {
+                    id: crate::collect_window::CollectWindowId(99)
+                },
+                CollectWindowCommand::TypeNote {
+                    id: crate::collect_window::CollectWindowId(99),
+                    note_index: match payload {
+                        CollectWindowPayload::Note { index } => index,
+                        CollectWindowPayload::Meme { .. } => panic!("expected note"),
+                    }
+                },
+            ],
+            "release must restore clickability, focus, then type"
+        );
+    }
+
+    #[test]
+    fn collect_window_closes_meme_after_visible_dwell() {
+        let mut rng = SplitMix64::seed(23);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        let mut task = CollectWindowTask::forced(CollectWindowKind::Meme);
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        ctx.collect_window = collect_options(0, 1);
+
+        assert!(!task.run(&mut goose, &mut ctx));
+        let request = match ctx.collect_window_commands[0] {
+            CollectWindowCommand::Spawn { request, .. } => request,
+            other => panic!("unexpected collect command: {other:?}"),
+        };
+        ctx.collect_window_commands.clear();
+        let rect = Rect {
+            min: Vec2::new(200.0, 100.0),
+            max: Vec2::new(500.0, 300.0),
+        };
+        ctx.collect_window_snapshot =
+            Some(collect_snapshot(request, CollectWindowKind::Meme, rect));
+        task.run(&mut goose, &mut ctx); // wait -> run
+        ctx.collect_window_commands.clear();
+        goose.rig.beak_tip = Vec2::new(350.0, 200.0);
+        task.run(&mut goose, &mut ctx); // run -> dragging
+        ctx.collect_window_commands.clear();
+        goose.position = (ctx.bounds.min + ctx.bounds.max) * 0.5;
+        goose.rig.beak_tip = goose.position;
+        task.run(&mut goose, &mut ctx); // dragging -> release
+        ctx.collect_window_commands.clear();
+        task.run(&mut goose, &mut ctx); // release once
+        ctx.collect_window_commands.clear();
+        ctx.now += COLLECT_VISIBLE_DWELL + 0.1;
+
+        assert!(task.run(&mut goose, &mut ctx));
+        assert_eq!(
+            ctx.collect_window_commands.as_slice(),
+            &[CollectWindowCommand::Close {
+                id: crate::collect_window::CollectWindowId(99)
+            }]
+        );
     }
 }

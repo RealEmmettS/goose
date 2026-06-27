@@ -5,6 +5,8 @@
 //! IPC, config TUI, and the macOS/Linux backends arrive in later rounds.
 
 #[cfg(windows)]
+mod assets;
+#[cfg(windows)]
 mod audio;
 
 #[cfg(windows)]
@@ -12,16 +14,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use honk_engine::render::{render_footmarks, render_hearts, render_rig};
     use honk_engine::tiny_skia::{Color, Pixmap};
     use honk_engine::{
-        Accumulator, Clock, CursorCommand, ForeignWindowOptions, MouseStealOptions, Pointer, Vec2,
-        World, WorldOptions,
+        Accumulator, Clock, CollectWindowCapabilities, CollectWindowCommand, CollectWindowOptions,
+        CollectWindowPayload, CursorCommand, ForeignWindowOptions, MouseStealOptions, Pointer,
+        Vec2, World, WorldOptions,
     };
-    use honk_platform_windows::{pointer_state, warp_cursor, ForeignWindowWatcher, Overlay};
+    use honk_platform_windows::{
+        pointer_state, warp_cursor, CollectWindowController, ForeignWindowWatcher, Overlay,
+    };
 
     // `--no-sound` / `--silent` runs the goose mute (the original's SilenceSounds).
     let no_sound = std::env::args().any(|a| a == "--no-sound" || a == "--silent");
     let no_mouse_steal = std::env::args().any(|a| a == "--no-mouse-steal");
     let no_window_ride = std::env::args().any(|a| a == "--no-window-ride");
     let mut audio = if no_sound { None } else { audio::Audio::new() };
+    let assets = assets::AssetCatalog::load();
+    println!("honk300: loaded {}", assets.summary());
 
     let mut overlay = Overlay::new()?;
     // Fullscreen primary-monitor overlay so world-space props (footmarks, later
@@ -51,6 +58,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         !no_window_ride, // Windows has SetWindowPos; M8 reports but does not use it.
     );
     foreign_window.enabled = !no_window_ride;
+    let collect_capabilities = CollectWindowCapabilities {
+        spawn_note: true,
+        spawn_image: true,
+        move_window: true,
+        set_passthrough: true,
+        synthesize_text: true,
+    };
+    let collect_window = CollectWindowOptions::with_backend_support(
+        collect_capabilities,
+        assets.note_count(),
+        assets.meme_count(),
+    );
 
     let mut world = World::with_options(
         bounds,
@@ -62,8 +81,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ..MouseStealOptions::default()
             },
             foreign_window,
+            collect_window,
         },
     );
+    if let Some(kind) = smoke_collect_kind() {
+        world.force_collect_window(kind);
+    }
+    let mut collect_controller = CollectWindowController::new(bounds);
     let mut canvas = Pixmap::new(width, height).ok_or("could not allocate the overlay canvas")?;
     let mut accumulator = Accumulator::new();
     let clock = Clock::start();
@@ -72,6 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Fullscreen present is heavier than a tiny window, so cap it a little lower.
     const PRESENT_INTERVAL: f32 = 1.0 / 40.0;
     let mut warned_cursor_warp = false;
+    let mut warned_collect_window = false;
 
     println!("honk300: a goose is loose on your desktop. Press Ctrl+C here to send it home.");
 
@@ -115,9 +140,54 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             world.set_foreign_window_watch_supported(false);
         }
         world.set_foreign_window_drag(dragged_window);
+        world.set_collect_window_snapshot(collect_controller.snapshot());
 
         for _ in 0..accumulator.pump(dt) {
             world.tick();
+        }
+
+        for command in world.take_collect_window_commands() {
+            let result = match command {
+                CollectWindowCommand::Spawn { request, payload } => match payload {
+                    CollectWindowPayload::Note { .. } => {
+                        collect_controller.spawn_note(request).map(|_| ())
+                    }
+                    CollectWindowPayload::Meme { index } => {
+                        if let Some(meme) = assets.meme(index) {
+                            collect_controller
+                                .spawn_image(request, &meme.title, &meme.pixmap)
+                                .map(|_| ())
+                        } else {
+                            Ok(())
+                        }
+                    }
+                },
+                CollectWindowCommand::Move { id, top_left } => {
+                    collect_controller.move_window(id, top_left)
+                }
+                CollectWindowCommand::SetPassthrough { id, passthrough } => {
+                    collect_controller.set_passthrough(id, passthrough)
+                }
+                CollectWindowCommand::Focus { id } => collect_controller.focus(id),
+                CollectWindowCommand::TypeNote { id, note_index } => {
+                    if let Some(text) = assets.note_text(note_index) {
+                        collect_controller.type_text(id, text)
+                    } else {
+                        Ok(())
+                    }
+                }
+                CollectWindowCommand::Close { id } => {
+                    collect_controller.close(id);
+                    Ok(())
+                }
+            };
+            if let Err(err) = result {
+                world.set_collect_window_supported(false);
+                if !warned_collect_window {
+                    warned_collect_window = true;
+                    eprintln!("honk300: collect-window unavailable; disabling it ({err})");
+                }
+            }
         }
 
         // Apply at most the newest warp request. If the OS/session rejects cursor warping,
@@ -154,6 +224,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+#[cfg(windows)]
+fn smoke_collect_kind() -> Option<honk_engine::CollectWindowKind> {
+    match std::env::var("HONK300_SMOKE_COLLECT")
+        .ok()?
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "note" => Some(honk_engine::CollectWindowKind::Note),
+        "meme" => Some(honk_engine::CollectWindowKind::Meme),
+        _ => None,
+    }
 }
 
 /// A non-deterministic seed for the roam driver, derived from the wall clock.

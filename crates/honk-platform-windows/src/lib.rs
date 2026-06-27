@@ -15,16 +15,22 @@
 
 #![cfg(windows)]
 
+use honk_engine::collect_window::{
+    CollectWindowId, CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot,
+};
 use honk_engine::math::Rect;
 use honk_engine::Vec2;
 use honk_engine::{ForeignWindowId, ForeignWindowSnapshot};
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::ffi::c_void;
+use std::process::{Child, Command};
 use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 use tiny_skia::Pixmap;
-use windows::core::{w, Error, Result};
+use windows::core::{w, Error, Result, PCWSTR};
 use windows::Win32::Foundation::{
-    COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM,
+    BOOL, COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM,
 };
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject,
@@ -33,16 +39,21 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
-use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
+    KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_LBUTTON,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetAncestor, GetCursorPos, GetSystemMetrics,
-    GetWindowRect, IsIconic, IsWindow, IsWindowVisible, PeekMessageW, PostQuitMessage,
-    RegisterClassExW, SetCursorPos, ShowWindow, TranslateMessage, UpdateLayeredWindow,
-    EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART, GA_ROOT, MSG, OBJID_WINDOW, PM_REMOVE,
-    SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
-    SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, ULW_ALPHA, WINEVENT_OUTOFCONTEXT,
-    WINEVENT_SKIPOWNPROCESS, WM_DESTROY, WM_QUIT, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EnumWindows, GetAncestor,
+    GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowLongPtrW, GetWindowRect,
+    GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, PeekMessageW, PostQuitMessage,
+    RegisterClassExW, SetCursorPos, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
+    ShowWindow, TranslateMessage, UpdateLayeredWindow, EVENT_SYSTEM_MOVESIZEEND,
+    EVENT_SYSTEM_MOVESIZESTART, GA_ROOT, GWL_EXSTYLE, MSG, OBJID_WINDOW, PM_REMOVE, SM_CXSCREEN,
+    SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_SHOWNOACTIVATE,
+    ULW_ALPHA, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_DESTROY, WM_QUIT, WNDCLASSEXW,
+    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
 /// Poll the global cursor position (desktop coordinates) and the left-button state.
@@ -216,6 +227,441 @@ fn rect_from_win32(rect: RECT) -> Rect {
         min: Vec2::new(rect.left as f32, rect.top as f32),
         max: Vec2::new(rect.right as f32, rect.bottom as f32),
     }
+}
+
+enum ControlledWindow {
+    Notepad {
+        request: CollectWindowRequestId,
+        hwnd: HWND,
+        _child: Child,
+    },
+    Image(ImageWindow),
+}
+
+impl ControlledWindow {
+    fn hwnd(&self) -> HWND {
+        match self {
+            Self::Notepad { hwnd, .. } => *hwnd,
+            Self::Image(window) => window.hwnd,
+        }
+    }
+
+    fn request(&self) -> CollectWindowRequestId {
+        match self {
+            Self::Notepad { request, .. } => *request,
+            Self::Image(window) => window.request,
+        }
+    }
+
+    fn kind(&self) -> CollectWindowKind {
+        match self {
+            Self::Notepad { .. } => CollectWindowKind::Note,
+            Self::Image(_) => CollectWindowKind::Meme,
+        }
+    }
+}
+
+struct ImageWindow {
+    request: CollectWindowRequestId,
+    hwnd: HWND,
+    pixmap: Pixmap,
+    dib: Option<Dib>,
+}
+
+impl ImageWindow {
+    fn new(
+        request: CollectWindowRequestId,
+        title: &str,
+        pixmap: &Pixmap,
+        top_left: Vec2,
+    ) -> Result<Self> {
+        unsafe {
+            let hmodule = GetModuleHandleW(None)?;
+            let hinstance = HINSTANCE(hmodule.0);
+            let class_name = w!("honk300_collect_image");
+            let wc = WNDCLASSEXW {
+                cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+                lpfnWndProc: Some(image_wndproc),
+                hInstance: hinstance,
+                lpszClassName: class_name,
+                ..Default::default()
+            };
+            RegisterClassExW(&wc);
+
+            let title_w: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+            let hwnd = CreateWindowExW(
+                WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+                class_name,
+                PCWSTR(title_w.as_ptr()),
+                WS_POPUP,
+                top_left.x.round() as i32,
+                top_left.y.round() as i32,
+                pixmap.width() as i32,
+                pixmap.height() as i32,
+                None,
+                None,
+                hinstance,
+                None,
+            )?;
+            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+
+            let mut window = Self {
+                request,
+                hwnd,
+                pixmap: pixmap.clone(),
+                dib: None,
+            };
+            window.present_at(top_left)?;
+            Ok(window)
+        }
+    }
+
+    fn present_at(&mut self, top_left: Vec2) -> Result<()> {
+        present_layered(
+            self.hwnd,
+            &mut self.dib,
+            &self.pixmap,
+            top_left.x.round() as i32,
+            top_left.y.round() as i32,
+        )
+    }
+}
+
+impl Drop for ImageWindow {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = DestroyWindow(self.hwnd);
+        }
+    }
+}
+
+/// Applies M9 collect-window commands through Win32 without exposing HWNDs to `honk-engine`.
+pub struct CollectWindowController {
+    next_id: u64,
+    windows: HashMap<CollectWindowId, ControlledWindow>,
+    spawn_top_left: Vec2,
+}
+
+impl CollectWindowController {
+    pub fn new(bounds: Rect) -> Self {
+        Self {
+            next_id: 1,
+            windows: HashMap::new(),
+            spawn_top_left: Vec2::new(bounds.min.x + 40.0, bounds.min.y + 80.0),
+        }
+    }
+
+    pub fn spawn_note(&mut self, request: CollectWindowRequestId) -> Result<CollectWindowId> {
+        if let Some(id) = self.find_request(request) {
+            return Ok(id);
+        }
+        let mut child = Command::new("notepad.exe")
+            .spawn()
+            .map_err(|err| error_from_message(format!("failed to spawn notepad.exe: {err}")))?;
+        let hwnd = match wait_for_process_window(child.id(), Duration::from_secs(3)) {
+            Some(hwnd) => hwnd,
+            None => {
+                let _ = child.kill();
+                return Err(error_from_message("timed out waiting for Notepad window"));
+            }
+        };
+        move_hwnd(hwnd, self.spawn_top_left)?;
+        let id = self.alloc_id();
+        self.windows.insert(
+            id,
+            ControlledWindow::Notepad {
+                request,
+                hwnd,
+                _child: child,
+            },
+        );
+        Ok(id)
+    }
+
+    pub fn spawn_image(
+        &mut self,
+        request: CollectWindowRequestId,
+        title: &str,
+        pixmap: &Pixmap,
+    ) -> Result<CollectWindowId> {
+        if let Some(id) = self.find_request(request) {
+            return Ok(id);
+        }
+        let id = self.alloc_id();
+        let window = ImageWindow::new(request, title, pixmap, self.spawn_top_left)?;
+        self.windows.insert(id, ControlledWindow::Image(window));
+        Ok(id)
+    }
+
+    pub fn move_window(&mut self, id: CollectWindowId, top_left: Vec2) -> Result<()> {
+        match self.windows.get_mut(&id) {
+            Some(ControlledWindow::Notepad { hwnd, .. }) => move_hwnd(*hwnd, top_left),
+            Some(ControlledWindow::Image(window)) => window.present_at(top_left),
+            None => Ok(()),
+        }
+    }
+
+    pub fn set_passthrough(&mut self, id: CollectWindowId, passthrough: bool) -> Result<()> {
+        if let Some(window) = self.windows.get(&id) {
+            set_passthrough(window.hwnd(), passthrough)?;
+        }
+        Ok(())
+    }
+
+    pub fn focus(&self, id: CollectWindowId) -> Result<()> {
+        if let Some(window) = self.windows.get(&id) {
+            unsafe {
+                if !SetForegroundWindow(window.hwnd()).as_bool() {
+                    return Err(Error::from_win32());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn type_text(&self, id: CollectWindowId, text: &str) -> Result<()> {
+        let Some(window) = self.windows.get(&id) else {
+            return Ok(());
+        };
+        let hwnd = window.hwnd();
+        unsafe {
+            if !SetForegroundWindow(hwnd).as_bool() {
+                return Err(Error::from_win32());
+            }
+        }
+        std::thread::sleep(Duration::from_millis(60));
+        unsafe {
+            if GetForegroundWindow() != hwnd {
+                return Err(error_from_message(
+                    "foreground window changed before Notepad typing",
+                ));
+            }
+        }
+        send_unicode_text(text)
+    }
+
+    pub fn close(&mut self, id: CollectWindowId) {
+        self.windows.remove(&id);
+    }
+
+    pub fn snapshot(&mut self) -> Option<CollectWindowSnapshot> {
+        let mut dead = Vec::new();
+        let mut result = None;
+        for (id, window) in &self.windows {
+            let hwnd = window.hwnd();
+            unsafe {
+                if !IsWindow(hwnd).as_bool() {
+                    dead.push(*id);
+                    continue;
+                }
+            }
+            if result.is_none() {
+                if let Ok(rect) = window_rect(hwnd) {
+                    result = Some(CollectWindowSnapshot {
+                        id: *id,
+                        request: window.request(),
+                        kind: window.kind(),
+                        rect,
+                        alive: true,
+                    });
+                }
+            }
+        }
+        for id in dead {
+            self.windows.remove(&id);
+        }
+        result
+    }
+
+    fn alloc_id(&mut self) -> CollectWindowId {
+        let id = CollectWindowId(self.next_id);
+        self.next_id += 1;
+        id
+    }
+
+    fn find_request(&self, request: CollectWindowRequestId) -> Option<CollectWindowId> {
+        self.windows
+            .iter()
+            .find_map(|(id, window)| (window.request() == request).then_some(*id))
+    }
+}
+
+fn move_hwnd(hwnd: HWND, top_left: Vec2) -> Result<()> {
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            None,
+            top_left.x.round() as i32,
+            top_left.y.round() as i32,
+            0,
+            0,
+            SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+        )
+    }
+}
+
+fn set_passthrough(hwnd: HWND, passthrough: bool) -> Result<()> {
+    unsafe {
+        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        let transparent = WS_EX_TRANSPARENT.0 as isize;
+        let next = if passthrough {
+            style | transparent
+        } else {
+            style & !transparent
+        };
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, next);
+        SetWindowPos(
+            hwnd,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+        )
+    }
+}
+
+struct FindWindowData {
+    pid: u32,
+    hwnd: HWND,
+}
+
+unsafe extern "system" fn enum_window_for_pid(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let data = &mut *(lparam.0 as *mut FindWindowData);
+    let mut pid = 0u32;
+    GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    if pid == data.pid && is_foreign_top_level_window(hwnd, HWND(std::ptr::null_mut())) {
+        data.hwnd = hwnd;
+        return BOOL(0);
+    }
+    BOOL(1)
+}
+
+fn wait_for_process_window(pid: u32, timeout: Duration) -> Option<HWND> {
+    let deadline = Instant::now() + timeout;
+    while Instant::now() < deadline {
+        let mut data = FindWindowData {
+            pid,
+            hwnd: HWND(std::ptr::null_mut()),
+        };
+        unsafe {
+            let _ = EnumWindows(
+                Some(enum_window_for_pid),
+                LPARAM(&mut data as *mut FindWindowData as isize),
+            );
+        }
+        if !data.hwnd.0.is_null() {
+            return Some(data.hwnd);
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    None
+}
+
+fn send_unicode_text(text: &str) -> Result<()> {
+    let mut inputs = Vec::new();
+    for unit in text.encode_utf16() {
+        inputs.push(keyboard_input(unit, false));
+        inputs.push(keyboard_input(unit, true));
+    }
+    let sent = unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
+    if sent != inputs.len() as u32 {
+        return Err(Error::from_win32());
+    }
+    Ok(())
+}
+
+fn keyboard_input(unit: u16, key_up: bool) -> INPUT {
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(0),
+                wScan: unit,
+                dwFlags: if key_up {
+                    KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
+                } else {
+                    KEYEVENTF_UNICODE
+                },
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    }
+}
+
+fn present_layered(
+    hwnd: HWND,
+    dib: &mut Option<Dib>,
+    pixmap: &Pixmap,
+    dest_x: i32,
+    dest_y: i32,
+) -> Result<()> {
+    let width = pixmap.width() as i32;
+    let height = pixmap.height() as i32;
+    if width == 0 || height == 0 {
+        return Ok(());
+    }
+
+    unsafe {
+        if dib
+            .as_ref()
+            .map(|d| d.width != width || d.height != height)
+            .unwrap_or(true)
+        {
+            *dib = Some(Dib::new(width, height)?);
+        }
+        let dib = dib.as_ref().expect("dib just set");
+
+        let src = pixmap.data();
+        let count = (width * height) as usize;
+        let dst = std::slice::from_raw_parts_mut(dib.bits, count * 4);
+        for i in 0..count {
+            let s = i * 4;
+            dst[s] = src[s + 2];
+            dst[s + 1] = src[s + 1];
+            dst[s + 2] = src[s];
+            dst[s + 3] = src[s + 3];
+        }
+
+        let screen = GetDC(None);
+        let dest = POINT {
+            x: dest_x,
+            y: dest_y,
+        };
+        let size = SIZE {
+            cx: width,
+            cy: height,
+        };
+        let src_pt = POINT { x: 0, y: 0 };
+        let blend = BLENDFUNCTION {
+            BlendOp: AC_SRC_OVER as u8,
+            BlendFlags: 0,
+            SourceConstantAlpha: 255,
+            AlphaFormat: AC_SRC_ALPHA as u8,
+        };
+        let result = UpdateLayeredWindow(
+            hwnd,
+            screen,
+            Some(&dest as *const POINT),
+            Some(&size as *const SIZE),
+            dib.hdc,
+            Some(&src_pt as *const POINT),
+            COLORREF(0),
+            Some(&blend as *const BLENDFUNCTION),
+            ULW_ALPHA,
+        );
+        ReleaseDC(None, screen);
+        result
+    }
+}
+
+fn error_from_message(message: impl Into<String>) -> Error {
+    Error::new(
+        windows::core::HRESULT(0x8000_4005u32 as i32),
+        message.into(),
+    )
 }
 
 /// A reusable top-down 32-bpp DIB section we blit the goose into each frame.
@@ -434,6 +880,15 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                 PostQuitMessage(0);
                 LRESULT(0)
             }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        }
+    }
+}
+
+extern "system" fn image_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_DESTROY => LRESULT(0),
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
     }

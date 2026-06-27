@@ -8,8 +8,8 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M8 are complete and M9 (collect-window
-dispatcher) is next. The repo now has a Cargo workspace, a platform-free
+**Current stage: implementation in progress.** M0-M9 are complete and M10 (single-instance
+IPC) is next. The repo now has a Cargo workspace, a platform-free
 `honk-engine`, a Windows platform crate, the `honk300` binary, the original app's files as
 reference, the canonical planning docs, and ADRs under `docs/adr/`.
 
@@ -35,7 +35,8 @@ reference, the canonical planning docs, and ADRs under `docs/adr/`.
 - `docs/adr/` — architecture decision records. Read these when a task touches platform
   boundaries, renderer architecture, capability traits, packaging targets, or milestone scope.
   ADR 0001 records the accepted M7 cursor-mischief contract and Renderer V2 direction; ADR 0002
-  records the M8 foreign-window watch-and-ride contract.
+  records the M8 foreign-window watch-and-ride contract; ADR 0003 records the M9 collect-window,
+  asset, and no-donate decisions.
 
 ## Big-picture architecture (original → planned port)
 
@@ -54,9 +55,11 @@ reference, the canonical planning docs, and ADRs under `docs/adr/`.
 ## Locked decisions (do not re-litigate)
 
 - Name `honk300` (binary `honk300`, optional `honk` alias); fresh permanent WiX/Inno GUIDs.
-- Procedural/clean-room goose. Sounds bundled 1:1 (personal use). **Memes: do NOT copy** —
-  regenerate originally via an `Assets/Images/Memes/codex.md` brief. **Notes: author fresh
-  originals**, not paraphrases.
+- Procedural/clean-room goose. Sounds bundled 1:1 (personal use). M9 bundles screened original
+  meme/note assets 1:1 for personal-use builds **plus one complete custom in-house counterpart
+  per original** in the clumsy MS Paint house style. User-supplied `Meme8.png` is approved.
+  Old developer donation pages, Patreon links, social handles, and old-project branding do not
+  ship.
 - Linux: **X11-first** (runs under XWayland); native Wayland behind an opt-in `--wayland`
   flag (reduced mischief).
 - Packaging: Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) + shell/PowerShell
@@ -73,6 +76,7 @@ reference, the canonical planning docs, and ADRs under `docs/adr/`.
   `HUMAN_CHANGELOG.md` when they change current guidance.
 - M7's accepted decisions live in `docs/adr/0001-m7-cursor-mischief-renderer-and-platform-guardrails.md`.
 - M8's accepted decisions live in `docs/adr/0002-m8-foreign-window-watch-and-ride.md`.
+- M9's accepted decisions live in `docs/adr/0003-m9-collect-window-assets-and-no-donate.md`.
 
 ## Gotchas (cross-platform overlay / desktop-pet)
 
@@ -104,9 +108,10 @@ from a sibling repo); **`crates-publish.yml` is intentionally dropped** (no crat
 ## Asset & IP rule
 
 `DESKTOP-GOOSE/` contains Samperson's / third-party copyrighted assets (memes, notes, sounds)
-— **reference only; do not redistribute** in source or public builds. The goose visual is
-clean-room procedural; memes are regenerated as original art; notepad messages are authored
-fresh.
+and old developer donation material. This is a personal-use repo, so M9 copies screened original
+memes/notes into `Assets/` and adds one complete custom counterpart per original; do not
+redistribute those assets publicly. The goose visual remains clean-room procedural. Do not ship
+old donate pages or old developer references.
 
 ## Changelog rule
 

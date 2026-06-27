@@ -8,14 +8,24 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 > **Where the project is:** the goose is alive on screen. It appears on your desktop, walks
 > around, reacts to your mouse, makes sounds, can steal the cursor in a short, bounded prank,
-> and can hop onto a window while you drag it around. The next milestone is making it collect
-> windows for notes, memes, and donate prompts. There's no installer yet — that comes later.
+> can hop onto a window while you drag it around, and can now bring in note and meme windows.
+> The next milestone is making the running goose controllable through a local command channel.
+> There's no installer yet — that comes later.
 
 ---
 
 ## Latest — June 2026
 
 **Added**
+- The goose can now bring things onto your desktop: a real Notepad window for little goose notes,
+  and separate meme image windows that it drags around. This is built so the goose's core logic
+  still stays separate from Windows-specific window handles and typing tricks, which keeps future
+  Mac and Linux support honest.
+- The note and meme assets now have a clear personal-use rule. Screened original notes and memes
+  are included for this owner's machines only when they pass the no-old-links/no-handles check,
+  each copied one gets a custom in-house counterpart in the clumsy paint style, and the
+  user-supplied goose drawing is included as an extra meme. One original meme with a visible
+  handle watermark is left out. Old donate pages and old developer references are left out too.
 - The goose can now run toward a window while you are dragging it and ride along if it gets
   there before you let go. When the drag ends, or if the computer says window watching is not
   available, it drops the trick and goes back to what it was doing. There is also a temporary
@@ -68,7 +78,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   fixed stale status notes, confirmed the goose's core logic still stays separate from
   Windows-only behavior, and created follow-up work for improving the fullscreen overlay's
   performance before packaging.
-- The task board now shows the window-riding milestone as done and moves the next window-collecting
+- The task board now shows the window-collecting milestone as done and moves the command-channel
   milestone into the active slot. The future sprite-sheet renderer remains tracked as its own
   follow-up task instead of being treated as unfinished cursor-stealing work.
 - The project guidance for future agents now says when to add or update architecture decision
@@ -142,10 +152,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 **Decided**
 - The new app will be called "honk300," matching the family of similarly-named tools on
   this machine.
-- The goose itself will be drawn from scratch rather than copied from the original. The
-  original honk sound effects are reused for personal use; the meme pictures will be
-  re-created as original art instead of copied; and the little notes the goose types will
-  be written fresh.
+- The goose itself will be drawn from scratch rather than copied from the original. The original
+  honk sound effects, screened meme pictures, and screened little notes are reused for personal
+  use, and each copied meme or note also gets a custom in-house counterpart. Old donate pages and
+  old developer references are not carried forward.
 - On Linux it will target the older, more capable display system by default, with the
   newer one available as an opt-in — where the goose can do far less, because that newer
   system deliberately blocks most of the pranks.

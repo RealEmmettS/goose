@@ -4,6 +4,7 @@
 //! in world/desktop coordinates; platform backends decide whether they can honor them
 //! (Windows now, macOS/X11 later, native Wayland as an honest no-op).
 
+use crate::collect_window::CollectWindowOptions;
 use crate::foreign_window::ForeignWindowOptions;
 use crate::math::Vec2;
 
@@ -61,4 +62,5 @@ impl MouseStealOptions {
 pub struct WorldOptions {
     pub mouse_steal: MouseStealOptions,
     pub foreign_window: ForeignWindowOptions,
+    pub collect_window: CollectWindowOptions,
 }
