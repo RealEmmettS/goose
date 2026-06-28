@@ -5,7 +5,7 @@
 //! personal-use self-distribution. Honest degradation: if there is no output device the
 //! whole backend is a silent no-op, and individual decode/playback failures are ignored.
 
-use honk_engine::Sound;
+use honk_engine::{HonkTone, Sound};
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use std::io::Cursor;
 
@@ -52,7 +52,11 @@ impl Audio {
     /// Play `sound` fire-and-forget (honks/pats rotate through their variants).
     pub fn play(&mut self, sound: Sound) {
         let bytes: &'static [u8] = match sound {
-            Sound::Honk => HONKS[self.next() % HONKS.len()],
+            Sound::Honk(tone) => match tone {
+                HonkTone::Normal => HONKS[self.next() % HONKS.len()],
+                HonkTone::High => HONKS[(self.next() + 1) % HONKS.len()],
+                HonkTone::Low => HONKS[(self.next() + HONKS.len() - 1) % HONKS.len()],
+            },
             Sound::Bite => BITE,
             Sound::MudSquish => MUD,
             Sound::Pat => PATS[self.next() % PATS.len()],

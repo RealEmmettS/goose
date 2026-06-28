@@ -3,14 +3,16 @@ use crate::audio;
 use crate::runtime::RuntimeOptions;
 use honk_config::{BackendState, Config, EffectiveOptions};
 use honk_control::{CommandServer, ControlCommand, ControlResponse};
-use honk_engine::render::{render_footmarks, render_hearts, render_rig};
+use honk_engine::render::{
+    render_footmarks_with_timing, render_hearts, render_rig_with_palette, render_sleepies,
+};
 use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
     Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, CursorCommand, Pointer, Sound,
     Vec2, World,
 };
 use honk_platform_windows::{
-    pointer_state, warp_cursor, CollectWindowController, ForeignWindowWatcher, Overlay,
+    local_time, pointer_state, warp_cursor, CollectWindowController, ForeignWindowWatcher, Overlay,
 };
 
 pub fn run(
@@ -165,6 +167,8 @@ pub fn run(
             }
         }
 
+        world.set_local_time(local_time());
+
         let now = clock.elapsed_secs();
         let dt = now - last;
         last = now;
@@ -279,9 +283,16 @@ pub fn run(
         if now - last_present >= PRESENT_INTERVAL {
             last_present = now;
             canvas.fill(Color::TRANSPARENT);
-            render_footmarks(&mut canvas, &world.goose.foot_marks, world.now(), origin);
-            render_rig(&mut canvas, world.rig(), origin);
+            render_footmarks_with_timing(
+                &mut canvas,
+                &world.goose.foot_marks,
+                world.now(),
+                origin,
+                world.footmark_timing(),
+            );
+            render_rig_with_palette(&mut canvas, world.rig(), origin, world.render_palette());
             render_hearts(&mut canvas, world.hearts(), world.now(), origin);
+            render_sleepies(&mut canvas, world.sleepies(), world.now(), origin);
             overlay.present(&canvas, origin.x.floor() as i32, origin.y.floor() as i32)?;
         }
 
@@ -318,7 +329,7 @@ fn sound_enabled(config: honk_config::AudioConfig, sound: Sound) -> bool {
         return false;
     }
     match sound {
-        Sound::Honk => config.honk,
+        Sound::Honk(_) => config.honk,
         Sound::Bite => config.bite,
         Sound::MudSquish => config.mud,
         Sound::Pat => config.pat,

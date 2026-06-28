@@ -136,7 +136,7 @@ impl Task for WanderTask {
             // And sometimes it honks for no reason at all — unless it's been freshly patted,
             // when it stays content and quiet for the calm window (§5.9).
             if !ctx.calm && ctx.rng.next_f64() < 0.25 {
-                ctx.sounds.push(Sound::Honk);
+                ctx.sounds.push(Sound::honk());
             }
         }
         ctx.now >= self.end_time.unwrap()
@@ -169,13 +169,13 @@ impl Task for HyperTask {
 
         if self.end_time.is_none() {
             goose.target_pos = random_point(ctx);
-            ctx.sounds.push(Sound::Honk); // an indignant honk at being clicked
+            ctx.sounds.push(Sound::high_honk()); // an indignant honk at being clicked
             self.end_time = Some(ctx.now + HYPER_DURATION);
         } else if arrived(goose, 3.0) {
             // Bolt to a fresh spot the instant it arrives — erratic, no dwell.
             goose.target_pos = random_point(ctx);
             if ctx.rng.next_f64() < 0.5 {
-                ctx.sounds.push(Sound::Honk);
+                ctx.sounds.push(Sound::high_honk());
             }
         }
         ctx.now >= self.end_time.unwrap()
@@ -269,7 +269,7 @@ impl Task for NabMouseTask {
                         target,
                     };
                     if ctx.rng.next_f64() < 0.5 {
-                        ctx.sounds.push(Sound::Honk);
+                        ctx.sounds.push(Sound::high_honk());
                     }
                 }
 
@@ -760,7 +760,7 @@ mod tests {
             task.run(&mut goose, &mut ctx);
             now += 0.1;
         }
-        sounds.iter().filter(|s| **s == Sound::Honk).count()
+        sounds.iter().filter(|s| **s == Sound::honk()).count()
     }
 
     #[test]
@@ -837,7 +837,7 @@ mod tests {
         let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
         task.run(&mut goose, &mut ctx);
         assert!(
-            sounds.contains(&Sound::Honk),
+            sounds.contains(&Sound::high_honk()),
             "clicking the goose makes it honk"
         );
     }

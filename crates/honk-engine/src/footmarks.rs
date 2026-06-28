@@ -13,6 +13,22 @@ pub const SHRINK_TIME: f32 = 1.0;
 /// Ring-buffer capacity.
 pub const CAPACITY: usize = 64;
 
+/// Runtime mud-print lifetime options. Defaults match the verified original constants.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FootMarkTiming {
+    pub lifetime: f32,
+    pub shrink_time: f32,
+}
+
+impl Default for FootMarkTiming {
+    fn default() -> Self {
+        Self {
+            lifetime: LIFETIME,
+            shrink_time: SHRINK_TIME,
+        }
+    }
+}
+
 /// A single muddy print: where it was left and when.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FootMark {
@@ -26,19 +42,31 @@ impl FootMark {
     /// Remaining-life scale in `[0, 1]` at time `now`: `1.0` while fresh, ramping to
     /// `0.0` across the final [`SHRINK_TIME`] seconds; `0.0` once dead.
     pub fn scale(&self, now: f32) -> f32 {
-        let remaining = LIFETIME - (now - self.created);
+        self.scale_with_timing(now, FootMarkTiming::default())
+    }
+
+    /// Remaining-life scale using explicit runtime timing.
+    pub fn scale_with_timing(&self, now: f32, timing: FootMarkTiming) -> f32 {
+        let lifetime = timing.lifetime.max(0.001);
+        let shrink_time = timing.shrink_time.max(0.001).min(lifetime);
+        let remaining = lifetime - (now - self.created);
         if remaining <= 0.0 {
             0.0
-        } else if remaining >= SHRINK_TIME {
+        } else if remaining >= shrink_time {
             1.0
         } else {
-            remaining / SHRINK_TIME
+            remaining / shrink_time
         }
     }
 
     /// Whether the print is still within its lifetime at `now`.
     pub fn is_alive(&self, now: f32) -> bool {
-        now - self.created <= LIFETIME
+        self.is_alive_with_timing(now, FootMarkTiming::default())
+    }
+
+    /// Whether the print is still alive using explicit runtime timing.
+    pub fn is_alive_with_timing(&self, now: f32, timing: FootMarkTiming) -> bool {
+        now - self.created <= timing.lifetime.max(0.001)
     }
 }
 
@@ -76,16 +104,30 @@ impl FootMarks {
 
     /// All prints still alive at `now`, with their current [`FootMark::scale`].
     pub fn active(&self, now: f32) -> impl Iterator<Item = (FootMark, f32)> + '_ {
+        self.active_with_timing(now, FootMarkTiming::default())
+    }
+
+    /// All prints still alive at `now`, using explicit runtime timing.
+    pub fn active_with_timing(
+        &self,
+        now: f32,
+        timing: FootMarkTiming,
+    ) -> impl Iterator<Item = (FootMark, f32)> + '_ {
         self.slots
             .iter()
             .filter_map(|s| *s)
-            .filter(move |m| m.is_alive(now))
-            .map(move |m| (m, m.scale(now)))
+            .filter(move |m| m.is_alive_with_timing(now, timing))
+            .map(move |m| (m, m.scale_with_timing(now, timing)))
     }
 
     /// Count of prints alive at `now`.
     pub fn alive_count(&self, now: f32) -> usize {
         self.active(now).count()
+    }
+
+    /// Count of prints alive at `now`, using explicit runtime timing.
+    pub fn alive_count_with_timing(&self, now: f32, timing: FootMarkTiming) -> usize {
+        self.active_with_timing(now, timing).count()
     }
 }
 
@@ -98,6 +140,13 @@ mod tests {
         assert_eq!(LIFETIME, 8.5);
         assert_eq!(SHRINK_TIME, 1.0);
         assert_eq!(CAPACITY, 64);
+        assert_eq!(
+            FootMarkTiming::default(),
+            FootMarkTiming {
+                lifetime: 8.5,
+                shrink_time: 1.0
+            }
+        );
     }
 
     #[test]
@@ -111,6 +160,22 @@ mod tests {
         assert_eq!(m.scale(8.0), 0.5); // halfway through the shrink
         assert_eq!(m.scale(8.5), 0.0); // dead
         assert_eq!(m.scale(100.0), 0.0); // long dead
+    }
+
+    #[test]
+    fn custom_timing_controls_scale_and_alive_window() {
+        let timing = FootMarkTiming {
+            lifetime: 4.0,
+            shrink_time: 2.0,
+        };
+        let m = FootMark {
+            position: Vec2::ZERO,
+            created: 0.0,
+        };
+        assert!(m.is_alive_with_timing(4.0, timing));
+        assert!(!m.is_alive_with_timing(4.1, timing));
+        assert_eq!(m.scale_with_timing(2.0, timing), 1.0);
+        assert_eq!(m.scale_with_timing(3.0, timing), 0.5);
     }
 
     #[test]

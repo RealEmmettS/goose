@@ -17,3 +17,4 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0004 — M10 CLI/TUI Control Plane And Terminal Protection](./0004-m10-cli-tui-control-plane-and-terminal-protection.md)
 - [0005 — M11 Three-Name CLI, Goose-Speak, And Poke-Outcome Round-Trip](./0005-m11-cli-grammar-and-poke-outcome-round-trip.md)
 - [0006 — M12 Config TUI, Durable TOML, And The Capability/Preference Boundary](./0006-m12-config-tui-and-capability-preference-boundary.md)
+- [0007 — M13 Dynamic Moods And Local-Time Injection](./0007-m13-moods-and-local-time-injection.md)

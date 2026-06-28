@@ -4,27 +4,38 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: implementation in progress.** Milestones M0-M12 are complete and M13 is
+> **Project stage: implementation in progress.** Milestones M0-M13 are complete and M14 is
 > next. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
 > Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
-> ratatui config TUI; there is no release yet. A plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md)
+> ratatui config TUI, dynamic moods, and the local on-hour double honk; there is no release yet. A plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md)
 > and must stay in lockstep.
 
 ## [Unreleased]
 
 ### Added
+- **Dynamic moods and on-hour double honk (milestone M13, complete)** — added
+  `honk-engine::mood` with `MoodKind::{Content,Hyper,Sad,Sleepy,Mischievous}`,
+  `MoodIntensity::{Calm,Normal,Spicy}`, seeded weighted transitions, and platform-free
+  `LocalTime` injection for schedule-like inputs. Mood effects post-modulate task output:
+  sad/sleepy slow movement and lower neck posture, sleepy emits procedural Z particles, hyper
+  can request the existing `HyperTask`, and mischievous duplicates only already-enabled
+  nab/collect factories in the pickable list. The Windows runtime samples local time outside the
+  engine and feeds `World::set_local_time`; the engine emits exactly two high honks at the top
+  of a local hour, once per hour. `Sound::Honk` now carries `HonkTone::{Normal,High,Low}` and
+  the audio backend maps tones to bundled honk clips while respecting audio toggles.
 - **Config TUI and durable configuration (milestone M12, complete)** — added the `honk-config`
   crate for versioned TOML defaults, path resolution, validation, tolerant loading, conversion
   into runtime/world options, and atomic save with practical preservation of unknown keys. The
   default path is `%LOCALAPPDATA%\honk300\config.toml`, `~/Library/Application Support/honk300/config.toml`,
   or `$XDG_DATA_HOME` / `~/.local/share/honk300/config.toml`, with `--config <path>` override.
   Startup falls back to defaults on missing or rejected config and warns without corrupting the
-  running state. Reload parses and validates before applying, then hot-applies current M0-M12
+  running state. Reload parses and validates before applying, then hot-applies current M0-M13
   settings for audio, mouse steal/tuning, perch-and-ride, collect-window kinds, pat behavior,
-  and timing knobs. Future settings for moods, schedule, Autumn, appearance, multi-monitor,
-  Wayland/backend, and spicy behavior are persisted and shown as planned or restart-required.
+  timing, movement speed, mud/footmark timing, palette, mood intensity, and on-hour honking.
+  Future settings for schedule, Autumn, full appearance, multi-monitor, Wayland/backend, and
+  spicy behavior are persisted and shown as planned or restart-required.
 - **Ratatui reducer UI (milestone M12, complete)** — added the `honk-config-tui` crate with
   reducer-owned state, pure render modules, categories for General, Behaviors, Mischief,
   Schedule, Appearance, Audio, Commands, and About, plus a Poke panel that sends M10 IPC commands.
@@ -163,6 +174,13 @@ All notable changes to this project are documented here. Format based on
   a dirty-rect optimization (`UpdateLayeredWindowIndirect` + `prcDirty`) is a future perf task.
 
 ### Improved
+- **M12R config/TUI polish** — `[speeds]`, `[mud]`, `[colors]`, `[moods]`, and on-hour settings
+  now validate and map into `WorldOptions` instead of staying write-only. Unknown top-level TOML
+  keys and unknown section keys emit a one-shot load warning while still being preserved on save.
+  The TUI now uses a row model with scroll support; surfaces movement, mud, color, mood,
+  on-hour, and quiet-time rows; edits quiet start/end in 15-minute increments; cycles mood
+  intensity through `calm -> normal -> spicy`; confirms dirty quits; routes command outcomes
+  through reducer actions; and starts the goose with null stdio plus Windows detached flags.
 - **Goose look reworked toward the real original — from direct observation and review.** The
   published modding API documents the rig *model* but not the `updateRig`/`Render` maths (closed
   binary; not decompiled, per the clean-room rule), so the goose was re-grounded by running the
@@ -244,16 +262,19 @@ All notable changes to this project are documented here. Format based on
 - `CLAUDE.md` — repository guidance for future Claude Code sessions.
 
 ### Changed
-- M11 and M12 are now Done, M13 is now Active, and Renderer V2 remains tracked separately as backlog task
+- M12R and M13 are now Done, M14 is now Active, and Renderer V2 remains tracked separately as backlog task
   `#r2v`. The task records now preserve M7's audit/readiness/renderer work, M8's foreign-window
   readiness pass, M9's collect-window asset/ADR/target-readiness work, and M10's IPC/control
-  readiness work, plus M11 CLI grammar and M12 config/TUI readiness work.
-- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M12 complete, M13 next,
-  and the ADR 0001/0002/0003/0004 location and maintenance rules.
+  readiness work, plus M11 CLI grammar, M12 config/TUI readiness work, and M13 moods/hourly-honk
+  closure.
+- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M13 complete, M14 next,
+  and the ADR 0001/0002/0003/0004/0007 location and maintenance rules.
 - Added **ADR 0005** (M11 three-name CLI, goose-speak, and the poke-outcome round-trip) and
   **ADR 0006** (M12 config TUI, durable TOML, and the capability/preference boundary), recording
   the previously-undocumented M11/M12 decisions and the four contract corrections from the
   adversarial review.
+- Added **ADR 0007** (M13 dynamic moods and local-time injection), recording the platform-free
+  mood state machine, honk-tone contract, and runtime-owned local-clock sampling boundary.
 - `claude_plan.md` and `codex_plan.md` are now **superseded reference drafts**; `honk300_plan.md`
   is canonical. The "Read these first" pointers in **both** `CLAUDE.md` and its Codex twin
   `AGENTS.md` were updated in lockstep (canonical plan, milestone range M0–M19, workspace

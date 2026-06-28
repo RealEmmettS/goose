@@ -5,8 +5,9 @@
 //! platform-free option structs consumed by the engine.
 
 use honk_engine::{
-    CollectWindowCapabilities, CollectWindowOptions, ForeignWindowOptions, InteractionOptions,
-    MouseStealOptions, TimingOptions, WorldOptions,
+    CollectWindowCapabilities, CollectWindowOptions, FootMarkTiming, ForeignWindowOptions,
+    HourlyHonkOptions, InteractionOptions, MoodIntensity, MoodOptions, MouseStealOptions,
+    ParametersTable, RenderPalette, TimingOptions, WorldOptions,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -382,12 +383,11 @@ impl From<toml::de::Error> for ConfigError {
 impl Config {
     pub fn load_or_default(path: Option<PathBuf>) -> Result<LoadedConfig, ConfigError> {
         let path = resolve_path(path)?;
-        match Self::load_existing(&path) {
-            Ok(config) => Ok(LoadedConfig {
-                path,
-                config,
-                warning: None,
-            }),
+        match Self::load_existing_with_warning(&path) {
+            Ok(mut loaded) => {
+                loaded.path = path;
+                Ok(loaded)
+            }
             Err(ConfigError::Io(err)) if err.kind() == io::ErrorKind::NotFound => {
                 Ok(LoadedConfig {
                     path,
@@ -404,10 +404,19 @@ impl Config {
     }
 
     pub fn load_existing(path: &Path) -> Result<Self, ConfigError> {
+        Self::load_existing_with_warning(path).map(|loaded| loaded.config)
+    }
+
+    pub fn load_existing_with_warning(path: &Path) -> Result<LoadedConfig, ConfigError> {
         let text = fs::read_to_string(path)?;
+        let warning = unknown_key_warning(&text);
         let config: Self = toml::from_str(&text)?;
         config.validate()?;
-        Ok(config)
+        Ok(LoadedConfig {
+            path: path.to_path_buf(),
+            config,
+            warning,
+        })
     }
 
     pub fn validate(&self) -> Result<(), ConfigError> {
@@ -438,6 +447,59 @@ impl Config {
         positive("mouse.grab_distance", self.mouse.grab_distance, &mut errors);
         positive("mouse.drop_distance", self.mouse.drop_distance, &mut errors);
         positive("mouse.succ_time", self.mouse.succ_time, &mut errors);
+        positive("speeds.walk_speed", self.speeds.walk_speed, &mut errors);
+        positive("speeds.run_speed", self.speeds.run_speed, &mut errors);
+        positive("speeds.charge_speed", self.speeds.charge_speed, &mut errors);
+        positive(
+            "speeds.acceleration_normal",
+            self.speeds.acceleration_normal,
+            &mut errors,
+        );
+        positive(
+            "speeds.acceleration_charged",
+            self.speeds.acceleration_charged,
+            &mut errors,
+        );
+        positive(
+            "speeds.step_time_normal",
+            self.speeds.step_time_normal,
+            &mut errors,
+        );
+        positive(
+            "speeds.step_time_charged",
+            self.speeds.step_time_charged,
+            &mut errors,
+        );
+        finite("speeds.stop_radius", self.speeds.stop_radius, &mut errors);
+        positive(
+            "mud.duration_to_track_seconds",
+            self.mud.duration_to_track_seconds,
+            &mut errors,
+        );
+        positive(
+            "mud.footmark_lifetime_seconds",
+            self.mud.footmark_lifetime_seconds,
+            &mut errors,
+        );
+        positive(
+            "mud.footmark_shrink_seconds",
+            self.mud.footmark_shrink_seconds,
+            &mut errors,
+        );
+        if self.mud.footmark_shrink_seconds > self.mud.footmark_lifetime_seconds {
+            errors.push("mud.footmark_shrink_seconds must be <= footmark_lifetime_seconds".into());
+        }
+        validate_hex_color("colors.goose_white", &self.colors.goose_white, &mut errors);
+        validate_hex_color(
+            "colors.goose_orange",
+            &self.colors.goose_orange,
+            &mut errors,
+        );
+        validate_hex_color(
+            "colors.goose_outline",
+            &self.colors.goose_outline,
+            &mut errors,
+        );
         validate_time(
             "schedule.quiet_start",
             &self.schedule.quiet_start,
@@ -525,6 +587,40 @@ impl Config {
                 first_wander_time: self.behavior.first_wander_time_seconds,
                 min_wandering_time: self.behavior.min_wandering_time_seconds,
                 max_wandering_time: self.behavior.max_wandering_time_seconds,
+            },
+            parameters: ParametersTable {
+                walk_speed: self.speeds.walk_speed,
+                run_speed: self.speeds.run_speed,
+                charge_speed: self.speeds.charge_speed,
+                acceleration_normal: self.speeds.acceleration_normal,
+                acceleration_charged: self.speeds.acceleration_charged,
+                stop_radius: self.speeds.stop_radius,
+                step_time_normal: self.speeds.step_time_normal,
+                step_time_charged: self.speeds.step_time_charged,
+                duration_to_track_mud: self.mud.duration_to_track_seconds,
+            },
+            footmarks: FootMarkTiming {
+                lifetime: self.mud.footmark_lifetime_seconds,
+                shrink_time: self.mud.footmark_shrink_seconds,
+            },
+            palette: if self.behavior.use_custom_colors {
+                RenderPalette {
+                    goose_white: parse_hex_rgb(&self.colors.goose_white)
+                        .unwrap_or(RenderPalette::default().goose_white),
+                    goose_orange: parse_hex_rgb(&self.colors.goose_orange)
+                        .unwrap_or(RenderPalette::default().goose_orange),
+                    goose_outline: parse_hex_rgb(&self.colors.goose_outline)
+                        .unwrap_or(RenderPalette::default().goose_outline),
+                }
+            } else {
+                RenderPalette::default()
+            },
+            mood: MoodOptions {
+                dynamic_moods: self.moods.dynamic_moods,
+                intensity: parse_mood_intensity(&self.moods.mood_intensity),
+            },
+            hourly_honk: HourlyHonkOptions {
+                on_hour_double_honk: self.behaviors.on_hour_double_honk,
             },
         };
 
@@ -709,6 +805,37 @@ fn positive(name: &str, value: f32, errors: &mut Vec<String>) {
     }
 }
 
+fn finite(name: &str, value: f32, errors: &mut Vec<String>) {
+    if !value.is_finite() {
+        errors.push(format!("{name} must be finite"));
+    }
+}
+
+fn validate_hex_color(name: &str, value: &str, errors: &mut Vec<String>) {
+    if parse_hex_rgb(value).is_none() {
+        errors.push(format!("{name} must be a #rrggbb hex color"));
+    }
+}
+
+fn parse_hex_rgb(value: &str) -> Option<(u8, u8, u8)> {
+    let hex = value.strip_prefix('#')?;
+    if hex.len() != 6 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+    let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+    let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+    Some((r, g, b))
+}
+
+fn parse_mood_intensity(value: &str) -> MoodIntensity {
+    match value {
+        "calm" => MoodIntensity::Calm,
+        "spicy" => MoodIntensity::Spicy,
+        _ => MoodIntensity::Normal,
+    }
+}
+
 fn validate_time(name: &str, value: &str, errors: &mut Vec<String>) {
     let Some((hour, minute)) = value.split_once(':') else {
         errors.push(format!("{name} must use HH:MM"));
@@ -724,6 +851,107 @@ fn validate_time(name: &str, value: &str, errors: &mut Vec<String>) {
     };
     if hour > 23 || minute > 59 {
         errors.push(format!("{name} must be within 00:00 through 23:59"));
+    }
+}
+
+fn unknown_key_warning(text: &str) -> Option<String> {
+    let doc = text.parse::<DocumentMut>().ok()?;
+    let mut unknown = Vec::new();
+    let root_allowed = [
+        "goose_config_version",
+        "behavior",
+        "colors",
+        "speeds",
+        "mud",
+        "mouse",
+        "behaviors",
+        "moods",
+        "mischief",
+        "interaction",
+        "schedule",
+        "appearance",
+        "audio",
+        "safety",
+        "platform",
+    ];
+    for (key, item) in doc.as_table().iter() {
+        if !root_allowed.contains(&key) {
+            unknown.push(key.to_string());
+            continue;
+        }
+        let Some(table) = item.as_table() else {
+            continue;
+        };
+        let allowed = known_section_keys(key);
+        for (child, _) in table.iter() {
+            if !allowed.contains(&child) {
+                unknown.push(format!("{key}.{child}"));
+            }
+        }
+    }
+    if unknown.is_empty() {
+        None
+    } else {
+        unknown.sort();
+        unknown.dedup();
+        Some(format!(
+            "ignored unknown config key{}: {}",
+            if unknown.len() == 1 { "" } else { "s" },
+            unknown.join(", ")
+        ))
+    }
+}
+
+fn known_section_keys(section: &str) -> &'static [&'static str] {
+    match section {
+        "behavior" => &[
+            "silence_sounds",
+            "can_attack_mouse",
+            "attack_randomly",
+            "use_custom_colors",
+            "first_wander_time_seconds",
+            "min_wandering_time_seconds",
+            "max_wandering_time_seconds",
+        ],
+        "colors" => &["goose_white", "goose_orange", "goose_outline"],
+        "speeds" => &[
+            "walk_speed",
+            "run_speed",
+            "charge_speed",
+            "acceleration_normal",
+            "acceleration_charged",
+            "step_time_normal",
+            "step_time_charged",
+            "stop_radius",
+        ],
+        "mud" => &[
+            "duration_to_track_seconds",
+            "footmark_lifetime_seconds",
+            "footmark_shrink_seconds",
+        ],
+        "mouse" => &["grab_distance", "drop_distance", "succ_time"],
+        "behaviors" => &["on_hour_double_honk", "multi_monitor_chase"],
+        "moods" => &["dynamic_moods", "mood_intensity"],
+        "mischief" => &[
+            "perch_and_ride",
+            "collect_windows",
+            "collect_notes",
+            "collect_memes",
+        ],
+        "interaction" => &["pat_streak"],
+        "schedule" => &[
+            "quiet_hours_enabled",
+            "quiet_start",
+            "quiet_end",
+            "dnd_respect",
+            "seasonal",
+            "autumn",
+        ],
+        "appearance" => &["calm_goose"],
+        "audio" => &["enabled", "honk", "bite", "mud", "pat"],
+        "safety" => &["pause_on_fullscreen", "no_mouse_steal", "no_window_ride"],
+        "platform" => &["wayland"],
+        _ => &[],
     }
 }
 
@@ -797,6 +1025,17 @@ mod tests {
     }
 
     #[test]
+    fn unknown_keys_warn_on_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "future_root = true\n[audio]\nfuture = 1\n").unwrap();
+        let loaded = Config::load_existing_with_warning(&path).unwrap();
+        let warning = loaded.warning.expect("unknown keys should warn");
+        assert!(warning.contains("future_root"));
+        assert!(warning.contains("audio.future"));
+    }
+
+    #[test]
     fn wrong_version_is_rejected() {
         let c: Config = toml::from_str("goose_config_version = 99\n").unwrap();
         assert!(matches!(c.validate(), Err(ConfigError::WrongVersion(99))));
@@ -810,6 +1049,21 @@ mod tests {
     }
 
     #[test]
+    fn validation_catches_bad_speed_mud_and_color_values() {
+        let mut c = Config::default();
+        c.speeds.walk_speed = 0.0;
+        c.mud.footmark_lifetime_seconds = 1.0;
+        c.mud.footmark_shrink_seconds = 2.0;
+        c.colors.goose_white = "white".into();
+        let Err(ConfigError::Validation(errors)) = c.validate() else {
+            panic!("expected validation errors");
+        };
+        assert!(errors.iter().any(|e| e.contains("speeds.walk_speed")));
+        assert!(errors.iter().any(|e| e.contains("footmark_shrink_seconds")));
+        assert!(errors.iter().any(|e| e.contains("colors.goose_white")));
+    }
+
+    #[test]
     fn effective_options_merge_cli_and_config() {
         let mut c = Config::default();
         c.safety.no_mouse_steal = true;
@@ -818,10 +1072,40 @@ mod tests {
         let effective = c.effective_options(backend(), CliOverrides::default());
         assert!(!effective.world.mouse_steal.enabled);
         assert_eq!(effective.world.mouse_steal.succ_time, 3.5);
+        assert_eq!(effective.world.parameters.walk_speed, 80.0);
+        assert_eq!(effective.world.footmarks.lifetime, 8.5);
+        assert_eq!(effective.world.mood.intensity, MoodIntensity::Normal);
+        assert!(effective.world.hourly_honk.on_hour_double_honk);
         assert!(!effective
             .world
             .collect_window
             .kind_active(honk_engine::CollectWindowKind::Meme));
+    }
+
+    #[test]
+    fn effective_options_maps_speed_mud_palette_mood_and_hourly_honk() {
+        let mut c = Config::default();
+        c.speeds.walk_speed = 91.0;
+        c.mud.duration_to_track_seconds = 12.0;
+        c.mud.footmark_lifetime_seconds = 6.0;
+        c.mud.footmark_shrink_seconds = 2.0;
+        c.behavior.use_custom_colors = true;
+        c.colors.goose_white = "#ddeeff".into();
+        c.colors.goose_orange = "#112233".into();
+        c.colors.goose_outline = "#445566".into();
+        c.moods.mood_intensity = "spicy".into();
+        c.behaviors.on_hour_double_honk = false;
+
+        let effective = c.effective_options(backend(), CliOverrides::default());
+        assert_eq!(effective.world.parameters.walk_speed, 91.0);
+        assert_eq!(effective.world.parameters.duration_to_track_mud, 12.0);
+        assert_eq!(effective.world.footmarks.lifetime, 6.0);
+        assert_eq!(effective.world.footmarks.shrink_time, 2.0);
+        assert_eq!(effective.world.palette.goose_white, (0xdd, 0xee, 0xff));
+        assert_eq!(effective.world.palette.goose_orange, (0x11, 0x22, 0x33));
+        assert_eq!(effective.world.palette.goose_outline, (0x44, 0x55, 0x66));
+        assert_eq!(effective.world.mood.intensity, MoodIntensity::Spicy);
+        assert!(!effective.world.hourly_honk.on_hour_double_honk);
     }
 
     #[test]

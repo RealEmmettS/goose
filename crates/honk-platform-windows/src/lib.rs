@@ -19,8 +19,8 @@ use honk_engine::collect_window::{
     CollectWindowId, CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot,
 };
 use honk_engine::math::Rect;
-use honk_engine::Vec2;
 use honk_engine::{ForeignWindowId, ForeignWindowSnapshot};
+use honk_engine::{LocalTime, Vec2};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::ffi::c_void;
@@ -38,6 +38,7 @@ use windows::Win32::Graphics::Gdi::{
     HBITMAP, HDC, HGDIOBJ,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::System::SystemInformation::GetLocalTime;
 use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
@@ -68,6 +69,19 @@ pub fn pointer_state() -> (f32, f32, bool) {
         // High bit of GetAsyncKeyState ⇒ the key is currently down.
         let left_down = (GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000) != 0;
         (pt.x as f32, pt.y as f32, left_down)
+    }
+}
+
+/// Snapshot the local wall clock for the platform-free on-hour honk gate.
+pub fn local_time() -> LocalTime {
+    unsafe {
+        let st = GetLocalTime();
+        LocalTime {
+            day: (st.wYear as i32 * 10_000) + (st.wMonth as i32 * 100) + st.wDay as i32,
+            hour: st.wHour as u8,
+            minute: st.wMinute as u8,
+            second: st.wSecond as u8,
+        }
     }
 }
 

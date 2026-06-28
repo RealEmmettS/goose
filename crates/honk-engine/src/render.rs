@@ -12,7 +12,7 @@
 //! outlined. World->pixmap is a translation by `origin`. Colours are the verified defaults
 //! (`#ffffff` / `#ffa500` / `#d3d3d3`); eye/shadow/mud tones are clean-room render details.
 
-use crate::footmarks::FootMarks;
+use crate::footmarks::{FootMarkTiming, FootMarks};
 use crate::math::Vec2;
 use crate::rig::{self, Rig};
 use tiny_skia::{Color, FillRule, LineCap, Paint, PathBuilder, Pixmap, Stroke, Transform};
@@ -23,6 +23,32 @@ const ORANGE_DARK: (u8, u8, u8) = (0xd8, 0x78, 0x00);
 const OUTLINE: (u8, u8, u8) = (0xd3, 0xd3, 0xd3);
 const EYE: (u8, u8, u8) = (0x1a, 0x1a, 0x1a);
 const MUD: (u8, u8, u8) = (0x5a, 0x40, 0x28);
+
+/// User-customizable original-style goose palette.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenderPalette {
+    pub goose_white: (u8, u8, u8),
+    pub goose_orange: (u8, u8, u8),
+    pub goose_outline: (u8, u8, u8),
+}
+
+impl Default for RenderPalette {
+    fn default() -> Self {
+        Self {
+            goose_white: WHITE,
+            goose_orange: ORANGE,
+            goose_outline: OUTLINE,
+        }
+    }
+}
+
+fn darken(rgb: (u8, u8, u8)) -> (u8, u8, u8) {
+    (
+        (rgb.0 as f32 * 0.85) as u8,
+        (rgb.1 as f32 * 0.73) as u8,
+        (rgb.2 as f32 * 0.55) as u8,
+    )
+}
 
 /// Extra radius drawn underneath each white part to give it a `#d3d3d3` outline.
 const OUTLINE_WIDTH: f32 = 1.6;
@@ -63,15 +89,26 @@ fn capsule(pixmap: &mut Pixmap, a: Vec2, b: Vec2, radius: f32, p: &Paint) {
     }
 }
 
-fn white_capsule(pixmap: &mut Pixmap, a: Vec2, b: Vec2, radius: f32) {
-    capsule(pixmap, a, b, radius + OUTLINE_WIDTH, &paint(OUTLINE, 255));
-    capsule(pixmap, a, b, radius, &paint(WHITE, 255));
+fn white_capsule(pixmap: &mut Pixmap, a: Vec2, b: Vec2, radius: f32, palette: RenderPalette) {
+    capsule(
+        pixmap,
+        a,
+        b,
+        radius + OUTLINE_WIDTH,
+        &paint(palette.goose_outline, 255),
+    );
+    capsule(pixmap, a, b, radius, &paint(palette.goose_white, 255));
 }
 
-fn white_shape(pixmap: &mut Pixmap, pb: PathBuilder) {
+fn white_shape(pixmap: &mut Pixmap, pb: PathBuilder, palette: RenderPalette) {
     if let Some(path) = pb.finish() {
-        stroke_path(pixmap, &path, &paint(OUTLINE, 255), OUTLINE_WIDTH * 2.0);
-        fill_path(pixmap, path, &paint(WHITE, 255));
+        stroke_path(
+            pixmap,
+            &path,
+            &paint(palette.goose_outline, 255),
+            OUTLINE_WIDTH * 2.0,
+        );
+        fill_path(pixmap, path, &paint(palette.goose_white, 255));
     }
 }
 
@@ -120,7 +157,7 @@ fn stipple_shadow(pixmap: &mut Pixmap, ground: Vec2) {
     }
 }
 
-fn original_foot(pixmap: &mut Pixmap, foot: Vec2, fwd: Vec2, across: Vec2) {
+fn original_foot(pixmap: &mut Pixmap, foot: Vec2, fwd: Vec2, across: Vec2, palette: RenderPalette) {
     let p = |x, y| local(foot, fwd, across, x, y);
     let mut web = PathBuilder::new();
     let heel = p(-2.2, 0.0);
@@ -132,11 +169,17 @@ fn original_foot(pixmap: &mut Pixmap, foot: Vec2, fwd: Vec2, across: Vec2) {
     web.line_to(heel.x, heel.y);
     web.close();
     if let Some(path) = web.finish() {
-        fill_path(pixmap, path, &paint(ORANGE, 255));
+        fill_path(pixmap, path, &paint(palette.goose_orange, 255));
     }
 }
 
-fn original_body(pixmap: &mut Pixmap, center: Vec2, fwd: Vec2, across: Vec2) {
+fn original_body(
+    pixmap: &mut Pixmap,
+    center: Vec2,
+    fwd: Vec2,
+    across: Vec2,
+    palette: RenderPalette,
+) {
     let p = |x, y| local(center, fwd, across, x, y);
     let mut body = PathBuilder::new();
     let start = p(-36.0, 0.0);
@@ -146,12 +189,23 @@ fn original_body(pixmap: &mut Pixmap, center: Vec2, fwd: Vec2, across: Vec2) {
     cubic_to(&mut body, p(28.0, 13.0), p(15.0, 20.0), p(-5.0, 20.0));
     cubic_to(&mut body, p(-27.0, 20.0), p(-38.0, 12.0), start);
     body.close();
-    white_shape(pixmap, body);
+    white_shape(pixmap, body, palette);
 }
 
 /// Render the muddy footprints into `pixmap` (call before the goose so it sits on top).
 pub fn render_footmarks(pixmap: &mut Pixmap, marks: &FootMarks, now: f32, origin: Vec2) {
-    for (mark, scale) in marks.active(now) {
+    render_footmarks_with_timing(pixmap, marks, now, origin, FootMarkTiming::default());
+}
+
+/// Render muddy footprints with runtime timing from config.
+pub fn render_footmarks_with_timing(
+    pixmap: &mut Pixmap,
+    marks: &FootMarks,
+    now: f32,
+    origin: Vec2,
+    timing: FootMarkTiming,
+) {
+    for (mark, scale) in marks.active_with_timing(now, timing) {
         let c = mark.position - origin;
         let alpha = (180.0 * scale) as u8;
         disc(pixmap, c, 3.5 * scale, &paint(MUD, alpha));
@@ -184,12 +238,52 @@ pub fn render_hearts(pixmap: &mut Pixmap, hearts: &crate::hearts::Hearts, now: f
     }
 }
 
+/// Render sleepy-mood Z particles above the goose.
+pub fn render_sleepies(
+    pixmap: &mut Pixmap,
+    sleepies: &crate::mood::ZParticles,
+    now: f32,
+    origin: Vec2,
+) {
+    for (pos, alpha) in sleepies.active(now) {
+        let a = (alpha * 220.0) as u8;
+        if a == 0 {
+            continue;
+        }
+        let c = pos - origin;
+        let p = paint((0x88, 0x99, 0xaa), a);
+        let mut pb = PathBuilder::new();
+        pb.move_to(c.x - 4.0, c.y - 5.0);
+        pb.line_to(c.x + 4.0, c.y - 5.0);
+        pb.line_to(c.x - 4.0, c.y + 5.0);
+        pb.line_to(c.x + 4.0, c.y + 5.0);
+        if let Some(path) = pb.finish() {
+            stroke_path(pixmap, &path, &p, 1.8);
+        }
+    }
+}
+
 /// Render the goose described by `rig` into `pixmap`, with world `origin` at the pixmap's
 /// top-left corner.
 pub fn render_rig(pixmap: &mut Pixmap, rig: &Rig, origin: Vec2) {
+    render_rig_with_palette(pixmap, rig, origin, RenderPalette::default());
+}
+
+/// Render the goose with an explicit runtime palette.
+pub fn render_rig_with_palette(
+    pixmap: &mut Pixmap,
+    rig: &Rig,
+    origin: Vec2,
+    palette: RenderPalette,
+) {
     let t = |p: Vec2| p - origin;
     let fwd = rig.forward;
     let across = fwd.perpendicular();
+    let orange_dark = if palette.goose_orange == ORANGE {
+        ORANGE_DARK
+    } else {
+        darken(palette.goose_orange)
+    };
 
     stipple_shadow(pixmap, t(rig.ground));
 
@@ -204,21 +298,28 @@ pub fn render_rig(pixmap: &mut Pixmap, rig: &Rig, origin: Vec2) {
 
     // Put the neck under the body/head so the joints do not read as exposed construction
     // circles. The original's charm is a compact silhouette with only soft interior hints.
-    white_capsule(pixmap, neck_base, neck_head, rig::NECC_RADIUS * 0.50);
+    white_capsule(
+        pixmap,
+        neck_base,
+        neck_head,
+        rig::NECC_RADIUS * 0.50,
+        palette,
+    );
 
     // Original-style compact body: one cohesive silhouette instead of stacked capsules.
     let bc = t(rig.body_center);
-    original_body(pixmap, bc, fwd, across);
+    original_body(pixmap, bc, fwd, across, palette);
     white_capsule(
         pixmap,
         neck_head - fwd * 2.4,
         snout - fwd * 1.7,
         rig::HEAD_RADIUS_2 + 0.2,
+        palette,
     );
 
     // Tiny orange feet, as in the original desktop goose.
     for foot in drawn_feet {
-        original_foot(pixmap, foot, fwd, across);
+        original_foot(pixmap, foot, fwd, across, palette);
     }
 
     // Beak: short rounded orange wedge.
@@ -241,15 +342,15 @@ pub fn render_rig(pixmap: &mut Pixmap, rig: &Rig, origin: Vec2) {
     );
     beak.close();
     if let Some(path) = beak.finish() {
-        stroke_path(pixmap, &path, &paint(ORANGE_DARK, 230), 1.3);
-        fill_path(pixmap, path, &paint(ORANGE, 255));
+        stroke_path(pixmap, &path, &paint(orange_dark, 230), 1.3);
+        fill_path(pixmap, path, &paint(palette.goose_orange, 255));
     }
 
     disc(
         pixmap,
         beak_base + fwd * 4.2 - across * 1.8,
         0.75,
-        &paint(ORANGE_DARK, 150),
+        &paint(orange_dark, 150),
     );
 
     // Eye: the original reads as a tiny dark dot, not a ringed cartoon eye.
@@ -259,7 +360,7 @@ pub fn render_rig(pixmap: &mut Pixmap, rig: &Rig, origin: Vec2) {
         pixmap,
         eye - fwd * 0.25 - across * 0.25,
         0.35,
-        &paint(WHITE, 230),
+        &paint(palette.goose_white, 230),
     );
 }
 
@@ -294,6 +395,27 @@ mod tests {
     }
 
     #[test]
+    fn custom_palette_changes_goose_pixels() {
+        let rig = Rig::default();
+        let default = render_centered(256, 256, &rig).expect("alloc");
+        let mut custom = Pixmap::new(256, 256).expect("alloc");
+        custom.fill(Color::TRANSPARENT);
+        let bb = rig.bounding_box();
+        let origin = (bb.min + bb.max) * 0.5 - Vec2::new(128.0, 128.0);
+        render_rig_with_palette(
+            &mut custom,
+            &rig,
+            origin,
+            RenderPalette {
+                goose_white: (0xdd, 0xf6, 0xff),
+                goose_orange: (0xff, 0x66, 0x00),
+                goose_outline: (0x88, 0x99, 0xaa),
+            },
+        );
+        assert_ne!(default.data(), custom.data());
+    }
+
+    #[test]
     fn renders_a_visible_heart() {
         use crate::hearts::Hearts;
         let mut hearts = Hearts::new();
@@ -319,6 +441,18 @@ mod tests {
         render_hearts(&mut pixmap, &hearts, 0.0, Vec2::ZERO);
         let opaque = pixmap.data().chunks_exact(4).filter(|px| px[3] > 0).count();
         assert_eq!(opaque, 0, "no hearts → nothing drawn");
+    }
+
+    #[test]
+    fn renders_visible_sleepy_particle() {
+        use crate::mood::ZParticles;
+        let mut z = ZParticles::new();
+        z.add(Vec2::new(64.0, 64.0), 0.0);
+        let mut pixmap = Pixmap::new(128, 128).expect("alloc");
+        pixmap.fill(Color::TRANSPARENT);
+        render_sleepies(&mut pixmap, &z, 0.0, Vec2::ZERO);
+        let opaque = pixmap.data().chunks_exact(4).filter(|px| px[3] > 0).count();
+        assert!(opaque > 5, "expected a visible Z particle");
     }
 
     #[test]

@@ -11,19 +11,27 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > can hop onto a window while you drag it around, and can now bring in note and meme windows.
 > It can now be controlled through a local command channel for starting, stopping, reloading, and
 > simple poke commands. It now understands the friendly three-name command grammar and has a
-> terminal settings screen backed by a saved config file. The next milestone is dynamic moods and
-> the on-hour honk. There's no installer yet — that comes later.
+> terminal settings screen backed by a saved config file. It now has dynamic moods and a double
+> honk at the top of each hour. The next milestone is quiet-hours, fullscreen/DND manners, and
+> seasonal Autumn. There's no installer yet — that comes later.
 
 ---
 
 ## Latest — June 2026
 
 **Added**
+- The goose now has little moods. Most of the time it stays content, but it can occasionally get
+  sleepy, sad, hyper, or mischievous. These moods change how it moves and carries itself without
+  replacing its normal behavior system: sleepy and sad slow it down, sleepy makes little Zs, hyper
+  can kick off the existing zoomy burst, and mischievous only leans into tricks that are already
+  enabled and supported.
+- The goose now does the on-hour double honk. At the top of each local hour it makes one high honk,
+  then a second one a moment later, and it will not keep repeating during the same hour.
 - The goose now has a real saved settings file and a terminal settings screen. You can open it
   with the config command, change current settings such as sound, mouse stealing, window riding,
   note/meme behavior, petting behavior, and timing, and save them without mixing settings code
   into the goose's core brain.
-- The settings screen also shows future options honestly. Things like moods, seasons, appearance,
+- The settings screen also shows future options honestly. Things like seasons, fuller appearance,
   multi-monitor behavior, Wayland/backend mode, and extra prank behavior can be saved for later,
   but they are marked as planned or restart-required until those milestones actually exist.
 - The command grammar now works under all three intended names: `honk300`, `honk`, and `goose`.
@@ -84,6 +92,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   the trail across your screen, the goose's see-through layer now covers the whole monitor.)
 
 **Fixed**
+- Settings for speed, muddy-footprint timing, colors, moods, and the hourly honk now actually
+  affect the running goose instead of only being written to the settings file.
+- If the settings file has extra unknown fields, the loader now warns once while still preserving
+  those fields when it saves again. That keeps the config friendly to hand edits and future
+  versions without silently hiding mistakes.
 - When you tell the goose to do something from a command — like honk or grab the cursor — it now
   tells you the truth about whether it actually did it. Before, it always answered "okay!" even
   when it ignored you because it was busy or because that trick was switched off. Now, if it can't
@@ -99,6 +112,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   it zoom around (or grab your cursor when that's allowed), even with petting turned off.
 
 **Improved**
+- The settings screen is cleaner internally and more complete to use. It now scrolls through real
+  rows, edits quiet-hour times in 15-minute steps, cycles mood intensity through calm, normal, and
+  spicy, asks before throwing away unsaved edits, and starts the goose without letting the child
+  process mess up the terminal screen.
 - The goose has been pulled back toward the original Desktop Goose look. The drawing is still
   fully procedural, but it now uses one cleaner, thinner oval body instead of several obvious
   pieces stuck together. The head stays tucked in, the beak is short, the eye is simpler, the
@@ -127,6 +144,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   fixes above so the reasoning behind them isn't lost: commands should report what really
   happened, and the difference between "the user turned this off" and "your computer can't do
   this" must be kept straight so a setting can always be turned back on.
+- The mood and hourly-honk milestone now has its own architecture record. It keeps the goose's
+  mood logic inside the shared engine, while the platform-specific app simply tells the engine
+  what the current local time is.
 
 **Decided**
 - The next major renderer should be a small, custom sprite-sheet system rather than a full game

@@ -34,6 +34,7 @@ pub mod hearts;
 pub mod interaction;
 pub mod locomotion;
 pub mod math;
+pub mod mood;
 pub mod render;
 pub mod rig;
 pub mod rng;
@@ -53,16 +54,21 @@ pub use cursor::{
 };
 pub use entity::{GooseEntity, ParametersTable, SpeedTier};
 pub use feet::Feet;
-pub use footmarks::{FootMark, FootMarks};
+pub use footmarks::{FootMark, FootMarkTiming, FootMarks};
 pub use foreign_window::{
     ForeignWindowCapabilities, ForeignWindowId, ForeignWindowOptions, ForeignWindowSnapshot,
 };
 pub use hearts::{Heart, Hearts};
 pub use interaction::{PatTracker, Pointer};
 pub use math::{Rect, Vec2};
+pub use mood::{
+    HourlyHonkOptions, LocalHour, LocalTime, MoodIntensity, MoodKind, MoodMachine, MoodOptions,
+    ZParticle, ZParticles,
+};
+pub use render::RenderPalette;
 pub use rig::Rig;
 pub use rng::{Deck, RandomSource, SplitMix64};
-pub use sound::Sound;
+pub use sound::{HonkTone, Sound};
 pub use task::{
     CollectWindowTask, FirstUxTask, HyperTask, NabMouseTask, PerchRideTask, Task, WanderTask,
 };

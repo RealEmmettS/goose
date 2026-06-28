@@ -13,6 +13,8 @@ use crate::hearts::Hearts;
 use crate::interaction::{PatTracker, Pointer};
 use crate::locomotion;
 use crate::math::{Rect, Vec2};
+use crate::mood::{LocalHour, LocalTime, MoodKind, MoodMachine, ZParticles};
+use crate::render::RenderPalette;
 use crate::rig::Rig;
 use crate::rng::{Deck, RandomSource, SplitMix64};
 use crate::sound::Sound;
@@ -24,6 +26,7 @@ use crate::time::DT;
 
 /// Distance travelled per full walking-gait cycle (radians of `gait_phase` per `TAU`).
 const GAIT_CYCLE_DISTANCE: f32 = 22.0;
+const SECOND_HOURLY_HONK_DELAY: f32 = 0.35;
 
 /// The whole simulation: one goose roaming within `bounds` (the virtual-desktop space).
 pub struct World {
@@ -50,6 +53,16 @@ pub struct World {
     pat: PatTracker,
     /// Heart particles emitted while being patted.
     hearts: Hearts,
+    /// Sleepy-mood Z particles.
+    sleepies: ZParticles,
+    /// Dynamic mood state machine.
+    mood: MoodMachine,
+    /// Latest runtime-sampled local time, if the platform has provided one.
+    local_time: Option<LocalTime>,
+    /// Local hour that has already triggered its on-hour honks.
+    last_hourly_honk: Option<LocalHour>,
+    /// Pending second honk for the current on-hour double honk.
+    second_hourly_honk_at: Option<f32>,
     /// Last pointer state fed in via [`World::set_pointer`].
     pointer: Pointer,
     /// Last platform-reported user-dragged foreign window.
@@ -82,6 +95,7 @@ impl World {
     pub fn with_options(bounds: Rect, seed: u64, options: WorldOptions) -> Self {
         let center = (bounds.min + bounds.max) * 0.5;
         let mut goose = GooseEntity::new();
+        goose.parameters = options.parameters;
         // Enter from just off the bottom edge; FirstUX walks the goose on-stage.
         goose.position = Vec2::new(center.x, bounds.max.y + 60.0);
         goose.target_pos = center;
@@ -89,13 +103,15 @@ impl World {
         goose.current_acceleration = goose.parameters.acceleration_normal;
         goose.rig = Rig::update(goose.position, goose.direction, 0.0, 0.0);
 
-        let pickable = Self::pickable_for(options);
+        let mut rng = SplitMix64::seed(seed);
+        let mood = MoodMachine::new(0.0, options.mood, &mut rng);
+        let pickable = Self::pickable_for(options, mood.current());
         let deck = Deck::new(pickable.len(), SplitMix64::seed(seed ^ 0x9E37_79B9));
 
         Self {
             goose,
             bounds,
-            rng: SplitMix64::seed(seed),
+            rng,
             current: Box::new(FirstUxTask::new()), // scripted intro runs first
             pickable,
             deck,
@@ -107,6 +123,11 @@ impl World {
             options,
             pat: PatTracker::new(),
             hearts: Hearts::new(),
+            sleepies: ZParticles::new(),
+            mood,
+            local_time: None,
+            last_hourly_honk: None,
+            second_hourly_honk_at: None,
             pointer: Pointer::default(),
             dragged_window: None,
             collect_window_snapshot: None,
@@ -123,7 +144,7 @@ impl World {
         self.elapsed
     }
 
-    fn pickable_for(options: WorldOptions) -> Vec<fn() -> Box<dyn Task>> {
+    fn pickable_for(options: WorldOptions, mood: MoodKind) -> Vec<fn() -> Box<dyn Task>> {
         let mut pickable: Vec<fn() -> Box<dyn Task>> =
             vec![|| Box::new(WanderTask::new()) as Box<dyn Task>];
         if options.mouse_steal.active() {
@@ -132,13 +153,19 @@ impl World {
         if options.collect_window.active() {
             pickable.push(|| Box::new(CollectWindowTask::new()) as Box<dyn Task>);
         }
+        if mood == MoodKind::Mischievous {
+            if options.mouse_steal.active() {
+                pickable.push(|| Box::new(NabMouseTask::new()) as Box<dyn Task>);
+            }
+            if options.collect_window.active() {
+                pickable.push(|| Box::new(CollectWindowTask::new()) as Box<dyn Task>);
+            }
+        }
         pickable
     }
 
-    /// Atomically apply a complete runtime option set from the control plane.
-    pub fn apply_options(&mut self, options: WorldOptions) {
-        self.options = options;
-        self.pickable = Self::pickable_for(options);
+    fn rebuild_pickable(&mut self) {
+        self.pickable = Self::pickable_for(self.options, self.mood.current());
         self.deck = Deck::new(
             self.pickable.len(),
             SplitMix64::seed(
@@ -147,6 +174,18 @@ impl World {
                     ^ 0xA076_1D64_78BD_642F,
             ),
         );
+    }
+
+    /// Atomically apply a complete runtime option set from the control plane.
+    pub fn apply_options(&mut self, options: WorldOptions) {
+        self.options = options;
+        self.goose.parameters = options.parameters;
+        self.mood
+            .apply_options(options.mood, self.elapsed, &mut self.rng);
+        self.rebuild_pickable();
+        if !options.hourly_honk.on_hour_double_honk {
+            self.second_hourly_honk_at = None;
+        }
 
         if self.is_cursor_mischief_active() && !options.mouse_steal.active() {
             self.resume_or_wander();
@@ -164,7 +203,7 @@ impl World {
     pub fn poke(&mut self, action: PokeAction) -> PokeOutcome {
         match action {
             PokeAction::Honk => {
-                self.pending_sounds.push(Sound::Honk);
+                self.pending_sounds.push(Sound::honk());
                 PokeOutcome::Applied
             }
             PokeAction::Mud => {
@@ -285,6 +324,31 @@ impl World {
     /// The live heart particles (for the renderer).
     pub fn hearts(&self) -> &Hearts {
         &self.hearts
+    }
+
+    /// The live sleepy Z particles (for the renderer).
+    pub fn sleepies(&self) -> &ZParticles {
+        &self.sleepies
+    }
+
+    /// Runtime render palette from config.
+    pub fn render_palette(&self) -> RenderPalette {
+        self.options.palette
+    }
+
+    /// Runtime footmark timing from config.
+    pub fn footmark_timing(&self) -> crate::footmarks::FootMarkTiming {
+        self.options.footmarks
+    }
+
+    /// The current dynamic mood.
+    pub fn mood(&self) -> MoodKind {
+        self.mood.current()
+    }
+
+    /// Feed the current local time. Platform runtimes own local-time sampling.
+    pub fn set_local_time(&mut self, local_time: LocalTime) {
+        self.local_time = Some(local_time);
     }
 
     /// Whether the goose is currently in its post-pat calm window.
@@ -438,6 +502,28 @@ impl World {
     /// Advance the world by one fixed [`DT`] tick.
     pub fn tick(&mut self) {
         self.elapsed += DT;
+        self.apply_hourly_honk();
+
+        let mood_event = self.mood.tick(self.elapsed, &mut self.rng);
+        if mood_event.changed {
+            self.rebuild_pickable();
+        }
+        if let Some(sound) = mood_event.sound {
+            self.pending_sounds.push(sound);
+        }
+        if mood_event.spawn_sleepy_particle {
+            let jitter = Vec2::new(self.rng.range(-5.0, 5.0), self.rng.range(-4.0, 2.0));
+            self.sleepies
+                .add(self.goose.rig.neck_head + jitter, self.elapsed);
+        }
+        if mood_event.trigger_hyper
+            && !self.is_cursor_mischief_active()
+            && !self.is_perch_ride_active()
+            && !self.is_collect_window_active()
+            && self.interrupted.is_none()
+        {
+            self.start_hyper();
+        }
 
         if let Some(kind) = self.pending_collect.take() {
             if self.options.collect_window.kind_active(kind)
@@ -512,6 +598,8 @@ impl World {
             };
         }
 
+        self.apply_mood_locomotion_modulation();
+
         // Auto-locomotion toward the task's target.
         let before = self.goose.position;
         locomotion::step(&mut self.goose, DT);
@@ -522,12 +610,14 @@ impl World {
 
         let speed_frac =
             (self.goose.velocity.magnitude() / self.goose.parameters.walk_speed).min(1.0);
+        let neck_lerp = self.mood_neck_lerp(speed_frac * 0.4);
         self.goose.rig = Rig::update(
             self.goose.position,
             self.goose.direction,
-            speed_frac * 0.4,
+            neck_lerp,
             self.goose.gait_phase,
         );
+        self.goose.extending_neck = false;
 
         // Drop a fading muddy print at each foot-plant (half gait cycle) while tracking mud.
         let step = (self.goose.gait_phase / std::f32::consts::PI).floor() as i64;
@@ -552,6 +642,67 @@ impl World {
     pub fn rig(&self) -> &Rig {
         &self.goose.rig
     }
+
+    fn apply_hourly_honk(&mut self) {
+        if !self.options.hourly_honk.on_hour_double_honk {
+            return;
+        }
+        if let Some(due) = self.second_hourly_honk_at {
+            if self.elapsed >= due {
+                self.pending_sounds.push(Sound::high_honk());
+                self.second_hourly_honk_at = None;
+            }
+        }
+        let Some(local_time) = self.local_time else {
+            return;
+        };
+        let hour = local_time.hour_key();
+        if local_time.is_top_of_hour() && self.last_hourly_honk != Some(hour) {
+            self.pending_sounds.push(Sound::high_honk());
+            self.second_hourly_honk_at = Some(self.elapsed + SECOND_HOURLY_HONK_DELAY);
+            self.last_hourly_honk = Some(hour);
+        }
+    }
+
+    fn apply_mood_locomotion_modulation(&mut self) {
+        if !self.mood.options().dynamic_moods {
+            return;
+        }
+        match self.mood.current() {
+            MoodKind::Content => {}
+            MoodKind::Hyper => {
+                self.goose.current_speed *= 1.08;
+                self.goose.current_acceleration *= 1.05;
+            }
+            MoodKind::Sad => {
+                self.goose.current_speed *= 0.72;
+                self.goose.current_acceleration *= 0.8;
+            }
+            MoodKind::Sleepy => {
+                self.goose.current_speed *= 0.55;
+                self.goose.current_acceleration *= 0.65;
+            }
+            MoodKind::Mischievous => {
+                self.goose.current_speed *= 1.04;
+            }
+        }
+    }
+
+    fn mood_neck_lerp(&self, base: f32) -> f32 {
+        if self.goose.extending_neck {
+            return 1.0;
+        }
+        if !self.mood.options().dynamic_moods {
+            return base;
+        }
+        match self.mood.current() {
+            MoodKind::Content => base,
+            MoodKind::Hyper => base.max(0.65),
+            MoodKind::Sad => base * 0.25,
+            MoodKind::Sleepy => base * 0.15,
+            MoodKind::Mischievous => (base + 0.16).min(1.0),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -562,7 +713,10 @@ mod tests {
         CollectWindowRequestId, CollectWindowSnapshot,
     };
     use crate::cursor::{InteractionOptions, MouseStealOptions, TimingOptions};
+    use crate::entity::ParametersTable;
+    use crate::footmarks::FootMarkTiming;
     use crate::foreign_window::{ForeignWindowId, ForeignWindowOptions};
+    use crate::mood::{HourlyHonkOptions, MoodIntensity, MoodOptions};
 
     fn bounds() -> Rect {
         Rect {
@@ -1230,7 +1384,7 @@ mod tests {
     fn poke_honk_queues_sound_without_ticking() {
         let mut w = World::new(bounds(), 19);
         assert_eq!(w.poke(PokeAction::Honk), PokeOutcome::Applied);
-        assert_eq!(w.take_sounds(), vec![Sound::Honk]);
+        assert_eq!(w.take_sounds(), vec![Sound::honk()]);
         assert!(w.take_sounds().is_empty());
     }
 
@@ -1240,6 +1394,33 @@ mod tests {
         assert!(w.goose.track_mud_end_time < w.now());
         assert_eq!(w.poke(PokeAction::Mud), PokeOutcome::Applied);
         assert!(w.goose.track_mud_end_time > w.now());
+    }
+
+    #[test]
+    fn apply_options_hot_applies_parameters_and_footmark_timing() {
+        let mut w = World::new(bounds(), 201);
+        let parameters = ParametersTable {
+            walk_speed: 123.0,
+            run_speed: 234.0,
+            duration_to_track_mud: 4.25,
+            ..ParametersTable::default()
+        };
+        let footmarks = FootMarkTiming {
+            lifetime: 3.5,
+            shrink_time: 1.25,
+        };
+
+        w.apply_options(WorldOptions {
+            parameters,
+            footmarks,
+            ..WorldOptions::default()
+        });
+
+        assert_eq!(w.goose.parameters.walk_speed, 123.0);
+        assert_eq!(w.goose.parameters.run_speed, 234.0);
+        assert_eq!(w.footmark_timing(), footmarks);
+        assert_eq!(w.poke(PokeAction::Mud), PokeOutcome::Applied);
+        assert!((w.goose.track_mud_end_time - (w.now() + 4.25)).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -1319,6 +1500,119 @@ mod tests {
             ..WorldOptions::default()
         });
         assert_eq!(w.pickable.len(), 3);
+    }
+
+    #[test]
+    fn mischievous_bias_duplicates_only_already_active_pickable_tasks() {
+        let collect_options = CollectWindowOptions::with_backend_support(
+            CollectWindowCapabilities {
+                spawn_note: true,
+                spawn_image: true,
+                move_window: true,
+                set_passthrough: true,
+                synthesize_text: true,
+            },
+            1,
+            1,
+        );
+
+        assert_eq!(
+            World::pickable_for(WorldOptions::default(), MoodKind::Mischievous).len(),
+            1,
+            "unsupported defaults keep only wander pickable"
+        );
+        assert_eq!(
+            World::pickable_for(
+                WorldOptions {
+                    mouse_steal: MouseStealOptions::with_backend_support(true),
+                    ..WorldOptions::default()
+                },
+                MoodKind::Mischievous
+            )
+            .len(),
+            3,
+            "active nab appears once normally and once as mischievous bias"
+        );
+        assert_eq!(
+            World::pickable_for(
+                WorldOptions {
+                    collect_window: collect_options,
+                    ..WorldOptions::default()
+                },
+                MoodKind::Mischievous
+            )
+            .len(),
+            3,
+            "active collect appears once normally and once as mischievous bias"
+        );
+        assert_eq!(
+            World::pickable_for(
+                WorldOptions {
+                    mouse_steal: MouseStealOptions::with_backend_support(true),
+                    collect_window: collect_options,
+                    ..WorldOptions::default()
+                },
+                MoodKind::Mischievous
+            )
+            .len(),
+            5,
+            "mischievous mode duplicates only the two already-enabled mischief tasks"
+        );
+    }
+
+    #[test]
+    fn on_hour_double_honk_emits_two_honks_without_same_hour_repeat() {
+        let mut w = World::with_options(
+            bounds(),
+            260,
+            WorldOptions {
+                mood: MoodOptions {
+                    dynamic_moods: false,
+                    intensity: MoodIntensity::Normal,
+                },
+                hourly_honk: HourlyHonkOptions {
+                    on_hour_double_honk: true,
+                },
+                ..WorldOptions::default()
+            },
+        );
+        w.set_local_time(LocalTime {
+            day: 20260628,
+            hour: 13,
+            minute: 0,
+            second: 0,
+        });
+
+        let mut sounds = Vec::new();
+        for _ in 0..100 {
+            w.tick();
+            sounds.extend(w.take_sounds());
+        }
+
+        assert_eq!(
+            sounds,
+            vec![Sound::high_honk(), Sound::high_honk()],
+            "top-of-hour behavior is exactly one immediate honk plus one delayed honk"
+        );
+
+        for _ in 0..200 {
+            w.tick();
+            sounds.extend(w.take_sounds());
+        }
+        assert_eq!(
+            sounds.len(),
+            2,
+            "holding the same top-of-hour snapshot does not repeat within that local hour"
+        );
+
+        w.set_local_time(LocalTime {
+            day: 20260628,
+            hour: 14,
+            minute: 0,
+            second: 0,
+        });
+        w.tick();
+        assert_eq!(w.take_sounds(), vec![Sound::high_honk()]);
     }
 
     #[test]

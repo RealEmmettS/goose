@@ -62,6 +62,79 @@ pub enum TuiCommand {
     Poke(PokeAction),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandResult {
+    pub status: String,
+    pub is_error: bool,
+    pub mark_saved: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RowKind {
+    Static,
+    Toggle(ToggleField),
+    Adjust(AdjustField),
+    CycleMood,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Row {
+    pub label: String,
+    pub value: String,
+    pub kind: RowKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToggleField {
+    Sound,
+    NoMouseSteal,
+    NoWindowRide,
+    Wayland,
+    OnHourHonk,
+    CanAttackMouse,
+    PatStreak,
+    DynamicMoods,
+    PerchAndRide,
+    CollectWindows,
+    CollectNotes,
+    CollectMemes,
+    QuietHours,
+    DndRespect,
+    Seasonal,
+    Autumn,
+    CalmGoose,
+    CustomColors,
+    AudioEnabled,
+    HonkSound,
+    BiteSound,
+    MudSound,
+    PatSound,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdjustField {
+    FirstWander,
+    MinWander,
+    MaxWander,
+    WalkSpeed,
+    RunSpeed,
+    ChargeSpeed,
+    AccelNormal,
+    AccelCharged,
+    StepNormal,
+    StepCharged,
+    StopRadius,
+    MudDuration,
+    FootmarkLifetime,
+    FootmarkShrink,
+    MouseSucc,
+    QuietStart,
+    QuietEnd,
+    GooseWhite,
+    GooseOrange,
+    GooseOutline,
+}
+
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub config: Config,
@@ -73,6 +146,7 @@ pub struct AppState {
     pub status: String,
     pub status_is_error: bool,
     pending_commands: VecDeque<TuiCommand>,
+    confirm_quit: bool,
 }
 
 impl AppState {
@@ -87,6 +161,7 @@ impl AppState {
             status: "ready".into(),
             status_is_error: false,
             pending_commands: VecDeque::new(),
+            confirm_quit: false,
         }
     }
 
@@ -108,16 +183,7 @@ impl AppState {
     }
 
     pub fn row_count(&self) -> usize {
-        match self.active_category {
-            Category::General => 4,
-            Category::Behaviors => 6,
-            Category::Mischief => 5,
-            Category::Schedule => 6,
-            Category::Appearance => 2,
-            Category::Audio => 5,
-            Category::Commands => 8,
-            Category::About => 5,
-        }
+        self.rows().len()
     }
 
     pub fn resolve_key(&self, key: KeyEvent) -> Action {
@@ -149,9 +215,19 @@ impl AppState {
     }
 
     pub fn apply(&mut self, action: Action) {
+        if !matches!(action, Action::Quit | Action::None) {
+            self.confirm_quit = false;
+        }
         match action {
             Action::None => {}
-            Action::Quit => self.should_quit = true,
+            Action::Quit => {
+                if self.dirty() && !self.confirm_quit {
+                    self.confirm_quit = true;
+                    self.set_status("unsaved changes; press q again to quit".into(), true);
+                } else {
+                    self.should_quit = true;
+                }
+            }
             Action::NextCategory => self.set_category(self.active_category.next()),
             Action::PrevCategory => self.set_category(self.active_category.prev()),
             Action::SelectCategory(category) => self.set_category(category),
@@ -166,6 +242,12 @@ impl AppState {
             Action::Stop => self.pending_commands.push_back(TuiCommand::Stop),
             Action::Start => self.pending_commands.push_back(TuiCommand::Start),
             Action::Poke(action) => self.pending_commands.push_back(TuiCommand::Poke(action)),
+            Action::CommandResult(result) => {
+                if result.mark_saved {
+                    self.mark_saved();
+                }
+                self.set_status(result.status, result.is_error);
+            }
         }
     }
 
@@ -174,72 +256,100 @@ impl AppState {
         self.selected_row = self.selected_row.min(self.row_count().saturating_sub(1));
     }
 
+    fn selected_kind(&self) -> RowKind {
+        self.rows()
+            .get(self.selected_row)
+            .map(|row| row.kind)
+            .unwrap_or(RowKind::Static)
+    }
+
     fn toggle_selected(&mut self) {
-        match (self.active_category, self.selected_row) {
-            (Category::General, 0) => self.config.audio.enabled = !self.config.audio.enabled,
-            (Category::General, 1) => {
-                self.config.safety.no_mouse_steal = !self.config.safety.no_mouse_steal
-            }
-            (Category::General, 2) => {
-                self.config.safety.no_window_ride = !self.config.safety.no_window_ride
-            }
-            (Category::General, 3) => self.config.platform.wayland = !self.config.platform.wayland,
-            (Category::Behaviors, 0) => {
-                self.config.behavior.can_attack_mouse = !self.config.behavior.can_attack_mouse
-            }
-            (Category::Behaviors, 1) => {
-                self.config.interaction.pat_streak = !self.config.interaction.pat_streak
-            }
-            (Category::Mischief, 0) => {
-                self.config.mischief.perch_and_ride = !self.config.mischief.perch_and_ride
-            }
-            (Category::Mischief, 1) => {
-                self.config.mischief.collect_windows = !self.config.mischief.collect_windows
-            }
-            (Category::Mischief, 2) => {
-                self.config.mischief.collect_notes = !self.config.mischief.collect_notes
-            }
-            (Category::Mischief, 3) => {
-                self.config.mischief.collect_memes = !self.config.mischief.collect_memes
-            }
-            (Category::Schedule, 0) => {
-                self.config.schedule.quiet_hours_enabled = !self.config.schedule.quiet_hours_enabled
-            }
-            (Category::Schedule, 3) => {
-                self.config.schedule.dnd_respect = !self.config.schedule.dnd_respect
-            }
-            (Category::Schedule, 4) => {
-                self.config.schedule.seasonal = !self.config.schedule.seasonal
-            }
-            (Category::Schedule, 5) => self.config.schedule.autumn = !self.config.schedule.autumn,
-            (Category::Appearance, 0) => {
-                self.config.appearance.calm_goose = !self.config.appearance.calm_goose
-            }
-            (Category::Appearance, 1) => {
-                self.config.behavior.use_custom_colors = !self.config.behavior.use_custom_colors
-            }
-            (Category::Audio, 0) => self.config.audio.enabled = !self.config.audio.enabled,
-            (Category::Audio, 1) => self.config.audio.honk = !self.config.audio.honk,
-            (Category::Audio, 2) => self.config.audio.bite = !self.config.audio.bite,
-            (Category::Audio, 3) => self.config.audio.mud = !self.config.audio.mud,
-            (Category::Audio, 4) => self.config.audio.pat = !self.config.audio.pat,
-            _ => {}
+        match self.selected_kind() {
+            RowKind::Toggle(field) => self.toggle_field(field),
+            RowKind::CycleMood => self.cycle_mood(1),
+            RowKind::Adjust(_) | RowKind::Static => {}
         }
     }
 
     fn adjust_selected(&mut self, delta: i8) {
-        let delta = delta as f32;
-        match (self.active_category, self.selected_row) {
-            (Category::Behaviors, 2) => {
+        match self.selected_kind() {
+            RowKind::Adjust(field) => self.adjust_field(field, delta),
+            RowKind::CycleMood => self.cycle_mood(delta),
+            RowKind::Toggle(_) | RowKind::Static => {}
+        }
+    }
+
+    fn toggle_field(&mut self, field: ToggleField) {
+        match field {
+            ToggleField::Sound | ToggleField::AudioEnabled => {
+                self.config.audio.enabled = !self.config.audio.enabled
+            }
+            ToggleField::NoMouseSteal => {
+                self.config.safety.no_mouse_steal = !self.config.safety.no_mouse_steal
+            }
+            ToggleField::NoWindowRide => {
+                self.config.safety.no_window_ride = !self.config.safety.no_window_ride
+            }
+            ToggleField::Wayland => self.config.platform.wayland = !self.config.platform.wayland,
+            ToggleField::OnHourHonk => {
+                self.config.behaviors.on_hour_double_honk =
+                    !self.config.behaviors.on_hour_double_honk
+            }
+            ToggleField::CanAttackMouse => {
+                self.config.behavior.can_attack_mouse = !self.config.behavior.can_attack_mouse
+            }
+            ToggleField::PatStreak => {
+                self.config.interaction.pat_streak = !self.config.interaction.pat_streak
+            }
+            ToggleField::DynamicMoods => {
+                self.config.moods.dynamic_moods = !self.config.moods.dynamic_moods
+            }
+            ToggleField::PerchAndRide => {
+                self.config.mischief.perch_and_ride = !self.config.mischief.perch_and_ride
+            }
+            ToggleField::CollectWindows => {
+                self.config.mischief.collect_windows = !self.config.mischief.collect_windows
+            }
+            ToggleField::CollectNotes => {
+                self.config.mischief.collect_notes = !self.config.mischief.collect_notes
+            }
+            ToggleField::CollectMemes => {
+                self.config.mischief.collect_memes = !self.config.mischief.collect_memes
+            }
+            ToggleField::QuietHours => {
+                self.config.schedule.quiet_hours_enabled = !self.config.schedule.quiet_hours_enabled
+            }
+            ToggleField::DndRespect => {
+                self.config.schedule.dnd_respect = !self.config.schedule.dnd_respect
+            }
+            ToggleField::Seasonal => self.config.schedule.seasonal = !self.config.schedule.seasonal,
+            ToggleField::Autumn => self.config.schedule.autumn = !self.config.schedule.autumn,
+            ToggleField::CalmGoose => {
+                self.config.appearance.calm_goose = !self.config.appearance.calm_goose
+            }
+            ToggleField::CustomColors => {
+                self.config.behavior.use_custom_colors = !self.config.behavior.use_custom_colors
+            }
+            ToggleField::HonkSound => self.config.audio.honk = !self.config.audio.honk,
+            ToggleField::BiteSound => self.config.audio.bite = !self.config.audio.bite,
+            ToggleField::MudSound => self.config.audio.mud = !self.config.audio.mud,
+            ToggleField::PatSound => self.config.audio.pat = !self.config.audio.pat,
+        }
+    }
+
+    fn adjust_field(&mut self, field: AdjustField, delta: i8) {
+        let delta_f = delta as f32;
+        match field {
+            AdjustField::FirstWander => {
                 self.config.behavior.first_wander_time_seconds = clamp(
-                    self.config.behavior.first_wander_time_seconds + delta,
+                    self.config.behavior.first_wander_time_seconds + delta_f,
                     1.0,
                     300.0,
                 );
             }
-            (Category::Behaviors, 3) => {
+            AdjustField::MinWander => {
                 self.config.behavior.min_wandering_time_seconds = clamp(
-                    self.config.behavior.min_wandering_time_seconds + delta,
+                    self.config.behavior.min_wandering_time_seconds + delta_f,
                     1.0,
                     300.0,
                 );
@@ -250,9 +360,9 @@ impl AppState {
                         self.config.behavior.min_wandering_time_seconds;
                 }
             }
-            (Category::Behaviors, 4) => {
+            AdjustField::MaxWander => {
                 self.config.behavior.max_wandering_time_seconds = clamp(
-                    self.config.behavior.max_wandering_time_seconds + delta,
+                    self.config.behavior.max_wandering_time_seconds + delta_f,
                     1.0,
                     300.0,
                 );
@@ -263,103 +373,399 @@ impl AppState {
                         self.config.behavior.max_wandering_time_seconds;
                 }
             }
-            (Category::Behaviors, 5) => {
-                self.config.mouse.succ_time =
-                    clamp(self.config.mouse.succ_time + delta * 0.25, 0.25, 10.0);
+            AdjustField::WalkSpeed => {
+                self.config.speeds.walk_speed =
+                    clamp(self.config.speeds.walk_speed + delta_f * 5.0, 10.0, 800.0);
             }
-            _ => {}
+            AdjustField::RunSpeed => {
+                self.config.speeds.run_speed =
+                    clamp(self.config.speeds.run_speed + delta_f * 5.0, 10.0, 1000.0);
+            }
+            AdjustField::ChargeSpeed => {
+                self.config.speeds.charge_speed = clamp(
+                    self.config.speeds.charge_speed + delta_f * 10.0,
+                    10.0,
+                    1600.0,
+                );
+            }
+            AdjustField::AccelNormal => {
+                self.config.speeds.acceleration_normal = clamp(
+                    self.config.speeds.acceleration_normal + delta_f * 50.0,
+                    50.0,
+                    8000.0,
+                );
+            }
+            AdjustField::AccelCharged => {
+                self.config.speeds.acceleration_charged = clamp(
+                    self.config.speeds.acceleration_charged + delta_f * 50.0,
+                    50.0,
+                    10000.0,
+                );
+            }
+            AdjustField::StepNormal => {
+                self.config.speeds.step_time_normal = clamp(
+                    self.config.speeds.step_time_normal + delta_f * 0.01,
+                    0.02,
+                    1.0,
+                );
+            }
+            AdjustField::StepCharged => {
+                self.config.speeds.step_time_charged = clamp(
+                    self.config.speeds.step_time_charged + delta_f * 0.01,
+                    0.02,
+                    1.0,
+                );
+            }
+            AdjustField::StopRadius => {
+                self.config.speeds.stop_radius =
+                    clamp(self.config.speeds.stop_radius + delta_f, -100.0, 100.0);
+            }
+            AdjustField::MudDuration => {
+                self.config.mud.duration_to_track_seconds = clamp(
+                    self.config.mud.duration_to_track_seconds + delta_f,
+                    0.5,
+                    120.0,
+                );
+            }
+            AdjustField::FootmarkLifetime => {
+                self.config.mud.footmark_lifetime_seconds = clamp(
+                    self.config.mud.footmark_lifetime_seconds + delta_f * 0.25,
+                    0.25,
+                    60.0,
+                );
+                if self.config.mud.footmark_shrink_seconds
+                    > self.config.mud.footmark_lifetime_seconds
+                {
+                    self.config.mud.footmark_shrink_seconds =
+                        self.config.mud.footmark_lifetime_seconds;
+                }
+            }
+            AdjustField::FootmarkShrink => {
+                self.config.mud.footmark_shrink_seconds = clamp(
+                    self.config.mud.footmark_shrink_seconds + delta_f * 0.25,
+                    0.05,
+                    self.config.mud.footmark_lifetime_seconds,
+                );
+            }
+            AdjustField::MouseSucc => {
+                self.config.mouse.succ_time =
+                    clamp(self.config.mouse.succ_time + delta_f * 0.25, 0.25, 10.0);
+            }
+            AdjustField::QuietStart => {
+                self.config.schedule.quiet_start =
+                    adjust_time_15(&self.config.schedule.quiet_start, delta);
+            }
+            AdjustField::QuietEnd => {
+                self.config.schedule.quiet_end =
+                    adjust_time_15(&self.config.schedule.quiet_end, delta);
+            }
+            AdjustField::GooseWhite => {
+                self.config.colors.goose_white =
+                    adjust_color(&self.config.colors.goose_white, delta);
+            }
+            AdjustField::GooseOrange => {
+                self.config.colors.goose_orange =
+                    adjust_color(&self.config.colors.goose_orange, delta);
+            }
+            AdjustField::GooseOutline => {
+                self.config.colors.goose_outline =
+                    adjust_color(&self.config.colors.goose_outline, delta);
+            }
         }
     }
 
-    pub fn rows(&self) -> Vec<(String, String)> {
+    fn cycle_mood(&mut self, delta: i8) {
+        const VALUES: [&str; 3] = ["calm", "normal", "spicy"];
+        let current = VALUES
+            .iter()
+            .position(|v| *v == self.config.moods.mood_intensity)
+            .unwrap_or(1) as i8;
+        let next = (current + delta).rem_euclid(VALUES.len() as i8) as usize;
+        self.config.moods.mood_intensity = VALUES[next].into();
+    }
+
+    pub fn rows(&self) -> Vec<Row> {
         match self.active_category {
             Category::General => vec![
-                row("Sound", on_off(self.config.audio.enabled)),
-                row("No mouse steal", on_off(self.config.safety.no_mouse_steal)),
-                row("No window ride", on_off(self.config.safety.no_window_ride)),
-                row("Wayland backend", planned(self.config.platform.wayland)),
+                row(
+                    "Sound",
+                    on_off(self.config.audio.enabled),
+                    RowKind::Toggle(ToggleField::Sound),
+                ),
+                row(
+                    "No mouse steal",
+                    on_off(self.config.safety.no_mouse_steal),
+                    RowKind::Toggle(ToggleField::NoMouseSteal),
+                ),
+                row(
+                    "No window ride",
+                    on_off(self.config.safety.no_window_ride),
+                    RowKind::Toggle(ToggleField::NoWindowRide),
+                ),
+                row(
+                    "On-hour honk",
+                    on_off(self.config.behaviors.on_hour_double_honk),
+                    RowKind::Toggle(ToggleField::OnHourHonk),
+                ),
+                row(
+                    "Wayland backend",
+                    planned(self.config.platform.wayland),
+                    RowKind::Toggle(ToggleField::Wayland),
+                ),
             ],
             Category::Behaviors => vec![
                 row(
                     "Can attack mouse",
                     on_off(self.config.behavior.can_attack_mouse),
+                    RowKind::Toggle(ToggleField::CanAttackMouse),
                 ),
-                row("Pat streak", on_off(self.config.interaction.pat_streak)),
+                row(
+                    "Pat streak",
+                    on_off(self.config.interaction.pat_streak),
+                    RowKind::Toggle(ToggleField::PatStreak),
+                ),
+                row(
+                    "Dynamic moods",
+                    on_off(self.config.moods.dynamic_moods),
+                    RowKind::Toggle(ToggleField::DynamicMoods),
+                ),
+                row(
+                    "Mood intensity",
+                    self.config.moods.mood_intensity.clone(),
+                    RowKind::CycleMood,
+                ),
                 row(
                     "First wander time",
                     seconds(self.config.behavior.first_wander_time_seconds),
+                    RowKind::Adjust(AdjustField::FirstWander),
                 ),
                 row(
                     "Min wandering time",
                     seconds(self.config.behavior.min_wandering_time_seconds),
+                    RowKind::Adjust(AdjustField::MinWander),
                 ),
                 row(
                     "Max wandering time",
                     seconds(self.config.behavior.max_wandering_time_seconds),
+                    RowKind::Adjust(AdjustField::MaxWander),
                 ),
-                row("Mouse succ time", seconds(self.config.mouse.succ_time)),
+                row(
+                    "Walk speed",
+                    number(self.config.speeds.walk_speed),
+                    RowKind::Adjust(AdjustField::WalkSpeed),
+                ),
+                row(
+                    "Run speed",
+                    number(self.config.speeds.run_speed),
+                    RowKind::Adjust(AdjustField::RunSpeed),
+                ),
+                row(
+                    "Charge speed",
+                    number(self.config.speeds.charge_speed),
+                    RowKind::Adjust(AdjustField::ChargeSpeed),
+                ),
+                row(
+                    "Normal accel",
+                    number(self.config.speeds.acceleration_normal),
+                    RowKind::Adjust(AdjustField::AccelNormal),
+                ),
+                row(
+                    "Charged accel",
+                    number(self.config.speeds.acceleration_charged),
+                    RowKind::Adjust(AdjustField::AccelCharged),
+                ),
+                row(
+                    "Normal step",
+                    seconds(self.config.speeds.step_time_normal),
+                    RowKind::Adjust(AdjustField::StepNormal),
+                ),
+                row(
+                    "Charged step",
+                    seconds(self.config.speeds.step_time_charged),
+                    RowKind::Adjust(AdjustField::StepCharged),
+                ),
+                row(
+                    "Stop radius",
+                    number(self.config.speeds.stop_radius),
+                    RowKind::Adjust(AdjustField::StopRadius),
+                ),
+                row(
+                    "Mouse succ time",
+                    seconds(self.config.mouse.succ_time),
+                    RowKind::Adjust(AdjustField::MouseSucc),
+                ),
+                row(
+                    "Mud duration",
+                    seconds(self.config.mud.duration_to_track_seconds),
+                    RowKind::Adjust(AdjustField::MudDuration),
+                ),
+                row(
+                    "Footmark life",
+                    seconds(self.config.mud.footmark_lifetime_seconds),
+                    RowKind::Adjust(AdjustField::FootmarkLifetime),
+                ),
+                row(
+                    "Footmark shrink",
+                    seconds(self.config.mud.footmark_shrink_seconds),
+                    RowKind::Adjust(AdjustField::FootmarkShrink),
+                ),
             ],
             Category::Mischief => vec![
                 row(
                     "Perch and ride",
                     on_off(self.config.mischief.perch_and_ride),
+                    RowKind::Toggle(ToggleField::PerchAndRide),
                 ),
                 row(
                     "Collect windows",
                     on_off(self.config.mischief.collect_windows),
+                    RowKind::Toggle(ToggleField::CollectWindows),
                 ),
-                row("Collect notes", on_off(self.config.mischief.collect_notes)),
-                row("Collect memes", on_off(self.config.mischief.collect_memes)),
-                row("Terminal protection", "always on".into()),
+                row(
+                    "Collect notes",
+                    on_off(self.config.mischief.collect_notes),
+                    RowKind::Toggle(ToggleField::CollectNotes),
+                ),
+                row(
+                    "Collect memes",
+                    on_off(self.config.mischief.collect_memes),
+                    RowKind::Toggle(ToggleField::CollectMemes),
+                ),
+                row("Terminal protection", "always on".into(), RowKind::Static),
             ],
             Category::Schedule => vec![
                 row(
                     "Quiet hours",
                     planned(self.config.schedule.quiet_hours_enabled),
+                    RowKind::Toggle(ToggleField::QuietHours),
                 ),
-                row("Quiet start", self.config.schedule.quiet_start.clone()),
-                row("Quiet end", self.config.schedule.quiet_end.clone()),
-                row("DND fullscreen", planned(self.config.schedule.dnd_respect)),
-                row("Seasonal", planned(self.config.schedule.seasonal)),
-                row("Autumn", planned(self.config.schedule.autumn)),
+                row(
+                    "Quiet start",
+                    self.config.schedule.quiet_start.clone(),
+                    RowKind::Adjust(AdjustField::QuietStart),
+                ),
+                row(
+                    "Quiet end",
+                    self.config.schedule.quiet_end.clone(),
+                    RowKind::Adjust(AdjustField::QuietEnd),
+                ),
+                row(
+                    "DND fullscreen",
+                    planned(self.config.schedule.dnd_respect),
+                    RowKind::Toggle(ToggleField::DndRespect),
+                ),
+                row(
+                    "Seasonal",
+                    planned(self.config.schedule.seasonal),
+                    RowKind::Toggle(ToggleField::Seasonal),
+                ),
+                row(
+                    "Autumn",
+                    planned(self.config.schedule.autumn),
+                    RowKind::Toggle(ToggleField::Autumn),
+                ),
             ],
             Category::Appearance => vec![
-                row("Calm goose", planned(self.config.appearance.calm_goose)),
+                row(
+                    "Calm goose",
+                    planned(self.config.appearance.calm_goose),
+                    RowKind::Toggle(ToggleField::CalmGoose),
+                ),
                 row(
                     "Custom colors",
-                    planned(self.config.behavior.use_custom_colors),
+                    on_off(self.config.behavior.use_custom_colors),
+                    RowKind::Toggle(ToggleField::CustomColors),
+                ),
+                row(
+                    "Goose white",
+                    self.config.colors.goose_white.clone(),
+                    RowKind::Adjust(AdjustField::GooseWhite),
+                ),
+                row(
+                    "Goose orange",
+                    self.config.colors.goose_orange.clone(),
+                    RowKind::Adjust(AdjustField::GooseOrange),
+                ),
+                row(
+                    "Goose outline",
+                    self.config.colors.goose_outline.clone(),
+                    RowKind::Adjust(AdjustField::GooseOutline),
                 ),
             ],
             Category::Audio => vec![
-                row("Audio enabled", on_off(self.config.audio.enabled)),
-                row("Honk sound", on_off(self.config.audio.honk)),
-                row("Bite sound", on_off(self.config.audio.bite)),
-                row("Mud sound", on_off(self.config.audio.mud)),
-                row("Pat sound", on_off(self.config.audio.pat)),
+                row(
+                    "Audio enabled",
+                    on_off(self.config.audio.enabled),
+                    RowKind::Toggle(ToggleField::AudioEnabled),
+                ),
+                row(
+                    "Honk sound",
+                    on_off(self.config.audio.honk),
+                    RowKind::Toggle(ToggleField::HonkSound),
+                ),
+                row(
+                    "Bite sound",
+                    on_off(self.config.audio.bite),
+                    RowKind::Toggle(ToggleField::BiteSound),
+                ),
+                row(
+                    "Mud sound",
+                    on_off(self.config.audio.mud),
+                    RowKind::Toggle(ToggleField::MudSound),
+                ),
+                row(
+                    "Pat sound",
+                    on_off(self.config.audio.pat),
+                    RowKind::Toggle(ToggleField::PatSound),
+                ),
             ],
             Category::Commands => vec![
-                row("honk300 / honk / goose", "start".into()),
-                row("plz", "start".into()),
-                row("stop / bad / no / no honk", "stop".into()),
-                row("reload", "reload config".into()),
-                row("do honk", "poke honk".into()),
-                row("do wander|mud|meme|note|nab", "poke action".into()),
-                row("config", "open this TUI".into()),
-                row("install/update/uninstall/setup", "M19".into()),
+                row("honk300 / honk / goose", "start".into(), RowKind::Static),
+                row("plz", "start".into(), RowKind::Static),
+                row("stop / bad / no / no honk", "stop".into(), RowKind::Static),
+                row("reload", "reload config".into(), RowKind::Static),
+                row("do honk", "poke honk".into(), RowKind::Static),
+                row(
+                    "do wander|mud|meme|note|nab",
+                    "poke action".into(),
+                    RowKind::Static,
+                ),
+                row("config", "open this TUI".into(), RowKind::Static),
+                row(
+                    "install/update/uninstall/setup",
+                    "M19".into(),
+                    RowKind::Static,
+                ),
             ],
             Category::About => vec![
-                row("honk300", "Desktop Goose in Rust".into()),
-                row("Config", self.path.display().to_string()),
-                row("Control", "CLI/TUI only over local IPC".into()),
-                row("Terminal protection", "not configurable".into()),
-                row("Future settings", "persisted, marked planned".into()),
+                row("honk300", "Desktop Goose in Rust".into(), RowKind::Static),
+                row("Config", self.path.display().to_string(), RowKind::Static),
+                row(
+                    "Control",
+                    "CLI/TUI only over local IPC".into(),
+                    RowKind::Static,
+                ),
+                row(
+                    "Terminal protection",
+                    "not configurable".into(),
+                    RowKind::Static,
+                ),
+                row(
+                    "M13",
+                    "dynamic moods + on-hour honk".into(),
+                    RowKind::Static,
+                ),
             ],
         }
     }
 }
 
-fn row(label: &str, value: String) -> (String, String) {
-    (label.into(), value)
+fn row(label: &str, value: String, kind: RowKind) -> Row {
+    Row {
+        label: label.into(),
+        value,
+        kind,
+    }
 }
 
 fn on_off(v: bool) -> String {
@@ -374,8 +780,55 @@ fn seconds(v: f32) -> String {
     format!("{v:.2}s")
 }
 
+fn number(v: f32) -> String {
+    format!("{v:.2}")
+}
+
 fn clamp(value: f32, min: f32, max: f32) -> f32 {
     value.max(min).min(max)
+}
+
+fn adjust_time_15(value: &str, delta: i8) -> String {
+    let Some((hour, minute)) = value.split_once(':') else {
+        return "00:00".into();
+    };
+    let Ok(hour) = hour.parse::<i32>() else {
+        return "00:00".into();
+    };
+    let Ok(minute) = minute.parse::<i32>() else {
+        return "00:00".into();
+    };
+    let total = (hour * 60 + minute + delta as i32 * 15).rem_euclid(24 * 60);
+    format!("{:02}:{:02}", total / 60, total % 60)
+}
+
+fn adjust_color(value: &str, delta: i8) -> String {
+    let Some((r, g, b)) = parse_hex(value) else {
+        return "#ffffff".into();
+    };
+    let step = delta as i16 * 0x11;
+    format!(
+        "#{:02x}{:02x}{:02x}",
+        clamp_channel(r as i16 + step),
+        clamp_channel(g as i16 + step),
+        clamp_channel(b as i16 + step)
+    )
+}
+
+fn parse_hex(value: &str) -> Option<(u8, u8, u8)> {
+    let hex = value.strip_prefix('#')?;
+    if hex.len() != 6 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    Some((
+        u8::from_str_radix(&hex[0..2], 16).ok()?,
+        u8::from_str_radix(&hex[2..4], 16).ok()?,
+        u8::from_str_radix(&hex[4..6], 16).ok()?,
+    ))
+}
+
+fn clamp_channel(value: i16) -> u8 {
+    value.clamp(0, 255) as u8
 }
 
 #[cfg(test)]
@@ -398,6 +851,16 @@ mod tests {
     }
 
     #[test]
+    fn dynamic_rows_match_active_category() {
+        let mut app = app();
+        assert_eq!(app.row_count(), app.rows().len());
+        app.apply(Action::SelectCategory(Category::Behaviors));
+        assert_eq!(app.row_count(), app.rows().len());
+        assert!(app.rows().iter().any(|row| row.label == "Dynamic moods"));
+        assert!(app.rows().iter().any(|row| row.label == "Walk speed"));
+    }
+
+    #[test]
     fn toggles_boolean_setting_and_tracks_dirty() {
         let mut app = app();
         assert!(app.config.audio.enabled);
@@ -410,9 +873,68 @@ mod tests {
     fn adjusts_numeric_setting() {
         let mut app = app();
         app.apply(Action::SelectCategory(Category::Behaviors));
-        app.selected_row = 2;
+        app.selected_row = app
+            .rows()
+            .iter()
+            .position(|row| row.label == "First wander time")
+            .unwrap();
         app.apply(Action::Adjust(1));
         assert_eq!(app.config.behavior.first_wander_time_seconds, 21.0);
+    }
+
+    #[test]
+    fn quiet_time_adjusts_in_fifteen_minute_steps() {
+        let mut app = app();
+        app.apply(Action::SelectCategory(Category::Schedule));
+        app.selected_row = app
+            .rows()
+            .iter()
+            .position(|row| row.label == "Quiet start")
+            .unwrap();
+        app.apply(Action::Adjust(1));
+        assert_eq!(app.config.schedule.quiet_start, "22:15");
+        app.apply(Action::Adjust(-1));
+        assert_eq!(app.config.schedule.quiet_start, "22:00");
+    }
+
+    #[test]
+    fn mood_intensity_cycles() {
+        let mut app = app();
+        app.apply(Action::SelectCategory(Category::Behaviors));
+        app.selected_row = app
+            .rows()
+            .iter()
+            .position(|row| row.label == "Mood intensity")
+            .unwrap();
+        app.apply(Action::Adjust(1));
+        assert_eq!(app.config.moods.mood_intensity, "spicy");
+        app.apply(Action::Adjust(1));
+        assert_eq!(app.config.moods.mood_intensity, "calm");
+    }
+
+    #[test]
+    fn dirty_quit_requires_confirmation() {
+        let mut app = app();
+        app.apply(Action::Toggle);
+        app.apply(Action::Quit);
+        assert!(!app.should_quit);
+        assert!(app.status_is_error);
+        app.apply(Action::Quit);
+        assert!(app.should_quit);
+    }
+
+    #[test]
+    fn command_result_updates_status_through_reducer() {
+        let mut app = app();
+        app.apply(Action::Toggle);
+        app.apply(Action::CommandResult(CommandResult {
+            status: "saved".into(),
+            is_error: false,
+            mark_saved: true,
+        }));
+        assert_eq!(app.status, "saved");
+        assert!(!app.status_is_error);
+        assert!(!app.dirty());
     }
 
     #[test]

@@ -5,8 +5,12 @@
 //! (Windows now, macOS/X11 later, native Wayland as an honest no-op).
 
 use crate::collect_window::CollectWindowOptions;
+use crate::entity::ParametersTable;
+use crate::footmarks::FootMarkTiming;
 use crate::foreign_window::ForeignWindowOptions;
 use crate::math::Vec2;
+use crate::mood::{HourlyHonkOptions, MoodOptions};
+use crate::render::RenderPalette;
 
 /// A cursor operation requested by the simulation for the platform backend to apply.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -65,6 +69,11 @@ pub struct WorldOptions {
     pub collect_window: CollectWindowOptions,
     pub interaction: InteractionOptions,
     pub timing: TimingOptions,
+    pub parameters: ParametersTable,
+    pub footmarks: FootMarkTiming,
+    pub palette: RenderPalette,
+    pub mood: MoodOptions,
+    pub hourly_honk: HourlyHonkOptions,
 }
 
 /// User-facing interaction toggles that affect platform-free input handling.

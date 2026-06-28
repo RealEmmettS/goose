@@ -78,18 +78,27 @@ fn render_categories(frame: &mut Frame<'_>, area: ratatui::layout::Rect, app: &A
 }
 
 fn render_rows(frame: &mut Frame<'_>, area: ratatui::layout::Rect, app: &AppState) {
-    let items: Vec<ListItem<'_>> = app
-        .rows()
+    let rows = app.rows();
+    let visible = area.height.saturating_sub(2).max(1) as usize;
+    let start = if app.selected_row >= visible {
+        app.selected_row + 1 - visible
+    } else {
+        0
+    };
+    let end = (start + visible).min(rows.len());
+    let items: Vec<ListItem<'_>> = rows
         .into_iter()
         .enumerate()
-        .map(|(idx, (label, value))| {
+        .skip(start)
+        .take(end.saturating_sub(start))
+        .map(|(idx, row)| {
             let marker = if idx == app.selected_row { "> " } else { "  " };
             let style = if idx == app.selected_row {
                 Style::default().fg(Color::Cyan)
             } else {
                 Style::default()
             };
-            ListItem::new(format!("{marker}{label:<24} {value}")).style(style)
+            ListItem::new(format!("{marker}{:<24} {}", row.label, row.value)).style(style)
         })
         .collect();
     frame.render_widget(

@@ -1,7 +1,7 @@
-use super::state::Category;
+use super::state::{Category, CommandResult};
 use honk_engine::PokeAction;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
     None,
     Quit,
@@ -17,4 +17,5 @@ pub enum Action {
     Stop,
     Start,
     Poke(PokeAction),
+    CommandResult(CommandResult),
 }

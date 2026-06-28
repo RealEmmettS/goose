@@ -8,11 +8,13 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M12 are complete and M13 (dynamic moods +
-on-hour double honk) is next. The repo now has a Cargo workspace, a platform-free
+**Current stage: implementation in progress.** M0-M13 are complete and M14 (quiet hours,
+DND/fullscreen respect, and seasonal Autumn) is next. The repo now has a Cargo workspace, a platform-free
 `honk-engine`, shared `honk-control`, versioned TOML `honk-config`, the `honk-config-tui`
 terminal UI, a Windows platform crate, the `honk300` binary, the original app's files as
-reference, the canonical planning docs, and ADRs under `docs/adr/`.
+reference, the canonical planning docs, and ADRs under `docs/adr/`. M13's dynamic moods and
+on-hour double honk are implemented through platform-free engine state plus runtime-injected
+local time.
 
 ## Read these first (source-of-truth pointers)
 
@@ -38,7 +40,8 @@ reference, the canonical planning docs, and ADRs under `docs/adr/`.
   ADR 0001 records the accepted M7 cursor-mischief contract and Renderer V2 direction; ADR 0002
   records the M8 foreign-window watch-and-ride contract; ADR 0003 records the M9 collect-window,
   asset, and no-donate decisions; ADR 0004 records the M10 CLI/TUI-only control plane, local IPC,
-  and terminal-window protection rule.
+  and terminal-window protection rule; ADR 0007 records the M13 dynamic-mood and local-time
+  injection contract.
 
 ## Big-picture architecture (original → planned port)
 
@@ -86,6 +89,25 @@ reference, the canonical planning docs, and ADRs under `docs/adr/`.
 - M8's accepted decisions live in `docs/adr/0002-m8-foreign-window-watch-and-ride.md`.
 - M9's accepted decisions live in `docs/adr/0003-m9-collect-window-assets-and-no-donate.md`.
 - M10's accepted decisions live in `docs/adr/0004-m10-cli-tui-control-plane-and-terminal-protection.md`.
+- M13's accepted decisions live in `docs/adr/0007-m13-moods-and-local-time-injection.md`.
+
+## Task management system
+
+This repo uses the SHAUGHV `tasks-*` system. The board source of truth is `.tasks/TASKS.md`;
+each task's rich handoff lives at `.tasks/tasks/<id>.md` with `## Status` and `## Activity`
+kept current while work is in flight.
+
+Use proper subtasks for small required steps that should be visible and checkable in the
+dashboard modal: indented checkbox rows under the parent task in `.tasks/TASKS.md`, optionally
+followed by indented description lines (`    > detail for this subtask`). Do not bury those
+board-trackable steps as plain text in the parent task description, and do not call them
+"sub-items." Use the parent description for reasoning, context, plan, impact, acceptance, and
+resume notes. If related work is large enough to need its own status, activity log, or owner,
+make it a separate top-level task and link it with `(needs #id)`.
+
+Relevant skills: `tasks-start`, `tasks-management`, `tasks-update`, `tasks-memory`,
+`tasks-remove`. Companion skills such as `ttdr`, `personal-productivity`, `iterative-plan`, or
+`git-workflow` are optional if installed.
 
 ## Gotchas (cross-platform overlay / desktop-pet)
 
