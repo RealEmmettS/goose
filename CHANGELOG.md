@@ -250,6 +250,10 @@ All notable changes to this project are documented here. Format based on
   readiness work, plus M11 CLI grammar and M12 config/TUI readiness work.
 - `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M12 complete, M13 next,
   and the ADR 0001/0002/0003/0004 location and maintenance rules.
+- Added **ADR 0005** (M11 three-name CLI, goose-speak, and the poke-outcome round-trip) and
+  **ADR 0006** (M12 config TUI, durable TOML, and the capability/preference boundary), recording
+  the previously-undocumented M11/M12 decisions and the four contract corrections from the
+  adversarial review.
 - `claude_plan.md` and `codex_plan.md` are now **superseded reference drafts**; `honk300_plan.md`
   is canonical. The "Read these first" pointers in **both** `CLAUDE.md` and its Codex twin
   `AGENTS.md` were updated in lockstep (canonical plan, milestone range M0–M19, workspace
@@ -257,6 +261,29 @@ All notable changes to this project are documented here. Format based on
 - `README.md` gained a **"Status — the decided plan"** section recording `honk300_plan.md` as
   canonical and summarizing the decided direction (three-name goose-speak CLI, ratatui config
   TUI, new autonomous behaviors, no external mods / no tray, all-OS/all-arch builds).
+
+### Fixed
+- **Control responses now report the real outcome (M11 round-trip).** `honk300 do <action>` and
+  `reload` previously always answered `OK` because the server thread responded at command-enqueue
+  time, before the simulation ran. The transport now completes a request/response round-trip:
+  `honk-control` gained `ControlRequest`, a bounded (2 s) wait for the sim's answer, and a
+  `PokeOutcome`→`ControlResponse` mapping (`Busy` → `ERR BUSY`, `Unsupported` → `ERR UNSUPPORTED`,
+  reload failure → `ERR RELOAD_REJECTED`, timeout → `ERR TIMEOUT`). The CLI/TUI "rejected: {code}"
+  paths now actually fire. (ADR 0005.)
+- **Cursor-warp capability is no longer seeded from the mouse-steal preference (M12 reload).** The
+  Windows runtime initialized `cursor_warp_supported` from `!no_mouse_steal`, latching warp off so
+  a config edit that re-enabled mouse steal never took effect until restart. It is now a pure
+  platform capability (`true` on Windows, via `initial_cursor_warp_supported`) that degrades only
+  on a real warp failure; the preference is applied solely through `MouseStealOptions::enabled`.
+  (ADR 0006.)
+- **Collect-window capability loss now survives reload (M12).** A backend collect-window failure
+  was recorded only in engine state and was overwritten by the next reload, so the goose kept
+  retrying a dead capability. `BackendState` gained `collect_window_supported`, threaded through
+  `Config::effective_options`, so the loss is durable across reloads. (ADR 0006.)
+- **Disabling the pat streak no longer disables clicking (M12 interaction).** `interaction.pat_streak`
+  gated the click reaction as well as pats. It now scopes to the hover-pat hearts/calm only;
+  clicking the goose still triggers a hyper burst (or a cursor nab when mouse steal is supported).
+  (ADR 0006.)
 
 ### Decided
 - **Renderer V2 direction:** use a custom CPU sprite/atlas blitter that outputs premultiplied

@@ -2,7 +2,7 @@ use crate::assets;
 use crate::audio;
 use crate::runtime::RuntimeOptions;
 use honk_config::{BackendState, Config, EffectiveOptions};
-use honk_control::{CommandServer, ControlCommand};
+use honk_control::{CommandServer, ControlCommand, ControlResponse};
 use honk_engine::render::{render_footmarks, render_hearts, render_rig};
 use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
@@ -28,13 +28,18 @@ pub fn run(
     let width = bounds.width().ceil().max(1.0) as u32;
     let height = bounds.height().ceil().max(1.0) as u32;
 
-    let mut cursor_warp_supported =
-        !(options.cli_overrides.no_mouse_steal || config.safety.no_mouse_steal);
+    // Backend capability only: Windows can always warp the cursor. The user's mouse-steal
+    // preference is applied separately via MouseStealOptions::enabled in effective_options, so
+    // it must NOT be folded in here — doing so would keep warp latched off across a reload that
+    // re-enables stealing. The flag only flips to false later if a real warp call fails.
+    let mut cursor_warp_supported = initial_cursor_warp_supported();
+    let mut collect_window_supported = true;
     let initial_effective = effective_options(
         &config,
         &options,
         cursor_warp_supported,
         false,
+        collect_window_supported,
         assets.note_count(),
         assets.meme_count(),
     );
@@ -65,6 +70,7 @@ pub fn run(
         &options,
         cursor_warp_supported,
         window_watcher.is_some(),
+        collect_window_supported,
         assets.note_count(),
         assets.meme_count(),
     );
@@ -91,61 +97,70 @@ pub fn run(
             break;
         }
 
-        while let Some(command) = server.try_recv() {
-            match command {
+        while let Some(request) = server.try_recv() {
+            match request.command() {
                 ControlCommand::Stop => {
                     println!("honk300: stop command received.");
+                    request.respond(ControlResponse::Ok);
                     return Ok(());
                 }
-                ControlCommand::Reload => match Config::load_existing(&options.config_path) {
-                    Ok(next_config) => {
-                        config = next_config;
-                        effective = effective_options(
-                            &config,
-                            &options,
-                            cursor_warp_supported,
-                            window_watcher.is_some(),
-                            assets.note_count(),
-                            assets.meme_count(),
-                        );
-                        if !effective.world.foreign_window.enabled {
-                            window_watcher = None;
-                        } else if window_watcher.is_none() {
-                            match ForeignWindowWatcher::new(&overlay) {
-                                Ok(watcher) => window_watcher = Some(watcher),
-                                Err(err) => {
-                                    if !warned_window_ride {
-                                        warned_window_ride = true;
-                                        eprintln!(
-                                            "honk300: window ride unavailable after reload ({err})"
-                                        );
-                                    }
-                                }
-                            }
+                ControlCommand::Reload => {
+                    let response = match Config::load_existing(&options.config_path) {
+                        Ok(next_config) => {
+                            config = next_config;
                             effective = effective_options(
                                 &config,
                                 &options,
                                 cursor_warp_supported,
                                 window_watcher.is_some(),
+                                collect_window_supported,
                                 assets.note_count(),
                                 assets.meme_count(),
                             );
+                            if !effective.world.foreign_window.enabled {
+                                window_watcher = None;
+                            } else if window_watcher.is_none() {
+                                match ForeignWindowWatcher::new(&overlay) {
+                                    Ok(watcher) => window_watcher = Some(watcher),
+                                    Err(err) => {
+                                        if !warned_window_ride {
+                                            warned_window_ride = true;
+                                            eprintln!(
+                                                "honk300: window ride unavailable after reload ({err})"
+                                            );
+                                        }
+                                    }
+                                }
+                                effective = effective_options(
+                                    &config,
+                                    &options,
+                                    cursor_warp_supported,
+                                    window_watcher.is_some(),
+                                    collect_window_supported,
+                                    assets.note_count(),
+                                    assets.meme_count(),
+                                );
+                            }
+                            if effective.no_sound {
+                                audio = None;
+                            } else if audio.is_none() {
+                                audio = audio::Audio::new();
+                            }
+                            world.apply_options(effective.world);
+                            println!("honk300: reload command applied.");
+                            ControlResponse::Ok
                         }
-                        if effective.no_sound {
-                            audio = None;
-                        } else if audio.is_none() {
-                            audio = audio::Audio::new();
+                        Err(err) => {
+                            eprintln!("honk300: reload rejected; keeping prior config ({err})");
+                            ControlResponse::Err("RELOAD_REJECTED".into())
                         }
-                        world.apply_options(effective.world);
-                        println!("honk300: reload command applied.");
-                    }
-                    Err(err) => {
-                        eprintln!("honk300: reload rejected; keeping prior config ({err})");
-                    }
-                },
+                    };
+                    request.respond(response);
+                }
                 ControlCommand::Do(action) => {
                     let outcome = world.poke(action);
                     println!("honk300: do {action:?} -> {outcome:?}");
+                    request.respond(outcome.into());
                 }
             }
         }
@@ -227,6 +242,9 @@ pub fn run(
                 }
             };
             if let Err(err) = result {
+                // Latch the loss in the runtime capability flag too, so a later reload rebuilds
+                // the world with collect still disabled instead of resurrecting it.
+                collect_window_supported = false;
                 world.set_collect_window_supported(false);
                 if !warned_collect_window {
                     warned_collect_window = true;
@@ -279,6 +297,7 @@ fn effective_options(
     options: &RuntimeOptions,
     cursor_warp_supported: bool,
     window_watch_supported: bool,
+    collect_window_supported: bool,
     note_count: u32,
     meme_count: u32,
 ) -> EffectiveOptions {
@@ -286,6 +305,7 @@ fn effective_options(
         BackendState {
             cursor_warp_supported,
             window_watch_supported,
+            collect_window_supported,
             note_count,
             meme_count,
         },
@@ -317,10 +337,33 @@ fn smoke_collect_kind() -> Option<honk_engine::CollectWindowKind> {
     }
 }
 
+/// The platform's initial cursor-warp capability, before any runtime warp attempt.
+///
+/// On Windows this is unconditionally `true` (`SetCursorPos` always exists); it is a backend
+/// capability, deliberately independent of the user's mouse-steal preference, which is applied
+/// separately via `MouseStealOptions::enabled`.
+fn initial_cursor_warp_supported() -> bool {
+    true
+}
+
 /// A non-deterministic seed for the roam driver, derived from the wall clock.
 fn seed_from_clock() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0x9E37_79B9_7F4A_7C15)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::initial_cursor_warp_supported;
+
+    #[test]
+    fn initial_cursor_warp_capability_ignores_mouse_steal_preference() {
+        // The cursor-warp capability is a backend trait — Windows can always warp the cursor —
+        // not a user choice. Seeding it from the no-mouse-steal preference would wrongly latch
+        // warp off and keep it off across a reload that re-enables stealing. The preference is
+        // applied separately through MouseStealOptions::enabled, so this stays a pure capability.
+        assert!(initial_cursor_warp_supported());
+    }
 }

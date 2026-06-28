@@ -15,3 +15,5 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0002 — M8 Foreign-Window Watch-And-Ride Contract](./0002-m8-foreign-window-watch-and-ride.md)
 - [0003 — M9 Collect-Window, Asset Provenance, And No-Donate Scope](./0003-m9-collect-window-assets-and-no-donate.md)
 - [0004 — M10 CLI/TUI Control Plane And Terminal Protection](./0004-m10-cli-tui-control-plane-and-terminal-protection.md)
+- [0005 — M11 Three-Name CLI, Goose-Speak, And Poke-Outcome Round-Trip](./0005-m11-cli-grammar-and-poke-outcome-round-trip.md)
+- [0006 — M12 Config TUI, Durable TOML, And The Capability/Preference Boundary](./0006-m12-config-tui-and-capability-preference-boundary.md)

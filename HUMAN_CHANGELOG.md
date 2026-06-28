@@ -83,6 +83,21 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   prints follows it as it waddles, and they slowly fade and shrink away on their own. (To show
   the trail across your screen, the goose's see-through layer now covers the whole monitor.)
 
+**Fixed**
+- When you tell the goose to do something from a command — like honk or grab the cursor — it now
+  tells you the truth about whether it actually did it. Before, it always answered "okay!" even
+  when it ignored you because it was busy or because that trick was switched off. Now, if it can't
+  do the thing, it says so.
+- If you switch mouse-stealing off and later switch it back on in your settings and reload, it
+  actually comes back on now. Before, turning it off once quietly jammed it off until you fully
+  restarted the goose.
+- If the goose ever loses the ability to bring note and meme windows onto your computer, it now
+  stays switched off instead of forgetting and pointlessly trying again every time you reload your
+  settings.
+- Turning off petting no longer accidentally turns off clicking. Before, switching off the
+  hearts-and-calm petting also stopped the goose from reacting to a click. Now a click still makes
+  it zoom around (or grab your cursor when that's allowed), even with petting turned off.
+
 **Improved**
 - The goose has been pulled back toward the original Desktop Goose look. The drawing is still
   fully procedural, but it now uses one cleaner, thinner oval body instead of several obvious
@@ -107,6 +122,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   follow-up task instead of being treated as unfinished cursor-stealing work.
 - The project guidance for future agents now says when to add or update architecture decision
   records, and it repeats the rule that the technical and human changelogs must stay in sync.
+- The command-grammar and settings-screen milestones now have their own architecture records,
+  written after a careful second look at how they were built. Those records also capture the four
+  fixes above so the reasoning behind them isn't lost: commands should report what really
+  happened, and the difference between "the user turned this off" and "your computer can't do
+  this" must be kept straight so a setting can always be turned back on.
 
 **Decided**
 - The next major renderer should be a small, custom sprite-sheet system rather than a full game

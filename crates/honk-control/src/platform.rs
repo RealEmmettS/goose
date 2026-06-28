@@ -2,12 +2,53 @@
 
 use super::protocol::{ControlCommand, ControlResponse};
 use std::io;
-use std::sync::mpsc::{self, Receiver};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::time::Duration;
+
+/// How long the transport waits for the sim to answer a command before giving up.
+const RESPONSE_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SingletonStatus {
     Acquired,
     AlreadyRunning,
+}
+
+/// A decoded command paired with a one-shot channel back to the waiting transport.
+///
+/// The server thread hands this to the sim and blocks (briefly) on the response, so a caller
+/// of `do <action>` or `reload` learns the real outcome instead of a blanket "received".
+pub struct ControlRequest {
+    command: ControlCommand,
+    responder: Sender<ControlResponse>,
+}
+
+impl ControlRequest {
+    pub(crate) fn new(command: ControlCommand, responder: Sender<ControlResponse>) -> Self {
+        Self { command, responder }
+    }
+
+    /// The requested command.
+    pub fn command(&self) -> ControlCommand {
+        self.command
+    }
+
+    /// Answer the waiting transport with this command's outcome. Consumes the request so each
+    /// command is answered once; if the transport already timed out, the send is dropped.
+    pub fn respond(self, response: ControlResponse) {
+        let _ = self.responder.send(response);
+    }
+}
+
+/// Hand a decoded command to the sim and block until it answers (or the wait times out).
+fn dispatch(tx: &Sender<ControlRequest>, command: ControlCommand) -> ControlResponse {
+    let (resp_tx, resp_rx) = mpsc::channel();
+    if tx.send(ControlRequest::new(command, resp_tx)).is_err() {
+        return ControlResponse::Err("SERVER_CLOSED".into());
+    }
+    resp_rx
+        .recv_timeout(RESPONSE_TIMEOUT)
+        .unwrap_or_else(|_| ControlResponse::Err("TIMEOUT".into()))
 }
 
 pub struct Singleton {
@@ -22,7 +63,7 @@ impl Singleton {
 
 pub struct CommandServer {
     _imp: imp::CommandServer,
-    rx: Receiver<ControlCommand>,
+    rx: Receiver<ControlRequest>,
 }
 
 impl CommandServer {
@@ -32,7 +73,7 @@ impl CommandServer {
         Ok(Self { _imp: imp, rx })
     }
 
-    pub fn try_recv(&self) -> Option<ControlCommand> {
+    pub fn try_recv(&self) -> Option<ControlRequest> {
         self.rx.try_recv().ok()
     }
 }
@@ -41,9 +82,30 @@ pub fn send_command(command: ControlCommand) -> io::Result<ControlResponse> {
     imp::send_command(command)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn control_request_delivers_response_to_the_waiter() {
+        // The transport hands the sim a request, then blocks until the sim answers; this is the
+        // primitive that lets `do <action>` report the real outcome instead of a blind "OK".
+        let (tx, rx) = mpsc::channel::<ControlRequest>();
+        let (resp_tx, resp_rx) = mpsc::channel();
+        tx.send(ControlRequest::new(ControlCommand::Stop, resp_tx))
+            .unwrap();
+
+        let request = rx.try_recv().unwrap();
+        assert_eq!(request.command(), ControlCommand::Stop);
+        request.respond(ControlResponse::Err("BUSY".into()));
+
+        assert_eq!(resp_rx.recv().unwrap(), ControlResponse::Err("BUSY".into()));
+    }
+}
+
 #[cfg(windows)]
 mod imp {
-    use super::{ControlCommand, ControlResponse, SingletonStatus};
+    use super::{dispatch, ControlCommand, ControlRequest, ControlResponse, SingletonStatus};
     use std::collections::hash_map::DefaultHasher;
     use std::fs::OpenOptions;
     use std::hash::{Hash, Hasher};
@@ -103,7 +165,7 @@ mod imp {
     }
 
     impl CommandServer {
-        pub fn start(tx: Sender<ControlCommand>) -> io::Result<Self> {
+        pub fn start(tx: Sender<ControlRequest>) -> io::Result<Self> {
             let shutdown = Arc::new(AtomicBool::new(false));
             let thread_shutdown = Arc::clone(&shutdown);
             let join = thread::spawn(move || server_loop(tx, thread_shutdown));
@@ -157,7 +219,7 @@ mod imp {
         }
     }
 
-    fn server_loop(tx: Sender<ControlCommand>, shutdown: Arc<AtomicBool>) {
+    fn server_loop(tx: Sender<ControlRequest>, shutdown: Arc<AtomicBool>) {
         while !shutdown.load(Ordering::SeqCst) {
             let pipe = match create_pipe() {
                 Ok(pipe) => pipe,
@@ -185,10 +247,7 @@ mod imp {
             let response = match file.read(&mut buf) {
                 Ok(0) => ControlResponse::Err("EMPTY".into()),
                 Ok(len) => match ControlCommand::decode(&buf[..len]) {
-                    Ok(command) => match tx.send(command) {
-                        Ok(()) => ControlResponse::Ok,
-                        Err(_) => ControlResponse::Err("SERVER_CLOSED".into()),
-                    },
+                    Ok(command) => dispatch(&tx, command),
                     Err(err) => ControlResponse::Err(protocol_code(&err.to_string())),
                 },
                 Err(_) => ControlResponse::Err("READ_FAILED".into()),
@@ -256,7 +315,7 @@ mod imp {
 
 #[cfg(unix)]
 mod imp {
-    use super::{ControlCommand, ControlResponse, SingletonStatus};
+    use super::{dispatch, ControlCommand, ControlRequest, ControlResponse, SingletonStatus};
     use std::fs::{self, File, OpenOptions};
     use std::io::{self, Read, Write};
     use std::os::unix::net::{UnixListener, UnixStream};
@@ -315,7 +374,7 @@ mod imp {
     }
 
     impl CommandServer {
-        pub fn start(tx: Sender<ControlCommand>) -> io::Result<Self> {
+        pub fn start(tx: Sender<ControlRequest>) -> io::Result<Self> {
             let path = socket_path()?;
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
@@ -355,7 +414,7 @@ mod imp {
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
     }
 
-    fn server_loop(listener: UnixListener, tx: Sender<ControlCommand>, shutdown: Arc<AtomicBool>) {
+    fn server_loop(listener: UnixListener, tx: Sender<ControlRequest>, shutdown: Arc<AtomicBool>) {
         while !shutdown.load(Ordering::SeqCst) {
             match listener.accept() {
                 Ok((mut stream, _)) => {
@@ -366,10 +425,7 @@ mod imp {
                     let response = match stream.read(&mut buf) {
                         Ok(0) => ControlResponse::Err("EMPTY".into()),
                         Ok(len) => match ControlCommand::decode(&buf[..len]) {
-                            Ok(command) => match tx.send(command) {
-                                Ok(()) => ControlResponse::Ok,
-                                Err(_) => ControlResponse::Err("SERVER_CLOSED".into()),
-                            },
+                            Ok(command) => dispatch(&tx, command),
                             Err(err) => ControlResponse::Err(err.to_string()),
                         },
                         Err(_) => ControlResponse::Err("READ_FAILED".into()),
@@ -404,7 +460,7 @@ mod imp {
 
 #[cfg(not(any(windows, unix)))]
 mod imp {
-    use super::{ControlCommand, ControlResponse, SingletonStatus};
+    use super::{ControlCommand, ControlRequest, ControlResponse, SingletonStatus};
     use std::io;
     use std::sync::mpsc::Sender;
 
@@ -419,7 +475,7 @@ mod imp {
     pub struct CommandServer;
 
     impl CommandServer {
-        pub fn start(_tx: Sender<ControlCommand>) -> io::Result<Self> {
+        pub fn start(_tx: Sender<ControlRequest>) -> io::Result<Self> {
             Ok(Self)
         }
     }

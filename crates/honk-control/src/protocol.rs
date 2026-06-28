@@ -1,6 +1,6 @@
 #![cfg_attr(not(windows), allow(dead_code))]
 
-use honk_engine::PokeAction;
+use honk_engine::{PokeAction, PokeOutcome};
 use std::error::Error;
 use std::fmt;
 
@@ -91,6 +91,18 @@ impl ControlCommand {
                 Ok(Self::Do(decode_action(action)?))
             }
             _ => Err(ProtocolError::UnknownCommand),
+        }
+    }
+}
+
+impl From<PokeOutcome> for ControlResponse {
+    /// Map an engine poke result onto the wire response so `do <action>` reports the real
+    /// outcome instead of a blanket "received". Rejections become error codes the CLI/TUI show.
+    fn from(outcome: PokeOutcome) -> Self {
+        match outcome {
+            PokeOutcome::Applied => Self::Ok,
+            PokeOutcome::Busy => Self::Err("BUSY".into()),
+            PokeOutcome::Unsupported => Self::Err("UNSUPPORTED".into()),
         }
     }
 }
@@ -205,6 +217,22 @@ mod tests {
         assert_eq!(
             ControlCommand::decode(&[b'X'; MAX_FRAME_BYTES + 1]),
             Err(ProtocolError::TooLarge)
+        );
+    }
+
+    #[test]
+    fn maps_poke_outcomes_to_responses() {
+        assert_eq!(
+            ControlResponse::from(PokeOutcome::Applied),
+            ControlResponse::Ok
+        );
+        assert_eq!(
+            ControlResponse::from(PokeOutcome::Busy),
+            ControlResponse::Err("BUSY".into())
+        );
+        assert_eq!(
+            ControlResponse::from(PokeOutcome::Unsupported),
+            ControlResponse::Err("UNSUPPORTED".into())
         );
     }
 

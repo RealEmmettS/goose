@@ -320,6 +320,7 @@ pub struct CliOverrides {
 pub struct BackendState {
     pub cursor_warp_supported: bool,
     pub window_watch_supported: bool,
+    pub collect_window_supported: bool,
     pub note_count: u32,
     pub meme_count: u32,
 }
@@ -487,12 +488,16 @@ impl Config {
         );
         foreign_window.enabled = self.mischief.perch_and_ride && !no_window_ride;
 
+        // Backend capability gates every collect operation: if the runtime reported it can no
+        // longer drive collect windows, none of these are available regardless of config. This
+        // keeps a runtime capability loss durable across reloads instead of being reset by one.
+        let collect_supported = backend.collect_window_supported;
         let collect_capabilities = CollectWindowCapabilities {
-            spawn_note: true,
-            spawn_image: true,
-            move_window: self.mischief.collect_windows,
-            set_passthrough: true,
-            synthesize_text: true,
+            spawn_note: collect_supported,
+            spawn_image: collect_supported,
+            move_window: collect_supported && self.mischief.collect_windows,
+            set_passthrough: collect_supported,
+            synthesize_text: collect_supported,
         };
         let mut collect_window = CollectWindowOptions::with_backend_support(
             collect_capabilities,
@@ -749,9 +754,30 @@ mod tests {
         BackendState {
             cursor_warp_supported: true,
             window_watch_supported: true,
+            collect_window_supported: true,
             note_count: 1,
             meme_count: 1,
         }
+    }
+
+    #[test]
+    fn backend_collect_loss_disables_collect_window() {
+        // When the backend reports it can no longer spawn/move collect windows, that capability
+        // loss must survive into the effective options (and therefore across a reload), even
+        // though the user's config still enables collect behavior.
+        let mut c = Config::default();
+        c.mischief.collect_windows = true;
+        c.mischief.collect_notes = true;
+        c.mischief.collect_memes = true;
+
+        let mut backend = backend();
+        backend.collect_window_supported = false;
+
+        let effective = c.effective_options(backend, CliOverrides::default());
+        assert!(
+            !effective.world.collect_window.active(),
+            "a backend collect-window capability loss must disable collect behavior"
+        );
     }
 
     #[test]

@@ -324,8 +324,10 @@ impl World {
             return;
         }
 
-        let hovering =
-            self.options.interaction.pat_streak && pointer.present && self.goose_hit(pointer.pos);
+        // Whether the pointer is over the goose at all — this gates the click reaction.
+        let on_goose = pointer.present && self.goose_hit(pointer.pos);
+        // Patting (hearts/calm) is a separate interaction, gated by the pat-streak toggle.
+        let hovering = self.options.interaction.pat_streak && on_goose;
 
         // Pat = hovering hover-sweeps. Each registered pat spawns a heart above the goose.
         let pats = self.pat.update(hovering, pointer.pos, self.elapsed);
@@ -338,8 +340,9 @@ impl World {
             self.pending_sounds.push(Sound::Pat);
         }
 
-        // Click = left-button rising edge while hovering → a hyper burst on the next tick.
-        let clicked = hovering && pointer.left_down && !self.prev_left_down;
+        // Click = left-button rising edge while over the goose → a hyper burst on the next tick.
+        // Independent of the pat streak so disabling pats never disables the click reaction.
+        let clicked = on_goose && pointer.left_down && !self.prev_left_down;
         if clicked {
             if self.options.mouse_steal.active() {
                 self.pending_nab = true;
@@ -812,6 +815,46 @@ mod tests {
             w.current_task(),
             "wander",
             "the hyper burst resumes the prior task"
+        );
+    }
+
+    #[test]
+    fn clicking_the_goose_triggers_hyper_even_with_pat_streak_off() {
+        // Disabling the hover-pat streak (hearts/calm) must NOT also disable the M6 click
+        // reaction. Patting and clicking are distinct interactions; turning off pats should
+        // leave click-to-hyper working.
+        let mut w = World::with_options(
+            bounds(),
+            5,
+            WorldOptions {
+                interaction: InteractionOptions { pat_streak: false },
+                ..WorldOptions::default()
+            },
+        );
+        for _ in 0..6_000 {
+            w.tick();
+            if w.current_task() == "wander" {
+                break;
+            }
+        }
+        assert_eq!(w.current_task(), "wander");
+
+        let anchor = w.goose.rig.body_center;
+        w.set_pointer(Pointer {
+            pos: anchor,
+            present: true,
+            left_down: false,
+        });
+        w.set_pointer(Pointer {
+            pos: anchor,
+            present: true,
+            left_down: true,
+        });
+        w.tick();
+        assert_eq!(
+            w.current_task(),
+            "hyper",
+            "clicking the goose triggers hyper even when the pat streak is disabled"
         );
     }
 
