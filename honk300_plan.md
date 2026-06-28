@@ -399,7 +399,9 @@ honk300/                       (workspace root)
 │  ├─ honk-platform-x11/       # x11rb + XShape + EWMH + XRecord + unix socket
 │  ├─ honk-platform-wayland/   # wlr-layer-shell (degraded) backend
 │  ├─ honk-assets/             # rust-embed + extraction + override precedence
-│  └─ honk-config-tui/         # ratatui reducer settings UI + TOML I/O + Poke panel
+│  ├─ honk-control/            # shared local IPC protocol/client/server
+│  ├─ honk-config/             # versioned TOML load/validate/save + runtime options
+│  └─ honk-config-tui/         # ratatui reducer settings UI + Poke panel
 └─ src/main.rs                 # honk300 binary: clap + goose-speak normalization, config, install/update, loop
 ```
 
@@ -461,7 +463,7 @@ LLM). `<name>` below = any of the three.
 |---|---|
 | **Start** (default) | `<name>` · `<name> start` · `<name> plz` · `honk plz` · `goose plz` |
 | **Stop** | `<name> stop` · `honk bad` · `goose no honk` · `<name> no` · `<name> bad` |
-| **Poke an action** | `<name> do <honk\|wander\|mud\|meme\|note\|nab>` (and `honk plz` ⇒ `do honk`) |
+| **Poke an action** | `<name> do <honk\|wander\|mud\|meme\|note\|nab>`; pokes stay explicit, including `do honk` |
 | **Config TUI** | `<name> config` |
 | **Help** (lists every command incl. goose-speak) | `<name> help` · `<name> --help` |
 | **Lifecycle** | `<name> install` · `uninstall` · `update` · `setup` · `--version` |
@@ -728,7 +730,7 @@ being implemented three more times.
 | M9 | Collect-window dispatcher: Notepad (faithful keystroke synth) + meme | goose types a note; drags meme windows |
 | M10 | **Single-instance + IPC command channel** (stop/do/reload); **no tray, no global quit key** | second launch refused; `honk300 stop` quits; CLI pokes reach the running goose |
 | M11 | **CLI grammar** (3 names + goose-speak phrase-map) + `do <action>` pokes + `help` | `goose plz` starts, `honk bad` stops, `goose do honk` honks |
-| M12 | **Config TUI** (ratatui reducer; groups + Poke panel; TOML I/O; hot-apply via IPC) | toggling Autumn live stops the leaves; save persists |
+| M12 | **Config TUI** (ratatui reducer; groups + Poke panel; TOML I/O; hot-apply via IPC) | current settings hot-apply where supported; future settings are marked planned/restart-required; save persists |
 | M13 | **Dynamic moods** (param-modulation FSM) + **on-hour double honk** | goose spontaneously shifts mood; honks the hour |
 | M14 | **Schedule**: quiet hours + DND/fullscreen respect; **seasonal** (Autumn built-in) | goose calms at night/fullscreen; autumn leaves appear in season |
 | M15 | **Multi-monitor chase** + full recolor/appearance | goose crosses between monitors; recolor works |

@@ -5,7 +5,6 @@
 //! allowed desktop goose instance.
 
 mod cli;
-mod control;
 mod runtime;
 
 #[cfg(windows)]
@@ -13,22 +12,32 @@ mod assets;
 #[cfg(windows)]
 mod audio;
 
-use clap::Parser;
 use cli::{Cli, Command};
 #[cfg(windows)]
-use control::CommandServer;
-use control::{send_command, ControlCommand, ControlResponse, Singleton};
+use honk_config::CliOverrides;
+use honk_config::Config;
+#[cfg(windows)]
+use honk_control::CommandServer;
+use honk_control::{send_command, ControlCommand, ControlResponse, Singleton};
 #[cfg(windows)]
 use runtime::RuntimeOptions;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cli = Cli::parse();
+    let cli = Cli::parse_normalized();
 
-    if !cli.is_start() {
+    if cli.is_client_command() {
         return run_client_command(cli);
     }
 
-    run_start(cli)
+    match cli.command {
+        Some(Command::Config) => run_config(cli),
+        Some(Command::Install) => lifecycle_placeholder("install"),
+        Some(Command::Uninstall) => lifecycle_placeholder("uninstall"),
+        Some(Command::Update) => lifecycle_placeholder("update"),
+        Some(Command::Setup) => run_setup(cli),
+        Some(Command::Start) | None => run_start(cli),
+        Some(Command::Stop | Command::Reload | Command::Do { .. }) => unreachable!(),
+    }
 }
 
 fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
@@ -36,7 +45,15 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::Stop) => ControlCommand::Stop,
         Some(Command::Reload) => ControlCommand::Reload,
         Some(Command::Do { action }) => ControlCommand::Do(action.into_engine()),
-        Some(Command::Start) | None => unreachable!("start commands are handled separately"),
+        Some(
+            Command::Start
+            | Command::Config
+            | Command::Install
+            | Command::Uninstall
+            | Command::Update
+            | Command::Setup,
+        )
+        | None => unreachable!("non-client commands are handled separately"),
     };
     let response = match send_command(command) {
         Ok(response) => response,
@@ -60,31 +77,66 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+fn run_config(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+    let loaded = Config::load_or_default(cli.config)?;
+    if let Some(warning) = loaded.warning {
+        eprintln!("honk300 config: {warning}");
+    }
+    honk_config_tui::run(loaded.path)?;
+    Ok(())
+}
+
+fn run_setup(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+    let loaded = Config::load_or_default(cli.config)?;
+    loaded.config.save_atomic(&loaded.path)?;
+    println!("honk300: config ready at {}.", loaded.path.display());
+    Ok(())
+}
+
+fn lifecycle_placeholder(action: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("honk300 {action}: installer lifecycle commands land in M19.");
+    Ok(())
+}
+
 #[cfg(windows)]
 fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let (_singleton, status) = Singleton::acquire()?;
-    if status == control::SingletonStatus::AlreadyRunning {
+    if status == honk_control::SingletonStatus::AlreadyRunning {
         println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
         return Ok(());
+    }
+
+    let loaded = Config::load_or_default(cli.config.clone())?;
+    if let Some(warning) = &loaded.warning {
+        eprintln!("honk300: ignoring config problem and using defaults ({warning})");
     }
 
     let server = CommandServer::start()?;
     runtime::windows::run(
         RuntimeOptions {
-            no_sound: cli.no_sound,
-            no_mouse_steal: cli.no_mouse_steal,
-            no_window_ride: cli.no_window_ride,
+            config_path: loaded.path,
+            config: loaded.config,
+            cli_overrides: CliOverrides {
+                no_sound: cli.no_sound,
+                no_mouse_steal: cli.no_mouse_steal,
+                no_window_ride: cli.no_window_ride,
+                wayland: cli.wayland,
+            },
         },
         &server,
     )
 }
 
 #[cfg(not(windows))]
-fn run_start(_cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let (_singleton, status) = Singleton::acquire()?;
-    if status == control::SingletonStatus::AlreadyRunning {
+    if status == honk_control::SingletonStatus::AlreadyRunning {
         println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
         return Ok(());
+    }
+    let loaded = Config::load_or_default(cli.config)?;
+    if let Some(warning) = loaded.warning {
+        eprintln!("honk300: ignoring config problem and using defaults ({warning})");
     }
     eprintln!(
         "honk300: the desktop overlay is Windows-only for now \

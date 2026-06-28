@@ -11,7 +11,13 @@
 
 [workspace]
 resolver = "2"
-members = ["crates/honk-engine", "crates/honk-platform-windows"]
+members = [
+    "crates/honk-config",
+    "crates/honk-config-tui",
+    "crates/honk-control",
+    "crates/honk-engine",
+    "crates/honk-platform-windows",
+]
 
 [workspace.package]
 # Edition 2021 matches the family majority (TR300/ND300 = 2021; WB300 = 2024). Locked
@@ -48,6 +54,9 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
+honk-config = { path = "crates/honk-config" }
+honk-config-tui = { path = "crates/honk-config-tui" }
+honk-control = { path = "crates/honk-control" }
 honk-engine = { path = "crates/honk-engine" }
 
 [target.'cfg(windows)'.dependencies]
@@ -55,14 +64,6 @@ honk-platform-windows = { path = "crates/honk-platform-windows" }
 # Audio playback (honks/bite/mud/pat). Pure-Rust decode via symphonia; cpal backend.
 # Windows-scoped for now; the macOS/Linux backends wire audio in M16/M17.
 rodio = "0.20"
-windows = { version = "0.58", features = [
-    "Win32_Foundation",
-    "Win32_Security",
-    "Win32_Storage_FileSystem",
-    "Win32_System_IO",
-    "Win32_System_Pipes",
-    "Win32_System_Threading",
-] }
 
 # The profile cargo-dist will build with in the later packaging round.
 [profile.dist]

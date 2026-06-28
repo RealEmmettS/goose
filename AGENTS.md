@@ -8,9 +8,10 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M10 are complete and M11 (CLI grammar) is
-next. The repo now has a Cargo workspace, a platform-free
-`honk-engine`, a Windows platform crate, the `honk300` binary, the original app's files as
+**Current stage: implementation in progress.** M0-M12 are complete and M13 (dynamic moods +
+on-hour double honk) is next. The repo now has a Cargo workspace, a platform-free
+`honk-engine`, shared `honk-control`, versioned TOML `honk-config`, the `honk-config-tui`
+terminal UI, a Windows platform crate, the `honk300` binary, the original app's files as
 reference, the canonical planning docs, and ADRs under `docs/adr/`.
 
 ## Read these first (source-of-truth pointers)
@@ -48,8 +49,9 @@ reference, the canonical planning docs, and ADRs under `docs/adr/`.
 - **Engine = fixed 120 Hz tick + a Task state machine.** A default "roaming" state picks
   random tasks via a shuffle-bag (`Deck`); a task only sets `targetPos`/acceleration and the
   engine auto-locomotes toward it. Mod hooks fire Pre/Post Tick / UpdateRig / Render.
-- **Planned Rust layout (`honk300_plan.md` §7): a Cargo workspace** — a platform-agnostic `honk-engine`
-  crate (`#![forbid(unsafe_code)]`, no OS deps) plus capability-trait platform backends
+- **Rust layout (`honk300_plan.md` §7): a Cargo workspace** — a platform-agnostic `honk-engine`
+  crate (`#![forbid(unsafe_code)]`, no OS deps), shared `honk-control`, `honk-config`, and
+  `honk-config-tui` crates, plus capability-trait platform backends
   (`windows`/`macos`/`x11`/`wayland`). **One overlay window per monitor** (not one
   virtual-screen window); sim runs at 120 Hz, present is on-dirty/rate-capped.
 

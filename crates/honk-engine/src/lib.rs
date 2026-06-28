@@ -48,7 +48,9 @@ pub use collect_window::{
     CollectWindowOptions, CollectWindowPayload, CollectWindowRequestId, CollectWindowSnapshot,
 };
 pub use command::{PokeAction, PokeOutcome};
-pub use cursor::{CursorCommand, MouseStealOptions, WorldOptions};
+pub use cursor::{
+    CursorCommand, InteractionOptions, MouseStealOptions, TimingOptions, WorldOptions,
+};
 pub use entity::{GooseEntity, ParametersTable, SpeedTier};
 pub use feet::Feet;
 pub use footmarks::{FootMark, FootMarks};

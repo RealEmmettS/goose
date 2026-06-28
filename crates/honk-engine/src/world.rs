@@ -324,7 +324,8 @@ impl World {
             return;
         }
 
-        let hovering = pointer.present && self.goose_hit(pointer.pos);
+        let hovering =
+            self.options.interaction.pat_streak && pointer.present && self.goose_hit(pointer.pos);
 
         // Pat = hovering hover-sweeps. Each registered pat spawns a heart above the goose.
         let pats = self.pat.update(hovering, pointer.pos, self.elapsed);
@@ -496,6 +497,7 @@ impl World {
                 dragged_window: self.dragged_window,
                 collect_window_snapshot: self.collect_window_snapshot,
                 calm,
+                timing: self.options.timing,
             };
             self.current.run(&mut self.goose, &mut ctx)
         };
@@ -556,7 +558,7 @@ mod tests {
         CollectWindowCapabilities, CollectWindowId, CollectWindowKind, CollectWindowOptions,
         CollectWindowRequestId, CollectWindowSnapshot,
     };
-    use crate::cursor::MouseStealOptions;
+    use crate::cursor::{InteractionOptions, MouseStealOptions, TimingOptions};
     use crate::foreign_window::{ForeignWindowId, ForeignWindowOptions};
 
     fn bounds() -> Rect {
@@ -657,6 +659,28 @@ mod tests {
     }
 
     #[test]
+    fn first_ux_uses_configured_intro_pause() {
+        let mut w = World::with_options(
+            bounds(),
+            4,
+            WorldOptions {
+                timing: TimingOptions {
+                    first_wander_time: 0.1,
+                    ..TimingOptions::default()
+                },
+                ..WorldOptions::default()
+            },
+        );
+        for _ in 0..1_000 {
+            w.tick();
+            if w.current_task() == "wander" {
+                return;
+            }
+        }
+        panic!("short first-wander timing should hand off to wandering quickly");
+    }
+
+    #[test]
     fn deterministic_for_seed() {
         let mut a = World::new(bounds(), 42);
         let mut b = World::new(bounds(), 42);
@@ -714,6 +738,21 @@ mod tests {
             "patting spawns heart particles"
         );
         assert!(w.is_calm(), "patting calms the goose");
+    }
+
+    #[test]
+    fn configured_pat_streak_off_disables_hearts_and_calm() {
+        let mut w = World::with_options(
+            bounds(),
+            1,
+            WorldOptions {
+                interaction: InteractionOptions { pat_streak: false },
+                ..WorldOptions::default()
+            },
+        );
+        pat_the_goose(&mut w, 12);
+        assert_eq!(w.hearts().alive_count(w.now()), 0);
+        assert!(!w.is_calm());
     }
 
     #[test]

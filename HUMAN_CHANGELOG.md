@@ -10,14 +10,28 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > around, reacts to your mouse, makes sounds, can steal the cursor in a short, bounded prank,
 > can hop onto a window while you drag it around, and can now bring in note and meme windows.
 > It can now be controlled through a local command channel for starting, stopping, reloading, and
-> simple poke commands. The next milestone is the friendly three-name command grammar.
-> There's no installer yet — that comes later.
+> simple poke commands. It now understands the friendly three-name command grammar and has a
+> terminal settings screen backed by a saved config file. The next milestone is dynamic moods and
+> the on-hour honk. There's no installer yet — that comes later.
 
 ---
 
 ## Latest — June 2026
 
 **Added**
+- The goose now has a real saved settings file and a terminal settings screen. You can open it
+  with the config command, change current settings such as sound, mouse stealing, window riding,
+  note/meme behavior, petting behavior, and timing, and save them without mixing settings code
+  into the goose's core brain.
+- The settings screen also shows future options honestly. Things like moods, seasons, appearance,
+  multi-monitor behavior, Wayland/backend mode, and extra prank behavior can be saved for later,
+  but they are marked as planned or restart-required until those milestones actually exist.
+- The command grammar now works under all three intended names: `honk300`, `honk`, and `goose`.
+  `honk plz`, `goose plz`, and `honk300 plz` start it; `honk bad`, `goose no`, and
+  `goose no honk` stop it; and pokes like honk, wander, mud, note, meme, or nab stay explicit
+  through the `do` command.
+- Installer, uninstaller, updater, and setup words are now recognized so help can list them, but
+  the real installer/update work still waits for the packaging milestone.
 - You can now control the running goose from commands. Starting a second goose is blocked, and
   commands can tell the current goose to stop, reload its options, honk, wander, track mud, or
   bring in a note or meme. This is also the foundation for the future settings screen.
@@ -88,9 +102,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   fixed stale status notes, confirmed the goose's core logic still stays separate from
   Windows-only behavior, and created follow-up work for improving the fullscreen overlay's
   performance before packaging.
-- The task board now shows the command-channel milestone as done and moves the friendly command
-  grammar milestone into the active slot. The future sprite-sheet renderer remains tracked as its
-  own follow-up task instead of being treated as unfinished cursor-stealing work.
+- The task board now shows the command grammar and settings-screen milestones as done and moves
+  dynamic moods into the active slot. The future sprite-sheet renderer remains tracked as its own
+  follow-up task instead of being treated as unfinished cursor-stealing work.
 - The project guidance for future agents now says when to add or update architecture decision
   records, and it repeats the rule that the technical and human changelogs must stay in sync.
 

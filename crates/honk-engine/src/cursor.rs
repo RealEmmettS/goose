@@ -63,4 +63,37 @@ pub struct WorldOptions {
     pub mouse_steal: MouseStealOptions,
     pub foreign_window: ForeignWindowOptions,
     pub collect_window: CollectWindowOptions,
+    pub interaction: InteractionOptions,
+    pub timing: TimingOptions,
+}
+
+/// User-facing interaction toggles that affect platform-free input handling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InteractionOptions {
+    /// Whether hover sweeps over the goose register pats, hearts, and calm.
+    pub pat_streak: bool,
+}
+
+impl Default for InteractionOptions {
+    fn default() -> Self {
+        Self { pat_streak: true }
+    }
+}
+
+/// Runtime timing values that were historically constants in the original config.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TimingOptions {
+    pub first_wander_time: f32,
+    pub min_wandering_time: f32,
+    pub max_wandering_time: f32,
+}
+
+impl Default for TimingOptions {
+    fn default() -> Self {
+        Self {
+            first_wander_time: 20.0,
+            min_wandering_time: 20.0,
+            max_wandering_time: 40.0,
+        }
+    }
 }

@@ -1,0 +1,16 @@
+[package]
+name = "honk-config"
+version = "0.0.0"
+description = "Versioned TOML configuration for honk300"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+honk-engine = { path = "../honk-engine" }
+serde = { version = "1", features = ["derive"] }
+tempfile = "3"
+toml = "0.8"
+toml_edit = "0.22"

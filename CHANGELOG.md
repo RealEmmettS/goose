@@ -4,16 +4,43 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: implementation in progress.** Milestones M0-M10 are complete and M11 is
+> **Project stage: implementation in progress.** Milestones M0-M12 are complete and M13 is
 > next. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
 > Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
-> channel; there is no release yet. A plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md)
+> channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
+> ratatui config TUI; there is no release yet. A plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md)
 > and must stay in lockstep.
 
 ## [Unreleased]
 
 ### Added
+- **Config TUI and durable configuration (milestone M12, complete)** — added the `honk-config`
+  crate for versioned TOML defaults, path resolution, validation, tolerant loading, conversion
+  into runtime/world options, and atomic save with practical preservation of unknown keys. The
+  default path is `%LOCALAPPDATA%\honk300\config.toml`, `~/Library/Application Support/honk300/config.toml`,
+  or `$XDG_DATA_HOME` / `~/.local/share/honk300/config.toml`, with `--config <path>` override.
+  Startup falls back to defaults on missing or rejected config and warns without corrupting the
+  running state. Reload parses and validates before applying, then hot-applies current M0-M12
+  settings for audio, mouse steal/tuning, perch-and-ride, collect-window kinds, pat behavior,
+  and timing knobs. Future settings for moods, schedule, Autumn, appearance, multi-monitor,
+  Wayland/backend, and spicy behavior are persisted and shown as planned or restart-required.
+- **Ratatui reducer UI (milestone M12, complete)** — added the `honk-config-tui` crate with
+  reducer-owned state, pure render modules, categories for General, Behaviors, Mischief,
+  Schedule, Appearance, Audio, Commands, and About, plus a Poke panel that sends M10 IPC commands.
+  Terminal-window protection is shown as always on rather than configurable. Reducer tests cover
+  navigation, toggles, numeric edits, dirty/save state, and poke command generation.
+- **Shared control crate** — extracted the M10 protocol/client/server code from the binary into
+  `honk-control`, reused by the root binary and TUI without changing the wire protocol or adding
+  IPC concerns to `honk-engine`.
+- **CLI grammar (milestone M11, complete)** — added deterministic pre-clap normalization for
+  executable stems `honk300`, `honk`, and `goose`. The binary accepts default start, `start`,
+  `plz`, `stop`, `reload`, `do <honk|wander|mud|meme|note|nab>`, `config`, `help`, `--help`,
+  `--version`, `--config <path>`, and `--wayland`. `honk plz`, `goose plz`, and `honk300 plz`
+  all start; `bad`, `no`, and `no honk` stop; pokes stay explicit through `do <action>`,
+  including `do honk`. `install`, `uninstall`, `update`, and `setup` now parse for
+  discoverability, with M19 placeholder messages where installer/update behavior is not yet
+  implemented.
 - **CLI/TUI control plane (milestone M10, complete)** — the root binary is now split into
   `src/cli.rs`, `src/control/`, and `src/runtime/windows.rs`. `honk300` defaults to `start`;
   `honk300 start` refuses to create a second goose; and `honk300 stop`, `honk300 reload`, and
@@ -217,11 +244,11 @@ All notable changes to this project are documented here. Format based on
 - `CLAUDE.md` — repository guidance for future Claude Code sessions.
 
 ### Changed
-- M10 is now Done, M11 is now Active, and Renderer V2 remains tracked separately as backlog task
+- M11 and M12 are now Done, M13 is now Active, and Renderer V2 remains tracked separately as backlog task
   `#r2v`. The task records now preserve M7's audit/readiness/renderer work, M8's foreign-window
   readiness pass, M9's collect-window asset/ADR/target-readiness work, and M10's IPC/control
-  readiness work.
-- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M10 complete, M11 next,
+  readiness work, plus M11 CLI grammar and M12 config/TUI readiness work.
+- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M12 complete, M13 next,
   and the ADR 0001/0002/0003/0004 location and maintenance rules.
 - `claude_plan.md` and `codex_plan.md` are now **superseded reference drafts**; `honk300_plan.md`
   is canonical. The "Read these first" pointers in **both** `CLAUDE.md` and its Codex twin

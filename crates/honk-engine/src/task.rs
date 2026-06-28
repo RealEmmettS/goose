@@ -13,7 +13,7 @@ use crate::collect_window::{
     CollectWindowCommand, CollectWindowKind, CollectWindowOptions, CollectWindowPayload,
     CollectWindowRequestId, CollectWindowSnapshot,
 };
-use crate::cursor::{CursorCommand, MouseStealOptions};
+use crate::cursor::{CursorCommand, MouseStealOptions, TimingOptions};
 use crate::entity::GooseEntity;
 use crate::foreign_window::{ForeignWindowOptions, ForeignWindowSnapshot};
 use crate::interaction::Pointer;
@@ -64,6 +64,8 @@ pub struct TaskCtx<'a> {
     pub collect_window_snapshot: Option<CollectWindowSnapshot>,
     /// The goose is in its post-pat calm window (suppresses spontaneous honks; M6 §5.9).
     pub calm: bool,
+    /// Runtime timing values loaded from config or defaults.
+    pub timing: TimingOptions,
 }
 
 /// A goose behavior. Tasks set targets/params only; locomotion is the engine's job.
@@ -118,7 +120,12 @@ impl Task for WanderTask {
 
         if self.end_time.is_none() {
             goose.target_pos = random_point(ctx);
-            self.end_time = Some(ctx.now + ctx.rng.range(MIN_WANDERING_TIME, MAX_WANDERING_TIME));
+            self.end_time = Some(
+                ctx.now
+                    + ctx
+                        .rng
+                        .range(ctx.timing.min_wandering_time, ctx.timing.max_wandering_time),
+            );
         }
         if arrived(goose, 1.5) {
             goose.target_pos = random_point(ctx);
@@ -628,7 +635,7 @@ impl Task for FirstUxTask {
                 goose.current_acceleration = goose.parameters.acceleration_normal;
                 goose.target_pos = (ctx.bounds.min + ctx.bounds.max) * 0.5;
                 if arrived(goose, 2.0) {
-                    self.intro_until = Some(ctx.now + FIRST_WANDER_TIME);
+                    self.intro_until = Some(ctx.now + ctx.timing.first_wander_time);
                 }
                 false
             }
@@ -664,6 +671,7 @@ mod tests {
             dragged_window: None,
             collect_window_snapshot: None,
             calm: false,
+            timing: TimingOptions::default(),
         }
     }
 

@@ -1,0 +1,17 @@
+[package]
+name = "honk-config-tui"
+version = "0.0.0"
+description = "Ratatui config editor for honk300"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+color-eyre = "0.6.5"
+crossterm = "0.29.0"
+honk-config = { path = "../honk-config" }
+honk-control = { path = "../honk-control" }
+honk-engine = { path = "../honk-engine" }
+ratatui = "0.30.1"

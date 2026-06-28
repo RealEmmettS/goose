@@ -10,13 +10,14 @@ FOR REFERENCE:
 
 ## Status
 
-**Stage:** implementation in progress. Milestones **M0-M10** are complete; **M11 CLI grammar**
-is next. The current Windows build renders the procedural goose on the desktop,
+**Stage:** implementation in progress. Milestones **M0-M12** are complete; **M13 dynamic moods
+and on-hour honk** is next. The current Windows build renders the procedural goose on the desktop,
 walks it, leaves mud, plays sounds, reacts to pat/click input, can perform bounded cursor
 nabbing when cursor warping is enabled, and can perch on a user-dragged foreign window until
 release. It can also drag in Notepad and meme windows through the M9 collect-window dispatcher,
-and M10 adds a single-instance local control channel for `start`, `stop`, `reload`, and
-`do <action>` pokes. There is no installer or release artifact yet.
+M10 adds a single-instance local control channel for `start`, `stop`, `reload`, and
+`do <action>` pokes, M11 adds the three-name goose-speak CLI grammar, and M12 adds durable TOML
+configuration plus the terminal config TUI. There is no installer or release artifact yet.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
@@ -33,14 +34,15 @@ contract, cross-platform guardrails, and Renderer V2 direction.
 **Decided direction (see `honk300_plan.md` for the full detail):**
 
 - **Binary `honk300`**, installed under three names — `honk300` / `honk` / `goose` — with a
-  finite "goose-speak" CLI (`goose plz` to start, `honk bad` / `goose no honk` to stop,
-  `goose do honk` to poke, `<name> config`, `<name> help`).
+  finite "goose-speak" CLI (`honk plz` / `goose plz` to start, `honk bad` /
+  `goose no honk` to stop, `goose do honk` to poke, `<name> config`, `<name> help`).
 - **Clean-room procedural goose** (no sprite extraction); engine ported 1:1 from the verified
   constants. Sounds, screened original memes, and screened original notes are bundled 1:1 for
   personal use; M9 adds one complete custom in-house counterpart per copied meme/note original.
   Old donate pages and old developer references do not ship.
-- **TOML config** + a **ratatui terminal config TUI** at `<name> config` that toggles every
-  behavior (including Autumn), hot-applying changes to a running goose where cheap.
+- **TOML config** + a **ratatui terminal config TUI** at `<name> config`. Current M0-M12
+  settings hot-apply through reload where supported; future settings are persisted and shown
+  as planned or restart-required until their milestones land.
 - **New autonomous behaviors**, each an optional toggle, scoped to parameter-modulation of the
   procedural rig (no new art): dynamic moods, seasonal moods, multi-monitor chase, on-the-hour
   double honk, perch-&-ride windows, hover-sweep pat streak + hearts, quiet-hours/DND respect, a

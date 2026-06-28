@@ -54,6 +54,8 @@ pub struct CollectWindowOptions {
     pub capabilities: CollectWindowCapabilities,
     pub available_notes: u32,
     pub available_memes: u32,
+    pub notes_enabled: bool,
+    pub memes_enabled: bool,
 }
 
 impl Default for CollectWindowOptions {
@@ -63,6 +65,8 @@ impl Default for CollectWindowOptions {
             capabilities: CollectWindowCapabilities::default(),
             available_notes: 0,
             available_memes: 0,
+            notes_enabled: true,
+            memes_enabled: true,
         }
     }
 }
@@ -87,11 +91,14 @@ impl CollectWindowOptions {
         }
         match kind {
             CollectWindowKind::Note => {
-                self.available_notes > 0
+                self.notes_enabled
+                    && self.available_notes > 0
                     && self.capabilities.spawn_note
                     && self.capabilities.synthesize_text
             }
-            CollectWindowKind::Meme => self.available_memes > 0 && self.capabilities.spawn_image,
+            CollectWindowKind::Meme => {
+                self.memes_enabled && self.available_memes > 0 && self.capabilities.spawn_image
+            }
         }
     }
 
@@ -160,6 +167,24 @@ mod tests {
         assert!(options.kind_active(CollectWindowKind::Note));
         assert!(!options.kind_active(CollectWindowKind::Meme));
         assert!(options.active());
+    }
+
+    #[test]
+    fn options_distinguish_user_enabled_kinds() {
+        let caps = CollectWindowCapabilities {
+            spawn_note: true,
+            spawn_image: true,
+            move_window: true,
+            set_passthrough: true,
+            synthesize_text: true,
+        };
+        let mut options = CollectWindowOptions::with_backend_support(caps, 1, 1);
+        options.notes_enabled = false;
+        assert!(!options.kind_active(CollectWindowKind::Note));
+        assert!(options.kind_active(CollectWindowKind::Meme));
+
+        options.memes_enabled = false;
+        assert!(!options.active());
     }
 
     #[test]

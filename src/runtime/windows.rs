@@ -1,13 +1,13 @@
 use crate::assets;
 use crate::audio;
-use crate::control::{CommandServer, ControlCommand};
 use crate::runtime::RuntimeOptions;
+use honk_config::{BackendState, Config, EffectiveOptions};
+use honk_control::{CommandServer, ControlCommand};
 use honk_engine::render::{render_footmarks, render_hearts, render_rig};
 use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
-    Accumulator, Clock, CollectWindowCapabilities, CollectWindowCommand, CollectWindowOptions,
-    CollectWindowPayload, CursorCommand, ForeignWindowOptions, MouseStealOptions, Pointer, Vec2,
-    World, WorldOptions,
+    Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, CursorCommand, Pointer, Sound,
+    Vec2, World,
 };
 use honk_platform_windows::{
     pointer_state, warp_cursor, CollectWindowController, ForeignWindowWatcher, Overlay,
@@ -17,11 +17,7 @@ pub fn run(
     options: RuntimeOptions,
     server: &CommandServer,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut audio = if options.no_sound {
-        None
-    } else {
-        audio::Audio::new()
-    };
+    let mut config = options.config.clone();
     let assets = assets::AssetCatalog::load();
     println!("honk300: loaded {}", assets.summary());
 
@@ -32,8 +28,27 @@ pub fn run(
     let width = bounds.width().ceil().max(1.0) as u32;
     let height = bounds.height().ceil().max(1.0) as u32;
 
+    let mut cursor_warp_supported =
+        !(options.cli_overrides.no_mouse_steal || config.safety.no_mouse_steal);
+    let initial_effective = effective_options(
+        &config,
+        &options,
+        cursor_warp_supported,
+        false,
+        assets.note_count(),
+        assets.meme_count(),
+    );
+    if initial_effective.wayland {
+        eprintln!("honk300: --wayland is recorded for M18; Windows uses the native overlay.");
+    }
+    let mut audio = if initial_effective.no_sound {
+        None
+    } else {
+        audio::Audio::new()
+    };
+
     let mut warned_window_ride = false;
-    let mut window_watcher = if options.no_window_ride {
+    let mut window_watcher = if !initial_effective.world.foreign_window.enabled {
         None
     } else {
         match ForeignWindowWatcher::new(&overlay) {
@@ -45,19 +60,16 @@ pub fn run(
             }
         }
     };
-    let mut cursor_warp_supported = !options.no_mouse_steal;
-
-    let mut world = World::with_options(
-        bounds,
-        seed_from_clock(),
-        world_options(
-            options,
-            cursor_warp_supported,
-            window_watcher.is_some(),
-            assets.note_count(),
-            assets.meme_count(),
-        ),
+    let mut effective = effective_options(
+        &config,
+        &options,
+        cursor_warp_supported,
+        window_watcher.is_some(),
+        assets.note_count(),
+        assets.meme_count(),
     );
+
+    let mut world = World::with_options(bounds, seed_from_clock(), effective.world);
     if let Some(kind) = smoke_collect_kind() {
         world.force_collect_window(kind);
     }
@@ -85,17 +97,52 @@ pub fn run(
                     println!("honk300: stop command received.");
                     return Ok(());
                 }
-                ControlCommand::Reload => {
-                    let next_options = world_options(
-                        options,
-                        cursor_warp_supported,
-                        window_watcher.is_some(),
-                        assets.note_count(),
-                        assets.meme_count(),
-                    );
-                    world.apply_options(next_options);
-                    println!("honk300: reload command applied.");
-                }
+                ControlCommand::Reload => match Config::load_existing(&options.config_path) {
+                    Ok(next_config) => {
+                        config = next_config;
+                        effective = effective_options(
+                            &config,
+                            &options,
+                            cursor_warp_supported,
+                            window_watcher.is_some(),
+                            assets.note_count(),
+                            assets.meme_count(),
+                        );
+                        if !effective.world.foreign_window.enabled {
+                            window_watcher = None;
+                        } else if window_watcher.is_none() {
+                            match ForeignWindowWatcher::new(&overlay) {
+                                Ok(watcher) => window_watcher = Some(watcher),
+                                Err(err) => {
+                                    if !warned_window_ride {
+                                        warned_window_ride = true;
+                                        eprintln!(
+                                            "honk300: window ride unavailable after reload ({err})"
+                                        );
+                                    }
+                                }
+                            }
+                            effective = effective_options(
+                                &config,
+                                &options,
+                                cursor_warp_supported,
+                                window_watcher.is_some(),
+                                assets.note_count(),
+                                assets.meme_count(),
+                            );
+                        }
+                        if effective.no_sound {
+                            audio = None;
+                        } else if audio.is_none() {
+                            audio = audio::Audio::new();
+                        }
+                        world.apply_options(effective.world);
+                        println!("honk300: reload command applied.");
+                    }
+                    Err(err) => {
+                        eprintln!("honk300: reload rejected; keeping prior config ({err})");
+                    }
+                },
                 ControlCommand::Do(action) => {
                     let outcome = world.poke(action);
                     println!("honk300: do {action:?} -> {outcome:?}");
@@ -205,7 +252,9 @@ pub fn run(
         let sounds = world.take_sounds();
         if let Some(a) = audio.as_mut() {
             for s in sounds {
-                a.play(s);
+                if sound_enabled(effective.audio, s) {
+                    a.play(s);
+                }
             }
         }
 
@@ -225,35 +274,34 @@ pub fn run(
     Ok(())
 }
 
-fn world_options(
-    options: RuntimeOptions,
+fn effective_options(
+    config: &Config,
+    options: &RuntimeOptions,
     cursor_warp_supported: bool,
     window_watch_supported: bool,
     note_count: u32,
     meme_count: u32,
-) -> WorldOptions {
-    let mut foreign_window = ForeignWindowOptions::with_backend_support(
-        window_watch_supported,
-        !options.no_window_ride, // Windows has SetWindowPos; M8 reports but does not use it.
-    );
-    foreign_window.enabled = !options.no_window_ride;
-    let collect_capabilities = CollectWindowCapabilities {
-        spawn_note: true,
-        spawn_image: true,
-        move_window: true,
-        set_passthrough: true,
-        synthesize_text: true,
-    };
-    let collect_window =
-        CollectWindowOptions::with_backend_support(collect_capabilities, note_count, meme_count);
-    WorldOptions {
-        mouse_steal: MouseStealOptions {
-            enabled: !options.no_mouse_steal,
-            warp_supported: cursor_warp_supported,
-            ..MouseStealOptions::default()
+) -> EffectiveOptions {
+    config.effective_options(
+        BackendState {
+            cursor_warp_supported,
+            window_watch_supported,
+            note_count,
+            meme_count,
         },
-        foreign_window,
-        collect_window,
+        options.cli_overrides,
+    )
+}
+
+fn sound_enabled(config: honk_config::AudioConfig, sound: Sound) -> bool {
+    if !config.enabled {
+        return false;
+    }
+    match sound {
+        Sound::Honk => config.honk,
+        Sound::Bite => config.bite,
+        Sound::MudSquish => config.mud,
+        Sound::Pat => config.pat,
     }
 }
 
