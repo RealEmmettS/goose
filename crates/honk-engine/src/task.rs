@@ -7,8 +7,10 @@
 //!
 //! This `Task` trait is the documented internal extension seam (plan §18) — adding a
 //! behavior means adding a `Task` impl and registering it; there is no external mod ABI.
-//! Richer autonomous tasks (off-screen bolt and later moods) land after M9.
+//! Richer autonomous tasks such as Autumn build on the same internal seam; there is no
+//! external mod ABI.
 
+use crate::autumn::{AutumnPileId, AutumnPileTarget};
 use crate::collect_window::{
     CollectWindowCommand, CollectWindowKind, CollectWindowOptions, CollectWindowPayload,
     CollectWindowRequestId, CollectWindowSnapshot,
@@ -66,6 +68,8 @@ pub struct TaskCtx<'a> {
     pub calm: bool,
     /// Runtime timing values loaded from config or defaults.
     pub timing: TimingOptions,
+    /// Built-in Autumn leaf piles currently available as task targets.
+    pub autumn_piles: &'a [AutumnPileTarget],
 }
 
 /// A goose behavior. Tasks set targets/params only; locomotion is the engine's job.
@@ -104,6 +108,59 @@ pub struct WanderTask {
 impl WanderTask {
     pub fn new() -> Self {
         Self::default()
+    }
+}
+
+#[derive(Default)]
+pub struct AutumnLeafPileTask {
+    target: Option<AutumnPileTarget>,
+    target_pos: Option<Vec2>,
+}
+
+impl AutumnLeafPileTask {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn target_still_exists(ctx: &TaskCtx, id: AutumnPileId) -> bool {
+        ctx.autumn_piles.iter().any(|pile| pile.id == id)
+    }
+}
+
+impl Task for AutumnLeafPileTask {
+    fn id(&self) -> &'static str {
+        "autumn_leaf_pile"
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        let target = match self.target {
+            Some(target) if Self::target_still_exists(ctx, target.id) => target,
+            Some(_) => return true,
+            None => {
+                if ctx.autumn_piles.is_empty() {
+                    return true;
+                }
+                let idx = (ctx.rng.next_f64() * ctx.autumn_piles.len() as f64).floor() as usize;
+                let target = ctx.autumn_piles[idx.min(ctx.autumn_piles.len() - 1)];
+                self.target = Some(target);
+                target
+            }
+        };
+
+        let target_pos = *self.target_pos.get_or_insert_with(|| {
+            let toward_pile = (target.position - goose.position).normalize();
+            let approach = if toward_pile == Vec2::ZERO {
+                Vec2::new(1.0, 0.0)
+            } else {
+                toward_pile
+            };
+            target.position + approach * (target.radius * 4.0)
+        });
+
+        goose.current_speed = goose.parameters.run_speed;
+        goose.current_acceleration = goose.parameters.acceleration_normal;
+        goose.target_pos = clamp_point(target_pos, ctx.bounds);
+        arrived(goose, 20.0)
     }
 }
 
@@ -672,6 +729,7 @@ mod tests {
             collect_window_snapshot: None,
             calm: false,
             timing: TimingOptions::default(),
+            autumn_piles: &[],
         }
     }
 

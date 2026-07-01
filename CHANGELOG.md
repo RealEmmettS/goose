@@ -4,17 +4,38 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: implementation in progress.** Milestones M0-M13 are complete and M14 is
+> **Project stage: implementation in progress.** Milestones M0-M14 are complete and M15 is
 > next. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
 > Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
-> ratatui config TUI, dynamic moods, and the local on-hour double honk; there is no release yet. A plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md)
+> ratatui config TUI, dynamic moods, the local on-hour double honk, quiet-hours/DND/fullscreen
+> manners, and built-in Autumn leaves; there is no release yet. A plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md)
 > and must stay in lockstep.
 
 ## [Unreleased]
 
 ### Added
+- **Schedule manners and built-in Autumn (milestone M14, complete)** — added
+  `honk-engine::schedule` with `ScheduleOptions`, `LocalMinute`, `PresenceSnapshot`, and
+  `PresenceState`, plus `World::set_presence`, `World::manners_active`, and the schedule field on
+  `WorldOptions`. Quiet hours are start-inclusive/end-exclusive, support overnight windows, and
+  treat `start == end` as no quiet window. Quiet hours, Windows DND, and fullscreen use Calm
+  Suppression: spontaneous honks, on-hour honks, autonomous cursor/window/collect mischief, and
+  Autumn pile chase are suppressed while direct clicks and CLI/TUI pokes still pass through normal
+  config/capability gates. Windows maps `SHQueryUserNotificationState` into platform-neutral
+  presence snapshots and polls periodically, warning once and degrading to unsupported if the API
+  fails.
+- **Procedural Autumn leaf piles** — added platform-free `AutumnState`, piles, leaves, kicked-leaf
+  physics, `AutumnLeafPileTask`, render-layer splitting, and Windows render ordering
+  (footmarks → Autumn below-goose leaves → goose → Autumn above-goose leaves → hearts → sleepy
+  particles). Autumn is active September 1 through November 30 by local runtime-injected date,
+  uses recovered reference constants for pile timing/count/physics, and does not copy or load the
+  original `Autumn.dll`. The Windows runtime adds `HONK300_SMOKE_LOCAL_DATE=YYYYMMDD` so Autumn can
+  be visually smoke-tested outside the season.
+- **M14 config and TUI plumbing** — existing version-1 TOML schedule fields now map into
+  `WorldOptions.schedule`, `[safety].pause_on_fullscreen` controls fullscreen manners, and the TUI
+  removes `(planned)` from live schedule/season rows while adding a separate fullscreen-respect row.
 - **Dynamic moods and on-hour double honk (milestone M13, complete)** — added
   `honk-engine::mood` with `MoodKind::{Content,Hyper,Sad,Sleepy,Mischievous}`,
   `MoodIntensity::{Calm,Normal,Spicy}`, seeded weighted transitions, and platform-free
@@ -31,7 +52,7 @@ All notable changes to this project are documented here. Format based on
   default path is `%LOCALAPPDATA%\honk300\config.toml`, `~/Library/Application Support/honk300/config.toml`,
   or `$XDG_DATA_HOME` / `~/.local/share/honk300/config.toml`, with `--config <path>` override.
   Startup falls back to defaults on missing or rejected config and warns without corrupting the
-  running state. Reload parses and validates before applying, then hot-applies current M0-M13
+  running state. Reload parses and validates before applying, then hot-applies current M0-M14
   settings for audio, mouse steal/tuning, perch-and-ride, collect-window kinds, pat behavior,
   timing, movement speed, mud/footmark timing, palette, mood intensity, and on-hour honking.
   Future settings for schedule, Autumn, full appearance, multi-monitor, Wayland/backend, and
@@ -262,19 +283,21 @@ All notable changes to this project are documented here. Format based on
 - `CLAUDE.md` — repository guidance for future Claude Code sessions.
 
 ### Changed
-- M12R and M13 are now Done, M14 is now Active, and Renderer V2 remains tracked separately as backlog task
+- M14 is now Done, M15 is now Active, and Renderer V2 remains tracked separately as backlog task
   `#r2v`. The task records now preserve M7's audit/readiness/renderer work, M8's foreign-window
   readiness pass, M9's collect-window asset/ADR/target-readiness work, and M10's IPC/control
-  readiness work, plus M11 CLI grammar, M12 config/TUI readiness work, and M13 moods/hourly-honk
-  closure.
-- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M13 complete, M14 next,
-  and the ADR 0001/0002/0003/0004/0007 location and maintenance rules.
+  readiness work, plus M11 CLI grammar, M12 config/TUI readiness work, M13 moods/hourly-honk
+  closure, and M14 schedule/Autumn closure.
+- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M14 complete, M15 next,
+  and the ADR 0001/0002/0003/0004/0007/0008 location and maintenance rules.
 - Added **ADR 0005** (M11 three-name CLI, goose-speak, and the poke-outcome round-trip) and
   **ADR 0006** (M12 config TUI, durable TOML, and the capability/preference boundary), recording
   the previously-undocumented M11/M12 decisions and the four contract corrections from the
   adversarial review.
 - Added **ADR 0007** (M13 dynamic moods and local-time injection), recording the platform-free
   mood state machine, honk-tone contract, and runtime-owned local-clock sampling boundary.
+- Added **ADR 0008** (M14 schedule, presence, and Autumn), recording Calm Suppression, the
+  schedule/presence engine boundary, Windows presence polling, and the built-in Autumn constants.
 - `claude_plan.md` and `codex_plan.md` are now **superseded reference drafts**; `honk300_plan.md`
   is canonical. The "Read these first" pointers in **both** `CLAUDE.md` and its Codex twin
   `AGENTS.md` were updated in lockstep (canonical plan, milestone range M0–M19, workspace

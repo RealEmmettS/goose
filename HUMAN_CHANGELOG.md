@@ -12,14 +12,25 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > It can now be controlled through a local command channel for starting, stopping, reloading, and
 > simple poke commands. It now understands the friendly three-name command grammar and has a
 > terminal settings screen backed by a saved config file. It now has dynamic moods and a double
-> honk at the top of each hour. The next milestone is quiet-hours, fullscreen/DND manners, and
-> seasonal Autumn. There's no installer yet — that comes later.
+> honk at the top of each hour. It now also respects quiet times, fullscreen/DND manners, and
+> seasonal Autumn leaves. The next milestone is multi-monitor chasing and fuller appearance
+> controls. There's no installer yet — that comes later.
 
 ---
 
 ## Latest — June 2026
 
 **Added**
+- The goose now has manners for quiet time, Do Not Disturb, and fullscreen use. During those
+  periods it calms down: no random honks, no hourly double honk, and no autonomous pranks like
+  cursor grabbing or dragging windows around. You can still click it or use direct commands, so
+  the goose stays controllable instead of freezing completely.
+- Autumn is now built in. From September through November, the goose can find little procedural
+  leaf piles, run through them, and kick leaves around. The leaves are drawn and simulated inside
+  the app rather than loading the original Autumn add-on.
+- The settings screen now treats quiet hours, Do Not Disturb, fullscreen respect, seasonal mode,
+  and Autumn as real live settings instead of future placeholders. There is also a separate row
+  for whether fullscreen should make the goose calm down.
 - The goose now has little moods. Most of the time it stays content, but it can occasionally get
   sleepy, sad, hyper, or mischievous. These moods change how it moves and carries itself without
   replacing its normal behavior system: sleepy and sad slow it down, sleepy makes little Zs, hyper
@@ -123,6 +134,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   saved as a local comparison, then replaced because it did not feel as much like the original.
 
 **Behind the scenes**
+- The quiet-hours, fullscreen/DND, and Autumn milestone now has its own architecture record. It
+  keeps local date/time and computer-presence checks outside the goose's shared brain, while the
+  shared brain decides what "be polite right now" means.
 - The control milestone now has its own architecture record. It says control is handled by the
   command line and future terminal settings screen only, with no tray menu and no separate stop
   shortcut. It also records the permanent terminal-window protection rule.
@@ -134,8 +148,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   fixed stale status notes, confirmed the goose's core logic still stays separate from
   Windows-only behavior, and created follow-up work for improving the fullscreen overlay's
   performance before packaging.
-- The task board now shows the command grammar and settings-screen milestones as done and moves
-  dynamic moods into the active slot. The future sprite-sheet renderer remains tracked as its own
+- The task board now shows the command grammar, settings-screen, mood, and schedule/Autumn
+  milestones as done and moves multi-monitor/appearance work into the active slot. The future sprite-sheet renderer remains tracked as its own
   follow-up task instead of being treated as unfinished cursor-stealing work.
 - The project guidance for future agents now says when to add or update architecture decision
   records, and it repeats the rule that the technical and human changelogs must stay in sync.

@@ -8,8 +8,8 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M13 are complete and M14 (quiet hours,
-DND/fullscreen respect, and seasonal Autumn) is next. The Cargo workspace exists: `honk-engine` (platform-free
+**Current stage: implementation in progress.** M0-M14 are complete and M15 (multi-monitor
+chase plus full recolor/appearance) is next. The Cargo workspace exists: `honk-engine` (platform-free
 core), `honk-control` (shared IPC protocol/client/server), `honk-config` (versioned TOML
 configuration), `honk-config-tui` (ratatui reducer UI), `honk-platform-windows` (the layered
 overlay), and the root `honk300` binary — a
@@ -18,7 +18,8 @@ task/FirstUX AI, honks, reacts to pat/click input, can perform bounded cursor na
 perch on a user-dragged foreign window, and can collect Notepad/meme windows on Windows.
 M10 adds single-instance local control for `start`, `stop`, `reload`, and `do <action>` pokes;
 M11 adds the three-name goose-speak grammar; M12 adds durable config and the terminal UI; M13
-adds dynamic moods and the local on-hour double honk.
+adds dynamic moods and the local on-hour double honk; M14 adds quiet-hours/DND/fullscreen calm
+suppression and built-in procedural Autumn leaves.
 `honk300_plan.md` is the canonical plan (milestones M0–M19); the two superseded drafts remain as
 reference.
 
@@ -47,7 +48,7 @@ reference.
   records the M8 foreign-window watch-and-ride contract; ADR 0003 records the M9 collect-window,
   asset, and no-donate decisions; ADR 0004 records the M10 CLI/TUI-only control plane, local IPC,
   and terminal-window protection rule; ADR 0007 records the M13 dynamic-mood and local-time
-  injection contract.
+  injection contract; ADR 0008 records the M14 schedule/presence/Autumn contract.
 
 ## Big-picture architecture (original → planned port)
 
@@ -97,6 +98,7 @@ reference.
 - M9's accepted decisions live in `docs/adr/0003-m9-collect-window-assets-and-no-donate.md`.
 - M10's accepted decisions live in `docs/adr/0004-m10-cli-tui-control-plane-and-terminal-protection.md`.
 - M13's accepted decisions live in `docs/adr/0007-m13-moods-and-local-time-injection.md`.
+- M14's accepted decisions live in `docs/adr/0008-m14-schedule-presence-and-autumn.md`.
 
 ## Task management system
 

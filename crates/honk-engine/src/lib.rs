@@ -8,9 +8,9 @@
 //! Scope through milestone **M9** (see `honk300_plan.md` §14): data/constants, the Deck,
 //! renderer, locomotion, task/AI state machine, pointer interactions, sound/cursor intent
 //! queues, cursor-mischief task state, the platform-neutral foreign-window perch/ride
-//! contract, and the platform-neutral collect-window command/snapshot contract. Moods,
-//! schedule, IPC/config, and the non-Windows platform backends arrive in later rounds and build
-//! on the types defined here.
+//! contract, the platform-neutral collect-window command/snapshot contract, dynamic moods,
+//! local-time-driven schedule manners, and the built-in Autumn leaf-pile season. IPC/config and
+//! the non-Windows platform backends live outside the engine and build on the types defined here.
 //!
 //! Engine constants are ported verbatim from the verified modding-API source
 //! (`GooseModdingAPI/Exports.cs`, `SamEngine.cs`); the `updateRig` placement math and
@@ -23,6 +23,7 @@
 // a specific tiny-skia version themselves.
 pub use tiny_skia;
 
+pub mod autumn;
 pub mod collect_window;
 pub mod command;
 pub mod cursor;
@@ -38,12 +39,17 @@ pub mod mood;
 pub mod render;
 pub mod rig;
 pub mod rng;
+pub mod schedule;
 pub mod sound;
 pub mod task;
 pub mod time;
 pub mod world;
 
 // A curated surface for downstream crates (the platform backends, the eventual binary).
+pub use autumn::{
+    AutumnLeaf, AutumnLeafColor, AutumnPile, AutumnPileId, AutumnPileTarget, AutumnState,
+    LEAVES_PER_PILE, MAX_LEAF_PILES,
+};
 pub use collect_window::{
     CollectWindowCapabilities, CollectWindowCommand, CollectWindowId, CollectWindowKind,
     CollectWindowOptions, CollectWindowPayload, CollectWindowRequestId, CollectWindowSnapshot,
@@ -65,12 +71,14 @@ pub use mood::{
     HourlyHonkOptions, LocalHour, LocalTime, MoodIntensity, MoodKind, MoodMachine, MoodOptions,
     ZParticle, ZParticles,
 };
-pub use render::RenderPalette;
+pub use render::{AutumnRenderLayer, RenderPalette};
 pub use rig::Rig;
 pub use rng::{Deck, RandomSource, SplitMix64};
+pub use schedule::{LocalMinute, PresenceSnapshot, PresenceState, ScheduleOptions};
 pub use sound::{HonkTone, Sound};
 pub use task::{
-    CollectWindowTask, FirstUxTask, HyperTask, NabMouseTask, PerchRideTask, Task, WanderTask,
+    AutumnLeafPileTask, CollectWindowTask, FirstUxTask, HyperTask, NabMouseTask, PerchRideTask,
+    Task, WanderTask,
 };
 pub use time::{Accumulator, Clock, DT, FRAMERATE};
 pub use world::World;

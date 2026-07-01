@@ -4,15 +4,17 @@ use crate::runtime::RuntimeOptions;
 use honk_config::{BackendState, Config, EffectiveOptions};
 use honk_control::{CommandServer, ControlCommand, ControlResponse};
 use honk_engine::render::{
-    render_footmarks_with_timing, render_hearts, render_rig_with_palette, render_sleepies,
+    render_autumn_leaves, render_footmarks_with_timing, render_hearts, render_rig_with_palette,
+    render_sleepies, AutumnRenderLayer,
 };
 use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
-    Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, CursorCommand, Pointer, Sound,
-    Vec2, World,
+    Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, CursorCommand, LocalTime,
+    Pointer, PresenceSnapshot, Sound, Vec2, World,
 };
 use honk_platform_windows::{
-    local_time, pointer_state, warp_cursor, CollectWindowController, ForeignWindowWatcher, Overlay,
+    local_time, pointer_state, presence_state, warp_cursor, CollectWindowController,
+    ForeignWindowWatcher, Overlay,
 };
 
 pub fn run(
@@ -89,8 +91,11 @@ pub fn run(
     let mut last_present = f32::NEG_INFINITY;
     // Fullscreen present is heavier than a tiny window, so cap it a little lower.
     const PRESENT_INTERVAL: f32 = 1.0 / 40.0;
+    const PRESENCE_POLL_INTERVAL: f32 = 0.5;
     let mut warned_cursor_warp = false;
     let mut warned_collect_window = false;
+    let mut warned_presence = false;
+    let mut last_presence_poll = f32::NEG_INFINITY;
 
     println!("honk300: a goose is loose on your desktop. Use `honk300 stop` to send it home.");
 
@@ -167,9 +172,24 @@ pub fn run(
             }
         }
 
-        world.set_local_time(local_time());
-
         let now = clock.elapsed_secs();
+        world.set_local_time(runtime_local_time());
+        if now - last_presence_poll >= PRESENCE_POLL_INTERVAL {
+            last_presence_poll = now;
+            match presence_state() {
+                Ok(snapshot) => world.set_presence(snapshot),
+                Err(err) => {
+                    world.set_presence(PresenceSnapshot::unsupported());
+                    if !warned_presence {
+                        warned_presence = true;
+                        eprintln!(
+                            "honk300: Windows presence unavailable; DND/fullscreen respect disabled ({err})"
+                        );
+                    }
+                }
+            }
+        }
+
         let dt = now - last;
         last = now;
 
@@ -290,7 +310,23 @@ pub fn run(
                 origin,
                 world.footmark_timing(),
             );
+            render_autumn_leaves(
+                &mut canvas,
+                world.autumn(),
+                world.now(),
+                origin,
+                world.goose.position,
+                AutumnRenderLayer::BelowGoose,
+            );
             render_rig_with_palette(&mut canvas, world.rig(), origin, world.render_palette());
+            render_autumn_leaves(
+                &mut canvas,
+                world.autumn(),
+                world.now(),
+                origin,
+                world.goose.position,
+                AutumnRenderLayer::AboveGoose,
+            );
             render_hearts(&mut canvas, world.hearts(), world.now(), origin);
             render_sleepies(&mut canvas, world.sleepies(), world.now(), origin);
             overlay.present(&canvas, origin.x.floor() as i32, origin.y.floor() as i32)?;
@@ -348,6 +384,44 @@ fn smoke_collect_kind() -> Option<honk_engine::CollectWindowKind> {
     }
 }
 
+fn runtime_local_time() -> LocalTime {
+    let mut time = local_time();
+    if let Some(day) = smoke_local_date() {
+        time.day = day;
+    }
+    time
+}
+
+fn smoke_local_date() -> Option<i32> {
+    parse_smoke_local_date(&std::env::var("HONK300_SMOKE_LOCAL_DATE").ok()?)
+}
+
+fn parse_smoke_local_date(value: &str) -> Option<i32> {
+    if value.len() != 8 || !value.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let day = value.parse::<i32>().ok()?;
+    let year = day / 10_000;
+    let month = (day / 100) % 100;
+    let date = day % 100;
+    let max_day = days_in_month(year, month)?;
+    (year >= 1900 && (1..=max_day).contains(&date)).then_some(day)
+}
+
+fn days_in_month(year: i32, month: i32) -> Option<i32> {
+    Some(match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year(year) => 29,
+        2 => 28,
+        _ => return None,
+    })
+}
+
+fn is_leap_year(year: i32) -> bool {
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
 /// The platform's initial cursor-warp capability, before any runtime warp attempt.
 ///
 /// On Windows this is unconditionally `true` (`SetCursorPos` always exists); it is a backend
@@ -367,7 +441,7 @@ fn seed_from_clock() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::initial_cursor_warp_supported;
+    use super::{initial_cursor_warp_supported, parse_smoke_local_date};
 
     #[test]
     fn initial_cursor_warp_capability_ignores_mouse_steal_preference() {
@@ -376,5 +450,16 @@ mod tests {
         // warp off and keep it off across a reload that re-enables stealing. The preference is
         // applied separately through MouseStealOptions::enabled, so this stays a pure capability.
         assert!(initial_cursor_warp_supported());
+    }
+
+    #[test]
+    fn smoke_local_date_accepts_yyyymmdd_only() {
+        assert_eq!(parse_smoke_local_date("20261015"), Some(20261015));
+        assert_eq!(parse_smoke_local_date("20240229"), Some(20240229));
+        assert_eq!(parse_smoke_local_date("20260231"), None);
+        assert_eq!(parse_smoke_local_date("20250229"), None);
+        assert_eq!(parse_smoke_local_date("2026-10-15"), None);
+        assert_eq!(parse_smoke_local_date("20261301"), None);
+        assert_eq!(parse_smoke_local_date("18991231"), None);
     }
 }

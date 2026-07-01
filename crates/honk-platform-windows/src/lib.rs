@@ -19,7 +19,7 @@ use honk_engine::collect_window::{
     CollectWindowId, CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot,
 };
 use honk_engine::math::Rect;
-use honk_engine::{ForeignWindowId, ForeignWindowSnapshot};
+use honk_engine::{ForeignWindowId, ForeignWindowSnapshot, PresenceSnapshot};
 use honk_engine::{LocalTime, Vec2};
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -43,6 +43,11 @@ use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVE
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
     KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_LBUTTON,
+};
+use windows::Win32::UI::Shell::{
+    SHQueryUserNotificationState, QUERY_USER_NOTIFICATION_STATE, QUNS_ACCEPTS_NOTIFICATIONS,
+    QUNS_APP, QUNS_BUSY, QUNS_NOT_PRESENT, QUNS_PRESENTATION_MODE, QUNS_QUIET_TIME,
+    QUNS_RUNNING_D3D_FULL_SCREEN,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EnumWindows, GetAncestor,
@@ -82,6 +87,22 @@ pub fn local_time() -> LocalTime {
             minute: st.wMinute as u8,
             second: st.wSecond as u8,
         }
+    }
+}
+
+/// Snapshot Windows user notification state for platform-neutral calm-suppression gating.
+pub fn presence_state() -> Result<PresenceSnapshot> {
+    unsafe { SHQueryUserNotificationState().map(map_notification_state) }
+}
+
+fn map_notification_state(state: QUERY_USER_NOTIFICATION_STATE) -> PresenceSnapshot {
+    match state {
+        QUNS_ACCEPTS_NOTIFICATIONS => PresenceSnapshot::available(),
+        QUNS_BUSY | QUNS_RUNNING_D3D_FULL_SCREEN => PresenceSnapshot::fullscreen(),
+        QUNS_PRESENTATION_MODE | QUNS_NOT_PRESENT | QUNS_QUIET_TIME | QUNS_APP => {
+            PresenceSnapshot::do_not_disturb()
+        }
+        _ => PresenceSnapshot::unsupported(),
     }
 }
 
@@ -1031,5 +1052,37 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn notification_state_mapping_feeds_engine_presence() {
+        assert_eq!(
+            map_notification_state(QUNS_ACCEPTS_NOTIFICATIONS),
+            PresenceSnapshot::available()
+        );
+        assert_eq!(
+            map_notification_state(QUNS_BUSY),
+            PresenceSnapshot::fullscreen()
+        );
+        assert_eq!(
+            map_notification_state(QUNS_RUNNING_D3D_FULL_SCREEN),
+            PresenceSnapshot::fullscreen()
+        );
+        for state in [
+            QUNS_PRESENTATION_MODE,
+            QUNS_NOT_PRESENT,
+            QUNS_QUIET_TIME,
+            QUNS_APP,
+        ] {
+            assert_eq!(
+                map_notification_state(state),
+                PresenceSnapshot::do_not_disturb(),
+                "{state:?}"
+            );
+        }
+        assert_eq!(
+            map_notification_state(QUERY_USER_NOTIFICATION_STATE(-1)),
+            PresenceSnapshot::unsupported()
+        );
     }
 }

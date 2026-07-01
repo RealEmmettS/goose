@@ -12,6 +12,7 @@
 //! outlined. World->pixmap is a translation by `origin`. Colours are the verified defaults
 //! (`#ffffff` / `#ffa500` / `#d3d3d3`); eye/shadow/mud tones are clean-room render details.
 
+use crate::autumn::{AutumnLeafColor, AutumnState};
 use crate::footmarks::{FootMarkTiming, FootMarks};
 use crate::math::Vec2;
 use crate::rig::{self, Rig};
@@ -23,6 +24,10 @@ const ORANGE_DARK: (u8, u8, u8) = (0xd8, 0x78, 0x00);
 const OUTLINE: (u8, u8, u8) = (0xd3, 0xd3, 0xd3);
 const EYE: (u8, u8, u8) = (0x1a, 0x1a, 0x1a);
 const MUD: (u8, u8, u8) = (0x5a, 0x40, 0x28);
+const LEAF_GOLD: (u8, u8, u8) = (0xe2, 0xb8, 0x35);
+const LEAF_ORANGE: (u8, u8, u8) = (0xd9, 0x6a, 0x21);
+const LEAF_RED: (u8, u8, u8) = (0xa9, 0x3b, 0x2a);
+const LEAF_BROWN: (u8, u8, u8) = (0x7a, 0x4a, 0x24);
 
 /// User-customizable original-style goose palette.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,6 +136,13 @@ fn triangle(pixmap: &mut Pixmap, a: Vec2, b: Vec2, c: Vec2, p: &Paint) {
     }
 }
 
+fn ellipse(pixmap: &mut Pixmap, center: Vec2, rx: f32, ry: f32, p: &Paint) {
+    let transform = Transform::from_row(rx, 0.0, 0.0, ry, center.x, center.y);
+    if let Some(path) = PathBuilder::from_circle(0.0, 0.0, 1.0) {
+        pixmap.fill_path(&path, p, FillRule::Winding, transform, None);
+    }
+}
+
 /// Dotted elliptical ground shadow, matching the original's dithered shadow brush.
 fn stipple_shadow(pixmap: &mut Pixmap, ground: Vec2) {
     let rx = rig::BODY_RADIUS * 1.12;
@@ -154,6 +166,63 @@ fn stipple_shadow(pixmap: &mut Pixmap, ground: Vec2) {
             dx += step;
         }
         dy += step;
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutumnRenderLayer {
+    BelowGoose,
+    AboveGoose,
+}
+
+fn leaf_rgb(color: AutumnLeafColor) -> (u8, u8, u8) {
+    match color {
+        AutumnLeafColor::Gold => LEAF_GOLD,
+        AutumnLeafColor::Orange => LEAF_ORANGE,
+        AutumnLeafColor::Red => LEAF_RED,
+        AutumnLeafColor::Brown => LEAF_BROWN,
+    }
+}
+
+/// Render built-in Autumn leaves. Call `BelowGoose` before the goose and `AboveGoose` after it.
+pub fn render_autumn_leaves(
+    pixmap: &mut Pixmap,
+    autumn: &AutumnState,
+    now: f32,
+    origin: Vec2,
+    goose_pos: Vec2,
+    layer: AutumnRenderLayer,
+) {
+    for pile in autumn.piles() {
+        let spawn = pile.spawn_scale(now);
+        let fade = pile.fade_out(now);
+        let alpha_scale = 1.0 - fade;
+        if layer == AutumnRenderLayer::BelowGoose && pile.kicked_at.is_none() {
+            let radius = pile.radius * spawn;
+            let center = pile.position - origin;
+            ellipse(
+                pixmap,
+                center,
+                radius,
+                radius * 0.6,
+                &paint((0x31, 0x25, 0x1a), (48.0 * alpha_scale) as u8),
+            );
+        }
+
+        for leaf in &pile.leaves {
+            let world = pile.position + leaf.screen_offset() * spawn;
+            let leaf_above_goose = world.y >= goose_pos.y;
+            if matches!(layer, AutumnRenderLayer::AboveGoose) != leaf_above_goose {
+                continue;
+            }
+            let alpha = (225.0 * alpha_scale) as u8;
+            if alpha == 0 {
+                continue;
+            }
+            let center = world - origin;
+            let rgb = leaf_rgb(leaf.color);
+            ellipse(pixmap, center, 3.5, 2.0, &paint(rgb, alpha));
+        }
     }
 }
 
@@ -453,6 +522,64 @@ mod tests {
         render_sleepies(&mut pixmap, &z, 0.0, Vec2::ZERO);
         let opaque = pixmap.data().chunks_exact(4).filter(|px| px[3] > 0).count();
         assert!(opaque > 5, "expected a visible Z particle");
+    }
+
+    #[test]
+    fn renders_visible_autumn_leaves() {
+        use crate::autumn::AutumnState;
+        use crate::entity::GooseEntity;
+        use crate::math::Rect;
+        use crate::rng::SplitMix64;
+
+        let mut autumn = AutumnState::new();
+        let goose = GooseEntity::new();
+        let mut rng = SplitMix64::seed(99);
+        autumn.tick(
+            0.0,
+            true,
+            Rect {
+                min: Vec2::ZERO,
+                max: Vec2::new(128.0, 128.0),
+            },
+            &goose,
+            &mut rng,
+        );
+        autumn.tick(
+            10.1,
+            true,
+            Rect {
+                min: Vec2::ZERO,
+                max: Vec2::new(128.0, 128.0),
+            },
+            &goose,
+            &mut rng,
+        );
+
+        let mut pixmap = Pixmap::new(128, 128).expect("alloc");
+        pixmap.fill(Color::TRANSPARENT);
+        render_autumn_leaves(
+            &mut pixmap,
+            &autumn,
+            10.1,
+            Vec2::ZERO,
+            Vec2::new(64.0, 64.0),
+            AutumnRenderLayer::BelowGoose,
+        );
+        render_autumn_leaves(
+            &mut pixmap,
+            &autumn,
+            10.1,
+            Vec2::ZERO,
+            Vec2::new(64.0, 64.0),
+            AutumnRenderLayer::AboveGoose,
+        );
+
+        let leafish = pixmap
+            .data()
+            .chunks_exact(4)
+            .filter(|px| px[3] > 80 && px[0] > px[2] && px[1] > 40)
+            .count();
+        assert!(leafish > 30, "expected visible Autumn leaves");
     }
 
     #[test]

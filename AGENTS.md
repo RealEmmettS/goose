@@ -8,13 +8,13 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M13 are complete and M14 (quiet hours,
-DND/fullscreen respect, and seasonal Autumn) is next. The repo now has a Cargo workspace, a platform-free
+**Current stage: implementation in progress.** M0-M14 are complete and M15 (multi-monitor
+chase plus full recolor/appearance) is next. The repo now has a Cargo workspace, a platform-free
 `honk-engine`, shared `honk-control`, versioned TOML `honk-config`, the `honk-config-tui`
 terminal UI, a Windows platform crate, the `honk300` binary, the original app's files as
 reference, the canonical planning docs, and ADRs under `docs/adr/`. M13's dynamic moods and
-on-hour double honk are implemented through platform-free engine state plus runtime-injected
-local time.
+on-hour double honk use runtime-injected local time; M14's quiet-hours/DND/fullscreen manners and
+built-in Autumn leaves use platform-neutral schedule/presence state.
 
 ## Read these first (source-of-truth pointers)
 
@@ -41,7 +41,7 @@ local time.
   records the M8 foreign-window watch-and-ride contract; ADR 0003 records the M9 collect-window,
   asset, and no-donate decisions; ADR 0004 records the M10 CLI/TUI-only control plane, local IPC,
   and terminal-window protection rule; ADR 0007 records the M13 dynamic-mood and local-time
-  injection contract.
+  injection contract; ADR 0008 records the M14 schedule/presence/Autumn contract.
 
 ## Big-picture architecture (original → planned port)
 
@@ -90,6 +90,7 @@ local time.
 - M9's accepted decisions live in `docs/adr/0003-m9-collect-window-assets-and-no-donate.md`.
 - M10's accepted decisions live in `docs/adr/0004-m10-cli-tui-control-plane-and-terminal-protection.md`.
 - M13's accepted decisions live in `docs/adr/0007-m13-moods-and-local-time-injection.md`.
+- M14's accepted decisions live in `docs/adr/0008-m14-schedule-presence-and-autumn.md`.
 
 ## Task management system
 

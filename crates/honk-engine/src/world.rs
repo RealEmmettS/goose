@@ -5,6 +5,7 @@
 //! [`Deck`](crate::rng::Deck). Tasks set targets/params; [`crate::locomotion`] moves the
 //! goose; the gait + footmark logic here is mechanical.
 
+use crate::autumn::AutumnState;
 use crate::collect_window::{CollectWindowCommand, CollectWindowKind, CollectWindowSnapshot};
 use crate::command::{PokeAction, PokeOutcome};
 use crate::cursor::{CursorCommand, WorldOptions};
@@ -17,10 +18,11 @@ use crate::mood::{LocalHour, LocalTime, MoodKind, MoodMachine, ZParticles};
 use crate::render::RenderPalette;
 use crate::rig::Rig;
 use crate::rng::{Deck, RandomSource, SplitMix64};
+use crate::schedule::PresenceSnapshot;
 use crate::sound::Sound;
 use crate::task::{
-    CollectWindowTask, FirstUxTask, HyperTask, NabMouseTask, PerchRideTask, Task, TaskCtx,
-    WanderTask,
+    AutumnLeafPileTask, CollectWindowTask, FirstUxTask, HyperTask, NabMouseTask, PerchRideTask,
+    Task, TaskCtx, WanderTask,
 };
 use crate::time::DT;
 
@@ -57,8 +59,16 @@ pub struct World {
     sleepies: ZParticles,
     /// Dynamic mood state machine.
     mood: MoodMachine,
+    /// Built-in Autumn leaf-pile state.
+    autumn: AutumnState,
     /// Latest runtime-sampled local time, if the platform has provided one.
     local_time: Option<LocalTime>,
+    /// Latest platform-reported DND/fullscreen presence state.
+    presence: PresenceSnapshot,
+    /// Last schedule manners state used to build the pickable task deck.
+    last_manners_active: bool,
+    /// Last Autumn pickable state used to build the pickable task deck.
+    last_autumn_pickable: bool,
     /// Local hour that has already triggered its on-hour honks.
     last_hourly_honk: Option<LocalHour>,
     /// Pending second honk for the current on-hour double honk.
@@ -105,7 +115,16 @@ impl World {
 
         let mut rng = SplitMix64::seed(seed);
         let mood = MoodMachine::new(0.0, options.mood, &mut rng);
-        let pickable = Self::pickable_for(options, mood.current());
+        let presence = PresenceSnapshot::default();
+        let local_time = None;
+        let last_manners_active = options.schedule.manners_active(local_time, presence);
+        let last_autumn_pickable = false;
+        let pickable = Self::pickable_for(
+            options,
+            mood.current(),
+            last_manners_active,
+            last_autumn_pickable,
+        );
         let deck = Deck::new(pickable.len(), SplitMix64::seed(seed ^ 0x9E37_79B9));
 
         Self {
@@ -125,7 +144,11 @@ impl World {
             hearts: Hearts::new(),
             sleepies: ZParticles::new(),
             mood,
-            local_time: None,
+            autumn: AutumnState::new(),
+            local_time,
+            presence,
+            last_manners_active,
+            last_autumn_pickable,
             last_hourly_honk: None,
             second_hourly_honk_at: None,
             pointer: Pointer::default(),
@@ -144,14 +167,25 @@ impl World {
         self.elapsed
     }
 
-    fn pickable_for(options: WorldOptions, mood: MoodKind) -> Vec<fn() -> Box<dyn Task>> {
+    fn pickable_for(
+        options: WorldOptions,
+        mood: MoodKind,
+        manners_active: bool,
+        autumn_pickable: bool,
+    ) -> Vec<fn() -> Box<dyn Task>> {
         let mut pickable: Vec<fn() -> Box<dyn Task>> =
             vec![|| Box::new(WanderTask::new()) as Box<dyn Task>];
+        if manners_active {
+            return pickable;
+        }
         if options.mouse_steal.active() {
             pickable.push(|| Box::new(NabMouseTask::new()) as Box<dyn Task>);
         }
         if options.collect_window.active() {
             pickable.push(|| Box::new(CollectWindowTask::new()) as Box<dyn Task>);
+        }
+        if autumn_pickable {
+            pickable.push(|| Box::new(AutumnLeafPileTask::new()) as Box<dyn Task>);
         }
         if mood == MoodKind::Mischievous {
             if options.mouse_steal.active() {
@@ -165,7 +199,12 @@ impl World {
     }
 
     fn rebuild_pickable(&mut self) {
-        self.pickable = Self::pickable_for(self.options, self.mood.current());
+        self.pickable = Self::pickable_for(
+            self.options,
+            self.mood.current(),
+            self.manners_active(),
+            self.autumn_pickable(),
+        );
         self.deck = Deck::new(
             self.pickable.len(),
             SplitMix64::seed(
@@ -182,10 +221,14 @@ impl World {
         self.goose.parameters = options.parameters;
         self.mood
             .apply_options(options.mood, self.elapsed, &mut self.rng);
-        self.rebuild_pickable();
         if !options.hourly_honk.on_hour_double_honk {
             self.second_hourly_honk_at = None;
         }
+        if !self.autumn_active() {
+            self.autumn.clear();
+        }
+        self.refresh_schedule_state();
+        self.rebuild_pickable();
 
         if self.is_cursor_mischief_active() && !options.mouse_steal.active() {
             self.resume_or_wander();
@@ -349,6 +392,25 @@ impl World {
     /// Feed the current local time. Platform runtimes own local-time sampling.
     pub fn set_local_time(&mut self, local_time: LocalTime) {
         self.local_time = Some(local_time);
+        self.refresh_schedule_state();
+    }
+
+    /// Feed the latest platform presence state (DND/fullscreen/presentation).
+    pub fn set_presence(&mut self, presence: PresenceSnapshot) {
+        self.presence = presence;
+        self.refresh_schedule_state();
+    }
+
+    /// Whether quiet-hours or OS presence manners are currently calming the goose.
+    pub fn manners_active(&self) -> bool {
+        self.options
+            .schedule
+            .manners_active(self.local_time, self.presence)
+    }
+
+    /// The live built-in Autumn leaf state (for the renderer).
+    pub fn autumn(&self) -> &AutumnState {
+        &self.autumn
     }
 
     /// Whether the goose is currently in its post-pat calm window.
@@ -502,13 +564,15 @@ impl World {
     /// Advance the world by one fixed [`DT`] tick.
     pub fn tick(&mut self) {
         self.elapsed += DT;
+        self.refresh_schedule_state();
+        let manners_active = self.manners_active();
         self.apply_hourly_honk();
 
         let mood_event = self.mood.tick(self.elapsed, &mut self.rng);
         if mood_event.changed {
             self.rebuild_pickable();
         }
-        if let Some(sound) = mood_event.sound {
+        if let Some(sound) = mood_event.sound.filter(|_| !manners_active) {
             self.pending_sounds.push(sound);
         }
         if mood_event.spawn_sleepy_particle {
@@ -517,6 +581,7 @@ impl World {
                 .add(self.goose.rig.neck_head + jitter, self.elapsed);
         }
         if mood_event.trigger_hyper
+            && !manners_active
             && !self.is_cursor_mischief_active()
             && !self.is_perch_ride_active()
             && !self.is_collect_window_active()
@@ -560,6 +625,7 @@ impl World {
         }
 
         if self.options.foreign_window.watch_active()
+            && !manners_active
             && self.dragged_window.is_some()
             && !self.is_cursor_mischief_active()
             && !self.is_perch_ride_active()
@@ -569,7 +635,12 @@ impl World {
         }
 
         // Run the current task (it only sets targets/params); pick the next when it's done.
-        let calm = self.pat.is_calm(self.elapsed);
+        let calm = self.pat.is_calm(self.elapsed) || manners_active;
+        let autumn_targets = if !manners_active && self.autumn_active() {
+            self.autumn.targets()
+        } else {
+            Vec::new()
+        };
         let done = {
             let mut ctx = TaskCtx {
                 now: self.elapsed,
@@ -587,6 +658,7 @@ impl World {
                 collect_window_snapshot: self.collect_window_snapshot,
                 calm,
                 timing: self.options.timing,
+                autumn_piles: &autumn_targets,
             };
             self.current.run(&mut self.goose, &mut ctx)
         };
@@ -599,6 +671,7 @@ impl World {
         }
 
         self.apply_mood_locomotion_modulation();
+        self.apply_manners_locomotion_modulation();
 
         // Auto-locomotion toward the task's target.
         let before = self.goose.position;
@@ -636,6 +709,19 @@ impl World {
             }
             self.last_step = step;
         }
+
+        let had_autumn_pickable = self.autumn_pickable();
+        self.autumn.tick(
+            self.elapsed,
+            self.autumn_active(),
+            self.bounds,
+            &self.goose,
+            &mut self.rng,
+        );
+        if had_autumn_pickable != self.autumn_pickable() {
+            self.refresh_schedule_state();
+            self.rebuild_pickable();
+        }
     }
 
     /// The current rig, for the renderer.
@@ -644,6 +730,10 @@ impl World {
     }
 
     fn apply_hourly_honk(&mut self) {
+        if self.manners_active() {
+            self.second_hourly_honk_at = None;
+            return;
+        }
         if !self.options.hourly_honk.on_hour_double_honk {
             return;
         }
@@ -688,6 +778,13 @@ impl World {
         }
     }
 
+    fn apply_manners_locomotion_modulation(&mut self) {
+        if self.manners_active() && self.current.id() == "wander" {
+            self.goose.current_speed *= 0.6;
+            self.goose.current_acceleration *= 0.7;
+        }
+    }
+
     fn mood_neck_lerp(&self, base: f32) -> f32 {
         if self.goose.extending_neck {
             return 1.0;
@@ -701,6 +798,26 @@ impl World {
             MoodKind::Sad => base * 0.25,
             MoodKind::Sleepy => base * 0.15,
             MoodKind::Mischievous => (base + 0.16).min(1.0),
+        }
+    }
+
+    fn autumn_active(&self) -> bool {
+        self.options.schedule.autumn_active(self.local_time)
+    }
+
+    fn autumn_pickable(&self) -> bool {
+        self.autumn_active() && self.autumn.has_unkicked_piles()
+    }
+
+    fn refresh_schedule_state(&mut self) {
+        let manners_active = self.manners_active();
+        let autumn_pickable = self.autumn_pickable();
+        if manners_active != self.last_manners_active
+            || autumn_pickable != self.last_autumn_pickable
+        {
+            self.last_manners_active = manners_active;
+            self.last_autumn_pickable = autumn_pickable;
+            self.rebuild_pickable();
         }
     }
 }
@@ -717,6 +834,7 @@ mod tests {
     use crate::footmarks::FootMarkTiming;
     use crate::foreign_window::{ForeignWindowId, ForeignWindowOptions};
     use crate::mood::{HourlyHonkOptions, MoodIntensity, MoodOptions};
+    use crate::schedule::{LocalMinute, PresenceSnapshot, ScheduleOptions};
 
     fn bounds() -> Rect {
         Rect {
@@ -1517,7 +1635,7 @@ mod tests {
         );
 
         assert_eq!(
-            World::pickable_for(WorldOptions::default(), MoodKind::Mischievous).len(),
+            World::pickable_for(WorldOptions::default(), MoodKind::Mischievous, false, false).len(),
             1,
             "unsupported defaults keep only wander pickable"
         );
@@ -1527,7 +1645,9 @@ mod tests {
                     mouse_steal: MouseStealOptions::with_backend_support(true),
                     ..WorldOptions::default()
                 },
-                MoodKind::Mischievous
+                MoodKind::Mischievous,
+                false,
+                false
             )
             .len(),
             3,
@@ -1539,7 +1659,9 @@ mod tests {
                     collect_window: collect_options,
                     ..WorldOptions::default()
                 },
-                MoodKind::Mischievous
+                MoodKind::Mischievous,
+                false,
+                false
             )
             .len(),
             3,
@@ -1552,11 +1674,33 @@ mod tests {
                     collect_window: collect_options,
                     ..WorldOptions::default()
                 },
-                MoodKind::Mischievous
+                MoodKind::Mischievous,
+                false,
+                false
             )
             .len(),
             5,
             "mischievous mode duplicates only the two already-enabled mischief tasks"
+        );
+        assert_eq!(
+            World::pickable_for(
+                WorldOptions {
+                    mouse_steal: MouseStealOptions::with_backend_support(true),
+                    collect_window: collect_options,
+                    ..WorldOptions::default()
+                },
+                MoodKind::Mischievous,
+                true,
+                true,
+            )
+            .len(),
+            1,
+            "manners suppress random mischief and Autumn chase, leaving only wander"
+        );
+        assert_eq!(
+            World::pickable_for(WorldOptions::default(), MoodKind::Content, false, true).len(),
+            2,
+            "Autumn chase is pickable when an unkicked pile exists"
         );
     }
 
@@ -1613,6 +1757,116 @@ mod tests {
         });
         w.tick();
         assert_eq!(w.take_sounds(), vec![Sound::high_honk()]);
+    }
+
+    #[test]
+    fn quiet_hours_suppress_on_hour_honks_but_direct_honk_still_works() {
+        let mut w = World::with_options(
+            bounds(),
+            261,
+            WorldOptions {
+                mood: MoodOptions {
+                    dynamic_moods: false,
+                    intensity: MoodIntensity::Normal,
+                },
+                hourly_honk: HourlyHonkOptions {
+                    on_hour_double_honk: true,
+                },
+                schedule: ScheduleOptions {
+                    quiet_hours_enabled: true,
+                    quiet_start: LocalMinute::new(22, 0).unwrap(),
+                    quiet_end: LocalMinute::new(8, 0).unwrap(),
+                    ..ScheduleOptions::default()
+                },
+                ..WorldOptions::default()
+            },
+        );
+        w.set_local_time(LocalTime {
+            day: 20260628,
+            hour: 23,
+            minute: 0,
+            second: 0,
+        });
+        assert!(w.manners_active());
+        for _ in 0..100 {
+            w.tick();
+        }
+        assert!(w.take_sounds().is_empty(), "on-hour honks are suppressed");
+        assert_eq!(w.poke(PokeAction::Honk), PokeOutcome::Applied);
+        assert_eq!(w.take_sounds(), vec![Sound::honk()]);
+    }
+
+    #[test]
+    fn presence_fullscreen_suppresses_random_window_ride() {
+        let mut w = World::with_options(
+            bounds(),
+            262,
+            WorldOptions {
+                foreign_window: ForeignWindowOptions::with_backend_support(true, true),
+                ..WorldOptions::default()
+            },
+        );
+        w.current = Box::new(WanderTask::new());
+        w.set_presence(PresenceSnapshot::fullscreen());
+        w.set_foreign_window_drag(Some(ForeignWindowSnapshot {
+            id: ForeignWindowId(1),
+            rect: Rect {
+                min: Vec2::new(100.0, 100.0),
+                max: Vec2::new(300.0, 200.0),
+            },
+            ride_anchor: Vec2::new(200.0, 90.0),
+        }));
+        w.tick();
+        assert_eq!(w.current_task(), "wander");
+    }
+
+    #[test]
+    fn direct_nab_is_allowed_during_manners_when_capable() {
+        let mut w = World::with_options(
+            bounds(),
+            263,
+            WorldOptions {
+                mouse_steal: MouseStealOptions::with_backend_support(true),
+                ..WorldOptions::default()
+            },
+        );
+        w.current = Box::new(WanderTask::new());
+        w.set_pointer(Pointer {
+            pos: w.goose.rig.beak_tip,
+            present: true,
+            left_down: false,
+        });
+        w.set_presence(PresenceSnapshot::do_not_disturb());
+        assert!(w.manners_active());
+        assert_eq!(w.poke(PokeAction::Nab), PokeOutcome::Applied);
+        w.tick();
+        assert_eq!(w.current_task(), "nab_mouse");
+    }
+
+    #[test]
+    fn autumn_spawns_only_inside_autumn_window() {
+        let mut w = World::new(bounds(), 264);
+        w.set_local_time(LocalTime {
+            day: 20260831,
+            hour: 12,
+            minute: 0,
+            second: 0,
+        });
+        for _ in 0..1300 {
+            w.tick();
+        }
+        assert!(w.autumn().piles().is_empty());
+
+        w.set_local_time(LocalTime {
+            day: 20260901,
+            hour: 12,
+            minute: 0,
+            second: 0,
+        });
+        for _ in 0..1300 {
+            w.tick();
+        }
+        assert!(!w.autumn().piles().is_empty());
     }
 
     #[test]

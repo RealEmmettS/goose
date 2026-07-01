@@ -5,6 +5,7 @@
 
 use crate::math::Vec2;
 use crate::rng::{RandomSource, SplitMix64};
+use crate::schedule::LocalMinute;
 use crate::sound::Sound;
 
 const Z_LIFETIME: f32 = 1.6;
@@ -69,6 +70,22 @@ impl LocalTime {
         LocalHour {
             day: self.day,
             hour: self.hour,
+        }
+    }
+
+    pub const fn local_minute(self) -> LocalMinute {
+        match LocalMinute::new(self.hour, self.minute) {
+            Some(minute) => minute,
+            None => LocalMinute::MIN,
+        }
+    }
+
+    pub const fn month(self) -> Option<u8> {
+        let month = ((self.day / 100) % 100) as u8;
+        if month >= 1 && month <= 12 {
+            Some(month)
+        } else {
+            None
         }
     }
 

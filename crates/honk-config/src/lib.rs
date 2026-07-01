@@ -6,8 +6,9 @@
 
 use honk_engine::{
     CollectWindowCapabilities, CollectWindowOptions, FootMarkTiming, ForeignWindowOptions,
-    HourlyHonkOptions, InteractionOptions, MoodIntensity, MoodOptions, MouseStealOptions,
-    ParametersTable, RenderPalette, TimingOptions, WorldOptions,
+    HourlyHonkOptions, InteractionOptions, LocalMinute, MoodIntensity, MoodOptions,
+    MouseStealOptions, ParametersTable, RenderPalette, ScheduleOptions, TimingOptions,
+    WorldOptions,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -543,6 +544,7 @@ impl Config {
         let no_sound = cli.no_sound || self.behavior.silence_sounds || !self.audio.enabled;
         let no_mouse_steal = cli.no_mouse_steal || self.safety.no_mouse_steal;
         let no_window_ride = cli.no_window_ride || self.safety.no_window_ride;
+        let default_schedule = ScheduleOptions::default();
 
         let mut foreign_window = ForeignWindowOptions::with_backend_support(
             backend.window_watch_supported,
@@ -621,6 +623,17 @@ impl Config {
             },
             hourly_honk: HourlyHonkOptions {
                 on_hour_double_honk: self.behaviors.on_hour_double_honk,
+            },
+            schedule: ScheduleOptions {
+                quiet_hours_enabled: self.schedule.quiet_hours_enabled,
+                quiet_start: parse_local_minute(&self.schedule.quiet_start)
+                    .unwrap_or(default_schedule.quiet_start),
+                quiet_end: parse_local_minute(&self.schedule.quiet_end)
+                    .unwrap_or(default_schedule.quiet_end),
+                dnd_respect: self.schedule.dnd_respect,
+                pause_on_fullscreen: self.safety.pause_on_fullscreen,
+                seasonal: self.schedule.seasonal,
+                autumn: self.schedule.autumn,
             },
         };
 
@@ -834,6 +847,13 @@ fn parse_mood_intensity(value: &str) -> MoodIntensity {
         "spicy" => MoodIntensity::Spicy,
         _ => MoodIntensity::Normal,
     }
+}
+
+fn parse_local_minute(value: &str) -> Option<LocalMinute> {
+    let (hour, minute) = value.split_once(':')?;
+    let hour = hour.parse::<u8>().ok()?;
+    let minute = minute.parse::<u8>().ok()?;
+    LocalMinute::new(hour, minute)
 }
 
 fn validate_time(name: &str, value: &str, errors: &mut Vec<String>) {
@@ -1076,6 +1096,11 @@ mod tests {
         assert_eq!(effective.world.footmarks.lifetime, 8.5);
         assert_eq!(effective.world.mood.intensity, MoodIntensity::Normal);
         assert!(effective.world.hourly_honk.on_hour_double_honk);
+        assert_eq!(effective.world.schedule.quiet_start.minutes(), 22 * 60);
+        assert_eq!(effective.world.schedule.quiet_end.minutes(), 8 * 60);
+        assert!(effective.world.schedule.dnd_respect);
+        assert!(effective.world.schedule.pause_on_fullscreen);
+        assert!(effective.world.schedule.autumn);
         assert!(!effective
             .world
             .collect_window
@@ -1095,6 +1120,13 @@ mod tests {
         c.colors.goose_outline = "#445566".into();
         c.moods.mood_intensity = "spicy".into();
         c.behaviors.on_hour_double_honk = false;
+        c.schedule.quiet_hours_enabled = false;
+        c.schedule.quiet_start = "21:15".into();
+        c.schedule.quiet_end = "06:45".into();
+        c.schedule.dnd_respect = false;
+        c.schedule.seasonal = false;
+        c.schedule.autumn = false;
+        c.safety.pause_on_fullscreen = false;
 
         let effective = c.effective_options(backend(), CliOverrides::default());
         assert_eq!(effective.world.parameters.walk_speed, 91.0);
@@ -1106,6 +1138,22 @@ mod tests {
         assert_eq!(effective.world.palette.goose_outline, (0x44, 0x55, 0x66));
         assert_eq!(effective.world.mood.intensity, MoodIntensity::Spicy);
         assert!(!effective.world.hourly_honk.on_hour_double_honk);
+        assert!(!effective.world.schedule.quiet_hours_enabled);
+        assert_eq!(effective.world.schedule.quiet_start.minutes(), 21 * 60 + 15);
+        assert_eq!(effective.world.schedule.quiet_end.minutes(), 6 * 60 + 45);
+        assert!(!effective.world.schedule.dnd_respect);
+        assert!(!effective.world.schedule.pause_on_fullscreen);
+        assert!(!effective.world.schedule.seasonal);
+        assert!(!effective.world.schedule.autumn);
+    }
+
+    #[test]
+    fn parses_quiet_time_to_local_minutes() {
+        assert_eq!(parse_local_minute("00:00").unwrap().minutes(), 0);
+        assert_eq!(parse_local_minute("23:59").unwrap().minutes(), 23 * 60 + 59);
+        assert!(parse_local_minute("24:00").is_none());
+        assert!(parse_local_minute("12:60").is_none());
+        assert!(parse_local_minute("nope").is_none());
     }
 
     #[test]

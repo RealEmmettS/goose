@@ -100,6 +100,7 @@ pub enum ToggleField {
     CollectMemes,
     QuietHours,
     DndRespect,
+    PauseOnFullscreen,
     Seasonal,
     Autumn,
     CalmGoose,
@@ -321,6 +322,9 @@ impl AppState {
             }
             ToggleField::DndRespect => {
                 self.config.schedule.dnd_respect = !self.config.schedule.dnd_respect
+            }
+            ToggleField::PauseOnFullscreen => {
+                self.config.safety.pause_on_fullscreen = !self.config.safety.pause_on_fullscreen
             }
             ToggleField::Seasonal => self.config.schedule.seasonal = !self.config.schedule.seasonal,
             ToggleField::Autumn => self.config.schedule.autumn = !self.config.schedule.autumn,
@@ -636,7 +640,7 @@ impl AppState {
             Category::Schedule => vec![
                 row(
                     "Quiet hours",
-                    planned(self.config.schedule.quiet_hours_enabled),
+                    on_off(self.config.schedule.quiet_hours_enabled),
                     RowKind::Toggle(ToggleField::QuietHours),
                 ),
                 row(
@@ -650,18 +654,23 @@ impl AppState {
                     RowKind::Adjust(AdjustField::QuietEnd),
                 ),
                 row(
-                    "DND fullscreen",
-                    planned(self.config.schedule.dnd_respect),
+                    "DND respect",
+                    on_off(self.config.schedule.dnd_respect),
                     RowKind::Toggle(ToggleField::DndRespect),
                 ),
                 row(
+                    "Pause fullscreen",
+                    on_off(self.config.safety.pause_on_fullscreen),
+                    RowKind::Toggle(ToggleField::PauseOnFullscreen),
+                ),
+                row(
                     "Seasonal",
-                    planned(self.config.schedule.seasonal),
+                    on_off(self.config.schedule.seasonal),
                     RowKind::Toggle(ToggleField::Seasonal),
                 ),
                 row(
                     "Autumn",
-                    planned(self.config.schedule.autumn),
+                    on_off(self.config.schedule.autumn),
                     RowKind::Toggle(ToggleField::Autumn),
                 ),
             ],
@@ -750,11 +759,7 @@ impl AppState {
                     "not configurable".into(),
                     RowKind::Static,
                 ),
-                row(
-                    "M13",
-                    "dynamic moods + on-hour honk".into(),
-                    RowKind::Static,
-                ),
+                row("M14", "schedule + Autumn".into(), RowKind::Static),
             ],
         }
     }
@@ -895,6 +900,34 @@ mod tests {
         assert_eq!(app.config.schedule.quiet_start, "22:15");
         app.apply(Action::Adjust(-1));
         assert_eq!(app.config.schedule.quiet_start, "22:00");
+    }
+
+    #[test]
+    fn schedule_rows_are_live_m14_controls() {
+        let mut app = app();
+        app.apply(Action::SelectCategory(Category::Schedule));
+        let rows = app.rows();
+        for label in [
+            "Quiet hours",
+            "DND respect",
+            "Pause fullscreen",
+            "Seasonal",
+            "Autumn",
+        ] {
+            let row = rows.iter().find(|row| row.label == label).unwrap();
+            assert!(
+                !row.value.contains("planned"),
+                "{label} should be a live M14 row"
+            );
+        }
+
+        app.selected_row = rows
+            .iter()
+            .position(|row| row.label == "Pause fullscreen")
+            .unwrap();
+        assert!(app.config.safety.pause_on_fullscreen);
+        app.apply(Action::Toggle);
+        assert!(!app.config.safety.pause_on_fullscreen);
     }
 
     #[test]

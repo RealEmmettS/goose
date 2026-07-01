@@ -11,6 +11,7 @@ use crate::foreign_window::ForeignWindowOptions;
 use crate::math::Vec2;
 use crate::mood::{HourlyHonkOptions, MoodOptions};
 use crate::render::RenderPalette;
+use crate::schedule::ScheduleOptions;
 
 /// A cursor operation requested by the simulation for the platform backend to apply.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -74,6 +75,7 @@ pub struct WorldOptions {
     pub palette: RenderPalette,
     pub mood: MoodOptions,
     pub hourly_honk: HourlyHonkOptions,
+    pub schedule: ScheduleOptions,
 }
 
 /// User-facing interaction toggles that affect platform-free input handling.
