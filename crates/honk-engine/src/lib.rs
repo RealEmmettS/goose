@@ -56,7 +56,8 @@ pub use collect_window::{
 };
 pub use command::{PokeAction, PokeOutcome};
 pub use cursor::{
-    CursorCommand, InteractionOptions, MouseStealOptions, TimingOptions, WorldOptions,
+    AppearanceOptions, CursorCommand, InteractionOptions, MouseStealOptions, TimingOptions,
+    WorldOptions,
 };
 pub use entity::{GooseEntity, ParametersTable, SpeedTier};
 pub use feet::Feet;

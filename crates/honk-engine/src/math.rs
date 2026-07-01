@@ -94,6 +94,10 @@ pub struct Rect {
 }
 
 impl Rect {
+    pub fn new(min: Vec2, max: Vec2) -> Self {
+        Self { min, max }
+    }
+
     /// Smallest rect containing all `points`, then grown by `pad` on every side.
     /// Returns `None` for an empty point set.
     pub fn bounding(points: impl IntoIterator<Item = Vec2>, pad: f32) -> Option<Rect> {
@@ -116,6 +120,37 @@ impl Rect {
     /// Whether `p` lies inside the rectangle (inclusive of the edges).
     pub fn contains(&self, p: Vec2) -> bool {
         p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y
+    }
+
+    /// Return a rect expanded by `pad` on all sides.
+    pub fn grow(self, pad: f32) -> Rect {
+        Rect {
+            min: Vec2::new(self.min.x - pad, self.min.y - pad),
+            max: Vec2::new(self.max.x + pad, self.max.y + pad),
+        }
+    }
+
+    /// The smallest rect containing both inputs.
+    pub fn union(self, other: Rect) -> Rect {
+        Rect {
+            min: Vec2::new(self.min.x.min(other.min.x), self.min.y.min(other.min.y)),
+            max: Vec2::new(self.max.x.max(other.max.x), self.max.y.max(other.max.y)),
+        }
+    }
+
+    /// The overlapping area, if the two rects have positive area in common.
+    pub fn intersection(self, other: Rect) -> Option<Rect> {
+        let min = Vec2::new(self.min.x.max(other.min.x), self.min.y.max(other.min.y));
+        let max = Vec2::new(self.max.x.min(other.max.x), self.max.y.min(other.max.y));
+        (max.x > min.x && max.y > min.y).then_some(Rect { min, max })
+    }
+
+    /// Expand outward to whole-pixel edges.
+    pub fn pixel_aligned(self) -> Rect {
+        Rect {
+            min: Vec2::new(self.min.x.floor(), self.min.y.floor()),
+            max: Vec2::new(self.max.x.ceil(), self.max.y.ceil()),
+        }
     }
 
     /// Width of the rect.
@@ -212,6 +247,29 @@ mod tests {
         assert!(r.contains(Vec2::new(10.0, 10.0)), "max corner (inclusive)");
         assert!(!r.contains(Vec2::new(-0.1, 5.0)), "left of the rect");
         assert!(!r.contains(Vec2::new(5.0, 10.1)), "below the rect");
+    }
+
+    #[test]
+    fn rect_union_intersection_and_pixel_alignment() {
+        let a = Rect::new(Vec2::new(-10.2, 2.4), Vec2::new(20.1, 30.8));
+        let b = Rect::new(Vec2::new(5.0, -4.0), Vec2::new(40.0, 10.0));
+
+        assert_eq!(
+            a.union(b),
+            Rect::new(Vec2::new(-10.2, -4.0), Vec2::new(40.0, 30.8))
+        );
+        assert_eq!(
+            a.intersection(b),
+            Some(Rect::new(Vec2::new(5.0, 2.4), Vec2::new(20.1, 10.0)))
+        );
+        assert_eq!(
+            a.pixel_aligned(),
+            Rect::new(Vec2::new(-11.0, 2.0), Vec2::new(21.0, 31.0))
+        );
+        assert_eq!(
+            a.intersection(Rect::new(Vec2::new(20.1, 0.0), Vec2::new(30.0, 10.0))),
+            None
+        );
     }
 
     #[test]

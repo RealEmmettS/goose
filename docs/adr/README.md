@@ -19,3 +19,4 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0006 — M12 Config TUI, Durable TOML, And The Capability/Preference Boundary](./0006-m12-config-tui-and-capability-preference-boundary.md)
 - [0007 — M13 Dynamic Moods And Local-Time Injection](./0007-m13-moods-and-local-time-injection.md)
 - [0008 — M14 Schedule, Presence, And Autumn](./0008-m14-schedule-presence-and-autumn.md)
+- [0009 — M15 Multi-Monitor And Appearance](./0009-m15-multi-monitor-and-appearance.md)

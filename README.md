@@ -10,8 +10,8 @@ FOR REFERENCE:
 
 ## Status
 
-**Stage:** implementation in progress. Milestones **M0-M14** are complete; **M15 multi-monitor
-chase and full recolor/appearance** is next. The current Windows build renders the procedural goose on the desktop,
+**Stage:** implementation in progress. Milestones **M0-M15** are complete; **M16 macOS backend
+and universal2 app packaging** is next. The current Windows build renders the procedural goose on the desktop,
 walks it, leaves mud, plays sounds, reacts to pat/click input, can perform bounded cursor
 nabbing when cursor warping is enabled, and can perch on a user-dragged foreign window until
 release. It can also drag in Notepad and meme windows through the M9 collect-window dispatcher,
@@ -19,7 +19,9 @@ M10 adds a single-instance local control channel for `start`, `stop`, `reload`, 
 `do <action>` pokes, M11 adds the three-name goose-speak CLI grammar, and M12 adds durable TOML
 configuration plus the terminal config TUI. M13 adds deterministic dynamic moods and the local
 on-hour double honk; M14 adds quiet-hours/DND/fullscreen calm suppression and built-in procedural
-Autumn leaves. There is no installer or release artifact yet.
+Autumn leaves. M15 adds Windows multi-monitor chase, per-monitor dirty-region presentation, live
+Calm Goose, and full RGB editing for the original three-color goose palette. There is no installer
+or release artifact yet.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
@@ -42,14 +44,14 @@ contract, cross-platform guardrails, and Renderer V2 direction.
   constants. Sounds, screened original memes, and screened original notes are bundled 1:1 for
   personal use; M9 adds one complete custom in-house counterpart per copied meme/note original.
   Old donate pages and old developer references do not ship.
-- **TOML config** + a **ratatui terminal config TUI** at `<name> config`. Current M0-M14
+- **TOML config** + a **ratatui terminal config TUI** at `<name> config`. Current M0-M15
   settings hot-apply through reload where supported; future settings are persisted and shown
   as planned or restart-required until their milestones land.
 - **New autonomous behaviors**, each an optional toggle, scoped to parameter-modulation of the
   procedural rig (no new copied goose art): dynamic moods, on-the-hour double honk,
-  quiet-hours/DND/fullscreen manners, and built-in Autumn leaves are implemented; multi-monitor
-  chase, full appearance/recolor, and a Calm-goose valve remain later milestones. Default = full
-  original prank, always-on.
+  quiet-hours/DND/fullscreen manners, built-in Autumn leaves, multi-monitor chase, full
+  original-palette recolor, and the Calm Goose valve are implemented. Default = full original
+  prank, always-on.
 - **No external mods** (Autumn is built-in; extensibility via documented internal seams),
   **no system tray**, and **no global quit key**. Starting, stopping, and configuration are
   CLI/TUI-only over the single-instance IPC channel.

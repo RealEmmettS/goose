@@ -5,9 +5,9 @@
 //! platform-free option structs consumed by the engine.
 
 use honk_engine::{
-    CollectWindowCapabilities, CollectWindowOptions, FootMarkTiming, ForeignWindowOptions,
-    HourlyHonkOptions, InteractionOptions, LocalMinute, MoodIntensity, MoodOptions,
-    MouseStealOptions, ParametersTable, RenderPalette, ScheduleOptions, TimingOptions,
+    AppearanceOptions, CollectWindowCapabilities, CollectWindowOptions, FootMarkTiming,
+    ForeignWindowOptions, HourlyHonkOptions, InteractionOptions, LocalMinute, MoodIntensity,
+    MoodOptions, MouseStealOptions, ParametersTable, RenderPalette, ScheduleOptions, TimingOptions,
     WorldOptions,
 };
 use serde::{Deserialize, Serialize};
@@ -573,6 +573,7 @@ impl Config {
         collect_window.memes_enabled = self.mischief.collect_memes;
 
         let world = WorldOptions {
+            multi_monitor_chase: self.behaviors.multi_monitor_chase,
             mouse_steal: MouseStealOptions {
                 enabled: self.behavior.can_attack_mouse && !no_mouse_steal,
                 warp_supported: backend.cursor_warp_supported,
@@ -584,6 +585,9 @@ impl Config {
             collect_window,
             interaction: InteractionOptions {
                 pat_streak: self.interaction.pat_streak,
+            },
+            appearance: AppearanceOptions {
+                calm_goose: self.appearance.calm_goose,
             },
             timing: TimingOptions {
                 first_wander_time: self.behavior.first_wander_time_seconds,
@@ -1095,6 +1099,8 @@ mod tests {
         assert_eq!(effective.world.parameters.walk_speed, 80.0);
         assert_eq!(effective.world.footmarks.lifetime, 8.5);
         assert_eq!(effective.world.mood.intensity, MoodIntensity::Normal);
+        assert!(effective.world.multi_monitor_chase);
+        assert!(!effective.world.appearance.calm_goose);
         assert!(effective.world.hourly_honk.on_hour_double_honk);
         assert_eq!(effective.world.schedule.quiet_start.minutes(), 22 * 60);
         assert_eq!(effective.world.schedule.quiet_end.minutes(), 8 * 60);
@@ -1120,6 +1126,8 @@ mod tests {
         c.colors.goose_outline = "#445566".into();
         c.moods.mood_intensity = "spicy".into();
         c.behaviors.on_hour_double_honk = false;
+        c.behaviors.multi_monitor_chase = false;
+        c.appearance.calm_goose = true;
         c.schedule.quiet_hours_enabled = false;
         c.schedule.quiet_start = "21:15".into();
         c.schedule.quiet_end = "06:45".into();
@@ -1137,6 +1145,8 @@ mod tests {
         assert_eq!(effective.world.palette.goose_orange, (0x11, 0x22, 0x33));
         assert_eq!(effective.world.palette.goose_outline, (0x44, 0x55, 0x66));
         assert_eq!(effective.world.mood.intensity, MoodIntensity::Spicy);
+        assert!(!effective.world.multi_monitor_chase);
+        assert!(effective.world.appearance.calm_goose);
         assert!(!effective.world.hourly_honk.on_hour_double_honk);
         assert!(!effective.world.schedule.quiet_hours_enabled);
         assert_eq!(effective.world.schedule.quiet_start.minutes(), 21 * 60 + 15);

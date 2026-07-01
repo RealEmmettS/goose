@@ -4,18 +4,35 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: implementation in progress.** Milestones M0-M14 are complete and M15 is
+> **Project stage: implementation in progress.** Milestones M0-M15 are complete and M16 is
 > next. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
 > Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
 > ratatui config TUI, dynamic moods, the local on-hour double honk, quiet-hours/DND/fullscreen
-> manners, and built-in Autumn leaves; there is no release yet. A plain-English companion lives in [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md)
-> and must stay in lockstep.
+> manners, built-in Autumn leaves, Windows multi-monitor chase, and live appearance/recolor
+> controls; there is no release yet. A plain-English companion lives in
+> [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
 
 ### Added
+- **Multi-monitor chase and appearance controls (milestone M15, complete)** — Windows now creates
+  one layered overlay HWND per monitor, enumerates signed monitor bounds, chooses the engine world
+  bounds from `[behaviors].multi_monitor_chase`, and clips/crops dirty render regions per monitor
+  before calling `UpdateLayeredWindow`. With multi-monitor chase off, startup uses the primary
+  monitor bounds; with it on, startup uses the full signed virtual desktop. Reloads hot-apply
+  normal world options but report multi-monitor chase changes as restart-required.
+- **M15 engine/config appearance contract** — `WorldOptions` now carries
+  `multi_monitor_chase` and `AppearanceOptions { calm_goose }`. Calm Goose uses the existing Calm
+  Suppression/manners path to suppress spontaneous honks, on-hour honks, autonomous
+  cursor/window/collect mischief, and Autumn pile chase while leaving direct clicks and CLI/TUI
+  pokes under their normal gates. `World::render_bounds(previous)` centralizes dirty-region
+  coverage for the goose, previous frame, footmarks, hearts, sleepy particles, and Autumn piles.
+- **M15 TUI recolor controls and ADR 0009** — the config TUI now makes Calm Goose live, marks
+  multi-monitor chase as restart-required, and edits goose white/orange/outline through separate
+  RGB channel rows so hue changes are possible without free-form text input. ADR 0009 records the
+  accepted multi-monitor, dirty-render, Calm Goose, and original three-color palette scope.
 - **Schedule manners and built-in Autumn (milestone M14, complete)** — added
   `honk-engine::schedule` with `ScheduleOptions`, `LocalMinute`, `PresenceSnapshot`, and
   `PresenceState`, plus `World::set_presence`, `World::manners_active`, and the schedule field on
@@ -52,11 +69,11 @@ All notable changes to this project are documented here. Format based on
   default path is `%LOCALAPPDATA%\honk300\config.toml`, `~/Library/Application Support/honk300/config.toml`,
   or `$XDG_DATA_HOME` / `~/.local/share/honk300/config.toml`, with `--config <path>` override.
   Startup falls back to defaults on missing or rejected config and warns without corrupting the
-  running state. Reload parses and validates before applying, then hot-applies current M0-M14
+  running state. Reload parses and validates before applying, then hot-applies current M0-M15
   settings for audio, mouse steal/tuning, perch-and-ride, collect-window kinds, pat behavior,
-  timing, movement speed, mud/footmark timing, palette, mood intensity, and on-hour honking.
-  Future settings for schedule, Autumn, full appearance, multi-monitor, Wayland/backend, and
-  spicy behavior are persisted and shown as planned or restart-required.
+  timing, movement speed, mud/footmark timing, palette, mood intensity, on-hour honking, schedule,
+  Autumn, and Calm Goose. Future settings for Wayland/backend and spicy behavior are persisted and
+  shown as planned or restart-required.
 - **Ratatui reducer UI (milestone M12, complete)** — added the `honk-config-tui` crate with
   reducer-owned state, pure render modules, categories for General, Behaviors, Mischief,
   Schedule, Appearance, Audio, Commands, and About, plus a Poke panel that sends M10 IPC commands.
@@ -283,13 +300,13 @@ All notable changes to this project are documented here. Format based on
 - `CLAUDE.md` — repository guidance for future Claude Code sessions.
 
 ### Changed
-- M14 is now Done, M15 is now Active, and Renderer V2 remains tracked separately as backlog task
+- M15 is now Done, M16 is now next, and Renderer V2 remains tracked separately as backlog task
   `#r2v`. The task records now preserve M7's audit/readiness/renderer work, M8's foreign-window
   readiness pass, M9's collect-window asset/ADR/target-readiness work, and M10's IPC/control
   readiness work, plus M11 CLI grammar, M12 config/TUI readiness work, M13 moods/hourly-honk
-  closure, and M14 schedule/Autumn closure.
-- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M14 complete, M15 next,
-  and the ADR 0001/0002/0003/0004/0007/0008 location and maintenance rules.
+  closure, M14 schedule/Autumn closure, and M15 multi-monitor/appearance closure.
+- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M15 complete, M16 next,
+  and the ADR 0001/0002/0003/0004/0007/0008/0009 location and maintenance rules.
 - Added **ADR 0005** (M11 three-name CLI, goose-speak, and the poke-outcome round-trip) and
   **ADR 0006** (M12 config TUI, durable TOML, and the capability/preference boundary), recording
   the previously-undocumented M11/M12 decisions and the four contract corrections from the
@@ -298,6 +315,9 @@ All notable changes to this project are documented here. Format based on
   mood state machine, honk-tone contract, and runtime-owned local-clock sampling boundary.
 - Added **ADR 0008** (M14 schedule, presence, and Autumn), recording Calm Suppression, the
   schedule/presence engine boundary, Windows presence polling, and the built-in Autumn constants.
+- Added **ADR 0009** (M15 multi-monitor and appearance), recording the per-monitor Windows overlay
+  boundary, dirty-region presentation, Calm Goose valve, restart-required multi-monitor reload
+  rule, and original three-color recolor scope.
 - `claude_plan.md` and `codex_plan.md` are now **superseded reference drafts**; `honk300_plan.md`
   is canonical. The "Read these first" pointers in **both** `CLAUDE.md` and its Codex twin
   `AGENTS.md` were updated in lockstep (canonical plan, milestone range M0–M19, workspace

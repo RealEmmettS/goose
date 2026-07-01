@@ -13,14 +13,25 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > simple poke commands. It now understands the friendly three-name command grammar and has a
 > terminal settings screen backed by a saved config file. It now has dynamic moods and a double
 > honk at the top of each hour. It now also respects quiet times, fullscreen/DND manners, and
-> seasonal Autumn leaves. The next milestone is multi-monitor chasing and fuller appearance
-> controls. There's no installer yet — that comes later.
+> seasonal Autumn leaves. It now supports Windows multi-monitor chasing and fuller appearance
+> controls. The next milestone is Mac support. There's no installer yet — that comes later.
 
 ---
 
-## Latest — June 2026
+## Latest — July 2026
 
 **Added**
+- The goose can now roam across multiple Windows monitors when multi-monitor chasing is on. It
+  treats the whole signed desktop as one space, so monitors to the left or above the main screen
+  work too. If you turn multi-monitor chasing off, it stays on the primary screen.
+- Drawing is now lighter. Instead of repainting a whole monitor-sized layer every frame, the app
+  redraws the small part of the desktop where the goose and its active effects can appear, then
+  clips that drawing to each monitor.
+- Calm Goose is now a real setting. When it is on, the goose stops doing surprise disruptions and
+  random honks, but direct clicks and commands still work.
+- Appearance controls are now more complete. The settings screen lets you adjust red, green, and
+  blue channels for the goose body, orange parts, and outline, so custom colors can change hue
+  instead of only getting lighter or darker.
 - The goose now has manners for quiet time, Do Not Disturb, and fullscreen use. During those
   periods it calms down: no random honks, no hourly double honk, and no autonomous pranks like
   cursor grabbing or dragging windows around. You can still click it or use direct commands, so
@@ -42,9 +53,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   with the config command, change current settings such as sound, mouse stealing, window riding,
   note/meme behavior, petting behavior, and timing, and save them without mixing settings code
   into the goose's core brain.
-- The settings screen also shows future options honestly. Things like seasons, fuller appearance,
-  multi-monitor behavior, Wayland/backend mode, and extra prank behavior can be saved for later,
-  but they are marked as planned or restart-required until those milestones actually exist.
+- The settings screen also shows future options honestly. Wayland/backend mode and extra prank
+  behavior can be saved for later, but they are marked as planned or restart-required until those
+  milestones actually exist.
 - The command grammar now works under all three intended names: `honk300`, `honk`, and `goose`.
   `honk plz`, `goose plz`, and `honk300 plz` start it; `honk bad`, `goose no`, and
   `goose no honk` stop it; and pokes like honk, wander, mud, note, meme, or nab stay explicit
@@ -134,6 +145,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   saved as a local comparison, then replaced because it did not feel as much like the original.
 
 **Behind the scenes**
+- The multi-monitor and appearance milestone now has its own architecture record. It says the
+  shared goose logic only receives desktop bounds, while Windows owns monitor discovery and
+  per-monitor transparent windows. It also records that recoloring means the original three-color
+  goose palette, not a new renderer or new art.
 - The quiet-hours, fullscreen/DND, and Autumn milestone now has its own architecture record. It
   keeps local date/time and computer-presence checks outside the goose's shared brain, while the
   shared brain decides what "be polite right now" means.
@@ -148,8 +163,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   fixed stale status notes, confirmed the goose's core logic still stays separate from
   Windows-only behavior, and created follow-up work for improving the fullscreen overlay's
   performance before packaging.
-- The task board now shows the command grammar, settings-screen, mood, and schedule/Autumn
-  milestones as done and moves multi-monitor/appearance work into the active slot. The future sprite-sheet renderer remains tracked as its own
+- The task board now shows the command grammar, settings-screen, mood, schedule/Autumn, and
+  multi-monitor/appearance milestones as done. The future sprite-sheet renderer remains tracked as its own
   follow-up task instead of being treated as unfinished cursor-stealing work.
 - The project guidance for future agents now says when to add or update architecture decision
   records, and it repeats the rule that the technical and human changelogs must stay in sync.

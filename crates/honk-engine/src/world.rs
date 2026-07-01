@@ -117,7 +117,7 @@ impl World {
         let mood = MoodMachine::new(0.0, options.mood, &mut rng);
         let presence = PresenceSnapshot::default();
         let local_time = None;
-        let last_manners_active = options.schedule.manners_active(local_time, presence);
+        let last_manners_active = Self::manners_active_for(options, local_time, presence);
         let last_autumn_pickable = false;
         let pickable = Self::pickable_for(
             options,
@@ -213,6 +213,14 @@ impl World {
                     ^ 0xA076_1D64_78BD_642F,
             ),
         );
+    }
+
+    fn manners_active_for(
+        options: WorldOptions,
+        local_time: Option<LocalTime>,
+        presence: PresenceSnapshot,
+    ) -> bool {
+        options.appearance.calm_goose || options.schedule.manners_active(local_time, presence)
     }
 
     /// Atomically apply a complete runtime option set from the control plane.
@@ -379,6 +387,47 @@ impl World {
         self.options.palette
     }
 
+    /// World-space area that can contain visible pixels this frame, optionally unioned with the
+    /// previous frame so moving pixels get cleared by dirty-region presentation.
+    pub fn render_bounds(&self, previous: Option<Rect>) -> Rect {
+        let mut rect = self.goose.rig.bounding_box();
+        for (mark, scale) in self
+            .goose
+            .foot_marks
+            .active_with_timing(self.elapsed, self.footmark_timing())
+        {
+            rect = rect.union(Rect::new(mark.position, mark.position).grow(5.0 * scale + 2.0));
+        }
+        for (pos, _) in self.hearts.active(self.elapsed) {
+            rect = rect.union(Rect::new(pos, pos).grow(12.0));
+        }
+        for (pos, _) in self.sleepies.active(self.elapsed) {
+            rect = rect.union(Rect::new(pos, pos).grow(14.0));
+        }
+        for pile in self.autumn.piles() {
+            let spawn = pile.spawn_scale(self.elapsed);
+            rect =
+                rect.union(Rect::new(pile.position, pile.position).grow(pile.radius * spawn + 6.0));
+            for leaf in &pile.leaves {
+                let pos = pile.position + leaf.screen_offset() * spawn;
+                rect = rect.union(Rect::new(pos, pos).grow(5.0));
+            }
+        }
+        if let Some(previous) = previous {
+            rect = rect.union(previous);
+        }
+        rect.grow(3.0)
+            .intersection(self.bounds)
+            .unwrap_or_else(|| {
+                self.goose
+                    .rig
+                    .bounding_box()
+                    .intersection(self.bounds)
+                    .unwrap_or(self.bounds)
+            })
+            .pixel_aligned()
+    }
+
     /// Runtime footmark timing from config.
     pub fn footmark_timing(&self) -> crate::footmarks::FootMarkTiming {
         self.options.footmarks
@@ -403,9 +452,7 @@ impl World {
 
     /// Whether quiet-hours or OS presence manners are currently calming the goose.
     pub fn manners_active(&self) -> bool {
-        self.options
-            .schedule
-            .manners_active(self.local_time, self.presence)
+        Self::manners_active_for(self.options, self.local_time, self.presence)
     }
 
     /// The live built-in Autumn leaf state (for the renderer).
@@ -829,7 +876,7 @@ mod tests {
         CollectWindowCapabilities, CollectWindowId, CollectWindowKind, CollectWindowOptions,
         CollectWindowRequestId, CollectWindowSnapshot,
     };
-    use crate::cursor::{InteractionOptions, MouseStealOptions, TimingOptions};
+    use crate::cursor::{AppearanceOptions, InteractionOptions, MouseStealOptions, TimingOptions};
     use crate::entity::ParametersTable;
     use crate::footmarks::FootMarkTiming;
     use crate::foreign_window::{ForeignWindowId, ForeignWindowOptions};
@@ -983,6 +1030,21 @@ mod tests {
         w.goose.track_mud_end_time = -1.0;
         let faded_at = w.now() + 10.0; // past the 8.5 s lifetime
         assert_eq!(w.goose.foot_marks.alive_count(faded_at), 0);
+    }
+
+    #[test]
+    fn render_bounds_include_previous_frame_and_clip_to_world() {
+        let mut w = World::new(bounds(), 500);
+        w.goose.position = Vec2::new(5.0, 6.0);
+        w.goose.rig = Rig::update(w.goose.position, w.goose.direction, 0.0, 0.0);
+        w.goose.foot_marks.add(Vec2::new(900.0, 700.0), w.now());
+
+        let previous = Rect::new(Vec2::new(990.0, 790.0), Vec2::new(1040.0, 850.0));
+        let dirty = w.render_bounds(Some(previous));
+
+        assert_eq!(dirty.min, Vec2::new(0.0, 0.0));
+        assert_eq!(dirty.max, Vec2::new(1000.0, 800.0));
+        assert!(dirty.contains(Vec2::new(900.0, 700.0)));
     }
 
     /// Sweep the cursor back and forth over the goose `strokes` times, hovering throughout.
@@ -1784,6 +1846,38 @@ mod tests {
         w.set_local_time(LocalTime {
             day: 20260628,
             hour: 23,
+            minute: 0,
+            second: 0,
+        });
+        assert!(w.manners_active());
+        for _ in 0..100 {
+            w.tick();
+        }
+        assert!(w.take_sounds().is_empty(), "on-hour honks are suppressed");
+        assert_eq!(w.poke(PokeAction::Honk), PokeOutcome::Applied);
+        assert_eq!(w.take_sounds(), vec![Sound::honk()]);
+    }
+
+    #[test]
+    fn calm_goose_suppresses_on_hour_honks_but_direct_honk_still_works() {
+        let mut w = World::with_options(
+            bounds(),
+            265,
+            WorldOptions {
+                appearance: AppearanceOptions { calm_goose: true },
+                mood: MoodOptions {
+                    dynamic_moods: false,
+                    intensity: MoodIntensity::Normal,
+                },
+                hourly_honk: HourlyHonkOptions {
+                    on_hour_double_honk: true,
+                },
+                ..WorldOptions::default()
+            },
+        );
+        w.set_local_time(LocalTime {
+            day: 20260701,
+            hour: 9,
             minute: 0,
             second: 0,
         });

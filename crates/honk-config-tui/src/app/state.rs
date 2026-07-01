@@ -91,6 +91,7 @@ pub enum ToggleField {
     NoWindowRide,
     Wayland,
     OnHourHonk,
+    MultiMonitorChase,
     CanAttackMouse,
     PatStreak,
     DynamicMoods,
@@ -131,9 +132,21 @@ pub enum AdjustField {
     MouseSucc,
     QuietStart,
     QuietEnd,
-    GooseWhite,
-    GooseOrange,
-    GooseOutline,
+    Color(ColorSlot, ColorChannel),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorSlot {
+    White,
+    Orange,
+    Outline,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorChannel {
+    Red,
+    Green,
+    Blue,
 }
 
 #[derive(Debug, Clone)]
@@ -295,6 +308,10 @@ impl AppState {
             ToggleField::OnHourHonk => {
                 self.config.behaviors.on_hour_double_honk =
                     !self.config.behaviors.on_hour_double_honk
+            }
+            ToggleField::MultiMonitorChase => {
+                self.config.behaviors.multi_monitor_chase =
+                    !self.config.behaviors.multi_monitor_chase
             }
             ToggleField::CanAttackMouse => {
                 self.config.behavior.can_attack_mouse = !self.config.behavior.can_attack_mouse
@@ -463,19 +480,18 @@ impl AppState {
                 self.config.schedule.quiet_end =
                     adjust_time_15(&self.config.schedule.quiet_end, delta);
             }
-            AdjustField::GooseWhite => {
-                self.config.colors.goose_white =
-                    adjust_color(&self.config.colors.goose_white, delta);
-            }
-            AdjustField::GooseOrange => {
-                self.config.colors.goose_orange =
-                    adjust_color(&self.config.colors.goose_orange, delta);
-            }
-            AdjustField::GooseOutline => {
-                self.config.colors.goose_outline =
-                    adjust_color(&self.config.colors.goose_outline, delta);
-            }
+            AdjustField::Color(slot, channel) => self.adjust_color_channel(slot, channel, delta),
         }
+    }
+
+    fn adjust_color_channel(&mut self, slot: ColorSlot, channel: ColorChannel, delta: i8) {
+        let color = match slot {
+            ColorSlot::White => &mut self.config.colors.goose_white,
+            ColorSlot::Orange => &mut self.config.colors.goose_orange,
+            ColorSlot::Outline => &mut self.config.colors.goose_outline,
+        };
+        let next = adjust_color_channel(color.as_str(), channel, delta);
+        *color = next;
     }
 
     fn cycle_mood(&mut self, delta: i8) {
@@ -510,6 +526,11 @@ impl AppState {
                     "On-hour honk",
                     on_off(self.config.behaviors.on_hour_double_honk),
                     RowKind::Toggle(ToggleField::OnHourHonk),
+                ),
+                row(
+                    "Multi-monitor chase",
+                    restart_required(self.config.behaviors.multi_monitor_chase),
+                    RowKind::Toggle(ToggleField::MultiMonitorChase),
                 ),
                 row(
                     "Wayland backend",
@@ -677,7 +698,7 @@ impl AppState {
             Category::Appearance => vec![
                 row(
                     "Calm goose",
-                    planned(self.config.appearance.calm_goose),
+                    on_off(self.config.appearance.calm_goose),
                     RowKind::Toggle(ToggleField::CalmGoose),
                 ),
                 row(
@@ -685,20 +706,59 @@ impl AppState {
                     on_off(self.config.behavior.use_custom_colors),
                     RowKind::Toggle(ToggleField::CustomColors),
                 ),
-                row(
-                    "Goose white",
-                    self.config.colors.goose_white.clone(),
-                    RowKind::Adjust(AdjustField::GooseWhite),
+                color_row(
+                    "White R",
+                    &self.config.colors.goose_white,
+                    ColorSlot::White,
+                    ColorChannel::Red,
                 ),
-                row(
-                    "Goose orange",
-                    self.config.colors.goose_orange.clone(),
-                    RowKind::Adjust(AdjustField::GooseOrange),
+                color_row(
+                    "White G",
+                    &self.config.colors.goose_white,
+                    ColorSlot::White,
+                    ColorChannel::Green,
                 ),
-                row(
-                    "Goose outline",
-                    self.config.colors.goose_outline.clone(),
-                    RowKind::Adjust(AdjustField::GooseOutline),
+                color_row(
+                    "White B",
+                    &self.config.colors.goose_white,
+                    ColorSlot::White,
+                    ColorChannel::Blue,
+                ),
+                color_row(
+                    "Orange R",
+                    &self.config.colors.goose_orange,
+                    ColorSlot::Orange,
+                    ColorChannel::Red,
+                ),
+                color_row(
+                    "Orange G",
+                    &self.config.colors.goose_orange,
+                    ColorSlot::Orange,
+                    ColorChannel::Green,
+                ),
+                color_row(
+                    "Orange B",
+                    &self.config.colors.goose_orange,
+                    ColorSlot::Orange,
+                    ColorChannel::Blue,
+                ),
+                color_row(
+                    "Outline R",
+                    &self.config.colors.goose_outline,
+                    ColorSlot::Outline,
+                    ColorChannel::Red,
+                ),
+                color_row(
+                    "Outline G",
+                    &self.config.colors.goose_outline,
+                    ColorSlot::Outline,
+                    ColorChannel::Green,
+                ),
+                color_row(
+                    "Outline B",
+                    &self.config.colors.goose_outline,
+                    ColorSlot::Outline,
+                    ColorChannel::Blue,
                 ),
             ],
             Category::Audio => vec![
@@ -773,12 +833,24 @@ fn row(label: &str, value: String, kind: RowKind) -> Row {
     }
 }
 
+fn color_row(label: &str, color: &str, slot: ColorSlot, channel: ColorChannel) -> Row {
+    row(
+        label,
+        color_channel_value(color, channel),
+        RowKind::Adjust(AdjustField::Color(slot, channel)),
+    )
+}
+
 fn on_off(v: bool) -> String {
     if v { "on" } else { "off" }.into()
 }
 
 fn planned(v: bool) -> String {
     format!("{} (planned)", if v { "on" } else { "off" })
+}
+
+fn restart_required(v: bool) -> String {
+    format!("{} (restart)", if v { "on" } else { "off" })
 }
 
 fn seconds(v: f32) -> String {
@@ -807,17 +879,29 @@ fn adjust_time_15(value: &str, delta: i8) -> String {
     format!("{:02}:{:02}", total / 60, total % 60)
 }
 
-fn adjust_color(value: &str, delta: i8) -> String {
+fn adjust_color_channel(value: &str, channel: ColorChannel, delta: i8) -> String {
     let Some((r, g, b)) = parse_hex(value) else {
         return "#ffffff".into();
     };
     let step = delta as i16 * 0x11;
-    format!(
-        "#{:02x}{:02x}{:02x}",
-        clamp_channel(r as i16 + step),
-        clamp_channel(g as i16 + step),
-        clamp_channel(b as i16 + step)
-    )
+    let (r, g, b) = match channel {
+        ColorChannel::Red => (clamp_channel(r as i16 + step), g, b),
+        ColorChannel::Green => (r, clamp_channel(g as i16 + step), b),
+        ColorChannel::Blue => (r, g, clamp_channel(b as i16 + step)),
+    };
+    format!("#{r:02x}{g:02x}{b:02x}")
+}
+
+fn color_channel_value(value: &str, channel: ColorChannel) -> String {
+    let Some((r, g, b)) = parse_hex(value) else {
+        return "invalid".into();
+    };
+    let value = match channel {
+        ColorChannel::Red => r,
+        ColorChannel::Green => g,
+        ColorChannel::Blue => b,
+    };
+    format!("{value:03}")
 }
 
 fn parse_hex(value: &str) -> Option<(u8, u8, u8)> {
@@ -928,6 +1012,58 @@ mod tests {
         assert!(app.config.safety.pause_on_fullscreen);
         app.apply(Action::Toggle);
         assert!(!app.config.safety.pause_on_fullscreen);
+    }
+
+    #[test]
+    fn general_marks_multi_monitor_chase_restart_required() {
+        let mut app = app();
+        app.apply(Action::SelectCategory(Category::General));
+        let rows = app.rows();
+        let row = rows
+            .iter()
+            .find(|row| row.label == "Multi-monitor chase")
+            .unwrap();
+        assert_eq!(row.value, "on (restart)");
+
+        app.selected_row = rows
+            .iter()
+            .position(|row| row.label == "Multi-monitor chase")
+            .unwrap();
+        app.apply(Action::Toggle);
+        assert!(!app.config.behaviors.multi_monitor_chase);
+    }
+
+    #[test]
+    fn appearance_rows_are_live_m15_controls_with_rgb_channel_editing() {
+        let mut app = app();
+        app.config.colors.goose_white = "#102030".into();
+        app.apply(Action::SelectCategory(Category::Appearance));
+        let rows = app.rows();
+        assert_eq!(
+            rows.iter()
+                .find(|row| row.label == "Calm goose")
+                .unwrap()
+                .value,
+            "off"
+        );
+        for label in ["White R", "White G", "White B", "Orange R", "Outline B"] {
+            assert!(rows.iter().any(|row| row.label == label), "{label}");
+        }
+
+        app.selected_row = rows
+            .iter()
+            .position(|row| row.label == "Calm goose")
+            .unwrap();
+        app.apply(Action::Toggle);
+        assert!(app.config.appearance.calm_goose);
+
+        app.selected_row = app
+            .rows()
+            .iter()
+            .position(|row| row.label == "White G")
+            .unwrap();
+        app.apply(Action::Adjust(1));
+        assert_eq!(app.config.colors.goose_white, "#103130");
     }
 
     #[test]

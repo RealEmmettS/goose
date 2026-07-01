@@ -62,13 +62,23 @@ impl MouseStealOptions {
     }
 }
 
+/// Runtime appearance/personality options that stay platform-free.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct AppearanceOptions {
+    /// Master calm valve: suppress autonomous disruption while leaving direct commands live.
+    pub calm_goose: bool,
+}
+
 /// Runtime options for the platform-free world.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WorldOptions {
+    /// Whether the runtime should use the full virtual desktop instead of the primary monitor.
+    pub multi_monitor_chase: bool,
     pub mouse_steal: MouseStealOptions,
     pub foreign_window: ForeignWindowOptions,
     pub collect_window: CollectWindowOptions,
     pub interaction: InteractionOptions,
+    pub appearance: AppearanceOptions,
     pub timing: TimingOptions,
     pub parameters: ParametersTable,
     pub footmarks: FootMarkTiming,
@@ -76,6 +86,26 @@ pub struct WorldOptions {
     pub mood: MoodOptions,
     pub hourly_honk: HourlyHonkOptions,
     pub schedule: ScheduleOptions,
+}
+
+impl Default for WorldOptions {
+    fn default() -> Self {
+        Self {
+            multi_monitor_chase: true,
+            mouse_steal: MouseStealOptions::default(),
+            foreign_window: ForeignWindowOptions::default(),
+            collect_window: CollectWindowOptions::default(),
+            interaction: InteractionOptions::default(),
+            appearance: AppearanceOptions::default(),
+            timing: TimingOptions::default(),
+            parameters: ParametersTable::default(),
+            footmarks: FootMarkTiming::default(),
+            palette: RenderPalette::default(),
+            mood: MoodOptions::default(),
+            hourly_honk: HourlyHonkOptions::default(),
+            schedule: ScheduleOptions::default(),
+        }
+    }
 }
 
 /// User-facing interaction toggles that affect platform-free input handling.

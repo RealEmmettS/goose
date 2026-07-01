@@ -1,9 +1,8 @@
 //! Windows overlay backend for honk300.
 //!
-//! A single **fullscreen primary-monitor layered popup window** presented via
-//! [`Overlay::present`] and `UpdateLayeredWindow`. The fullscreen surface is the current
-//! M3+ shape so world-space footmarks/hearts render where they belong; per-monitor windows
-//! and tighter dirty-rect presentation remain planned performance work.
+//! One layered popup window per monitor, each presented via [`Overlay::present`] and
+//! `UpdateLayeredWindow`. The engine simulates in signed virtual-desktop coordinates; the
+//! backend clips dirty world-space render regions to each monitor window.
 //!
 //! Click-through is natural per-pixel alpha: we set `WS_EX_LAYERED` but **not**
 //! `WS_EX_TRANSPARENT`, so opaque goose pixels receive clicks while transparent margins
@@ -33,9 +32,10 @@ use windows::Win32::Foundation::{
     BOOL, COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM,
 };
 use windows::Win32::Graphics::Gdi::{
-    CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject,
-    AC_SRC_ALPHA, AC_SRC_OVER, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, DIB_RGB_COLORS,
-    HBITMAP, HDC, HGDIOBJ,
+    CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, EnumDisplayMonitors, GetDC,
+    GetMonitorInfoW, ReleaseDC, SelectObject, AC_SRC_ALPHA, AC_SRC_OVER, BITMAPINFO,
+    BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ, HMONITOR,
+    MONITORINFO,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::SystemInformation::GetLocalTime;
@@ -55,18 +55,17 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
     PeekMessageW, PostQuitMessage, RegisterClassExW, SetCursorPos, SetForegroundWindow,
     SetWindowLongPtrW, SetWindowPos, ShowWindow, TranslateMessage, UpdateLayeredWindow,
-    EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART, GA_ROOT, GWL_EXSTYLE, MSG, OBJID_WINDOW,
-    PM_REMOVE, SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
-    SM_YVIRTUALSCREEN, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
-    SW_SHOWNOACTIVATE, ULW_ALPHA, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_DESTROY,
-    WM_QUIT, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
-    WS_EX_TRANSPARENT, WS_POPUP,
+    EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART, GA_ROOT, GWL_EXSTYLE,
+    MONITORINFOF_PRIMARY, MSG, OBJID_WINDOW, PM_REMOVE, SM_CXSCREEN, SM_CXVIRTUALSCREEN,
+    SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SWP_FRAMECHANGED,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_SHOWNOACTIVATE, ULW_ALPHA,
+    WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_DESTROY, WM_QUIT, WNDCLASSEXW,
+    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
 /// Poll the global cursor position (desktop coordinates) and the left-button state.
-/// Returns `(x, y, left_down)`. Desktop coordinates equal world coordinates because the
-/// overlay's origin is the primary monitor's top-left corner. Used to feed the engine's
-/// hit-testing (pat hover-streak + click→hyper, plan §6) each frame.
+/// Returns `(x, y, left_down)`. Desktop coordinates equal engine world coordinates across the
+/// signed virtual desktop. Used to feed hit-testing (pat hover-streak + click→hyper) each frame.
 pub fn pointer_state() -> (f32, f32, bool) {
     unsafe {
         let mut pt = POINT::default();
@@ -171,7 +170,7 @@ unsafe extern "system" fn move_event_proc(
 /// Watches user-initiated foreign-window move/resize operations for M8 perch-and-ride.
 pub struct ForeignWindowWatcher {
     hook: HWINEVENTHOOK,
-    overlay_hwnd: HWND,
+    overlay_hwnds: Vec<isize>,
     active: Option<isize>,
 }
 
@@ -196,7 +195,7 @@ impl ForeignWindowWatcher {
 
         Ok(Self {
             hook,
-            overlay_hwnd: overlay.hwnd,
+            overlay_hwnds: overlay.hwnd_keys(),
             active: None,
         })
     }
@@ -207,7 +206,7 @@ impl ForeignWindowWatcher {
         let Some(hwnd) = self.active.map(hwnd_from_key) else {
             return Ok(None);
         };
-        if !is_foreign_top_level_window(hwnd, self.overlay_hwnd) {
+        if !is_foreign_top_level_window(hwnd, &self.overlay_hwnds) {
             self.active = None;
             return Ok(None);
         }
@@ -224,7 +223,7 @@ impl ForeignWindowWatcher {
             while let Some(event) = events.pop_front() {
                 let hwnd = hwnd_from_key(event.hwnd);
                 if event.started {
-                    if is_foreign_top_level_window(hwnd, self.overlay_hwnd) {
+                    if is_foreign_top_level_window(hwnd, &self.overlay_hwnds) {
                         self.active = Some(event.hwnd);
                     }
                 } else if self.active == Some(event.hwnd) {
@@ -243,9 +242,9 @@ impl Drop for ForeignWindowWatcher {
     }
 }
 
-fn is_foreign_top_level_window(hwnd: HWND, overlay_hwnd: HWND) -> bool {
+fn is_foreign_top_level_window(hwnd: HWND, overlay_hwnds: &[isize]) -> bool {
     unsafe {
-        if hwnd.0.is_null() || hwnd_key(hwnd) == hwnd_key(overlay_hwnd) {
+        if hwnd.0.is_null() || overlay_hwnds.contains(&hwnd_key(hwnd)) {
             return false;
         }
         if !IsWindow(hwnd).as_bool() || !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool()
@@ -640,7 +639,7 @@ unsafe extern "system" fn enum_window_for_pid(hwnd: HWND, lparam: LPARAM) -> BOO
     let data = &mut *(lparam.0 as *mut FindWindowData);
     let mut pid = 0u32;
     GetWindowThreadProcessId(hwnd, Some(&mut pid));
-    if pid == data.pid && is_foreign_top_level_window(hwnd, HWND(std::ptr::null_mut())) {
+    if pid == data.pid && is_foreign_top_level_window(hwnd, &[]) {
         data.hwnd = hwnd;
         return BOOL(0);
     }
@@ -828,15 +827,99 @@ impl Drop for Dib {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct MonitorBounds {
+    bounds: Rect,
+    primary: bool,
+}
+
 /// The honk300 desktop overlay: one always-on-top, click-through-where-transparent
-/// layered window that the goose lives in.
+/// layered window per monitor.
 pub struct Overlay {
+    windows: Vec<OverlayWindow>,
+    virtual_bounds: Rect,
+    primary_bounds: Rect,
+}
+
+struct OverlayWindow {
     hwnd: HWND,
     dib: Option<Dib>,
+    bounds: Rect,
+    visible: bool,
+}
+
+impl OverlayWindow {
+    unsafe fn new(hinstance: HINSTANCE, class_name: PCWSTR, bounds: Rect) -> Result<Self> {
+        let hwnd = CreateWindowExW(
+            WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
+            class_name,
+            w!("honk300"),
+            WS_POPUP,
+            bounds.min.x.floor() as i32,
+            bounds.min.y.floor() as i32,
+            1,
+            1,
+            None,
+            None,
+            hinstance,
+            None,
+        )?;
+        let _ = ShowWindow(hwnd, SW_HIDE);
+        Ok(Self {
+            hwnd,
+            dib: None,
+            bounds,
+            visible: false,
+        })
+    }
+
+    fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> Result<()> {
+        let Some(intersection) = dirty.intersection(self.bounds).map(Rect::pixel_aligned) else {
+            self.hide();
+            return Ok(());
+        };
+        let src_x = (intersection.min.x - dirty.min.x).round().max(0.0) as u32;
+        let src_y = (intersection.min.y - dirty.min.y).round().max(0.0) as u32;
+        let width = intersection.width().round().max(1.0) as u32;
+        let height = intersection.height().round().max(1.0) as u32;
+        let cropped = crop_pixmap(pixmap, src_x, src_y, width, height)
+            .ok_or_else(|| error_from_message("could not allocate monitor crop"))?;
+        present_layered(
+            self.hwnd,
+            &mut self.dib,
+            &cropped,
+            intersection.min.x as i32,
+            intersection.min.y as i32,
+        )?;
+        if !self.visible {
+            unsafe {
+                let _ = ShowWindow(self.hwnd, SW_SHOWNOACTIVATE);
+            }
+            self.visible = true;
+        }
+        Ok(())
+    }
+
+    fn hide(&mut self) {
+        if self.visible {
+            unsafe {
+                let _ = ShowWindow(self.hwnd, SW_HIDE);
+            }
+            self.visible = false;
+        }
+    }
+}
+
+impl Drop for OverlayWindow {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = DestroyWindow(self.hwnd);
+        }
+    }
 }
 
 impl Overlay {
-    /// Register the window class and create the (initially hidden) layered window.
+    /// Register the window class and create one initially hidden layered window per monitor.
     pub fn new() -> Result<Overlay> {
         unsafe {
             let hmodule = GetModuleHandleW(None)?;
@@ -852,28 +935,41 @@ impl Overlay {
             };
             RegisterClassExW(&wc);
 
-            let hwnd = CreateWindowExW(
-                WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
-                class_name,
-                w!("honk300"),
-                WS_POPUP,
-                0,
-                0,
-                0,
-                0,
-                None,
-                None,
-                hinstance,
-                None,
-            )?;
+            let monitors = enumerate_monitor_bounds();
+            let virtual_bounds = monitor_union(&monitors);
+            let primary_bounds = primary_monitor_bounds(&monitors);
+            let mut windows = Vec::with_capacity(monitors.len());
+            for monitor in monitors {
+                windows.push(OverlayWindow::new(hinstance, class_name, monitor.bounds)?);
+            }
 
-            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-            Ok(Overlay { hwnd, dib: None })
+            Ok(Overlay {
+                windows,
+                virtual_bounds,
+                primary_bounds,
+            })
         }
     }
 
-    /// The full virtual-desktop bounds (across all monitors). Multi-monitor traversal is
-    /// M15; M3's fullscreen overlay covers the primary monitor (see [`Overlay::primary_bounds`]).
+    /// The full virtual-desktop bounds reported by the current overlay monitor set.
+    pub fn virtual_desktop_bounds(&self) -> Rect {
+        self.virtual_bounds
+    }
+
+    /// The primary monitor bounds reported by the current overlay monitor set.
+    pub fn primary_monitor_bounds(&self) -> Rect {
+        self.primary_bounds
+    }
+
+    /// HWND keys for all overlay windows, used to filter them from foreign-window watching.
+    fn hwnd_keys(&self) -> Vec<isize> {
+        self.windows
+            .iter()
+            .map(|window| hwnd_key(window.hwnd))
+            .collect()
+    }
+
+    /// The full virtual-desktop bounds using Win32 system metrics.
     pub fn virtual_bounds() -> Rect {
         unsafe {
             let x = GetSystemMetrics(SM_XVIRTUALSCREEN) as f32;
@@ -887,8 +983,7 @@ impl Overlay {
         }
     }
 
-    /// The primary monitor's bounds (origin `(0, 0)`). The fullscreen overlay covers this
-    /// so world-space props (footmarks, later meme/notepad windows) render in place.
+    /// The primary monitor's bounds from Win32 system metrics.
     pub fn primary_bounds() -> Rect {
         unsafe {
             let w = GetSystemMetrics(SM_CXSCREEN) as f32;
@@ -900,7 +995,7 @@ impl Overlay {
         }
     }
 
-    /// Drain pending window messages. Returns `false` when the window is closing
+    /// Drain pending window messages. Returns `false` when a window is closing
     /// (`WM_QUIT`), signalling the caller to exit the loop.
     pub fn pump(&mut self) -> bool {
         unsafe {
@@ -916,70 +1011,92 @@ impl Overlay {
         }
     }
 
-    /// Present `pixmap` (premultiplied RGBA from the renderer) at desktop position
-    /// `(dest_x, dest_y)`. Resizes the backing window/DIB to the pixmap as needed.
-    pub fn present(&mut self, pixmap: &Pixmap, dest_x: i32, dest_y: i32) -> Result<()> {
-        let width = pixmap.width() as i32;
-        let height = pixmap.height() as i32;
-        if width == 0 || height == 0 {
+    /// Present a dirty world-space region. The pixmap's top-left pixel must correspond to
+    /// `dirty.min`; this method clips and crops it for each monitor window.
+    pub fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> Result<()> {
+        let dirty = dirty.pixel_aligned();
+        if dirty.width() <= 0.0 || dirty.height() <= 0.0 {
             return Ok(());
         }
-
-        unsafe {
-            // (Re)allocate the DIB when the size changes.
-            if self
-                .dib
-                .as_ref()
-                .map(|d| d.width != width || d.height != height)
-                .unwrap_or(true)
-            {
-                self.dib = Some(Dib::new(width, height)?);
-            }
-            let dib = self.dib.as_ref().expect("dib just set");
-
-            // Copy premultiplied RGBA → premultiplied BGRA (swap R and B).
-            let src = pixmap.data();
-            let count = (width * height) as usize;
-            let dst = std::slice::from_raw_parts_mut(dib.bits, count * 4);
-            for i in 0..count {
-                let s = i * 4;
-                dst[s] = src[s + 2]; // B
-                dst[s + 1] = src[s + 1]; // G
-                dst[s + 2] = src[s]; // R
-                dst[s + 3] = src[s + 3]; // A
-            }
-
-            let screen = GetDC(None);
-            let dest = POINT {
-                x: dest_x,
-                y: dest_y,
-            };
-            let size = SIZE {
-                cx: width,
-                cy: height,
-            };
-            let src_pt = POINT { x: 0, y: 0 };
-            let blend = BLENDFUNCTION {
-                BlendOp: AC_SRC_OVER as u8,
-                BlendFlags: 0,
-                SourceConstantAlpha: 255,
-                AlphaFormat: AC_SRC_ALPHA as u8,
-            };
-            let result = UpdateLayeredWindow(
-                self.hwnd,
-                screen,
-                Some(&dest as *const POINT),
-                Some(&size as *const SIZE),
-                dib.hdc,
-                Some(&src_pt as *const POINT),
-                COLORREF(0),
-                Some(&blend as *const BLENDFUNCTION),
-                ULW_ALPHA,
-            );
-            ReleaseDC(None, screen);
-            result
+        for window in &mut self.windows {
+            window.present(dirty, pixmap)?;
         }
+        Ok(())
     }
+}
+
+fn crop_pixmap(pixmap: &Pixmap, src_x: u32, src_y: u32, width: u32, height: u32) -> Option<Pixmap> {
+    if src_x.checked_add(width)? > pixmap.width() || src_y.checked_add(height)? > pixmap.height() {
+        return None;
+    }
+    let mut cropped = Pixmap::new(width, height)?;
+    let src_stride = pixmap.width() as usize * 4;
+    let dst_stride = width as usize * 4;
+    let src = pixmap.data();
+    let dst = cropped.data_mut();
+    for row in 0..height as usize {
+        let src_start = (src_y as usize + row) * src_stride + src_x as usize * 4;
+        let dst_start = row * dst_stride;
+        dst[dst_start..dst_start + dst_stride]
+            .copy_from_slice(&src[src_start..src_start + dst_stride]);
+    }
+    Some(cropped)
+}
+
+fn enumerate_monitor_bounds() -> Vec<MonitorBounds> {
+    let mut monitors = Vec::new();
+    unsafe {
+        let _ = EnumDisplayMonitors(
+            HDC(std::ptr::null_mut()),
+            None,
+            Some(enum_monitor_proc),
+            LPARAM(&mut monitors as *mut Vec<MonitorBounds> as isize),
+        );
+    }
+    if monitors.is_empty() {
+        monitors.push(MonitorBounds {
+            bounds: Overlay::primary_bounds(),
+            primary: true,
+        });
+    }
+    monitors
+}
+
+unsafe extern "system" fn enum_monitor_proc(
+    monitor: HMONITOR,
+    _hdc: HDC,
+    _rect: *mut RECT,
+    data: LPARAM,
+) -> BOOL {
+    let monitors = &mut *(data.0 as *mut Vec<MonitorBounds>);
+    let mut info = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    if GetMonitorInfoW(monitor, &mut info).as_bool() {
+        monitors.push(MonitorBounds {
+            bounds: rect_from_win32(info.rcMonitor),
+            primary: info.dwFlags & MONITORINFOF_PRIMARY != 0,
+        });
+    }
+    BOOL(1)
+}
+
+fn monitor_union(monitors: &[MonitorBounds]) -> Rect {
+    monitors
+        .iter()
+        .map(|monitor| monitor.bounds)
+        .reduce(Rect::union)
+        .unwrap_or_else(Overlay::virtual_bounds)
+}
+
+fn primary_monitor_bounds(monitors: &[MonitorBounds]) -> Rect {
+    monitors
+        .iter()
+        .find(|monitor| monitor.primary)
+        .or_else(|| monitors.first())
+        .map(|monitor| monitor.bounds)
+        .unwrap_or_else(Overlay::primary_bounds)
 }
 
 extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -1023,10 +1140,30 @@ mod tests {
     #[test]
     fn null_or_own_window_is_not_foreign_top_level() {
         let null = HWND(std::ptr::null_mut());
-        assert!(!is_foreign_top_level_window(null, null));
+        assert!(!is_foreign_top_level_window(null, &[]));
 
         let fake = HWND(std::ptr::dangling_mut::<c_void>());
-        assert!(!is_foreign_top_level_window(fake, fake));
+        assert!(!is_foreign_top_level_window(fake, &[hwnd_key(fake)]));
+    }
+
+    #[test]
+    fn monitor_bounds_union_and_primary_selection_support_negative_coords() {
+        let monitors = [
+            MonitorBounds {
+                bounds: Rect::new(Vec2::new(-1280.0, 0.0), Vec2::new(0.0, 720.0)),
+                primary: false,
+            },
+            MonitorBounds {
+                bounds: Rect::new(Vec2::new(0.0, -80.0), Vec2::new(1920.0, 1000.0)),
+                primary: true,
+            },
+        ];
+
+        assert_eq!(
+            monitor_union(&monitors),
+            Rect::new(Vec2::new(-1280.0, -80.0), Vec2::new(1920.0, 1000.0))
+        );
+        assert_eq!(primary_monitor_bounds(&monitors), monitors[1].bounds);
     }
 
     #[test]

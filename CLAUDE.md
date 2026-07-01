@@ -8,8 +8,8 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M14 are complete and M15 (multi-monitor
-chase plus full recolor/appearance) is next. The Cargo workspace exists: `honk-engine` (platform-free
+**Current stage: implementation in progress.** M0-M15 are complete and M16 (macOS backend plus
+universal2 app packaging) is next. The Cargo workspace exists: `honk-engine` (platform-free
 core), `honk-control` (shared IPC protocol/client/server), `honk-config` (versioned TOML
 configuration), `honk-config-tui` (ratatui reducer UI), `honk-platform-windows` (the layered
 overlay), and the root `honk300` binary — a
@@ -19,7 +19,9 @@ perch on a user-dragged foreign window, and can collect Notepad/meme windows on 
 M10 adds single-instance local control for `start`, `stop`, `reload`, and `do <action>` pokes;
 M11 adds the three-name goose-speak grammar; M12 adds durable config and the terminal UI; M13
 adds dynamic moods and the local on-hour double honk; M14 adds quiet-hours/DND/fullscreen calm
-suppression and built-in procedural Autumn leaves.
+suppression and built-in procedural Autumn leaves; M15 adds signed virtual-desktop multi-monitor
+chase, one Windows overlay HWND per monitor, live Calm Goose, and RGB editing for the original
+three-color goose palette.
 `honk300_plan.md` is the canonical plan (milestones M0–M19); the two superseded drafts remain as
 reference.
 
@@ -48,7 +50,8 @@ reference.
   records the M8 foreign-window watch-and-ride contract; ADR 0003 records the M9 collect-window,
   asset, and no-donate decisions; ADR 0004 records the M10 CLI/TUI-only control plane, local IPC,
   and terminal-window protection rule; ADR 0007 records the M13 dynamic-mood and local-time
-  injection contract; ADR 0008 records the M14 schedule/presence/Autumn contract.
+  injection contract; ADR 0008 records the M14 schedule/presence/Autumn contract; ADR 0009
+  records the M15 multi-monitor/appearance contract.
 
 ## Big-picture architecture (original → planned port)
 
@@ -99,6 +102,7 @@ reference.
 - M10's accepted decisions live in `docs/adr/0004-m10-cli-tui-control-plane-and-terminal-protection.md`.
 - M13's accepted decisions live in `docs/adr/0007-m13-moods-and-local-time-injection.md`.
 - M14's accepted decisions live in `docs/adr/0008-m14-schedule-presence-and-autumn.md`.
+- M15's accepted decisions live in `docs/adr/0009-m15-multi-monitor-and-appearance.md`.
 
 ## Task management system
 

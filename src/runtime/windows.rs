@@ -10,7 +10,7 @@ use honk_engine::render::{
 use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
     Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, CursorCommand, LocalTime,
-    Pointer, PresenceSnapshot, Sound, Vec2, World,
+    Pointer, PresenceSnapshot, Rect, Sound, Vec2, World,
 };
 use honk_platform_windows::{
     local_time, pointer_state, presence_state, warp_cursor, CollectWindowController,
@@ -26,11 +26,8 @@ pub fn run(
     println!("honk300: loaded {}", assets.summary());
 
     let mut overlay = Overlay::new()?;
-    // Fullscreen primary-monitor overlay so world-space props render where they belong.
-    let bounds = Overlay::primary_bounds();
-    let origin = bounds.min;
-    let width = bounds.width().ceil().max(1.0) as u32;
-    let height = bounds.height().ceil().max(1.0) as u32;
+    let primary_bounds = overlay.primary_monitor_bounds();
+    let virtual_bounds = overlay.virtual_desktop_bounds();
 
     // Backend capability only: Windows can always warp the cursor. The user's mouse-steal
     // preference is applied separately via MouseStealOptions::enabled in effective_options, so
@@ -79,18 +76,22 @@ pub fn run(
         assets.meme_count(),
     );
 
-    let mut world = World::with_options(bounds, seed_from_clock(), effective.world);
+    let world_bounds = world_bounds_for(
+        effective.world.multi_monitor_chase,
+        primary_bounds,
+        virtual_bounds,
+    );
+    let mut world = World::with_options(world_bounds, seed_from_clock(), effective.world);
     if let Some(kind) = smoke_collect_kind() {
         world.force_collect_window(kind);
     }
-    let mut collect_controller = CollectWindowController::new(bounds);
-    let mut canvas = Pixmap::new(width, height).ok_or("could not allocate the overlay canvas")?;
+    let mut collect_controller = CollectWindowController::new(primary_bounds);
     let mut accumulator = Accumulator::new();
     let clock = Clock::start();
     let mut last = clock.elapsed_secs();
     let mut last_present = f32::NEG_INFINITY;
-    // Fullscreen present is heavier than a tiny window, so cap it a little lower.
-    const PRESENT_INTERVAL: f32 = 1.0 / 40.0;
+    let mut last_render_bounds: Option<Rect> = None;
+    const PRESENT_INTERVAL: f32 = 1.0 / 60.0;
     const PRESENCE_POLL_INTERVAL: f32 = 0.5;
     let mut warned_cursor_warp = false;
     let mut warned_collect_window = false;
@@ -114,6 +115,7 @@ pub fn run(
                 ControlCommand::Reload => {
                     let response = match Config::load_existing(&options.config_path) {
                         Ok(next_config) => {
+                            let prior_multi_monitor_chase = effective.world.multi_monitor_chase;
                             config = next_config;
                             effective = effective_options(
                                 &config,
@@ -152,6 +154,11 @@ pub fn run(
                                 audio = None;
                             } else if audio.is_none() {
                                 audio = audio::Audio::new();
+                            }
+                            if effective.world.multi_monitor_chase != prior_multi_monitor_chase {
+                                eprintln!(
+                                    "honk300: multi-monitor chase changed; restart required for bounds/window rebuild"
+                                );
                             }
                             world.apply_options(effective.world);
                             println!("honk300: reload command applied.");
@@ -302,6 +309,12 @@ pub fn run(
 
         if now - last_present >= PRESENT_INTERVAL {
             last_present = now;
+            let dirty = world.render_bounds(last_render_bounds);
+            let width = dirty.width().ceil().max(1.0) as u32;
+            let height = dirty.height().ceil().max(1.0) as u32;
+            let origin = dirty.min;
+            let mut canvas =
+                Pixmap::new(width, height).ok_or("could not allocate dirty overlay canvas")?;
             canvas.fill(Color::TRANSPARENT);
             render_footmarks_with_timing(
                 &mut canvas,
@@ -329,7 +342,8 @@ pub fn run(
             );
             render_hearts(&mut canvas, world.hearts(), world.now(), origin);
             render_sleepies(&mut canvas, world.sleepies(), world.now(), origin);
-            overlay.present(&canvas, origin.x.floor() as i32, origin.y.floor() as i32)?;
+            overlay.present(dirty, &canvas)?;
+            last_render_bounds = Some(dirty);
         }
 
         // Yield so the loop doesn't busy-spin; the accumulator keeps the sim at 120 Hz.
@@ -369,6 +383,14 @@ fn sound_enabled(config: honk_config::AudioConfig, sound: Sound) -> bool {
         Sound::Bite => config.bite,
         Sound::MudSquish => config.mud,
         Sound::Pat => config.pat,
+    }
+}
+
+fn world_bounds_for(multi_monitor_chase: bool, primary_bounds: Rect, virtual_bounds: Rect) -> Rect {
+    if multi_monitor_chase {
+        virtual_bounds
+    } else {
+        primary_bounds
     }
 }
 
@@ -441,7 +463,8 @@ fn seed_from_clock() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{initial_cursor_warp_supported, parse_smoke_local_date};
+    use super::{initial_cursor_warp_supported, parse_smoke_local_date, world_bounds_for};
+    use honk_engine::{Rect, Vec2};
 
     #[test]
     fn initial_cursor_warp_capability_ignores_mouse_steal_preference() {
@@ -461,5 +484,17 @@ mod tests {
         assert_eq!(parse_smoke_local_date("2026-10-15"), None);
         assert_eq!(parse_smoke_local_date("20261301"), None);
         assert_eq!(parse_smoke_local_date("18991231"), None);
+    }
+
+    #[test]
+    fn world_bounds_follow_multi_monitor_chase_setting() {
+        let primary = Rect::new(Vec2::new(0.0, 0.0), Vec2::new(1920.0, 1080.0));
+        let virtual_desktop = Rect::new(Vec2::new(-1280.0, 0.0), Vec2::new(1920.0, 1080.0));
+
+        assert_eq!(world_bounds_for(false, primary, virtual_desktop), primary);
+        assert_eq!(
+            world_bounds_for(true, primary, virtual_desktop),
+            virtual_desktop
+        );
     }
 }
