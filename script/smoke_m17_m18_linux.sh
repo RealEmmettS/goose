@@ -125,7 +125,7 @@ for _y in range(height):
     opaque += sum(1 for alpha in row[3::4] if alpha)
     prev = row
 
-if opaque == 0:
+if opaque < 50:
     raise SystemExit(5)
 print(f"visible alpha pixels: {opaque}")
 PY
@@ -206,11 +206,11 @@ for _y in range(height):
             goose += 1
     prev = row
 
+print(f"x11 screenshot background pixels: {background}; goose-like pixels: {goose}")
 if background < 1000:
     raise SystemExit(5)
 if goose < 50:
     raise SystemExit(6)
-print(f"x11 screenshot background pixels: {background}; goose-like pixels: {goose}")
 PY
     then
       return 0

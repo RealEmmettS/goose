@@ -67,7 +67,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 PLIST
 
 plutil -lint "$CONTENTS_DIR/Info.plist"
-lipo -verify_arch x86_64 arm64 "$BIN"
+lipo "$BIN" -verify_arch x86_64 arm64
 codesign --force --deep --sign - "$APP_DIR"
 codesign --verify --deep --strict "$APP_DIR"
 
