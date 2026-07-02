@@ -6,8 +6,9 @@ Date: 2026-07-01
 
 M16-M18 implementation is in-tree. M16.1-M18.1 readiness is now a CI-proven gate, not a
 Windows-host claim. The local Windows host can prove formatting, tests, release build, and
-cross-target compilation; GitHub-hosted and optional self-hosted runners provide the macOS/Linux
-runtime evidence required before `#m16r`, `#m17r`, and `#m18r` can move to Done.
+cross-target compilation; GitHub-hosted runners have now provided the Linux X11/Wayland evidence
+for `#m17r` and `#m18r`, while `#m16r` still requires optional self-hosted or manual macOS
+Accessibility-granted evidence.
 
 ## Implemented Evidence
 
@@ -59,15 +60,18 @@ runtime evidence required before `#m16r`, `#m17r`, and `#m18r` can move to Done.
   headless sway and verifies native Wayland reduced mode renders while mischief remains
   unsupported.
 
-## Open Readiness Evidence
+## Readiness Evidence State
 
-- `#m16r` can close only after hosted macOS bundle/status smoke has passed and Accessibility
-  granted behavior is proven on a self-hosted/pre-granted or manual macOS run. Hosted macOS can
-  prove denied/degraded behavior, but it cannot grant durable Accessibility permission.
-- `#m17r` can close after Linux x64 and ARM hosted X11 smoke passes and the CI run URL/artifact
-  names are recorded.
-- `#m18r` can close after Linux x64 and ARM hosted Wayland reduced-mode smoke passes and the CI
-  run URL/artifact names are recorded.
+- `#m16r` remains open. Hosted macOS bundle/status smoke passed on both arm64 and Intel hosted
+  runners, but the Accessibility-granted smoke job was skipped because the self-hosted
+  pre-granted runner gate was not enabled. Hosted macOS proves app bundle/status/IPC and
+  denied/degraded behavior; it cannot grant durable Accessibility permission.
+- `#m17r` is closed. Linux x64 and ARM hosted X11 visible smoke passed, including
+  internal frame proof, root screenshot proof, IPC status/reload/stop/poke, terminal-filter
+  fixture coverage, and GNU/musl target checks.
+- `#m18r` is closed. Linux x64 and ARM hosted Wayland reduced-mode smoke passed under
+  headless sway, including visible frame proof, IPC status/reload/stop/poke, and explicit
+  unsupported mischief status.
 
 ## Local Verification Commands
 
@@ -94,5 +98,22 @@ foreach ($target in $targets) {
 
 ## CI Evidence Log
 
-- Pending push: record GitHub Actions run URL, macOS app artifact names, Linux smoke job names,
-  and optional macOS Accessibility run URL here before moving readiness tasks to Done.
+- 2026-07-02 - GitHub Actions run
+  <https://github.com/RealEmmettS/goose/actions/runs/28569332035> completed successfully for
+  hosted Windows/macOS/Linux readiness.
+  - Windows host gate: passed fmt, workspace tests, clippy, release build, and Windows x64/ARM64
+    target checks.
+  - macOS bundle smoke (`macos-15` arm64): passed workspace tests, universal2 app packaging,
+    `plutil`, `codesign`, `lipo -verify_arch x86_64 arm64`, bundle launch/status/IPC smoke, and
+    artifact upload.
+  - macOS bundle smoke (`macos-15-intel`): passed the same hosted bundle/status gate and artifact
+    upload on Intel-hosted macOS.
+  - macOS app artifacts: `honk300-macos-macos-15` and `honk300-macos-macos-15-intel`.
+  - Linux visible smoke (`ubuntu-latest`): passed X11 visible overlay smoke, Wayland reduced-mode
+    smoke, workspace tests, and Linux x64 GNU/musl target checks.
+  - Linux visible smoke (`ubuntu-24.04-arm`): passed X11 visible overlay smoke, Wayland
+    reduced-mode smoke, workspace tests, and Linux ARM GNU/musl target checks.
+  - macOS Accessibility smoke:
+    <https://github.com/RealEmmettS/goose/actions/runs/28569332035/job/84703318760> was skipped,
+    so Accessibility-granted cursor/window/collect evidence is still missing and `#m16r` stays
+    open.

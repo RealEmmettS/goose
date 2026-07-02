@@ -18,15 +18,18 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
-- **M16 macOS backend, status, and `.app` staging (implementation in-tree; macOS-host smoke
-  pending)** — added `crates/honk-platform-macos` with AppKit/CoreGraphics/ApplicationServices
+- **M16 macOS backend, status, and `.app` staging (implementation in-tree; Accessibility-granted
+  smoke pending)** — added `crates/honk-platform-macos` with AppKit/CoreGraphics/ApplicationServices
   dependencies, macOS `start` runtime wiring through the existing Unix IPC transport, one
   AppKit overlay surface per display, CoreGraphics pointer polling/warp, local-time sampling,
   Accessibility-gated focused-window polling for foreign-window ride snapshots, AppKit-owned
   note/meme collect windows, macOS terminal-app classification tests, Accessibility-denied
   capability degradation, and dependency-free macOS audio through `/usr/bin/afplay`. The macOS
-  target checks pass for `x86_64-apple-darwin` and `aarch64-apple-darwin`; physical macOS smoke
-  and universal2 bundle validation remain the M16.1 readiness gate.
+  target checks pass for `x86_64-apple-darwin` and `aarch64-apple-darwin`; hosted macOS CI run
+  <https://github.com/RealEmmettS/goose/actions/runs/28569332035> now proves the universal2
+  bundle/status/IPC gate and uploads `honk300-macos-macos-15` plus
+  `honk300-macos-macos-15-intel`. Accessibility-granted cursor/window/collect smoke remains the
+  M16.1 readiness blocker.
 - **Runtime status protocol and TUI Status tab** — `honk-control` now supports `STATUS` and a
   compact `ControlResponse::Status` payload reporting running state, platform, bundle mode,
   Accessibility, cursor/window/collect/presence/audio capability states, and asset counts.
@@ -39,7 +42,7 @@ All notable changes to this project are documented here. Format based on
   `plutil`, `codesign`, and `lipo`. Bundle-aware asset discovery now prefers
   `Contents/Resources/Assets`, and TUI Start launches bundled macOS runs through
   `/usr/bin/open -n <Honk300.app> --args start --config <path>`.
-- **M17/M18 Linux visible backend and reduced Wayland runtime (CI proof pending)** — extended
+- **M17/M18 Linux visible backend and reduced Wayland runtime (CI proven)** — extended
   `crates/honk-platform-linux` beyond session/control plumbing with an X11 visible overlay
   using `x11rb` (`shape`, `xfixes`, `xinerama`, `randr`, `render`), XShape/XFixes input-region
   shaping, Xinerama/root display bounds, pointer sampling, cursor warp, and terminal-filtered
@@ -54,8 +57,10 @@ All notable changes to this project are documented here. Format based on
   Xvfb/openbox/xcompmgr and headless sway. The X11 smoke verifies both internal frame pixels and
   actual root-window screenshot pixels. The optional self-hosted macOS Accessibility job is gated by
   `HONK300_RUN_A11Y_SMOKE=true` and labels `[self-hosted, macOS, ARM64, honk300-a11y]`.
-  `docs/readiness/m16-m18-readiness.md` now records that `#m16r`, `#m17r`, and `#m18r` stay open
-  until CI run URLs and artifacts are captured.
+  `docs/readiness/m16-m18-readiness.md` now records run
+  <https://github.com/RealEmmettS/goose/actions/runs/28569332035>. `#m17r` and `#m18r` are Done
+  from Linux x64/ARM hosted evidence; `#m16r` remains open because the optional self-hosted
+  Accessibility smoke job was skipped.
 - **Multi-monitor chase and appearance controls (milestone M15, complete)** — Windows now creates
   one layered overlay HWND per monitor, enumerates signed monitor bounds, chooses the engine world
   bounds from `[behaviors].multi_monitor_chase`, and clips/crops dirty render regions per monitor

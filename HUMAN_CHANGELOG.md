@@ -15,7 +15,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > honk at the top of each hour. It now also respects quiet times, fullscreen/DND manners, and
 > seasonal Autumn leaves. It now supports Windows multi-monitor chasing and fuller appearance
 > controls. Mac support and the Linux desktop paths are now in the codebase, with repeatable
-> CI smoke scripts for the Mac/Linux machines that must produce the remaining runtime evidence. There's
+> CI smoke proof for hosted Mac bundle checks and Linux desktop behavior. Mac Accessibility-granted
+> desktop tricks still need a pre-approved Mac smoke run. There's
 > no installer yet — that comes later.
 
 ---
@@ -27,7 +28,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   starts through the same command system as Windows, can show the goose through Mac desktop
   windows, can play sounds, can use Mac-owned note and meme windows, and reports permission
   problems clearly. Window-riding tricks stay gated behind Mac Accessibility permission. It
-  still needs a real Mac smoke test before the Mac milestone is fully closed.
+  has now passed hosted Mac app bundle and status smoke tests on Intel and Apple Silicon runners,
+  but still needs a pre-approved Accessibility smoke test before the Mac readiness card is fully
+  closed.
 - There is a new status command and a Status page in the terminal settings screen. They show
   whether the goose is running, what platform and bundle mode it is using, whether Mac
   Accessibility is allowed or denied, which desktop tricks are available, and how many note and
@@ -46,7 +49,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   app, checks the app identity/signing/universal build, launches it, asks it for status, pokes it,
   reloads it, and stops it. On Linux it runs visible X11 under a virtual display and reduced
   Wayland under headless sway, then checks both the app's frame output and the actual X11 screen
-  capture for visible pixels. The readiness cards stay open until those CI runs are recorded.
+  capture for visible pixels. The hosted Linux X11 and reduced Wayland readiness cards are now
+  closed from that CI proof; the Mac card stays open only for the Accessibility-granted behavior
+  that hosted runners cannot provide.
 - The goose can now roam across multiple Windows monitors when multi-monitor chasing is on. It
   treats the whole signed desktop as one space, so monitors to the left or above the main screen
   work too. If you turn multi-monitor chasing off, it stays on the primary screen.

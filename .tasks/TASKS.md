@@ -15,12 +15,12 @@
 ## To-Do
 - [ ] **M19 — packaging (all OS/arch) + install/update/uninstall** - cargo-dist + windows-installers.yml; 3 name aliases; autostart #a8d
 - [ ] **M16.1 — macOS host readiness smoke** - hosted macOS bundle/status smoke plus Accessibility granted evidence from a pre-granted self-hosted/manual macOS run #m16r
-- [ ] **M17.1 — Linux X11 visible backend readiness** - CI-smoke the visible transparent X11/XWayland overlay, input shaping/click-through, pointer/window support, terminal filtering, and Linux x64/ARM evidence #m17r
-- [ ] **M18.1 — native Wayland reduced-mode readiness** - CI-smoke visible layer-shell reduced mode with IPC stop/poke/reload/status and explicit unsupported mischief evidence #m18r
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
 
 ## Active
 ## Done
+- [x] **M18.1 — native Wayland reduced-mode readiness** - CI-smoked visible layer-shell reduced mode with IPC stop/poke/reload/status and explicit unsupported mischief evidence on Linux x64/ARM (done 2026-07-02) #m18r
+- [x] **M17.1 — Linux X11 visible backend readiness** - CI-smoked the visible transparent X11/XWayland overlay, input shaping/click-through, pointer/window support, terminal filtering, and Linux x64/ARM evidence (done 2026-07-02) #m17r
 - [x] **M16–M18 — macOS / Linux X11 / Wayland backends** - in-tree macOS backend plus Linux control-runtime foundation, status/TUI capability reporting, scripts/readiness handoff, ADRs, docs/changelogs, and full Windows-host gate/cross-target checks complete; host GUI smoke split to #m16r/#m17r/#m18r (done 2026-07-01) #f7c
   - [x] Land M16 macOS backend/runtime/status/.app-staging implementation in-tree.
   - [x] Split M16.1 macOS-host readiness smoke to follow-up #m16r with repeatable `script/smoke_m16_macos.sh`.
