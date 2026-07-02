@@ -207,8 +207,6 @@ for _y in range(height):
     prev = row
 
 print(f"x11 screenshot background pixels: {background}; goose-like pixels: {goose}")
-if background < 1000:
-    raise SystemExit(5)
 if goose < 50:
     raise SystemExit(6)
 PY

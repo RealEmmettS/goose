@@ -23,7 +23,14 @@ bash "${ROOT}/script/package_macos_app.sh"
 echo "smoke_m16_macos: validating bundle"
 plutil -lint "${APP}/Contents/Info.plist"
 test "$(plutil -extract CFBundleIdentifier raw "${APP}/Contents/Info.plist")" = "dev.emmetts.honk300"
-test "$(plutil -extract LSUIElement raw "${APP}/Contents/Info.plist")" = "1"
+LSUI_ELEMENT="$(plutil -extract LSUIElement raw "${APP}/Contents/Info.plist")"
+case "${LSUI_ELEMENT}" in
+  1|true) ;;
+  *)
+    echo "smoke_m16_macos: expected LSUIElement true, got ${LSUI_ELEMENT}" >&2
+    exit 1
+    ;;
+esac
 codesign --verify --deep --strict "${APP}"
 lipo "${BIN}" -verify_arch x86_64 arm64
 
