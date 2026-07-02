@@ -18,7 +18,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "smoke_m16_macos: building universal2 app"
-"${ROOT}/script/package_macos_app.sh"
+bash "${ROOT}/script/package_macos_app.sh"
 
 echo "smoke_m16_macos: validating bundle"
 plutil -lint "${APP}/Contents/Info.plist"
@@ -35,7 +35,7 @@ echo "smoke_m16_macos: launching bundled LSUIElement runtime"
 
 ready=0
 for _ in $(seq 1 80); do
-  if "${BIN}" status >/tmp/honk300-m16-status.txt 2>&1; then
+  if "${BIN}" status >/tmp/honk300-m16-status.txt 2>&1 && grep -q "honk300: running" /tmp/honk300-m16-status.txt; then
     ready=1
     break
   fi

@@ -23,7 +23,7 @@ start_runtime() {
 
   ready=0
   for _ in $(seq 1 80); do
-    if "${BIN}" status >"${STATUS}" 2>&1; then
+    if "${BIN}" status >"${STATUS}" 2>&1 && grep -q "honk300: running" "${STATUS}"; then
       ready=1
       break
     fi
@@ -52,7 +52,7 @@ exercise_single_action() {
 }
 
 echo "smoke_m16_macos_accessibility: building universal2 app"
-"${ROOT}/script/package_macos_app.sh"
+bash "${ROOT}/script/package_macos_app.sh"
 
 "${BIN}" setup --config "${CONFIG}"
 

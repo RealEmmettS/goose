@@ -49,7 +49,7 @@ need_cmd() {
 wait_for_status() {
   ready=0
   for _ in $(seq 1 100); do
-    if "${BIN}" status >"${STATUS}" 2>&1; then
+    if "${BIN}" status >"${STATUS}" 2>&1 && grep -q "honk300: running" "${STATUS}"; then
       ready=1
       break
     fi
