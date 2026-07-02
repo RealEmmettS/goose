@@ -931,6 +931,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "honk-platform-linux"
+version = "0.0.0"
+dependencies = [
+ "honk-engine",
+ "libc",
+]
+
+[[package]]
 name = "honk-platform-macos"
 version = "0.0.0"
 dependencies = [
@@ -965,6 +973,7 @@ dependencies = [
  "honk-config-tui",
  "honk-control",
  "honk-engine",
+ "honk-platform-linux",
  "honk-platform-macos",
  "honk-platform-windows",
  "rodio",

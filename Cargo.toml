@@ -16,6 +16,7 @@ members = [
     "crates/honk-config-tui",
     "crates/honk-control",
     "crates/honk-engine",
+    "crates/honk-platform-linux",
     "crates/honk-platform-macos",
     "crates/honk-platform-windows",
 ]
@@ -68,6 +69,9 @@ rodio = "0.20"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 honk-platform-macos = { path = "crates/honk-platform-macos" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+honk-platform-linux = { path = "crates/honk-platform-linux" }
 
 # The profile cargo-dist will build with in the later packaging round.
 [profile.dist]

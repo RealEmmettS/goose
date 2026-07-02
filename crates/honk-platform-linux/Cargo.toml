@@ -1,0 +1,13 @@
+[package]
+name = "honk-platform-linux"
+version = "0.0.0"
+description = "Linux platform helpers for honk300"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+honk-engine = { path = "../honk-engine" }
+libc = "0.2"

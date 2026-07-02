@@ -10,6 +10,8 @@ use honk_engine::{HonkTone, Sound};
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 #[cfg(windows)]
 use std::io::Cursor;
+#[cfg(target_os = "linux")]
+use std::path::PathBuf;
 
 const HONKS: [&[u8]; 4] = [
     include_bytes!("../Assets/Sounds/Honk1.mp3"),
@@ -74,10 +76,12 @@ impl Audio {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub struct Audio {
     dir: std::path::PathBuf,
     counter: usize,
+    #[cfg(target_os = "linux")]
+    player: LinuxAudioPlayer,
 }
 
 #[cfg(target_os = "macos")]
@@ -103,18 +107,7 @@ impl Audio {
     }
 
     pub fn play(&mut self, sound: Sound) {
-        let name = match sound {
-            Sound::Honk(tone) => match tone {
-                HonkTone::Normal => format!("honk{}.mp3", self.next() % HONKS.len()),
-                HonkTone::High => format!("honk{}.mp3", (self.next() + 1) % HONKS.len()),
-                HonkTone::Low => {
-                    format!("honk{}.mp3", (self.next() + HONKS.len() - 1) % HONKS.len())
-                }
-            },
-            Sound::Bite => "bite.mp3".into(),
-            Sound::MudSquish => "mud.mp3".into(),
-            Sound::Pat => format!("pat{}.wav", self.next() % PATS.len()),
-        };
+        let name = sound_file_name(sound, || self.next());
         let _ = std::process::Command::new("/usr/bin/afplay")
             .arg(self.dir.join(name))
             .stdin(std::process::Stdio::null())
@@ -124,14 +117,103 @@ impl Audio {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(target_os = "linux")]
+impl Audio {
+    /// Open the Linux command-line sound backend. Returns `None` if no compatible player
+    /// for both MP3 and WAV clips is available, or the clips cannot be staged.
+    pub fn new() -> Option<Self> {
+        let player = LinuxAudioPlayer::detect()?;
+        let dir = std::env::temp_dir().join(format!("honk300-audio-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok()?;
+        for (name, bytes) in sound_files() {
+            std::fs::write(dir.join(name), bytes).ok()?;
+        }
+        Some(Self {
+            dir,
+            counter: 0,
+            player,
+        })
+    }
+
+    fn next(&mut self) -> usize {
+        self.counter = self.counter.wrapping_add(1);
+        self.counter
+    }
+
+    pub fn play(&mut self, sound: Sound) {
+        let name = sound_file_name(sound, || self.next());
+        let path = self.dir.join(name);
+        let mut command = self.player.command(path);
+        let _ = command
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Debug, Clone)]
+enum LinuxAudioPlayer {
+    Ffplay(PathBuf),
+    Mpv(PathBuf),
+}
+
+#[cfg(target_os = "linux")]
+impl LinuxAudioPlayer {
+    fn detect() -> Option<Self> {
+        for path in [
+            "/usr/bin/ffplay",
+            "/usr/local/bin/ffplay",
+            "/opt/homebrew/bin/ffplay",
+        ] {
+            let path = PathBuf::from(path);
+            if path.exists() {
+                return Some(Self::Ffplay(path));
+            }
+        }
+        for path in [
+            "/usr/bin/mpv",
+            "/usr/local/bin/mpv",
+            "/opt/homebrew/bin/mpv",
+        ] {
+            let path = PathBuf::from(path);
+            if path.exists() {
+                return Some(Self::Mpv(path));
+            }
+        }
+        None
+    }
+
+    fn command(&self, path: PathBuf) -> std::process::Command {
+        match self {
+            Self::Ffplay(program) => {
+                let mut command = std::process::Command::new(program);
+                command
+                    .arg("-nodisp")
+                    .arg("-autoexit")
+                    .arg("-loglevel")
+                    .arg("quiet")
+                    .arg(path);
+                command
+            }
+            Self::Mpv(program) => {
+                let mut command = std::process::Command::new(program);
+                command.arg("--no-terminal").arg("--really-quiet").arg(path);
+                command
+            }
+        }
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 impl Drop for Audio {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.dir);
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 fn sound_files() -> Vec<(&'static str, &'static [u8])> {
     vec![
         ("honk0.mp3", HONKS[0]),
@@ -144,4 +226,20 @@ fn sound_files() -> Vec<(&'static str, &'static [u8])> {
         ("pat1.wav", PATS[1]),
         ("pat2.wav", PATS[2]),
     ]
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn sound_file_name(sound: Sound, mut next: impl FnMut() -> usize) -> String {
+    match sound {
+        Sound::Honk(tone) => match tone {
+            HonkTone::Normal => format!("honk{}.mp3", next() % HONKS.len()),
+            HonkTone::High => format!("honk{}.mp3", (next() + 1) % HONKS.len()),
+            HonkTone::Low => {
+                format!("honk{}.mp3", (next() + HONKS.len() - 1) % HONKS.len())
+            }
+        },
+        Sound::Bite => "bite.mp3".into(),
+        Sound::MudSquish => "mud.mp3".into(),
+        Sound::Pat => format!("pat{}.wav", next() % PATS.len()),
+    }
 }

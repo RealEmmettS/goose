@@ -12,13 +12,17 @@ Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of 
 universal2 `.app` staging) is implemented in-tree but still needs macOS-host smoke/readiness
 evidence before the backend milestone can close. The repo now has a Cargo workspace, a platform-free
 `honk-engine`, shared `honk-control`, versioned TOML `honk-config`, the `honk-config-tui`
-terminal UI, Windows and macOS platform crates, the `honk300` binary, the original app's files as
+terminal UI, Windows, macOS, and Linux platform crates, the `honk300` binary, the original app's files as
 reference, the canonical planning docs, and ADRs under `docs/adr/`. M13's dynamic moods and
 on-hour double honk use runtime-injected local time; M14's quiet-hours/DND/fullscreen manners and
 built-in Autumn leaves use platform-neutral schedule/presence state; M15's multi-monitor chase
 uses signed virtual-desktop bounds and one Windows overlay HWND per monitor while appearance
 recolor stays scoped to the original three-color goose palette. M16 adds macOS AppKit/CoreGraphics
-runtime wiring, universal2 app staging, `honk300 status`, and a TUI Status tab.
+runtime wiring, universal2 app staging, `honk300 status`, and a TUI Status tab. M17/M18 now have
+the Linux control-runtime foundation: X11-first/`--wayland` session detection, Unix IPC
+start/status/reload/stop/poke, Linux terminal classification, local-time sampling, command-player
+audio, and explicit unsupported/failed capability reporting. Visible X11/Wayland overlay/window
+support still needs Linux-host readiness work.
 
 ## Read these first (source-of-truth pointers)
 
@@ -47,7 +51,8 @@ runtime wiring, universal2 app staging, `honk300 status`, and a TUI Status tab.
   and terminal-window protection rule; ADR 0007 records the M13 dynamic-mood and local-time
   injection contract; ADR 0008 records the M14 schedule/presence/Autumn contract; ADR 0009
   records the M15 multi-monitor/appearance contract; ADR 0010 records the M16 macOS agent-bundle,
-  permission degradation, status protocol, and TUI-only control contract.
+  permission degradation, status protocol, and TUI-only control contract; ADR 0011 records the
+  M17/M18 Linux control-runtime foundation and degraded Wayland contract.
 
 ## Big-picture architecture (original → planned port)
 
@@ -98,6 +103,8 @@ runtime wiring, universal2 app staging, `honk300 status`, and a TUI Status tab.
 - M13's accepted decisions live in `docs/adr/0007-m13-moods-and-local-time-injection.md`.
 - M14's accepted decisions live in `docs/adr/0008-m14-schedule-presence-and-autumn.md`.
 - M15's accepted decisions live in `docs/adr/0009-m15-multi-monitor-and-appearance.md`.
+- M16's accepted decisions live in `docs/adr/0010-m16-macos-backend-agent-bundle-and-tui-status.md`.
+- M17/M18's Linux control-runtime foundation lives in `docs/adr/0011-m17-m18-linux-control-runtime-and-degraded-wayland.md`.
 
 ## Task management system
 

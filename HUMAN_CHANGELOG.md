@@ -15,7 +15,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > honk at the top of each hour. It now also respects quiet times, fullscreen/DND manners, and
 > seasonal Autumn leaves. It now supports Windows multi-monitor chasing and fuller appearance
 > controls. Mac support is now in the codebase and still needs real Mac smoke testing before the
-> milestone is fully closed. There's no installer yet — that comes later.
+> milestone is fully closed. Linux can now start as a controlled background runtime and tell you
+> honestly which desktop tricks are not available yet, but the visible Linux overlays still need
+> Linux-machine testing and follow-up implementation. There's no installer yet — that comes later.
 
 ---
 
@@ -35,6 +37,13 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   Intel and Apple Silicon slices, combines them into one app, copies the assets, gives the app
   the stable permission identity, and signs it for local testing. Final disk images, notarized
   signing, and installers still come later.
+- Linux no longer only says "not supported" when you start it. It now has the same local command
+  channel foundation as Mac and Windows, so it can start, stop, reload, answer status, and accept
+  simple poke commands. It also detects whether it is using the older X11-style desktop path or
+  the reduced Wayland mode, reports unavailable tricks clearly, protects common terminal apps,
+  and can play sounds when a compatible command-line audio player is installed. The actual visible
+  Linux desktop goose still needs the X11 and Wayland overlay work before those milestones are
+  fully done.
 - The goose can now roam across multiple Windows monitors when multi-monitor chasing is on. It
   treats the whole signed desktop as one space, so monitors to the left or above the main screen
   work too. If you turn multi-monitor chasing off, it stays on the primary screen.
@@ -159,6 +168,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   saved as a local comparison, then replaced because it did not feel as much like the original.
 
 **Behind the scenes**
+- The Linux backend foundation now has its own architecture record. It says Linux should use the
+  more capable X11 path by default, only use native Wayland when asked or when X11 is not
+  available, and keep unsupported tricks disabled instead of pretending they work.
 - The multi-monitor and appearance milestone now has its own architecture record. It says the
   shared goose logic only receives desktop bounds, while Windows owns monitor discovery and
   per-monitor transparent windows. It also records that recoloring means the original three-color

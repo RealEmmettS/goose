@@ -396,6 +396,7 @@ honk300/                       (workspace root)
 │  ├─ honk-platform/           # capability traits + shared types (ScreenRect, Input, Cap<T>, Presence)
 │  ├─ honk-platform-windows/   # layered-window + UpdateLayeredWindow + SetWinEventHook + pipe
 │  ├─ honk-platform-macos/     # objc2-app-kit + Accessibility + AX observers + unix socket
+│  ├─ honk-platform-linux/     # session detection + degraded runtime helpers + terminal classifier
 │  ├─ honk-platform-x11/       # x11rb + XShape + EWMH + XRecord + unix socket
 │  ├─ honk-platform-wayland/   # wlr-layer-shell (degraded) backend
 │  ├─ honk-assets/             # rust-embed + extraction + override precedence
@@ -743,6 +744,13 @@ being implemented three more times.
 | M17 | Linux X11 backend (XShape + EWMH + device_query) | full parity on X11/XWayland |
 | M18 | `--wayland` layer-shell degraded mode (stop/poke via IPC) | renders on Wayland; mischief self-disables; `goose stop` works |
 | M19 | install/update/uninstall(`--purge`)/setup + packaging **all targets** (Win x64+ARM64 ×4 installers, mac universal2 `.dmg`, Linux x64/ARM gnu+musl) + 3 aliases | installers produce working artifacts w/ autostart + shortcut on every OS/arch |
+
+Implementation note (2026-07-01): the Linux control-runtime foundation has landed in
+`honk-platform-linux` plus `src/runtime/linux.rs`. Linux `start` now uses Unix IPC, answers
+`status`/`reload`/`stop`/`do`, detects X11-first vs. `--wayland`, classifies common terminal apps,
+samples local time, and reports unsupported/failed capabilities honestly. This does **not** close
+M17 or M18 by itself: X11 still needs visible overlay/input/window parity and Wayland still needs
+the reduced layer-shell rendering path plus Linux-host readiness smoke.
 
 ---
 

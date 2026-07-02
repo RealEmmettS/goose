@@ -5,13 +5,15 @@ All notable changes to this project are documented here. Format based on
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
 > **Project stage: implementation in progress.** Milestones M0-M15 are complete and M16 is
-> implemented in-tree pending macOS-host readiness evidence. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
+> implemented in-tree pending macOS-host readiness evidence; M17/M18 now have a Linux
+> control-runtime foundation pending visible X11/Wayland backend readiness. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
 > Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
 > ratatui config TUI, dynamic moods, the local on-hour double honk, quiet-hours/DND/fullscreen
 > manners, built-in Autumn leaves, Windows multi-monitor chase, and live appearance/recolor
-> controls, plus macOS runtime/status/app-bundle staging; there is no release yet. A plain-English companion lives in
+> controls, plus macOS runtime/status/app-bundle staging and Linux IPC/status degradation
+> plumbing; there is no release yet. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
@@ -38,6 +40,17 @@ All notable changes to this project are documented here. Format based on
   `plutil`, `codesign`, and `lipo`. Bundle-aware asset discovery now prefers
   `Contents/Resources/Assets`, and TUI Start launches bundled macOS runs through
   `/usr/bin/open -n <Honk300.app> --args start --config <path>`.
+- **M17/M18 Linux control-runtime foundation (display backends still pending)** — added
+  `crates/honk-platform-linux` for X11-first vs. forced/native Wayland session detection,
+  fallback bounds, Linux local-time sampling, and a common-terminal classifier covering Alacritty,
+  GNOME Terminal, kitty, Konsole, Ghostty, WezTerm, xfce4-terminal, and Ptyxis without blocking
+  regular apps. Linux `start` now routes into a real runtime loop using the existing Unix IPC
+  transport for `status`, `reload`, `stop`, and `do <action>` instead of printing the old
+  non-Windows placeholder. The degraded runtime ticks the platform-free engine, loads assets,
+  plays sounds through `ffplay`/`mpv` when available, reports audio failure when no compatible
+  player exists, and reports cursor/window/collect/presence capabilities as unsupported or failed
+  until a visible X11 or Wayland backend proves them. ADR 0011 records that M17 full X11 parity
+  and M18 visible Wayland reduced mode remain Linux-host readiness gates.
 - **Multi-monitor chase and appearance controls (milestone M15, complete)** — Windows now creates
   one layered overlay HWND per monitor, enumerates signed monitor bounds, chooses the engine world
   bounds from `[behaviors].multi_monitor_chase`, and clips/crops dirty render regions per monitor
@@ -328,7 +341,8 @@ All notable changes to this project are documented here. Format based on
   readiness work, plus M11 CLI grammar, M12 config/TUI readiness work, M13 moods/hourly-honk
   closure, M14 schedule/Autumn closure, and M15 multi-monitor/appearance closure.
 - `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M15 complete, M16 active,
-  and the ADR 0001/0002/0003/0004/0007/0008/0009 location and maintenance rules.
+  the new M17/M18 Linux control-runtime foundation, and the ADR
+  0001/0002/0003/0004/0007/0008/0009/0010/0011 location and maintenance rules.
 - Added **ADR 0005** (M11 three-name CLI, goose-speak, and the poke-outcome round-trip) and
   **ADR 0006** (M12 config TUI, durable TOML, and the capability/preference boundary), recording
   the previously-undocumented M11/M12 decisions and the four contract corrections from the
@@ -340,6 +354,10 @@ All notable changes to this project are documented here. Format based on
 - Added **ADR 0009** (M15 multi-monitor and appearance), recording the per-monitor Windows overlay
   boundary, dirty-region presentation, Calm Goose valve, restart-required multi-monitor reload
   rule, and original three-color recolor scope.
+- Added **ADR 0011** (M17/M18 Linux control runtime and degraded Wayland foundation), recording
+  the X11-first session rule, forced/native Wayland degradation, Linux Unix IPC runtime, terminal
+  classifier, command-player audio, and the remaining Linux-host readiness gates for visible X11
+  and Wayland backends.
 - `claude_plan.md` and `codex_plan.md` are now **superseded reference drafts**; `honk300_plan.md`
   is canonical. The "Read these first" pointers in **both** `CLAUDE.md` and its Codex twin
   `AGENTS.md` were updated in lockstep (canonical plan, milestone range M0–M19, workspace

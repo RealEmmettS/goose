@@ -23,8 +23,11 @@ on-hour double honk; M14 adds quiet-hours/DND/fullscreen calm suppression and bu
 Autumn leaves. M15 adds Windows multi-monitor chase, per-monitor dirty-region presentation, live
 Calm Goose, and full RGB editing for the original three-color goose palette. M16 adds the macOS
 platform crate, AppKit/CoreGraphics runtime path, `honk300 status`, a TUI Status tab, bundle-aware
-asset/start handling, and `script/package_macos_app.sh`. There is no installer or release artifact
-yet.
+asset/start handling, and `script/package_macos_app.sh`. M17/M18 now have a Linux platform helper
+crate and real Linux `start` runtime for Unix IPC status/reload/stop/poke, X11-first vs.
+`--wayland` session detection, terminal classification, local-time sampling, command-player audio,
+and explicit unsupported/failed capability degradation. Visible Linux overlay/window support and
+Linux-host smoke remain open. There is no installer or release artifact yet.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
@@ -36,7 +39,8 @@ while `codex_plan.md`'s guessed speed values were wrong.)
 
 **Architecture decisions → [`docs/adr/`](./docs/adr/README.md).** ADRs record durable decisions
 that should survive individual task-board updates. ADR 0010 records the M16 macOS agent-bundle,
-permission-degradation, status protocol, and TUI-only control decisions.
+permission-degradation, status protocol, and TUI-only control decisions. ADR 0011 records the
+M17/M18 Linux control-runtime foundation and degraded Wayland contract.
 
 **Decided direction (see `honk300_plan.md` for the full detail):**
 
@@ -66,4 +70,5 @@ permission-degradation, status protocol, and TUI-only control decisions.
   Silicon** (universal2), Linux x64 **and ARM** (gnu + musl where packaging supports it).
   Native + CLI installers like TR300/ND300/WB300; **no crates.io**.
 - Linux is **X11-first** (runs under XWayland); native Wayland is an opt-in `--wayland` mode with
-  reduced mischief.
+  reduced mischief. The current Linux runtime can be controlled and reports capabilities honestly;
+  visible X11/Wayland overlay implementations still need Linux-host readiness evidence.

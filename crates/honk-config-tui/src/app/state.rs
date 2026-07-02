@@ -893,6 +893,11 @@ impl AppState {
                     RowKind::Static,
                 ),
                 row("M16", "macOS backend + status".into(), RowKind::Static),
+                row(
+                    "M17/M18",
+                    "Linux control runtime foundation".into(),
+                    RowKind::Static,
+                ),
             ],
         }
     }

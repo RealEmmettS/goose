@@ -7,19 +7,19 @@
 mod cli;
 mod runtime;
 
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 mod assets;
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 mod audio;
 
 use cli::{Cli, Command};
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use honk_config::CliOverrides;
 use honk_config::Config;
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use honk_control::CommandServer;
 use honk_control::{send_command, ControlCommand, ControlResponse, RuntimeStatus, Singleton};
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use runtime::RuntimeOptions;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -187,7 +187,35 @@ fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     )
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(target_os = "linux")]
+fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+    let (_singleton, status) = Singleton::acquire()?;
+    if status == honk_control::SingletonStatus::AlreadyRunning {
+        println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
+        return Ok(());
+    }
+    let loaded = Config::load_or_default(cli.config.clone())?;
+    if let Some(warning) = &loaded.warning {
+        eprintln!("honk300: ignoring config problem and using defaults ({warning})");
+    }
+
+    let server = CommandServer::start()?;
+    runtime::linux::run(
+        RuntimeOptions {
+            config_path: loaded.path,
+            config: loaded.config,
+            cli_overrides: CliOverrides {
+                no_sound: cli.no_sound,
+                no_mouse_steal: cli.no_mouse_steal,
+                no_window_ride: cli.no_window_ride,
+                wayland: cli.wayland,
+            },
+        },
+        &server,
+    )
+}
+
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let (_singleton, status) = Singleton::acquire()?;
     if status == honk_control::SingletonStatus::AlreadyRunning {
@@ -198,9 +226,6 @@ fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(warning) = loaded.warning {
         eprintln!("honk300: ignoring config problem and using defaults ({warning})");
     }
-    eprintln!(
-        "honk300: the desktop overlay is Windows-only for now \
-         (the macOS and Linux backends land in milestones M16/M17)."
-    );
+    eprintln!("honk300: this OS does not have a desktop backend yet.");
     Ok(())
 }
