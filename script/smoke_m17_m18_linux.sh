@@ -255,6 +255,14 @@ start_sway_headless() {
     if [ -S "${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}" ]; then
       return 0
     fi
+    for socket in "${XDG_RUNTIME_DIR}"/wayland-*; do
+      if [ -S "${socket}" ]; then
+        WAYLAND_DISPLAY="$(basename "${socket}")"
+        export WAYLAND_DISPLAY
+        echo "smoke_m17_m18_linux: using Wayland display ${WAYLAND_DISPLAY}"
+        return 0
+      fi
+    done
     sleep 0.25
   done
   cat "${WORK}/sway.log" >&2 || true
