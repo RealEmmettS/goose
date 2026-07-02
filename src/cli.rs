@@ -293,7 +293,12 @@ mod tests {
 
     #[test]
     fn invoked_name_strips_paths_and_extensions() {
+        #[cfg(windows)]
         assert_eq!(invoked_name("C:\\Tools\\goose.exe"), "goose");
+
+        #[cfg(not(windows))]
+        assert_eq!(invoked_name("/opt/honk/goose"), "goose");
+
         assert_eq!(invoked_name("honk300"), "honk300");
     }
 }
