@@ -7,7 +7,7 @@ if [ "$(uname -s)" != "Darwin" ]; then
 fi
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-APP="${ROOT}/target/macos-universal/Honk300.app"
+APP="${ROOT}/target/dist/macos-universal2/Honk300.app"
 BIN="${APP}/Contents/MacOS/honk300"
 CONFIG="$(mktemp "${TMPDIR:-/tmp}/honk300-m16-config.XXXXXX.toml")"
 
@@ -22,6 +22,8 @@ echo "smoke_m16_macos: building universal2 app"
 
 echo "smoke_m16_macos: validating bundle"
 plutil -lint "${APP}/Contents/Info.plist"
+test "$(plutil -extract CFBundleIdentifier raw "${APP}/Contents/Info.plist")" = "dev.emmetts.honk300"
+test "$(plutil -extract LSUIElement raw "${APP}/Contents/Info.plist")" = "1"
 codesign --verify --deep --strict "${APP}"
 lipo -verify_arch x86_64 arm64 "${BIN}"
 

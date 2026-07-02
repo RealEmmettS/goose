@@ -14,8 +14,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > terminal settings screen backed by a saved config file. It now has dynamic moods and a double
 > honk at the top of each hour. It now also respects quiet times, fullscreen/DND manners, and
 > seasonal Autumn leaves. It now supports Windows multi-monitor chasing and fuller appearance
-> controls. Mac support and the Linux control runtime are now in the codebase, with repeatable
-> smoke scripts for the Mac/Linux machines that must produce the remaining GUI evidence. There's
+> controls. Mac support and the Linux desktop paths are now in the codebase, with repeatable
+> CI smoke scripts for the Mac/Linux machines that must produce the remaining runtime evidence. There's
 > no installer yet — that comes later.
 
 ---
@@ -37,16 +37,16 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   the stable permission identity, and signs it for local testing. Final disk images, notarized
   signing, and installers still come later.
 - Linux no longer only says "not supported" when you start it. It now has the same local command
-  channel foundation as Mac and Windows, so it can start, stop, reload, answer status, and accept
-  simple poke commands. It also detects whether it is using the older X11-style desktop path or
-  the reduced Wayland mode, reports unavailable tricks clearly, protects common terminal apps,
-  and can play sounds when a compatible command-line audio player is installed. The actual visible
-  Linux desktop goose still needs the X11 and Wayland overlay work before those milestones are
-  fully done.
-- There are now smoke-test scripts for the Mac and Linux backend work. They build the right local
-  artifacts, start the goose, ask it for status, poke it, reload it, and stop it. They also make
-  clear which checks still need a real Mac or Linux desktop, instead of pretending those were
-  proven from this Windows machine.
+  channel foundation as Mac and Windows, and it can render through the older X11 desktop path or
+  a reduced native Wayland path. X11 can sample and move the cursor and notice dragged windows
+  while protecting common terminal apps. Native Wayland stays intentionally limited: it can show
+  the goose and take commands, but cursor stealing and window tricks report unavailable instead
+  of pretending they work.
+- There is now a real CI smoke-test setup for Mac and Linux backend readiness. It builds the Mac
+  app, checks the app identity/signing/universal build, launches it, asks it for status, pokes it,
+  reloads it, and stops it. On Linux it runs visible X11 under a virtual display and reduced
+  Wayland under headless sway, then checks both the app's frame output and the actual X11 screen
+  capture for visible pixels. The readiness cards stay open until those CI runs are recorded.
 - The goose can now roam across multiple Windows monitors when multi-monitor chasing is on. It
   treats the whole signed desktop as one space, so monitors to the left or above the main screen
   work too. If you turn multi-monitor chasing off, it stays on the primary screen.
@@ -174,6 +174,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - The Linux backend foundation now has its own architecture record. It says Linux should use the
   more capable X11 path by default, only use native Wayland when asked or when X11 is not
   available, and keep unsupported tricks disabled instead of pretending they work.
+- The Mac/Linux readiness work now has its own architecture record. It says the remaining backend
+  cards are closed by CI evidence, not local guesses from Windows, and records the optional
+  self-hosted Mac Accessibility check for permission-granted behavior.
 - The multi-monitor and appearance milestone now has its own architecture record. It says the
   shared goose logic only receives desktop bounds, while Windows owns monitor discovery and
   per-monitor transparent windows. It also records that recoloring means the original three-color

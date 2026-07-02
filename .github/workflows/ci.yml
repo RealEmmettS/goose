@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows host gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust targets
+        run: rustup target add x86_64-pc-windows-msvc aarch64-pc-windows-msvc
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Test
+        run: cargo test --workspace
+      - name: Clippy
+        run: cargo clippy --all-targets --workspace -- -D warnings
+      - name: Release build
+        run: cargo build --release
+      - name: Windows target checks
+        run: |
+          cargo check --workspace --target x86_64-pc-windows-msvc
+          cargo check --workspace --target aarch64-pc-windows-msvc
+
+  macos:
+    name: macOS bundle smoke (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - macos-15
+          - macos-15-intel
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust targets
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+      - name: Test
+        run: cargo test --workspace
+      - name: macOS bundle smoke
+        run: script/smoke_m16_macos.sh
+      - name: Archive universal2 app
+        run: ditto -c -k --keepParent target/dist/macos-universal2/Honk300.app "Honk300-${{ matrix.runner }}.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "honk300-macos-${{ matrix.runner }}"
+          path: "Honk300-${{ matrix.runner }}.zip"
+
+  macos-accessibility:
+    name: macOS Accessibility smoke
+    if: ${{ vars.HONK300_RUN_A11Y_SMOKE == 'true' }}
+    runs-on: [self-hosted, macOS, ARM64, honk300-a11y]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust targets
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+      - name: Accessibility smoke
+        run: script/smoke_m16_macos_accessibility.sh
+
+  linux:
+    name: Linux visible smoke (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway
+      - name: Install Rust targets
+        run: |
+          rustup target add x86_64-unknown-linux-gnu x86_64-unknown-linux-musl
+          rustup target add aarch64-unknown-linux-gnu aarch64-unknown-linux-musl
+      - name: Test
+        run: cargo test --workspace
+      - name: Linux X11 and Wayland smoke
+        run: script/smoke_m17_m18_linux.sh
+      - name: Linux target checks
+        run: |
+          cargo check --workspace --target x86_64-unknown-linux-gnu
+          cargo check --workspace --target aarch64-unknown-linux-gnu
+          cargo check --workspace --target x86_64-unknown-linux-musl
+          cargo check --workspace --target aarch64-unknown-linux-musl

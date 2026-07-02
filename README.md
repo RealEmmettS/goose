@@ -10,9 +10,9 @@ FOR REFERENCE:
 
 ## Status
 
-**Stage:** implementation in progress. Milestones **M0-M18** are implemented in-tree to the
-available Windows-host evidence, with macOS/Linux GUI smoke split into repeatable readiness
-scripts and follow-up host work. The current Windows build renders the procedural goose on the desktop,
+**Stage:** implementation in progress. Milestones **M0-M18** are implemented in-tree, and
+M16.1-M18.1 readiness is now wired for CI proof instead of Windows-host claims. The current
+Windows build renders the procedural goose on the desktop,
 walks it, leaves mud, plays sounds, reacts to pat/click input, can perform bounded cursor
 nabbing when cursor warping is enabled, and can perch on a user-dragged foreign window until
 release. It can also drag in Notepad and meme windows through the M9 collect-window dispatcher,
@@ -22,13 +22,14 @@ configuration plus the terminal config TUI. M13 adds deterministic dynamic moods
 on-hour double honk; M14 adds quiet-hours/DND/fullscreen calm suppression and built-in procedural
 Autumn leaves. M15 adds Windows multi-monitor chase, per-monitor dirty-region presentation, live
 Calm Goose, and full RGB editing for the original three-color goose palette. M16 adds the macOS
-platform crate, AppKit/CoreGraphics runtime path, `honk300 status`, a TUI Status tab, bundle-aware
-asset/start handling, and `script/package_macos_app.sh`. M17/M18 now have a Linux platform helper
-crate and real Linux `start` runtime for Unix IPC status/reload/stop/poke, X11-first vs.
-`--wayland` session detection, terminal classification, local-time sampling, command-player audio,
-and explicit unsupported/failed capability degradation. Visible Linux overlay/window support and
-Linux-host smoke are tracked as follow-up readiness work. `docs/readiness/m16-m18-readiness.md`
-records the evidence and smoke-script handoff. There is no installer or release artifact yet.
+platform crate, AppKit/CoreGraphics runtime path, `honk300 status`, a TUI Status tab,
+bundle-aware asset/start handling, and `script/package_macos_app.sh`. M17 adds a Linux X11
+visible overlay path with input shaping, pointer sampling/warp, terminal-filtered
+foreign-window snapshots, and Unix IPC status/reload/stop/poke. M18 adds native Wayland reduced
+mode with layer-shell rendering, IPC control, and explicit unsupported reporting for mischief
+Wayland does not expose. Linux collect-window support remains unsupported and is reported that
+way. `docs/readiness/m16-m18-readiness.md` records the local gate, CI smoke gates, and pending
+run evidence. There is no installer or release artifact yet.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
@@ -41,7 +42,8 @@ while `codex_plan.md`'s guessed speed values were wrong.)
 **Architecture decisions → [`docs/adr/`](./docs/adr/README.md).** ADRs record durable decisions
 that should survive individual task-board updates. ADR 0010 records the M16 macOS agent-bundle,
 permission-degradation, status protocol, and TUI-only control decisions. ADR 0011 records the
-M17/M18 Linux control-runtime foundation and degraded Wayland contract.
+M17/M18 Linux control-runtime foundation and degraded Wayland contract. ADR 0012 records the
+CI-proven readiness contract for M16.1-M18.1.
 
 **Decided direction (see `honk300_plan.md` for the full detail):**
 
@@ -71,5 +73,5 @@ M17/M18 Linux control-runtime foundation and degraded Wayland contract.
   Silicon** (universal2), Linux x64 **and ARM** (gnu + musl where packaging supports it).
   Native + CLI installers like TR300/ND300/WB300; **no crates.io**.
 - Linux is **X11-first** (runs under XWayland); native Wayland is an opt-in `--wayland` mode with
-  reduced mischief. The current Linux runtime can be controlled and reports capabilities honestly;
-  visible X11/Wayland overlay implementations still need Linux-host readiness evidence.
+  reduced mischief. The current Linux runtime has visible X11 and reduced Wayland presentation
+  paths plus CI smoke scripts; readiness cards close only after the host CI evidence is recorded.

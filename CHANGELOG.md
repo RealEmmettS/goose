@@ -4,16 +4,15 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: implementation in progress.** Milestones M0-M18 are implemented in-tree to the
-> available Windows-host evidence, with macOS/Linux GUI smoke split into repeatable readiness
-> scripts and follow-up host work. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
+> **Project stage: implementation in progress.** Milestones M0-M18 are implemented in-tree, and
+> M16.1-M18.1 readiness is now gated on CI host evidence rather than Windows-host claims. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
 > Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
 > ratatui config TUI, dynamic moods, the local on-hour double honk, quiet-hours/DND/fullscreen
 > manners, built-in Autumn leaves, Windows multi-monitor chase, and live appearance/recolor
-> controls, plus macOS runtime/status/app-bundle staging and Linux IPC/status degradation
-> plumbing; there is no release yet. A plain-English companion lives in
+> controls, plus macOS runtime/status/app-bundle staging, Linux X11 visible overlay support,
+> native Wayland reduced-mode rendering, and CI smoke gates; there is no release yet. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
@@ -40,25 +39,23 @@ All notable changes to this project are documented here. Format based on
   `plutil`, `codesign`, and `lipo`. Bundle-aware asset discovery now prefers
   `Contents/Resources/Assets`, and TUI Start launches bundled macOS runs through
   `/usr/bin/open -n <Honk300.app> --args start --config <path>`.
-- **M17/M18 Linux control-runtime foundation (display backends still pending)** — added
-  `crates/honk-platform-linux` for X11-first vs. forced/native Wayland session detection,
-  fallback bounds, Linux local-time sampling, and a common-terminal classifier covering Alacritty,
-  GNOME Terminal, kitty, Konsole, Ghostty, WezTerm, xfce4-terminal, and Ptyxis without blocking
-  regular apps. Linux `start` now routes into a real runtime loop using the existing Unix IPC
-  transport for `status`, `reload`, `stop`, and `do <action>` instead of printing the old
-  non-Windows placeholder. The degraded runtime ticks the platform-free engine, loads assets,
-  plays sounds through `ffplay`/`mpv` when available, reports audio failure when no compatible
-  player exists, and reports cursor/window/collect/presence capabilities as unsupported or failed
-  until a visible X11 or Wayland backend proves them. ADR 0011 records that M17 full X11 parity
-  and M18 visible Wayland reduced mode remain Linux-host readiness gates.
-- **M16-M18 readiness scripts and evidence handoff** — added
-  `docs/readiness/m16-m18-readiness.md`, `script/smoke_m16_macos.sh`, and
-  `script/smoke_m17_m18_linux.sh`. The macOS smoke script builds and validates the universal2
-  `.app`, launches the LSUIElement bundle, checks status, and exercises honk/mud/reload/stop IPC.
-  The Linux smoke script builds the binary, runs default and forced-Wayland degraded modes, checks
-  status, verifies unsupported cursor-nab rejection, and exercises honk/mud/wander/reload/stop IPC.
-  The readiness note records the Windows-host gate/cross-target evidence and splits remaining
-  macOS/Linux GUI smoke into explicit host follow-up work.
+- **M17/M18 Linux visible backend and reduced Wayland runtime (CI proof pending)** — extended
+  `crates/honk-platform-linux` beyond session/control plumbing with an X11 visible overlay
+  using `x11rb` (`shape`, `xfixes`, `xinerama`, `randr`, `render`), XShape/XFixes input-region
+  shaping, Xinerama/root display bounds, pointer sampling, cursor warp, and terminal-filtered
+  foreign-window drag snapshots. Native Wayland now has a reduced layer-shell overlay using
+  `smithay-client-toolkit` and `wayland-protocols-wlr`; it renders and remains IPC-controllable
+  while cursor/window/collect/synthetic-input mischief reports unsupported. Linux collect-window
+  support remains unsupported and is visible in status rather than silently attempted.
+- **CI-proven M16.1-M18.1 readiness gates** — added `.github/workflows/ci.yml`,
+  `script/smoke_m16_macos_accessibility.sh`, and stronger macOS/Linux smoke coverage. Hosted CI
+  now covers Windows fmt/test/clippy/release plus Windows x64/ARM64 checks, macOS Intel/arm64
+  universal2 bundle smoke with app artifacts, and Linux x64/ARM X11 + Wayland smoke under
+  Xvfb/openbox/xcompmgr and headless sway. The X11 smoke verifies both internal frame pixels and
+  actual root-window screenshot pixels. The optional self-hosted macOS Accessibility job is gated by
+  `HONK300_RUN_A11Y_SMOKE=true` and labels `[self-hosted, macOS, ARM64, honk300-a11y]`.
+  `docs/readiness/m16-m18-readiness.md` now records that `#m16r`, `#m17r`, and `#m18r` stay open
+  until CI run URLs and artifacts are captured.
 - **Multi-monitor chase and appearance controls (milestone M15, complete)** — Windows now creates
   one layered overlay HWND per monitor, enumerates signed monitor bounds, chooses the engine world
   bounds from `[behaviors].multi_monitor_chase`, and clips/crops dirty render regions per monitor
@@ -348,9 +345,9 @@ All notable changes to this project are documented here. Format based on
   readiness pass, M9's collect-window asset/ADR/target-readiness work, and M10's IPC/control
   readiness work, plus M11 CLI grammar, M12 config/TUI readiness work, M13 moods/hourly-honk
   closure, M14 schedule/Autumn closure, and M15 multi-monitor/appearance closure.
-- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M15 complete, M16 active,
-  the new M17/M18 Linux control-runtime foundation, and the ADR
-  0001/0002/0003/0004/0007/0008/0009/0010/0011 location and maintenance rules.
+- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M18 implementation in
+  tree, the M16.1-M18.1 CI evidence gate, Linux X11/Wayland presentation support, and the ADR
+  0001/0002/0003/0004/0007/0008/0009/0010/0011/0012 location and maintenance rules.
 - Added **ADR 0005** (M11 three-name CLI, goose-speak, and the poke-outcome round-trip) and
   **ADR 0006** (M12 config TUI, durable TOML, and the capability/preference boundary), recording
   the previously-undocumented M11/M12 decisions and the four contract corrections from the
@@ -364,8 +361,11 @@ All notable changes to this project are documented here. Format based on
   rule, and original three-color recolor scope.
 - Added **ADR 0011** (M17/M18 Linux control runtime and degraded Wayland foundation), recording
   the X11-first session rule, forced/native Wayland degradation, Linux Unix IPC runtime, terminal
-  classifier, command-player audio, and the remaining Linux-host readiness gates for visible X11
-  and Wayland backends.
+  classifier, command-player audio, and the remaining Linux-host readiness gates that existed
+  before the visible backends landed.
+- Added **ADR 0012** (M16.1-M18.1 CI-proven backend readiness), recording the hosted CI matrix,
+  optional self-hosted macOS Accessibility gate, Linux X11/Wayland smoke contract, and the rule
+  that readiness tasks do not move to Done until CI evidence is recorded.
 - `claude_plan.md` and `codex_plan.md` are now **superseded reference drafts**; `honk300_plan.md`
   is canonical. The "Read these first" pointers in **both** `CLAUDE.md` and its Codex twin
   `AGENTS.md` were updated in lockstep (canonical plan, milestone range M0–M19, workspace

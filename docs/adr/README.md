@@ -22,3 +22,4 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0009 — M15 Multi-Monitor And Appearance](./0009-m15-multi-monitor-and-appearance.md)
 - [0010 — M16 macOS Backend, Agent Bundle, And TUI Status](./0010-m16-macos-backend-agent-bundle-and-tui-status.md)
 - [0011 — M17/M18 Linux Control Runtime And Degraded Wayland Foundation](./0011-m17-m18-linux-control-runtime-and-degraded-wayland.md)
+- [0012 — M16.1-M18.1 CI-Proven Backend Readiness](./0012-m16-1-m18-1-ci-proven-backend-readiness.md)

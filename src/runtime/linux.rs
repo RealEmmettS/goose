@@ -6,13 +6,19 @@ use honk_control::{
     BundleStatus, CapabilityStatus, CommandServer, ControlCommand, ControlResponse, PlatformStatus,
     RuntimeStatus,
 };
+use honk_engine::render::{
+    render_autumn_leaves, render_footmarks_with_timing, render_hearts, render_rig_with_palette,
+    render_sleepies, AutumnRenderLayer,
+};
+use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
-    Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, Pointer, PresenceSnapshot,
-    Sound, Vec2, World,
+    Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, CursorCommand,
+    PresenceSnapshot, Sound, World,
 };
 use honk_platform_linux::{
-    collect_window_supported, cursor_mischief_supported, default_world_bounds,
-    foreign_window_watch_supported, local_time, presence_supported, DisplayServer, SessionInfo,
+    display_collect_window_supported, display_cursor_mischief_supported,
+    display_foreign_window_watch_supported, local_time, presence_supported, DisplayServer, Overlay,
+    OverlayMode, SessionInfo,
 };
 
 pub fn run(
@@ -24,15 +30,19 @@ pub fn run(
     println!("honk300: loaded {}", assets.summary());
 
     let mut session = SessionInfo::detect(options.cli_overrides.wayland || config.platform.wayland);
+    let mut overlay = Overlay::new(session.display_server)?;
+    let mut overlay_mode = overlay.mode();
+    let mut display_server = overlay.display_server();
     eprintln!(
-        "honk300: Linux {} runtime active; unsupported desktop-control features degrade in status.",
-        session.display_server.label()
+        "honk300: Linux {} runtime active; overlay mode is {:?}.",
+        display_server.label(),
+        overlay_mode
     );
 
-    let mut cursor_warp = cursor_capability(session.display_server);
-    let mut window_watch = window_capability(session.display_server);
-    let collect_window = collect_capability(session.display_server);
-    let presence = presence_capability(session.display_server);
+    let mut cursor_warp = cursor_capability(overlay_mode, display_server);
+    let mut window_watch = window_capability(overlay_mode, display_server);
+    let mut collect_window = collect_capability(overlay_mode, display_server);
+    let presence = presence_capability(display_server);
     let mut audio_capability = BackendCapability::Supported;
 
     let mut effective = effective_options(
@@ -70,14 +80,13 @@ pub fn run(
         );
     }
 
-    let mut world = World::with_options(
-        default_world_bounds(session.display_server),
-        seed_from_clock(),
-        effective.world,
-    );
+    let mut world = World::with_options(overlay.bounds(), seed_from_clock(), effective.world);
     let mut accumulator = Accumulator::new();
     let clock = Clock::start();
     let mut last = clock.elapsed_secs();
+    let mut last_present = f32::NEG_INFINITY;
+    let mut last_render_bounds = None;
+    const PRESENT_INTERVAL: f32 = 1.0 / 60.0;
     let mut warned_collect = false;
     let mut warned_cursor = false;
 
@@ -94,21 +103,37 @@ pub fn run(
                 ControlCommand::Reload => {
                     let response = match Config::load_existing(&options.config_path) {
                         Ok(next_config) => {
-                            let prior_display = session.display_server;
+                            let prior_display = display_server;
                             config = next_config;
                             session = SessionInfo::detect(
                                 options.cli_overrides.wayland || config.platform.wayland,
                             );
-                            cursor_warp = cursor_capability(session.display_server);
-                            window_watch = window_capability(session.display_server);
+                            if session.display_server != display_server {
+                                match Overlay::new(session.display_server) {
+                                    Ok(next_overlay) => {
+                                        overlay = next_overlay;
+                                        overlay_mode = overlay.mode();
+                                        display_server = overlay.display_server();
+                                        last_render_bounds = None;
+                                    }
+                                    Err(err) => {
+                                        eprintln!(
+                                            "honk300: Linux overlay reload kept prior display mode; new overlay failed ({err})"
+                                        );
+                                    }
+                                }
+                            }
+                            cursor_warp = cursor_capability(overlay_mode, display_server);
+                            window_watch = window_capability(overlay_mode, display_server);
+                            collect_window = collect_capability(overlay_mode, display_server);
                             effective = effective_options(
                                 &config,
                                 &options,
                                 backend_state(
                                     cursor_warp,
                                     window_watch,
-                                    collect_capability(session.display_server),
-                                    presence_capability(session.display_server),
+                                    collect_window,
+                                    presence_capability(display_server),
                                     audio_capability,
                                     assets.note_count(),
                                     assets.meme_count(),
@@ -122,11 +147,11 @@ pub fn run(
                                     audio_capability = BackendCapability::Failed;
                                 }
                             }
-                            if prior_display != session.display_server {
+                            if prior_display != display_server {
                                 eprintln!(
                                     "honk300: Linux display mode changed from {} to {}; restart recommended once display backends are active.",
                                     prior_display.label(),
-                                    session.display_server.label()
+                                    display_server.label()
                                 );
                             }
                             world.apply_options(effective.world);
@@ -149,8 +174,8 @@ pub fn run(
                     request.respond(ControlResponse::Status(runtime_status(
                         cursor_warp,
                         window_watch,
-                        collect_capability(session.display_server),
-                        presence_capability(session.display_server),
+                        collect_window,
+                        presence_capability(display_server),
                         audio_capability,
                         assets.note_count(),
                         assets.meme_count(),
@@ -159,15 +184,18 @@ pub fn run(
             }
         }
 
+        if !overlay.pump() {
+            eprintln!("honk300: Linux overlay closed.");
+            return Ok(());
+        }
+
         world.set_local_time(local_time());
         world.set_presence(PresenceSnapshot::unsupported());
-        world.set_pointer(Pointer {
-            pos: Vec2::ZERO,
-            present: false,
-            left_down: false,
-        });
-        world.set_foreign_window_drag(None);
+        let pointer = overlay.pointer_state();
+        world.set_pointer(pointer);
+        world.set_foreign_window_drag(overlay.foreign_window_drag());
         world.set_collect_window_snapshot(None);
+        let _ = overlay.set_input_region(Some(world.rig().bounding_box()));
 
         let now = clock.elapsed_secs();
         let dt = now - last;
@@ -189,12 +217,19 @@ pub fn run(
             }
         }
 
-        if !world.take_cursor_commands().is_empty() {
-            cursor_warp = BackendCapability::Unsupported;
-            world.set_cursor_warp_supported(false);
-            if !warned_cursor {
-                warned_cursor = true;
-                eprintln!("honk300: Linux cursor warp is unsupported in this runtime mode.");
+        let cursor_commands = world.take_cursor_commands();
+        if let Some(CursorCommand::WarpTo(pos)) = cursor_commands.last().copied() {
+            if let Err(err) = overlay.warp_cursor(pos) {
+                cursor_warp = if err.kind() == std::io::ErrorKind::Unsupported {
+                    BackendCapability::Unsupported
+                } else {
+                    BackendCapability::Failed
+                };
+                world.set_cursor_warp_supported(false);
+                if !warned_cursor {
+                    warned_cursor = true;
+                    eprintln!("honk300: Linux cursor warp unavailable; disabling it ({err})");
+                }
             }
         }
 
@@ -205,6 +240,45 @@ pub fn run(
                     a.play(sound);
                 }
             }
+        }
+
+        if now - last_present >= PRESENT_INTERVAL {
+            last_present = now;
+            let dirty = world.render_bounds(last_render_bounds);
+            let width = dirty.width().ceil().max(1.0) as u32;
+            let height = dirty.height().ceil().max(1.0) as u32;
+            let origin = dirty.min;
+            let mut canvas =
+                Pixmap::new(width, height).ok_or("could not allocate dirty overlay canvas")?;
+            canvas.fill(Color::TRANSPARENT);
+            render_footmarks_with_timing(
+                &mut canvas,
+                &world.goose.foot_marks,
+                world.now(),
+                origin,
+                world.footmark_timing(),
+            );
+            render_autumn_leaves(
+                &mut canvas,
+                world.autumn(),
+                world.now(),
+                origin,
+                world.goose.position,
+                AutumnRenderLayer::BelowGoose,
+            );
+            render_rig_with_palette(&mut canvas, world.rig(), origin, world.render_palette());
+            render_autumn_leaves(
+                &mut canvas,
+                world.autumn(),
+                world.now(),
+                origin,
+                world.goose.position,
+                AutumnRenderLayer::AboveGoose,
+            );
+            render_hearts(&mut canvas, world.hearts(), world.now(), origin);
+            render_sleepies(&mut canvas, world.sleepies(), world.now(), origin);
+            overlay.present(dirty, &canvas)?;
+            last_render_bounds = Some(dirty);
         }
 
         std::thread::sleep(std::time::Duration::from_millis(2));
@@ -268,16 +342,34 @@ fn sound_enabled(config: honk_config::AudioConfig, sound: Sound) -> bool {
     }
 }
 
-fn cursor_capability(session: DisplayServer) -> BackendCapability {
-    capability_for(session, cursor_mischief_supported)
+fn cursor_capability(mode: OverlayMode, session: DisplayServer) -> BackendCapability {
+    if display_cursor_mischief_supported(session) {
+        return if mode == OverlayMode::X11 {
+            BackendCapability::Supported
+        } else {
+            BackendCapability::Failed
+        };
+    }
+    capability_for(session, display_cursor_mischief_supported)
 }
 
-fn window_capability(session: DisplayServer) -> BackendCapability {
-    capability_for(session, foreign_window_watch_supported)
+fn window_capability(mode: OverlayMode, session: DisplayServer) -> BackendCapability {
+    if display_foreign_window_watch_supported(session) {
+        return if mode == OverlayMode::X11 {
+            BackendCapability::Supported
+        } else {
+            BackendCapability::Failed
+        };
+    }
+    capability_for(session, display_foreign_window_watch_supported)
 }
 
-fn collect_capability(session: DisplayServer) -> BackendCapability {
-    capability_for(session, collect_window_supported)
+fn collect_capability(mode: OverlayMode, session: DisplayServer) -> BackendCapability {
+    if mode == OverlayMode::X11 && display_collect_window_supported(session) {
+        BackendCapability::Supported
+    } else {
+        capability_for(session, display_collect_window_supported)
+    }
 }
 
 fn presence_capability(session: DisplayServer) -> BackendCapability {
@@ -344,11 +436,23 @@ mod tests {
     #[test]
     fn unknown_display_maps_core_capabilities_to_failed() {
         assert_eq!(
-            cursor_capability(DisplayServer::Unknown),
+            cursor_capability(OverlayMode::Headless, DisplayServer::Unknown),
             BackendCapability::Failed
         );
         assert_eq!(
-            window_capability(DisplayServer::Unknown),
+            window_capability(OverlayMode::Headless, DisplayServer::Unknown),
+            BackendCapability::Failed
+        );
+    }
+
+    #[test]
+    fn x11_session_with_headless_fallback_reports_failed_desktop_capabilities() {
+        assert_eq!(
+            cursor_capability(OverlayMode::Headless, DisplayServer::X11),
+            BackendCapability::Failed
+        );
+        assert_eq!(
+            window_capability(OverlayMode::Headless, DisplayServer::X11),
             BackendCapability::Failed
         );
     }
@@ -356,11 +460,27 @@ mod tests {
     #[test]
     fn wayland_reports_core_mischief_unsupported_not_denied() {
         assert_eq!(
-            cursor_capability(DisplayServer::Wayland),
+            cursor_capability(OverlayMode::Wayland, DisplayServer::Wayland),
             BackendCapability::Unsupported
         );
         assert_eq!(
-            window_capability(DisplayServer::Wayland),
+            window_capability(OverlayMode::Wayland, DisplayServer::Wayland),
+            BackendCapability::Unsupported
+        );
+    }
+
+    #[test]
+    fn x11_reports_supported_cursor_and_window_but_not_collect() {
+        assert_eq!(
+            cursor_capability(OverlayMode::X11, DisplayServer::X11),
+            BackendCapability::Supported
+        );
+        assert_eq!(
+            window_capability(OverlayMode::X11, DisplayServer::X11),
+            BackendCapability::Supported
+        );
+        assert_eq!(
+            collect_capability(OverlayMode::X11, DisplayServer::X11),
             BackendCapability::Unsupported
         );
     }

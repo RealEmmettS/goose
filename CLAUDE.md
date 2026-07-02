@@ -8,9 +8,8 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M15 are complete and M16 (macOS backend plus
-universal2 `.app` staging) is implemented in-tree but still needs macOS-host smoke/readiness
-evidence before the backend milestone can close. The Cargo workspace exists: `honk-engine` (platform-free
+**Current stage: implementation in progress.** M0-M18 are implemented in-tree, and M16.1-M18.1
+readiness is gated on CI host evidence rather than Windows-host claims. The Cargo workspace exists: `honk-engine` (platform-free
 core), `honk-control` (shared IPC protocol/client/server), `honk-config` (versioned TOML
 configuration), `honk-config-tui` (ratatui reducer UI), `honk-platform-windows` (the layered
 overlay), `honk-platform-macos` (AppKit/CoreGraphics backend), `honk-platform-linux` (Linux
@@ -24,12 +23,12 @@ adds dynamic moods and the local on-hour double honk; M14 adds quiet-hours/DND/f
 suppression and built-in procedural Autumn leaves; M15 adds signed virtual-desktop multi-monitor
 chase, one Windows overlay HWND per monitor, live Calm Goose, and RGB editing for the original
 three-color goose palette; M16 adds macOS runtime wiring, `honk300 status`, a TUI Status tab,
-bundle-aware assets/start handling, and `script/package_macos_app.sh`; M17/M18 now have the
-Linux control-runtime foundation for X11-first/`--wayland` session detection, Unix IPC
-start/status/reload/stop/poke, terminal classification, local-time sampling, command-player audio,
-and explicit unsupported/failed capability reporting. Visible X11/Wayland overlay/window support
-still needs Linux-host readiness work. `docs/readiness/m16-m18-readiness.md` records the
-Windows-host evidence and the macOS/Linux smoke-script handoff.
+bundle-aware assets/start handling, and `script/package_macos_app.sh`; M17 adds the Linux X11
+visible overlay path with input shaping, pointer sampling/warp, terminal-filtered foreign-window
+snapshots, and Unix IPC control; M18 adds native Wayland reduced mode with layer-shell rendering,
+IPC control, and explicit unsupported reporting for blocked mischief. Linux collect-window support
+remains unsupported and is reported honestly. `docs/readiness/m16-m18-readiness.md` records the
+local gate, CI smoke gates, and pending host evidence log.
 `honk300_plan.md` is the canonical plan (milestones M0–M19); the two superseded drafts remain as
 reference.
 
@@ -61,7 +60,8 @@ reference.
   injection contract; ADR 0008 records the M14 schedule/presence/Autumn contract; ADR 0009
   records the M15 multi-monitor/appearance contract; ADR 0010 records the M16 macOS agent-bundle,
   permission degradation, status protocol, and TUI-only control contract; ADR 0011 records the
-  M17/M18 Linux control-runtime foundation and degraded Wayland contract.
+  M17/M18 Linux control-runtime foundation and degraded Wayland contract; ADR 0012 records the
+  M16.1-M18.1 CI-proven readiness contract.
 
 ## Big-picture architecture (original → planned port)
 
@@ -115,6 +115,7 @@ reference.
 - M15's accepted decisions live in `docs/adr/0009-m15-multi-monitor-and-appearance.md`.
 - M16's accepted decisions live in `docs/adr/0010-m16-macos-backend-agent-bundle-and-tui-status.md`.
 - M17/M18's Linux control-runtime foundation lives in `docs/adr/0011-m17-m18-linux-control-runtime-and-degraded-wayland.md`.
+- M16.1-M18.1's CI-proven readiness contract lives in `docs/adr/0012-m16-1-m18-1-ci-proven-backend-readiness.md`.
 
 ## Task management system
 

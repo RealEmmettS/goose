@@ -745,14 +745,15 @@ being implemented three more times.
 | M18 | `--wayland` layer-shell degraded mode (stop/poke via IPC) | renders on Wayland; mischief self-disables; `goose stop` works |
 | M19 | install/update/uninstall(`--purge`)/setup + packaging **all targets** (Win x64+ARM64 ×4 installers, mac universal2 `.dmg`, Linux x64/ARM gnu+musl) + 3 aliases | installers produce working artifacts w/ autostart + shortcut on every OS/arch |
 
-Implementation note (2026-07-01): the Linux control-runtime foundation has landed in
-`honk-platform-linux` plus `src/runtime/linux.rs`. Linux `start` now uses Unix IPC, answers
-`status`/`reload`/`stop`/`do`, detects X11-first vs. `--wayland`, classifies common terminal apps,
-samples local time, and reports unsupported/failed capabilities honestly. This does **not** close
-M17 or M18 by itself: X11 still needs visible overlay/input/window parity and Wayland still needs
-the reduced layer-shell rendering path plus Linux-host readiness smoke. The M16-M18 active
-implementation card is closed to Windows-host evidence in `docs/readiness/m16-m18-readiness.md`;
-remaining platform GUI evidence is split into host smoke scripts and follow-up readiness work.
+Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
+and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus
+`src/runtime/linux.rs`. Linux `start` now uses Unix IPC, answers `status`/`reload`/`stop`/`do`,
+detects X11-first vs. forced/native Wayland sessions, samples local time, protects common terminal
+apps, plays audio through command-line players when available, renders through X11 or reduced
+Wayland when the display server is available, and reports honest unsupported/failed capabilities.
+M16.1-M18.1 completion is CI-proven: readiness cards close only after the hosted Linux/macOS jobs
+and optional Accessibility-granted macOS job record their run evidence in
+`docs/readiness/m16-m18-readiness.md`.
 
 ---
 

@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted. M17/M18 are not closed by this ADR; it records the Linux runtime/control foundation and
-the honest degradation contract that must remain in place while the visible X11 and Wayland
-presentation backends are completed and smoke-tested on Linux hosts.
+Accepted. Extended by ADR 0012. This ADR records the Linux runtime/control foundation and the
+honest degradation contract that must remain in place around the visible X11 and Wayland
+presentation backends.
 
 ## Context
 

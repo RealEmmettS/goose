@@ -29,7 +29,7 @@ pub struct Cli {
     #[arg(long, global = true, value_name = "PATH")]
     pub config: Option<PathBuf>,
 
-    /// Request native Wayland mode when the M18 backend exists.
+    /// Request native Wayland reduced mode on Linux.
     #[arg(long, global = true)]
     pub wayland: bool,
 
