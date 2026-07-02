@@ -750,7 +750,9 @@ Implementation note (2026-07-01): the Linux control-runtime foundation has lande
 `status`/`reload`/`stop`/`do`, detects X11-first vs. `--wayland`, classifies common terminal apps,
 samples local time, and reports unsupported/failed capabilities honestly. This does **not** close
 M17 or M18 by itself: X11 still needs visible overlay/input/window parity and Wayland still needs
-the reduced layer-shell rendering path plus Linux-host readiness smoke.
+the reduced layer-shell rendering path plus Linux-host readiness smoke. The M16-M18 active
+implementation card is closed to Windows-host evidence in `docs/readiness/m16-m18-readiness.md`;
+remaining platform GUI evidence is split into host smoke scripts and follow-up readiness work.
 
 ---
 

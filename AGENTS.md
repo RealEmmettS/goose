@@ -22,7 +22,8 @@ runtime wiring, universal2 app staging, `honk300 status`, and a TUI Status tab. 
 the Linux control-runtime foundation: X11-first/`--wayland` session detection, Unix IPC
 start/status/reload/stop/poke, Linux terminal classification, local-time sampling, command-player
 audio, and explicit unsupported/failed capability reporting. Visible X11/Wayland overlay/window
-support still needs Linux-host readiness work.
+support still needs Linux-host readiness work. `docs/readiness/m16-m18-readiness.md` records the
+Windows-host evidence and the macOS/Linux smoke-script handoff.
 
 ## Read these first (source-of-truth pointers)
 

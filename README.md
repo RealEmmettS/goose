@@ -10,9 +10,9 @@ FOR REFERENCE:
 
 ## Status
 
-**Stage:** implementation in progress. Milestones **M0-M15** are complete; **M16 macOS backend
-implementation and universal2 `.app` staging are now in-tree, with macOS-host smoke/readiness
-evidence still required before closing the backend milestone.** The current Windows build renders the procedural goose on the desktop,
+**Stage:** implementation in progress. Milestones **M0-M18** are implemented in-tree to the
+available Windows-host evidence, with macOS/Linux GUI smoke split into repeatable readiness
+scripts and follow-up host work. The current Windows build renders the procedural goose on the desktop,
 walks it, leaves mud, plays sounds, reacts to pat/click input, can perform bounded cursor
 nabbing when cursor warping is enabled, and can perch on a user-dragged foreign window until
 release. It can also drag in Notepad and meme windows through the M9 collect-window dispatcher,
@@ -27,7 +27,8 @@ asset/start handling, and `script/package_macos_app.sh`. M17/M18 now have a Linu
 crate and real Linux `start` runtime for Unix IPC status/reload/stop/poke, X11-first vs.
 `--wayland` session detection, terminal classification, local-time sampling, command-player audio,
 and explicit unsupported/failed capability degradation. Visible Linux overlay/window support and
-Linux-host smoke remain open. There is no installer or release artifact yet.
+Linux-host smoke are tracked as follow-up readiness work. `docs/readiness/m16-m18-readiness.md`
+records the evidence and smoke-script handoff. There is no installer or release artifact yet.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the

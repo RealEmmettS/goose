@@ -4,9 +4,9 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: implementation in progress.** Milestones M0-M15 are complete and M16 is
-> implemented in-tree pending macOS-host readiness evidence; M17/M18 now have a Linux
-> control-runtime foundation pending visible X11/Wayland backend readiness. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
+> **Project stage: implementation in progress.** Milestones M0-M18 are implemented in-tree to the
+> available Windows-host evidence, with macOS/Linux GUI smoke split into repeatable readiness
+> scripts and follow-up host work. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
 > Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
@@ -51,6 +51,14 @@ All notable changes to this project are documented here. Format based on
   player exists, and reports cursor/window/collect/presence capabilities as unsupported or failed
   until a visible X11 or Wayland backend proves them. ADR 0011 records that M17 full X11 parity
   and M18 visible Wayland reduced mode remain Linux-host readiness gates.
+- **M16-M18 readiness scripts and evidence handoff** — added
+  `docs/readiness/m16-m18-readiness.md`, `script/smoke_m16_macos.sh`, and
+  `script/smoke_m17_m18_linux.sh`. The macOS smoke script builds and validates the universal2
+  `.app`, launches the LSUIElement bundle, checks status, and exercises honk/mud/reload/stop IPC.
+  The Linux smoke script builds the binary, runs default and forced-Wayland degraded modes, checks
+  status, verifies unsupported cursor-nab rejection, and exercises honk/mud/wander/reload/stop IPC.
+  The readiness note records the Windows-host gate/cross-target evidence and splits remaining
+  macOS/Linux GUI smoke into explicit host follow-up work.
 - **Multi-monitor chase and appearance controls (milestone M15, complete)** — Windows now creates
   one layered overlay HWND per monitor, enumerates signed monitor bounds, chooses the engine world
   bounds from `[behaviors].multi_monitor_chase`, and clips/crops dirty render regions per monitor

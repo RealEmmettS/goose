@@ -28,7 +28,8 @@ bundle-aware assets/start handling, and `script/package_macos_app.sh`; M17/M18 n
 Linux control-runtime foundation for X11-first/`--wayland` session detection, Unix IPC
 start/status/reload/stop/poke, terminal classification, local-time sampling, command-player audio,
 and explicit unsupported/failed capability reporting. Visible X11/Wayland overlay/window support
-still needs Linux-host readiness work.
+still needs Linux-host readiness work. `docs/readiness/m16-m18-readiness.md` records the
+Windows-host evidence and the macOS/Linux smoke-script handoff.
 `honk300_plan.md` is the canonical plan (milestones M0–M19); the two superseded drafts remain as
 reference.
 

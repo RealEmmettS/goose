@@ -14,10 +14,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > terminal settings screen backed by a saved config file. It now has dynamic moods and a double
 > honk at the top of each hour. It now also respects quiet times, fullscreen/DND manners, and
 > seasonal Autumn leaves. It now supports Windows multi-monitor chasing and fuller appearance
-> controls. Mac support is now in the codebase and still needs real Mac smoke testing before the
-> milestone is fully closed. Linux can now start as a controlled background runtime and tell you
-> honestly which desktop tricks are not available yet, but the visible Linux overlays still need
-> Linux-machine testing and follow-up implementation. There's no installer yet — that comes later.
+> controls. Mac support and the Linux control runtime are now in the codebase, with repeatable
+> smoke scripts for the Mac/Linux machines that must produce the remaining GUI evidence. There's
+> no installer yet — that comes later.
 
 ---
 
@@ -44,6 +43,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   and can play sounds when a compatible command-line audio player is installed. The actual visible
   Linux desktop goose still needs the X11 and Wayland overlay work before those milestones are
   fully done.
+- There are now smoke-test scripts for the Mac and Linux backend work. They build the right local
+  artifacts, start the goose, ask it for status, poke it, reload it, and stop it. They also make
+  clear which checks still need a real Mac or Linux desktop, instead of pretending those were
+  proven from this Windows machine.
 - The goose can now roam across multiple Windows monitors when multi-monitor chasing is on. It
   treats the whole signed desktop as one space, so monitors to the left or above the main screen
   work too. If you turn multi-monitor chasing off, it stays on the primary screen.
