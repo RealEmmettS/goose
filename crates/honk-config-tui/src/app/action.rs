@@ -14,6 +14,7 @@ pub enum Action {
     Adjust(i8),
     Save,
     Reload,
+    Status,
     Stop,
     Start,
     Poke(PokeAction),

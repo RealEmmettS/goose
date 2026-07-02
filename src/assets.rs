@@ -82,6 +82,10 @@ impl AssetCatalog {
 }
 
 fn assets_root() -> PathBuf {
+    if let Some(bundle_assets) = bundled_assets_root() {
+        return bundle_assets;
+    }
+
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let cwd_assets = cwd.join("Assets");
     if cwd_assets.exists() {
@@ -93,6 +97,18 @@ fn assets_root() -> PathBuf {
         .and_then(|exe| exe.parent().map(|p| p.join("Assets")))
         .filter(|path| path.exists())
         .unwrap_or(cwd_assets)
+}
+
+fn bundled_assets_root() -> Option<PathBuf> {
+    bundled_assets_root_for_exe(&std::env::current_exe().ok()?)
+}
+
+fn bundled_assets_root_for_exe(exe: &Path) -> Option<PathBuf> {
+    let bundle = exe
+        .ancestors()
+        .find(|path| path.extension().and_then(|ext| ext.to_str()) == Some("app"))?;
+    let assets = bundle.join("Contents").join("Resources").join("Assets");
+    assets.exists().then_some(assets)
 }
 
 fn sorted_files(root: &Path, subdirs: &[&str]) -> Vec<PathBuf> {
@@ -113,4 +129,37 @@ fn file_stem(path: &Path) -> String {
         .and_then(|stem| stem.to_str())
         .unwrap_or("untitled")
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_assets_inside_macos_app_bundle() {
+        let dir = test_dir("bundle-assets");
+        let app = dir.join("Honk300.app");
+        let assets = app.join("Contents").join("Resources").join("Assets");
+        fs::create_dir_all(&assets).unwrap();
+        let exe = app.join("Contents").join("MacOS").join("honk300");
+        assert_eq!(bundled_assets_root_for_exe(&exe), Some(assets));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn ignores_bare_binary_without_app_bundle() {
+        let dir = test_dir("bare-assets");
+        fs::create_dir_all(&dir).unwrap();
+        let exe = dir.join("honk300");
+        assert_eq!(bundled_assets_root_for_exe(&exe), None);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    fn test_dir(name: &str) -> PathBuf {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("honk300-{name}-{}-{nonce}", std::process::id()))
+    }
 }

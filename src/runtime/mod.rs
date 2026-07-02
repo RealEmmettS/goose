@@ -1,10 +1,13 @@
 #[cfg(windows)]
 pub mod windows;
 
-#[cfg(windows)]
+#[cfg(target_os = "macos")]
+pub mod macos;
+
+#[cfg(any(windows, target_os = "macos"))]
 use honk_config::{CliOverrides, Config};
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 #[derive(Debug, Clone)]
 pub struct RuntimeOptions {
     pub config_path: std::path::PathBuf,

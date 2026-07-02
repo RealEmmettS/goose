@@ -11,7 +11,8 @@ FOR REFERENCE:
 ## Status
 
 **Stage:** implementation in progress. Milestones **M0-M15** are complete; **M16 macOS backend
-and universal2 app packaging** is next. The current Windows build renders the procedural goose on the desktop,
+implementation and universal2 `.app` staging are now in-tree, with macOS-host smoke/readiness
+evidence still required before closing the backend milestone.** The current Windows build renders the procedural goose on the desktop,
 walks it, leaves mud, plays sounds, reacts to pat/click input, can perform bounded cursor
 nabbing when cursor warping is enabled, and can perch on a user-dragged foreign window until
 release. It can also drag in Notepad and meme windows through the M9 collect-window dispatcher,
@@ -20,8 +21,10 @@ M10 adds a single-instance local control channel for `start`, `stop`, `reload`, 
 configuration plus the terminal config TUI. M13 adds deterministic dynamic moods and the local
 on-hour double honk; M14 adds quiet-hours/DND/fullscreen calm suppression and built-in procedural
 Autumn leaves. M15 adds Windows multi-monitor chase, per-monitor dirty-region presentation, live
-Calm Goose, and full RGB editing for the original three-color goose palette. There is no installer
-or release artifact yet.
+Calm Goose, and full RGB editing for the original three-color goose palette. M16 adds the macOS
+platform crate, AppKit/CoreGraphics runtime path, `honk300 status`, a TUI Status tab, bundle-aware
+asset/start handling, and `script/package_macos_app.sh`. There is no installer or release artifact
+yet.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
@@ -32,8 +35,8 @@ drafts are now **superseded reference only**; where the three conflict, `honk300
 while `codex_plan.md`'s guessed speed values were wrong.)
 
 **Architecture decisions → [`docs/adr/`](./docs/adr/README.md).** ADRs record durable decisions
-that should survive individual task-board updates. The first ADR closes M7's cursor-mischief
-contract, cross-platform guardrails, and Renderer V2 direction.
+that should survive individual task-board updates. ADR 0010 records the M16 macOS agent-bundle,
+permission-degradation, status protocol, and TUI-only control decisions.
 
 **Decided direction (see `honk300_plan.md` for the full detail):**
 
@@ -45,8 +48,9 @@ contract, cross-platform guardrails, and Renderer V2 direction.
   personal use; M9 adds one complete custom in-house counterpart per copied meme/note original.
   Old donate pages and old developer references do not ship.
 - **TOML config** + a **ratatui terminal config TUI** at `<name> config`. Current M0-M15
-  settings hot-apply through reload where supported; future settings are persisted and shown
-  as planned or restart-required until their milestones land.
+  settings hot-apply through reload where supported; M16 adds a live Status tab for platform,
+  bundle, permission, capability, asset, and running-state visibility. Future settings are
+  persisted and shown as planned or restart-required until their milestones land.
 - **New autonomous behaviors**, each an optional toggle, scoped to parameter-modulation of the
   procedural rig (no new copied goose art): dynamic moods, on-the-hour double honk,
   quiet-hours/DND/fullscreen manners, built-in Autumn leaves, multi-monitor chase, full
@@ -54,7 +58,8 @@ contract, cross-platform guardrails, and Renderer V2 direction.
   prank, always-on.
 - **No external mods** (Autumn is built-in; extensibility via documented internal seams),
   **no system tray**, and **no global quit key**. Starting, stopping, and configuration are
-  CLI/TUI-only over the single-instance IPC channel.
+  CLI/TUI-only over the single-instance IPC channel. The macOS `.app` is an agent/permission
+  identity, not a native settings surface.
 - **Terminal windows are protected:** the goose may visually pass over terminals, but it must
   never move, focus, type into, drag, ride, collect, or otherwise manipulate terminal windows.
 - **Built for every OS + architecture:** Windows x64 **and ARM64**, macOS Intel **and Apple

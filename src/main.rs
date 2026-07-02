@@ -7,19 +7,19 @@
 mod cli;
 mod runtime;
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 mod assets;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 mod audio;
 
 use cli::{Cli, Command};
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use honk_config::CliOverrides;
 use honk_config::Config;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use honk_control::CommandServer;
-use honk_control::{send_command, ControlCommand, ControlResponse, Singleton};
-#[cfg(windows)]
+use honk_control::{send_command, ControlCommand, ControlResponse, RuntimeStatus, Singleton};
+#[cfg(any(windows, target_os = "macos"))]
 use runtime::RuntimeOptions;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,7 +36,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::Update) => lifecycle_placeholder("update"),
         Some(Command::Setup) => run_setup(cli),
         Some(Command::Start) | None => run_start(cli),
-        Some(Command::Stop | Command::Reload | Command::Do { .. }) => unreachable!(),
+        Some(Command::Stop | Command::Reload | Command::Status | Command::Do { .. }) => {
+            unreachable!()
+        }
     }
 }
 
@@ -44,6 +46,7 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let command = match cli.command {
         Some(Command::Stop) => ControlCommand::Stop,
         Some(Command::Reload) => ControlCommand::Reload,
+        Some(Command::Status) => ControlCommand::Status,
         Some(Command::Do { action }) => ControlCommand::Do(action.into_engine()),
         Some(
             Command::Start
@@ -63,6 +66,10 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused
             ) =>
         {
+            if matches!(cli.command, Some(Command::Status)) {
+                print_status(RuntimeStatus::not_running());
+                return Ok(());
+            }
             return Err("honk300: no running goose instance.".into());
         }
         Err(err) => return Err(err.into()),
@@ -74,7 +81,31 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             Ok(())
         }
         ControlResponse::Err(code) => Err(format!("honk300 command rejected: {code}").into()),
+        ControlResponse::Status(status) => {
+            print_status(status);
+            Ok(())
+        }
     }
+}
+
+fn print_status(status: RuntimeStatus) {
+    println!(
+        "honk300: {}",
+        if status.running {
+            "running"
+        } else {
+            "not running"
+        }
+    );
+    println!("platform: {}", status.platform.label());
+    println!("bundle: {}", status.bundle.label());
+    println!("accessibility: {}", status.accessibility.label());
+    println!("cursor: {}", status.cursor.label());
+    println!("window: {}", status.window.label());
+    println!("collect: {}", status.collect.label());
+    println!("presence: {}", status.presence.label());
+    println!("audio: {}", status.audio.label());
+    println!("assets: {} notes, {} memes", status.notes, status.memes);
 }
 
 fn run_config(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
@@ -127,7 +158,36 @@ fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     )
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+    let (_singleton, status) = Singleton::acquire()?;
+    if status == honk_control::SingletonStatus::AlreadyRunning {
+        println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
+        return Ok(());
+    }
+
+    let loaded = Config::load_or_default(cli.config.clone())?;
+    if let Some(warning) = &loaded.warning {
+        eprintln!("honk300: ignoring config problem and using defaults ({warning})");
+    }
+
+    let server = CommandServer::start()?;
+    runtime::macos::run(
+        RuntimeOptions {
+            config_path: loaded.path,
+            config: loaded.config,
+            cli_overrides: CliOverrides {
+                no_sound: cli.no_sound,
+                no_mouse_steal: cli.no_mouse_steal,
+                no_window_ride: cli.no_window_ride,
+                wayland: cli.wayland,
+            },
+        },
+        &server,
+    )
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let (_singleton, status) = Singleton::acquire()?;
     if status == honk_control::SingletonStatus::AlreadyRunning {

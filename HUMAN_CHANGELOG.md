@@ -14,13 +14,27 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > terminal settings screen backed by a saved config file. It now has dynamic moods and a double
 > honk at the top of each hour. It now also respects quiet times, fullscreen/DND manners, and
 > seasonal Autumn leaves. It now supports Windows multi-monitor chasing and fuller appearance
-> controls. The next milestone is Mac support. There's no installer yet — that comes later.
+> controls. Mac support is now in the codebase and still needs real Mac smoke testing before the
+> milestone is fully closed. There's no installer yet — that comes later.
 
 ---
 
 ## Latest — July 2026
 
 **Added**
+- Mac support is now in the app's codebase. It has a real Mac app identity for permissions,
+  starts through the same command system as Windows, can show the goose through Mac desktop
+  windows, can play sounds, can use Mac-owned note and meme windows, and reports permission
+  problems clearly. Window-riding tricks stay gated behind Mac Accessibility permission. It
+  still needs a real Mac smoke test before the Mac milestone is fully closed.
+- There is a new status command and a Status page in the terminal settings screen. They show
+  whether the goose is running, what platform and bundle mode it is using, whether Mac
+  Accessibility is allowed or denied, which desktop tricks are available, and how many note and
+  meme assets were loaded.
+- The Mac app bundle can now be staged as a local personal-use app. The staging script builds
+  Intel and Apple Silicon slices, combines them into one app, copies the assets, gives the app
+  the stable permission identity, and signs it for local testing. Final disk images, notarized
+  signing, and installers still come later.
 - The goose can now roam across multiple Windows monitors when multi-monitor chasing is on. It
   treats the whole signed desktop as one space, so monitors to the left or above the main screen
   work too. If you turn multi-monitor chasing off, it stays on the primary screen.

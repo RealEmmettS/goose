@@ -7,7 +7,9 @@
 mod platform;
 mod protocol;
 
-#[cfg(windows)]
 pub use platform::CommandServer;
 pub use platform::{send_command, Singleton, SingletonStatus};
-pub use protocol::{ControlCommand, ControlResponse, ProtocolError};
+pub use protocol::{
+    BundleStatus, CapabilityStatus, ControlCommand, ControlResponse, PlatformStatus, ProtocolError,
+    RuntimeStatus,
+};

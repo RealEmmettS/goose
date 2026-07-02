@@ -12,12 +12,12 @@ use honk_engine::render::{
 };
 use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
-    Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, CursorCommand, LocalTime,
-    Pointer, PresenceSnapshot, Rect, Sound, Vec2, World,
+    Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, CursorCommand, Pointer,
+    PresenceSnapshot, Rect, Sound, Vec2, World,
 };
-use honk_platform_windows::{
-    local_time, pointer_state, presence_state, warp_cursor, CollectWindowController,
-    ForeignWindowWatcher, Overlay,
+use honk_platform_macos::{
+    accessibility_state, local_time, pointer_state, presence_state, warp_cursor,
+    AccessibilityState, CollectWindowController, ForeignWindowWatcher, Overlay,
 };
 
 pub fn run(
@@ -32,16 +32,13 @@ pub fn run(
     let primary_bounds = overlay.primary_monitor_bounds();
     let virtual_bounds = overlay.virtual_desktop_bounds();
 
-    // Backend capability only: Windows can always warp the cursor. The user's mouse-steal
-    // preference is applied separately via MouseStealOptions::enabled in effective_options, so
-    // it must NOT be folded in here — doing so would keep warp latched off across a reload that
-    // re-enables stealing. The flag only flips to false later if a real warp call fails.
-    let mut cursor_warp = initial_cursor_warp_capability();
-    let mut window_watch = BackendCapability::Supported;
+    let mut cursor_warp = accessibility_capability();
+    let mut window_watch = accessibility_capability();
     let mut collect_window = BackendCapability::Supported;
-    let mut presence = BackendCapability::Supported;
+    let presence = BackendCapability::Unsupported;
     let mut audio_capability = BackendCapability::Supported;
-    let initial_effective = effective_options(
+
+    let mut effective = effective_options(
         &config,
         &options,
         backend_state(
@@ -54,33 +51,30 @@ pub fn run(
             assets.meme_count(),
         ),
     );
-    if initial_effective.wayland {
-        eprintln!("honk300: --wayland is recorded for M18; Windows uses the native overlay.");
-    }
-    let mut audio = if initial_effective.no_sound {
+    let mut audio = if effective.no_sound {
         None
     } else {
         audio::Audio::new()
     };
-    if !initial_effective.no_sound && audio.is_none() {
+    if !effective.no_sound && audio.is_none() {
         audio_capability = BackendCapability::Failed;
     }
 
     let mut warned_window_ride = false;
-    let mut window_watcher = if !initial_effective.world.foreign_window.enabled {
+    let mut window_watcher = if !effective.world.foreign_window.enabled {
         None
     } else {
         match ForeignWindowWatcher::new(&overlay) {
             Ok(watcher) => Some(watcher),
             Err(err) => {
-                window_watch = BackendCapability::Failed;
+                window_watch = permission_or_failed(&err);
                 warned_window_ride = true;
-                eprintln!("honk300: window ride unavailable; disabling perch-and-ride ({err})");
+                eprintln!("honk300: macOS window ride unavailable; disabling it ({err})");
                 None
             }
         }
     };
-    let mut effective = effective_options(
+    effective = effective_options(
         &config,
         &options,
         backend_state(
@@ -100,23 +94,17 @@ pub fn run(
         virtual_bounds,
     );
     let mut world = World::with_options(world_bounds, seed_from_clock(), effective.world);
-    if let Some(kind) = smoke_collect_kind() {
-        world.force_collect_window(kind);
-    }
-    let mut collect_controller = CollectWindowController::new(primary_bounds);
+    let mut collect_controller = CollectWindowController::new(primary_bounds, virtual_bounds);
     let mut accumulator = Accumulator::new();
     let clock = Clock::start();
     let mut last = clock.elapsed_secs();
     let mut last_present = f32::NEG_INFINITY;
     let mut last_render_bounds: Option<Rect> = None;
     const PRESENT_INTERVAL: f32 = 1.0 / 60.0;
-    const PRESENCE_POLL_INTERVAL: f32 = 0.5;
     let mut warned_cursor_warp = false;
     let mut warned_collect_window = false;
-    let mut warned_presence = false;
-    let mut last_presence_poll = f32::NEG_INFINITY;
 
-    println!("honk300: a goose is loose on your desktop. Use `honk300 stop` to send it home.");
+    println!("honk300: a macOS goose is loose. Use `honk300 stop` to send it home.");
 
     loop {
         if !overlay.pump() {
@@ -135,6 +123,9 @@ pub fn run(
                         Ok(next_config) => {
                             let prior_multi_monitor_chase = effective.world.multi_monitor_chase;
                             config = next_config;
+                            cursor_warp = refresh_accessibility_capability(cursor_warp);
+                            window_watch = refresh_accessibility_capability(window_watch);
+                            collect_window = refresh_supported_capability(collect_window);
                             effective = effective_options(
                                 &config,
                                 &options,
@@ -154,28 +145,15 @@ pub fn run(
                                 match ForeignWindowWatcher::new(&overlay) {
                                     Ok(watcher) => window_watcher = Some(watcher),
                                     Err(err) => {
-                                        window_watch = BackendCapability::Failed;
+                                        window_watch = permission_or_failed(&err);
                                         if !warned_window_ride {
                                             warned_window_ride = true;
                                             eprintln!(
-                                                "honk300: window ride unavailable after reload ({err})"
+                                                "honk300: macOS window ride unavailable after reload ({err})"
                                             );
                                         }
                                     }
                                 }
-                                effective = effective_options(
-                                    &config,
-                                    &options,
-                                    backend_state(
-                                        cursor_warp,
-                                        window_watch,
-                                        collect_window,
-                                        presence,
-                                        audio_capability,
-                                        assets.note_count(),
-                                        assets.meme_count(),
-                                    ),
-                                );
                             }
                             if effective.no_sound {
                                 audio = None;
@@ -191,7 +169,6 @@ pub fn run(
                                 );
                             }
                             world.apply_options(effective.world);
-                            println!("honk300: reload command applied.");
                             ControlResponse::Ok
                         }
                         Err(err) => {
@@ -220,36 +197,21 @@ pub fn run(
             }
         }
 
-        let now = clock.elapsed_secs();
-        world.set_local_time(runtime_local_time());
-        if now - last_presence_poll >= PRESENCE_POLL_INTERVAL {
-            last_presence_poll = now;
-            match presence_state() {
-                Ok(snapshot) => world.set_presence(snapshot),
-                Err(err) => {
-                    presence = BackendCapability::Failed;
-                    world.set_presence(PresenceSnapshot::unsupported());
-                    if !warned_presence {
-                        warned_presence = true;
-                        eprintln!(
-                            "honk300: Windows presence unavailable; DND/fullscreen respect disabled ({err})"
-                        );
-                    }
-                }
-            }
-        }
+        world.set_local_time(local_time());
+        world.set_presence(presence_state().unwrap_or_else(|_| PresenceSnapshot::unsupported()));
 
+        let now = clock.elapsed_secs();
         let dt = now - last;
         last = now;
 
-        // Feed the cursor before ticking: tasks such as nab_mouse chase the newest pointer
-        // sample, then emit platform-free cursor commands for the backend to apply below.
         let (mx, my, left_down) = pointer_state();
+        let pointer = Vec2::new(mx, my);
         world.set_pointer(Pointer {
-            pos: Vec2::new(mx, my),
+            pos: pointer,
             present: true,
             left_down,
         });
+        overlay.set_interactive(world.goose_hit(pointer));
 
         let mut disable_window_watcher = false;
         let dragged_window = match window_watcher.as_mut() {
@@ -257,11 +219,10 @@ pub fn run(
                 Ok(snapshot) => snapshot,
                 Err(err) => {
                     disable_window_watcher = true;
+                    window_watch = permission_or_failed(&err);
                     if !warned_window_ride {
                         warned_window_ride = true;
-                        eprintln!(
-                            "honk300: window ride polling failed; disabling perch-and-ride ({err})"
-                        );
+                        eprintln!("honk300: macOS window ride polling failed ({err})");
                     }
                     None
                 }
@@ -269,7 +230,6 @@ pub fn run(
             None => None,
         };
         if disable_window_watcher {
-            window_watch = BackendCapability::Failed;
             window_watcher = None;
             world.set_foreign_window_watch_supported(false);
         }
@@ -316,31 +276,26 @@ pub fn run(
                 }
             };
             if let Err(err) = result {
-                // Latch the loss in the runtime capability flag too, so a later reload rebuilds
-                // the world with collect still disabled instead of resurrecting it.
-                collect_window = BackendCapability::Failed;
+                collect_window = permission_or_failed(&err);
                 world.set_collect_window_supported(false);
                 if !warned_collect_window {
                     warned_collect_window = true;
-                    eprintln!("honk300: collect-window unavailable; disabling it ({err})");
+                    eprintln!("honk300: macOS collect-window unavailable; disabling it ({err})");
                 }
             }
         }
 
-        // Apply at most the newest warp request. If the OS/session rejects cursor warping,
-        // degrade honestly and stop registering further mouse-steal behavior.
         if let Some(CursorCommand::WarpTo(pos)) = world.take_cursor_commands().last().copied() {
             if let Err(err) = warp_cursor(pos) {
-                cursor_warp = BackendCapability::Failed;
+                cursor_warp = permission_or_failed(&err);
                 world.set_cursor_warp_supported(false);
                 if !warned_cursor_warp {
                     warned_cursor_warp = true;
-                    eprintln!("honk300: cursor warp unavailable; disabling mouse stealing ({err})");
+                    eprintln!("honk300: macOS cursor warp unavailable; disabling it ({err})");
                 }
             }
         }
 
-        // Drain and play any sounds the sim requested this frame (silently dropped if muted).
         let sounds = world.take_sounds();
         if let Some(a) = audio.as_mut() {
             for s in sounds {
@@ -389,7 +344,6 @@ pub fn run(
             last_render_bounds = Some(dirty);
         }
 
-        // Yield so the loop doesn't busy-spin; the accumulator keeps the sim at 120 Hz.
         std::thread::sleep(std::time::Duration::from_millis(2));
     }
 
@@ -444,63 +398,35 @@ fn world_bounds_for(multi_monitor_chase: bool, primary_bounds: Rect, virtual_bou
     }
 }
 
-fn smoke_collect_kind() -> Option<honk_engine::CollectWindowKind> {
-    match std::env::var("HONK300_SMOKE_COLLECT")
-        .ok()?
-        .to_ascii_lowercase()
-        .as_str()
-    {
-        "note" => Some(honk_engine::CollectWindowKind::Note),
-        "meme" => Some(honk_engine::CollectWindowKind::Meme),
-        _ => None,
+fn accessibility_capability() -> BackendCapability {
+    match accessibility_state() {
+        AccessibilityState::Trusted => BackendCapability::Supported,
+        AccessibilityState::Denied => BackendCapability::Denied,
     }
 }
 
-fn runtime_local_time() -> LocalTime {
-    let mut time = local_time();
-    if let Some(day) = smoke_local_date() {
-        time.day = day;
+fn permission_or_failed(err: &std::io::Error) -> BackendCapability {
+    if err.kind() == std::io::ErrorKind::PermissionDenied {
+        BackendCapability::Denied
+    } else if err.kind() == std::io::ErrorKind::Unsupported {
+        BackendCapability::Unsupported
+    } else {
+        BackendCapability::Failed
     }
-    time
 }
 
-fn smoke_local_date() -> Option<i32> {
-    parse_smoke_local_date(&std::env::var("HONK300_SMOKE_LOCAL_DATE").ok()?)
-}
-
-fn parse_smoke_local_date(value: &str) -> Option<i32> {
-    if value.len() != 8 || !value.bytes().all(|b| b.is_ascii_digit()) {
-        return None;
+fn refresh_accessibility_capability(current: BackendCapability) -> BackendCapability {
+    match current {
+        BackendCapability::Failed | BackendCapability::Unsupported => current,
+        BackendCapability::Supported | BackendCapability::Denied => accessibility_capability(),
     }
-    let day = value.parse::<i32>().ok()?;
-    let year = day / 10_000;
-    let month = (day / 100) % 100;
-    let date = day % 100;
-    let max_day = days_in_month(year, month)?;
-    (year >= 1900 && (1..=max_day).contains(&date)).then_some(day)
 }
 
-fn days_in_month(year: i32, month: i32) -> Option<i32> {
-    Some(match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if is_leap_year(year) => 29,
-        2 => 28,
-        _ => return None,
-    })
-}
-
-fn is_leap_year(year: i32) -> bool {
-    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
-}
-
-/// The platform's initial cursor-warp capability, before any runtime warp attempt.
-///
-/// On Windows this is unconditionally `true` (`SetCursorPos` always exists); it is a backend
-/// capability, deliberately independent of the user's mouse-steal preference, which is applied
-/// separately via `MouseStealOptions::enabled`.
-fn initial_cursor_warp_capability() -> BackendCapability {
-    BackendCapability::Supported
+fn refresh_supported_capability(current: BackendCapability) -> BackendCapability {
+    match current {
+        BackendCapability::Failed | BackendCapability::Unsupported => current,
+        BackendCapability::Supported | BackendCapability::Denied => BackendCapability::Supported,
+    }
 }
 
 fn runtime_status(
@@ -514,9 +440,9 @@ fn runtime_status(
 ) -> RuntimeStatus {
     RuntimeStatus {
         running: true,
-        platform: PlatformStatus::Windows,
-        bundle: BundleStatus::Bare,
-        accessibility: CapabilityStatus::Unsupported,
+        platform: PlatformStatus::Macos,
+        bundle: macos_bundle_status(),
+        accessibility: capability_status(accessibility_capability()),
         cursor: capability_status(cursor),
         window: capability_status(window),
         collect: capability_status(collect),
@@ -525,6 +451,17 @@ fn runtime_status(
         notes,
         memes,
     }
+}
+
+fn macos_bundle_status() -> BundleStatus {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| {
+            exe.ancestors()
+                .find(|path| path.extension().and_then(|ext| ext.to_str()) == Some("app"))
+                .map(|_| BundleStatus::App)
+        })
+        .unwrap_or(BundleStatus::Bare)
 }
 
 fn capability_status(capability: BackendCapability) -> CapabilityStatus {
@@ -536,52 +473,9 @@ fn capability_status(capability: BackendCapability) -> CapabilityStatus {
     }
 }
 
-/// A non-deterministic seed for the roam driver, derived from the wall clock.
 fn seed_from_clock() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0x9E37_79B9_7F4A_7C15)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{initial_cursor_warp_capability, parse_smoke_local_date, world_bounds_for};
-    use honk_config::BackendCapability;
-    use honk_engine::{Rect, Vec2};
-
-    #[test]
-    fn initial_cursor_warp_capability_ignores_mouse_steal_preference() {
-        // The cursor-warp capability is a backend trait — Windows can always warp the cursor —
-        // not a user choice. Seeding it from the no-mouse-steal preference would wrongly latch
-        // warp off and keep it off across a reload that re-enables stealing. The preference is
-        // applied separately through MouseStealOptions::enabled, so this stays a pure capability.
-        assert_eq!(
-            initial_cursor_warp_capability(),
-            BackendCapability::Supported
-        );
-    }
-
-    #[test]
-    fn smoke_local_date_accepts_yyyymmdd_only() {
-        assert_eq!(parse_smoke_local_date("20261015"), Some(20261015));
-        assert_eq!(parse_smoke_local_date("20240229"), Some(20240229));
-        assert_eq!(parse_smoke_local_date("20260231"), None);
-        assert_eq!(parse_smoke_local_date("20250229"), None);
-        assert_eq!(parse_smoke_local_date("2026-10-15"), None);
-        assert_eq!(parse_smoke_local_date("20261301"), None);
-        assert_eq!(parse_smoke_local_date("18991231"), None);
-    }
-
-    #[test]
-    fn world_bounds_follow_multi_monitor_chase_setting() {
-        let primary = Rect::new(Vec2::new(0.0, 0.0), Vec2::new(1920.0, 1080.0));
-        let virtual_desktop = Rect::new(Vec2::new(-1280.0, 0.0), Vec2::new(1920.0, 1080.0));
-
-        assert_eq!(world_bounds_for(false, primary, virtual_desktop), primary);
-        assert_eq!(
-            world_bounds_for(true, primary, virtual_desktop),
-            virtual_desktop
-        );
-    }
 }

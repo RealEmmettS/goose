@@ -1,6 +1,7 @@
 use super::Action;
 use crossterm::event::{KeyCode, KeyEvent};
 use honk_config::Config;
+use honk_control::RuntimeStatus;
 use honk_engine::PokeAction;
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -13,18 +14,20 @@ pub enum Category {
     Schedule,
     Appearance,
     Audio,
+    Status,
     Commands,
     About,
 }
 
 impl Category {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::General,
         Self::Behaviors,
         Self::Mischief,
         Self::Schedule,
         Self::Appearance,
         Self::Audio,
+        Self::Status,
         Self::Commands,
         Self::About,
     ];
@@ -37,6 +40,7 @@ impl Category {
             Self::Schedule => "Schedule",
             Self::Appearance => "Appearance",
             Self::Audio => "Audio",
+            Self::Status => "Status",
             Self::Commands => "Commands",
             Self::About => "About",
         }
@@ -57,6 +61,7 @@ impl Category {
 pub enum TuiCommand {
     Save,
     Reload,
+    Status,
     Stop,
     Start,
     Poke(PokeAction),
@@ -67,6 +72,7 @@ pub struct CommandResult {
     pub status: String,
     pub is_error: bool,
     pub mark_saved: bool,
+    pub runtime_status: Option<RuntimeStatus>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -159,6 +165,7 @@ pub struct AppState {
     pub should_quit: bool,
     pub status: String,
     pub status_is_error: bool,
+    pub runtime_status: RuntimeStatus,
     pending_commands: VecDeque<TuiCommand>,
     confirm_quit: bool,
 }
@@ -174,6 +181,7 @@ impl AppState {
             should_quit: false,
             status: "ready".into(),
             status_is_error: false,
+            runtime_status: RuntimeStatus::not_running(),
             pending_commands: VecDeque::new(),
             confirm_quit: false,
         }
@@ -205,7 +213,7 @@ impl AppState {
             KeyCode::Char('q') | KeyCode::Esc => Action::Quit,
             KeyCode::Tab => Action::NextCategory,
             KeyCode::BackTab => Action::PrevCategory,
-            KeyCode::Char(c @ '1'..='8') => {
+            KeyCode::Char(c @ '1'..='9') => {
                 let idx = (c as u8 - b'1') as usize;
                 Action::SelectCategory(Category::ALL[idx])
             }
@@ -216,6 +224,7 @@ impl AppState {
             KeyCode::Left | KeyCode::Char('-') => Action::Adjust(-1),
             KeyCode::Char('s') | KeyCode::Char('S') => Action::Save,
             KeyCode::Char('r') | KeyCode::Char('R') => Action::Reload,
+            KeyCode::Char('u') | KeyCode::Char('U') => Action::Status,
             KeyCode::Char('x') | KeyCode::Char('X') => Action::Stop,
             KeyCode::Char('g') | KeyCode::Char('G') => Action::Start,
             KeyCode::Char('h') => Action::Poke(PokeAction::Honk),
@@ -253,12 +262,16 @@ impl AppState {
             Action::Adjust(delta) => self.adjust_selected(delta),
             Action::Save => self.pending_commands.push_back(TuiCommand::Save),
             Action::Reload => self.pending_commands.push_back(TuiCommand::Reload),
+            Action::Status => self.pending_commands.push_back(TuiCommand::Status),
             Action::Stop => self.pending_commands.push_back(TuiCommand::Stop),
             Action::Start => self.pending_commands.push_back(TuiCommand::Start),
             Action::Poke(action) => self.pending_commands.push_back(TuiCommand::Poke(action)),
             Action::CommandResult(result) => {
                 if result.mark_saved {
                     self.mark_saved();
+                }
+                if let Some(status) = result.runtime_status {
+                    self.runtime_status = status;
                 }
                 self.set_status(result.status, result.is_error);
             }
@@ -788,11 +801,71 @@ impl AppState {
                     RowKind::Toggle(ToggleField::PatSound),
                 ),
             ],
+            Category::Status => vec![
+                row(
+                    "Running",
+                    if self.runtime_status.running {
+                        "yes".into()
+                    } else {
+                        "no".into()
+                    },
+                    RowKind::Static,
+                ),
+                row(
+                    "Platform",
+                    self.runtime_status.platform.label().into(),
+                    RowKind::Static,
+                ),
+                row(
+                    "Bundle",
+                    self.runtime_status.bundle.label().into(),
+                    RowKind::Static,
+                ),
+                row(
+                    "Accessibility",
+                    self.runtime_status.accessibility.label().into(),
+                    RowKind::Static,
+                ),
+                row(
+                    "Cursor",
+                    self.runtime_status.cursor.label().into(),
+                    RowKind::Static,
+                ),
+                row(
+                    "Window ride",
+                    self.runtime_status.window.label().into(),
+                    RowKind::Static,
+                ),
+                row(
+                    "Collect windows",
+                    self.runtime_status.collect.label().into(),
+                    RowKind::Static,
+                ),
+                row(
+                    "Presence",
+                    self.runtime_status.presence.label().into(),
+                    RowKind::Static,
+                ),
+                row(
+                    "Audio",
+                    self.runtime_status.audio.label().into(),
+                    RowKind::Static,
+                ),
+                row(
+                    "Assets",
+                    format!(
+                        "{} notes, {} memes",
+                        self.runtime_status.notes, self.runtime_status.memes
+                    ),
+                    RowKind::Static,
+                ),
+            ],
             Category::Commands => vec![
                 row("honk300 / honk / goose", "start".into(), RowKind::Static),
                 row("plz", "start".into(), RowKind::Static),
                 row("stop / bad / no / no honk", "stop".into(), RowKind::Static),
                 row("reload", "reload config".into(), RowKind::Static),
+                row("status", "show runtime status".into(), RowKind::Static),
                 row("do honk", "poke honk".into(), RowKind::Static),
                 row(
                     "do wander|mud|meme|note|nab",
@@ -819,7 +892,7 @@ impl AppState {
                     "not configurable".into(),
                     RowKind::Static,
                 ),
-                row("M14", "schedule + Autumn".into(), RowKind::Static),
+                row("M16", "macOS backend + status".into(), RowKind::Static),
             ],
         }
     }
@@ -1100,6 +1173,7 @@ mod tests {
             status: "saved".into(),
             is_error: false,
             mark_saved: true,
+            runtime_status: None,
         }));
         assert_eq!(app.status, "saved");
         assert!(!app.status_is_error);
@@ -1111,10 +1185,33 @@ mod tests {
         let mut app = app();
         app.apply(Action::Save);
         assert_eq!(app.take_pending_command(), Some(TuiCommand::Save));
+        app.apply(Action::Status);
+        assert_eq!(app.take_pending_command(), Some(TuiCommand::Status));
         app.apply(Action::Poke(PokeAction::Honk));
         assert_eq!(
             app.take_pending_command(),
             Some(TuiCommand::Poke(PokeAction::Honk))
         );
+    }
+
+    #[test]
+    fn status_rows_show_runtime_capabilities() {
+        let mut app = app();
+        app.apply(Action::SelectCategory(Category::Status));
+        let rows = app.rows();
+        for label in [
+            "Running",
+            "Platform",
+            "Bundle",
+            "Accessibility",
+            "Cursor",
+            "Window ride",
+            "Collect windows",
+            "Presence",
+            "Audio",
+            "Assets",
+        ] {
+            assert!(rows.iter().any(|row| row.label == label), "{label}");
+        }
     }
 }

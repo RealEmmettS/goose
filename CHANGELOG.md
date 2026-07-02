@@ -5,18 +5,39 @@ All notable changes to this project are documented here. Format based on
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
 > **Project stage: implementation in progress.** Milestones M0-M15 are complete and M16 is
-> next. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
+> implemented in-tree pending macOS-host readiness evidence. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
 > Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
 > ratatui config TUI, dynamic moods, the local on-hour double honk, quiet-hours/DND/fullscreen
 > manners, built-in Autumn leaves, Windows multi-monitor chase, and live appearance/recolor
-> controls; there is no release yet. A plain-English companion lives in
+> controls, plus macOS runtime/status/app-bundle staging; there is no release yet. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
 
 ### Added
+- **M16 macOS backend, status, and `.app` staging (implementation in-tree; macOS-host smoke
+  pending)** — added `crates/honk-platform-macos` with AppKit/CoreGraphics/ApplicationServices
+  dependencies, macOS `start` runtime wiring through the existing Unix IPC transport, one
+  AppKit overlay surface per display, CoreGraphics pointer polling/warp, local-time sampling,
+  Accessibility-gated focused-window polling for foreign-window ride snapshots, AppKit-owned
+  note/meme collect windows, macOS terminal-app classification tests, Accessibility-denied
+  capability degradation, and dependency-free macOS audio through `/usr/bin/afplay`. The macOS
+  target checks pass for `x86_64-apple-darwin` and `aarch64-apple-darwin`; physical macOS smoke
+  and universal2 bundle validation remain the M16.1 readiness gate.
+- **Runtime status protocol and TUI Status tab** — `honk-control` now supports `STATUS` and a
+  compact `ControlResponse::Status` payload reporting running state, platform, bundle mode,
+  Accessibility, cursor/window/collect/presence/audio capability states, and asset counts.
+  `honk300 status` prints the same data, and the config TUI has a Status category plus refresh
+  command. `honk-config::BackendState` now preserves supported/unsupported/denied/failed state
+  while still collapsing to simple engine options.
+- **macOS agent bundle staging** — added `script/package_macos_app.sh` to build x86_64 and arm64
+  release slices, `lipo` them into `Honk300.app`, copy `Assets/`, write `Info.plist` with
+  bundle id `dev.emmetts.honk300` and `LSUIElement=true`, ad-hoc sign, and validate with
+  `plutil`, `codesign`, and `lipo`. Bundle-aware asset discovery now prefers
+  `Contents/Resources/Assets`, and TUI Start launches bundled macOS runs through
+  `/usr/bin/open -n <Honk300.app> --args start --config <path>`.
 - **Multi-monitor chase and appearance controls (milestone M15, complete)** — Windows now creates
   one layered overlay HWND per monitor, enumerates signed monitor bounds, chooses the engine world
   bounds from `[behaviors].multi_monitor_chase`, and clips/crops dirty render regions per monitor
@@ -300,12 +321,13 @@ All notable changes to this project are documented here. Format based on
 - `CLAUDE.md` — repository guidance for future Claude Code sessions.
 
 ### Changed
-- M15 is now Done, M16 is now next, and Renderer V2 remains tracked separately as backlog task
+- M15 is now Done, M16 implementation has moved into the active backend-readiness track, and
+  Renderer V2 remains tracked separately as backlog task
   `#r2v`. The task records now preserve M7's audit/readiness/renderer work, M8's foreign-window
   readiness pass, M9's collect-window asset/ADR/target-readiness work, and M10's IPC/control
   readiness work, plus M11 CLI grammar, M12 config/TUI readiness work, M13 moods/hourly-honk
   closure, M14 schedule/Autumn closure, and M15 multi-monitor/appearance closure.
-- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M15 complete, M16 next,
+- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M15 complete, M16 active,
   and the ADR 0001/0002/0003/0004/0007/0008/0009 location and maintenance rules.
 - Added **ADR 0005** (M11 three-name CLI, goose-speak, and the poke-outcome round-trip) and
   **ADR 0006** (M12 config TUI, durable TOML, and the capability/preference boundary), recording

@@ -118,7 +118,7 @@ fn render_footer(frame: &mut Frame<'_>, area: ratatui::layout::Rect, app: &AppSt
         Style::default().fg(Color::Green)
     };
     let line = Line::from(vec![
-        Span::raw("j/k move  Tab category  Enter toggle  Left/Right adjust  S save  R reload  X stop  G start  h/w/m/e/n/b poke  q quit  "),
+        Span::raw("j/k move  Tab category  Enter toggle  Left/Right adjust  S save  R reload  U status  X stop  G start  h/w/m/e/n/b poke  q quit  "),
         Span::styled(&app.status, status_style),
     ]);
     frame.render_widget(

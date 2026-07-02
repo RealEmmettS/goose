@@ -16,6 +16,7 @@ members = [
     "crates/honk-config-tui",
     "crates/honk-control",
     "crates/honk-engine",
+    "crates/honk-platform-macos",
     "crates/honk-platform-windows",
 ]
 
@@ -64,6 +65,9 @@ honk-platform-windows = { path = "crates/honk-platform-windows" }
 # Audio playback (honks/bite/mud/pat). Pure-Rust decode via symphonia; cpal backend.
 # Windows-scoped for now; the macOS/Linux backends wire audio in M16/M17.
 rodio = "0.20"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+honk-platform-macos = { path = "crates/honk-platform-macos" }
 
 # The profile cargo-dist will build with in the later packaging round.
 [profile.dist]

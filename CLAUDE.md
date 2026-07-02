@@ -9,10 +9,11 @@ Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of 
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
 **Current stage: implementation in progress.** M0-M15 are complete and M16 (macOS backend plus
-universal2 app packaging) is next. The Cargo workspace exists: `honk-engine` (platform-free
+universal2 `.app` staging) is implemented in-tree but still needs macOS-host smoke/readiness
+evidence before the backend milestone can close. The Cargo workspace exists: `honk-engine` (platform-free
 core), `honk-control` (shared IPC protocol/client/server), `honk-config` (versioned TOML
 configuration), `honk-config-tui` (ratatui reducer UI), `honk-platform-windows` (the layered
-overlay), and the root `honk300` binary — a
+overlay), `honk-platform-macos` (AppKit/CoreGraphics backend), and the root `honk300` binary — a
 procedurally-rendered goose roams a transparent Windows overlay, leaves mud trails, runs the
 task/FirstUX AI, honks, reacts to pat/click input, can perform bounded cursor nabbing, and can
 perch on a user-dragged foreign window, and can collect Notepad/meme windows on Windows.
@@ -21,7 +22,8 @@ M11 adds the three-name goose-speak grammar; M12 adds durable config and the ter
 adds dynamic moods and the local on-hour double honk; M14 adds quiet-hours/DND/fullscreen calm
 suppression and built-in procedural Autumn leaves; M15 adds signed virtual-desktop multi-monitor
 chase, one Windows overlay HWND per monitor, live Calm Goose, and RGB editing for the original
-three-color goose palette.
+three-color goose palette; M16 adds macOS runtime wiring, `honk300 status`, a TUI Status tab,
+bundle-aware assets/start handling, and `script/package_macos_app.sh`.
 `honk300_plan.md` is the canonical plan (milestones M0–M19); the two superseded drafts remain as
 reference.
 
@@ -51,7 +53,8 @@ reference.
   asset, and no-donate decisions; ADR 0004 records the M10 CLI/TUI-only control plane, local IPC,
   and terminal-window protection rule; ADR 0007 records the M13 dynamic-mood and local-time
   injection contract; ADR 0008 records the M14 schedule/presence/Autumn contract; ADR 0009
-  records the M15 multi-monitor/appearance contract.
+  records the M15 multi-monitor/appearance contract; ADR 0010 records the M16 macOS agent-bundle,
+  permission degradation, status protocol, and TUI-only control contract.
 
 ## Big-picture architecture (original → planned port)
 
@@ -134,7 +137,9 @@ Relevant skills: `tasks-start`, `tasks-management`, `tasks-update`, `tasks-memor
 - **Terminal windows are never mischief targets.** Backend filters must exclude terminal windows
   before foreign-window ride, collect-window, or future spicy behavior code can target them.
 - **macOS needs a real `.app` bundle** (stable bundle-id) for a durable Accessibility grant;
-  a bare `~/.cargo/bin` binary can't hold one.
+  a bare `~/.cargo/bin` binary can't hold one. The bundle is an LSUIElement agent/permission
+  identity only: no native preferences window, menu-bar settings UI, Dock control surface, or
+  AppleScript `.sdef` command surface.
 - The original `Deck` shuffle is **biased** (`System.Random`, low-bound 0 / exclusive high).
   Decide faithful-port vs. corrected and pin the choice with a test.
 

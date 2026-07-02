@@ -464,6 +464,7 @@ LLM). `<name>` below = any of the three.
 | **Start** (default) | `<name>` · `<name> start` · `<name> plz` · `honk plz` · `goose plz` |
 | **Stop** | `<name> stop` · `honk bad` · `goose no honk` · `<name> no` · `<name> bad` |
 | **Poke an action** | `<name> do <honk\|wander\|mud\|meme\|note\|nab>`; pokes stay explicit, including `do honk` |
+| **Runtime status** | `<name> status` shows running state, platform, bundle mode, permissions, capabilities, and asset counts |
 | **Config TUI** | `<name> config` |
 | **Help** (lists every command incl. goose-speak) | `<name> help` · `<name> --help` |
 | **Lifecycle** | `<name> install` · `uninstall` · `update` · `setup` · `--version` |
@@ -481,6 +482,8 @@ carrying:
 - **`Stop`** — graceful shutdown (restore cursor, close spawned windows, flush).
 - **`Do(action)`** — trigger a poke immediately.
 - **`Reload`** — hot-apply config (§9).
+- **`Status`** — report running state plus platform, bundle, permission, capability, and asset
+  counts for the CLI/TUI.
 
 `<name> stop` / `<name> do …` / saving in `<name> config` send these. This is the universal,
 **Wayland-safe** quit/poke transport. The channel is
@@ -672,13 +675,15 @@ after cargo-dist's `Release`, torn-release guard via `dist-manifest.json` + the 
 builds ARM64 via the MSVC ARM64 toolchain (native ARM runner or cross), honestly noting any
 emulation-only test gaps.
 
-### 13.3 macOS: universal2 `.app` + `.dmg`
+### 13.3 macOS: universal2 `.app` staging + M19 `.dmg`
 A real `.app` bundle with a **stable bundle-id** (`dev.emmetts.honk300`) is **mandatory** for
 durable Accessibility grants (mischief features). Ship a **universal2** binary (Intel + Apple
-Silicon) in one `.app`, wrapped in a `.dmg`. Unsigned/un-notarized for personal use → document
+Silicon) in one `.app`; `.dmg`, Developer ID signing, notarization, installer/update/uninstall,
+and icon polish remain M19. Unsigned/un-notarized for personal use → document
 `xattr -dr com.apple.quarantine`; degrade mischief gracefully until Accessibility is granted.
-`LSUIElement` is **not** set by default (the goose is a foreground prank, but no Dock spam — TBD
-in M16; the original Mac set `LSUIElement=True`).
+M16 sets `LSUIElement=true` by default: the bundle is an agent/permission identity only, while
+configuration and status stay CLI/TUI-only. No native preferences window, menu-bar settings UI,
+Dock controls, or AppleScript `.sdef` commands ship in M16.
 
 ### 13.4 Linux: `.desktop` + tarball/AppImage, X11-first, per-arch
 Shell installer drops the binary (all three aliases), extracts assets, installs
@@ -734,7 +739,7 @@ being implemented three more times.
 | M13 | **Dynamic moods** (param-modulation FSM) + **on-hour double honk** | goose spontaneously shifts mood; honks the hour |
 | M14 | **Schedule**: quiet hours + DND/fullscreen respect; **seasonal** (Autumn built-in) | goose calms at night/fullscreen; autumn leaves appear in season |
 | M15 | **Multi-monitor chase** + full recolor/appearance | goose crosses between monitors; recolor works |
-| M16 | macOS backend + universal2 `.app` + permission-gated degradation | runs on Intel + Apple Silicon; degrades gracefully without A11y |
+| M16 | macOS backend + universal2 `.app` + permission-gated degradation + CLI/TUI status | runs on Intel + Apple Silicon; degrades gracefully without A11y; no native settings surface |
 | M17 | Linux X11 backend (XShape + EWMH + device_query) | full parity on X11/XWayland |
 | M18 | `--wayland` layer-shell degraded mode (stop/poke via IPC) | renders on Wayland; mischief self-disables; `goose stop` works |
 | M19 | install/update/uninstall(`--purge`)/setup + packaging **all targets** (Win x64+ARM64 ×4 installers, mac universal2 `.dmg`, Linux x64/ARM gnu+musl) + 3 aliases | installers produce working artifacts w/ autostart + shortcut on every OS/arch |

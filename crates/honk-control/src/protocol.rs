@@ -11,6 +11,7 @@ const MAX_FRAME_BYTES: usize = 128;
 pub enum ControlCommand {
     Stop,
     Reload,
+    Status,
     Do(PokeAction),
 }
 
@@ -18,6 +19,45 @@ pub enum ControlCommand {
 pub enum ControlResponse {
     Ok,
     Err(String),
+    Status(RuntimeStatus),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlatformStatus {
+    Windows,
+    Macos,
+    Linux,
+    Other,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BundleStatus {
+    App,
+    Bare,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapabilityStatus {
+    Supported,
+    Unsupported,
+    Denied,
+    Failed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RuntimeStatus {
+    pub running: bool,
+    pub platform: PlatformStatus,
+    pub bundle: BundleStatus,
+    pub accessibility: CapabilityStatus,
+    pub cursor: CapabilityStatus,
+    pub window: CapabilityStatus,
+    pub collect: CapabilityStatus,
+    pub presence: CapabilityStatus,
+    pub audio: CapabilityStatus,
+    pub notes: u32,
+    pub memes: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,6 +95,7 @@ impl ControlCommand {
         match self {
             Self::Stop => format!("{VERSION} STOP\n"),
             Self::Reload => format!("{VERSION} RELOAD\n"),
+            Self::Status => format!("{VERSION} STATUS\n"),
             Self::Do(action) => format!("{VERSION} DO {}\n", encode_action(action)),
         }
     }
@@ -82,6 +123,10 @@ impl ControlCommand {
             "RELOAD" => {
                 ensure_end(parts)?;
                 Ok(Self::Reload)
+            }
+            "STATUS" => {
+                ensure_end(parts)?;
+                Ok(Self::Status)
             }
             "DO" => {
                 let Some(action) = parts.next() else {
@@ -112,6 +157,7 @@ impl ControlResponse {
         match self {
             Self::Ok => "OK\n".to_string(),
             Self::Err(code) => format!("ERR {code}\n"),
+            Self::Status(status) => status.encode(),
         }
     }
 
@@ -136,6 +182,215 @@ impl ControlResponse {
                 ensure_end(parts)?;
                 Ok(Self::Err(code.to_string()))
             }
+            Some("STATUS") => RuntimeStatus::decode(parts).map(Self::Status),
+            _ => Err(ProtocolError::MalformedResponse),
+        }
+    }
+}
+
+impl RuntimeStatus {
+    pub fn not_running() -> Self {
+        Self {
+            running: false,
+            platform: PlatformStatus::current(),
+            bundle: BundleStatus::Unknown,
+            accessibility: CapabilityStatus::Unsupported,
+            cursor: CapabilityStatus::Unsupported,
+            window: CapabilityStatus::Unsupported,
+            collect: CapabilityStatus::Unsupported,
+            presence: CapabilityStatus::Unsupported,
+            audio: CapabilityStatus::Unsupported,
+            notes: 0,
+            memes: 0,
+        }
+    }
+
+    fn encode(&self) -> String {
+        format!(
+            "STATUS G={} P={} B={} A={} C={} W={} K={} R={} O={} N={} M={}\n",
+            u8::from(self.running),
+            self.platform.encode(),
+            self.bundle.encode(),
+            self.accessibility.encode(),
+            self.cursor.encode(),
+            self.window.encode(),
+            self.collect.encode(),
+            self.presence.encode(),
+            self.audio.encode(),
+            self.notes,
+            self.memes
+        )
+    }
+
+    fn decode(parts: std::str::SplitAsciiWhitespace<'_>) -> Result<Self, ProtocolError> {
+        let mut status = RuntimeStatus::not_running();
+        let mut seen = 0u16;
+        for token in parts {
+            let Some((key, value)) = token.split_once('=') else {
+                return Err(ProtocolError::MalformedResponse);
+            };
+            match key {
+                "G" => {
+                    status.running = match value {
+                        "0" => false,
+                        "1" => true,
+                        _ => return Err(ProtocolError::MalformedResponse),
+                    };
+                    seen |= 1 << 0;
+                }
+                "P" => {
+                    status.platform = PlatformStatus::decode(value)?;
+                    seen |= 1 << 1;
+                }
+                "B" => {
+                    status.bundle = BundleStatus::decode(value)?;
+                    seen |= 1 << 2;
+                }
+                "A" => {
+                    status.accessibility = CapabilityStatus::decode(value)?;
+                    seen |= 1 << 3;
+                }
+                "C" => {
+                    status.cursor = CapabilityStatus::decode(value)?;
+                    seen |= 1 << 4;
+                }
+                "W" => {
+                    status.window = CapabilityStatus::decode(value)?;
+                    seen |= 1 << 5;
+                }
+                "K" => {
+                    status.collect = CapabilityStatus::decode(value)?;
+                    seen |= 1 << 6;
+                }
+                "R" => {
+                    status.presence = CapabilityStatus::decode(value)?;
+                    seen |= 1 << 7;
+                }
+                "O" => {
+                    status.audio = CapabilityStatus::decode(value)?;
+                    seen |= 1 << 8;
+                }
+                "N" => {
+                    status.notes = value
+                        .parse()
+                        .map_err(|_| ProtocolError::MalformedResponse)?;
+                    seen |= 1 << 9;
+                }
+                "M" => {
+                    status.memes = value
+                        .parse()
+                        .map_err(|_| ProtocolError::MalformedResponse)?;
+                    seen |= 1 << 10;
+                }
+                _ => return Err(ProtocolError::MalformedResponse),
+            }
+        }
+        if seen == 0b111_1111_1111 {
+            Ok(status)
+        } else {
+            Err(ProtocolError::MalformedResponse)
+        }
+    }
+}
+
+impl PlatformStatus {
+    pub fn current() -> Self {
+        if cfg!(windows) {
+            Self::Windows
+        } else if cfg!(target_os = "macos") {
+            Self::Macos
+        } else if cfg!(target_os = "linux") {
+            Self::Linux
+        } else {
+            Self::Other
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Windows => "Windows",
+            Self::Macos => "macOS",
+            Self::Linux => "Linux",
+            Self::Other => "other",
+        }
+    }
+
+    fn encode(self) -> &'static str {
+        match self {
+            Self::Windows => "WIN",
+            Self::Macos => "MAC",
+            Self::Linux => "LIN",
+            Self::Other => "OTH",
+        }
+    }
+
+    fn decode(value: &str) -> Result<Self, ProtocolError> {
+        match value {
+            "WIN" => Ok(Self::Windows),
+            "MAC" => Ok(Self::Macos),
+            "LIN" => Ok(Self::Linux),
+            "OTH" => Ok(Self::Other),
+            _ => Err(ProtocolError::MalformedResponse),
+        }
+    }
+}
+
+impl BundleStatus {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::App => ".app",
+            Self::Bare => "bare binary",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    fn encode(self) -> &'static str {
+        match self {
+            Self::App => "APP",
+            Self::Bare => "BARE",
+            Self::Unknown => "UNK",
+        }
+    }
+
+    fn decode(value: &str) -> Result<Self, ProtocolError> {
+        match value {
+            "APP" => Ok(Self::App),
+            "BARE" => Ok(Self::Bare),
+            "UNK" => Ok(Self::Unknown),
+            _ => Err(ProtocolError::MalformedResponse),
+        }
+    }
+}
+
+impl CapabilityStatus {
+    pub fn active(self) -> bool {
+        matches!(self, Self::Supported)
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Supported => "supported",
+            Self::Unsupported => "unsupported",
+            Self::Denied => "denied",
+            Self::Failed => "failed",
+        }
+    }
+
+    fn encode(self) -> &'static str {
+        match self {
+            Self::Supported => "S",
+            Self::Unsupported => "U",
+            Self::Denied => "D",
+            Self::Failed => "F",
+        }
+    }
+
+    fn decode(value: &str) -> Result<Self, ProtocolError> {
+        match value {
+            "S" => Ok(Self::Supported),
+            "U" => Ok(Self::Unsupported),
+            "D" => Ok(Self::Denied),
+            "F" => Ok(Self::Failed),
             _ => Err(ProtocolError::MalformedResponse),
         }
     }
@@ -181,6 +436,7 @@ mod tests {
         for command in [
             ControlCommand::Stop,
             ControlCommand::Reload,
+            ControlCommand::Status,
             ControlCommand::Do(PokeAction::Honk),
             ControlCommand::Do(PokeAction::Wander),
             ControlCommand::Do(PokeAction::Mud),
@@ -246,6 +502,41 @@ mod tests {
             ControlResponse::decode(ControlResponse::Err("BUSY".into()).encode().as_bytes())
                 .unwrap(),
             ControlResponse::Err("BUSY".into())
+        );
+    }
+
+    #[test]
+    fn round_trips_status_response_under_frame_limit() {
+        let status = RuntimeStatus {
+            running: true,
+            platform: PlatformStatus::Macos,
+            bundle: BundleStatus::App,
+            accessibility: CapabilityStatus::Denied,
+            cursor: CapabilityStatus::Denied,
+            window: CapabilityStatus::Supported,
+            collect: CapabilityStatus::Failed,
+            presence: CapabilityStatus::Unsupported,
+            audio: CapabilityStatus::Supported,
+            notes: 12,
+            memes: 34,
+        };
+        let frame = ControlResponse::Status(status).encode();
+        assert!(frame.len() <= MAX_FRAME_BYTES, "{frame}");
+        assert_eq!(
+            ControlResponse::decode(frame.as_bytes()).unwrap(),
+            ControlResponse::Status(status)
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_status_response() {
+        assert_eq!(
+            ControlResponse::decode(b"STATUS G=1 P=MAC\n"),
+            Err(ProtocolError::MalformedResponse)
+        );
+        assert_eq!(
+            ControlResponse::decode(b"STATUS G=1 P=MAC B=APP A=X C=S W=S K=S R=S O=S N=1 M=2\n"),
+            Err(ProtocolError::MalformedResponse)
         );
     }
 }

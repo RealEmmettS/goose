@@ -320,11 +320,37 @@ pub struct CliOverrides {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BackendState {
-    pub cursor_warp_supported: bool,
-    pub window_watch_supported: bool,
-    pub collect_window_supported: bool,
+    pub cursor_warp: BackendCapability,
+    pub window_watch: BackendCapability,
+    pub collect_window: BackendCapability,
+    pub presence: BackendCapability,
+    pub audio: BackendCapability,
     pub note_count: u32,
     pub meme_count: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BackendCapability {
+    Supported,
+    Unsupported,
+    Denied,
+    Failed,
+}
+
+impl BackendCapability {
+    pub fn active(self) -> bool {
+        matches!(self, Self::Supported)
+    }
+}
+
+impl From<bool> for BackendCapability {
+    fn from(supported: bool) -> Self {
+        if supported {
+            Self::Supported
+        } else {
+            Self::Unsupported
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -547,7 +573,7 @@ impl Config {
         let default_schedule = ScheduleOptions::default();
 
         let mut foreign_window = ForeignWindowOptions::with_backend_support(
-            backend.window_watch_supported,
+            backend.window_watch.active(),
             !no_window_ride,
         );
         foreign_window.enabled = self.mischief.perch_and_ride && !no_window_ride;
@@ -555,7 +581,7 @@ impl Config {
         // Backend capability gates every collect operation: if the runtime reported it can no
         // longer drive collect windows, none of these are available regardless of config. This
         // keeps a runtime capability loss durable across reloads instead of being reset by one.
-        let collect_supported = backend.collect_window_supported;
+        let collect_supported = backend.collect_window.active();
         let collect_capabilities = CollectWindowCapabilities {
             spawn_note: collect_supported,
             spawn_image: collect_supported,
@@ -576,7 +602,7 @@ impl Config {
             multi_monitor_chase: self.behaviors.multi_monitor_chase,
             mouse_steal: MouseStealOptions {
                 enabled: self.behavior.can_attack_mouse && !no_mouse_steal,
-                warp_supported: backend.cursor_warp_supported,
+                warp_supported: backend.cursor_warp.active(),
                 grab_distance: self.mouse.grab_distance,
                 drop_distance: self.mouse.drop_distance,
                 succ_time: self.mouse.succ_time,
@@ -1004,9 +1030,11 @@ mod tests {
 
     fn backend() -> BackendState {
         BackendState {
-            cursor_warp_supported: true,
-            window_watch_supported: true,
-            collect_window_supported: true,
+            cursor_warp: BackendCapability::Supported,
+            window_watch: BackendCapability::Supported,
+            collect_window: BackendCapability::Supported,
+            presence: BackendCapability::Supported,
+            audio: BackendCapability::Supported,
             note_count: 1,
             meme_count: 1,
         }
@@ -1023,7 +1051,7 @@ mod tests {
         c.mischief.collect_memes = true;
 
         let mut backend = backend();
-        backend.collect_window_supported = false;
+        backend.collect_window = BackendCapability::Failed;
 
         let effective = c.effective_options(backend, CliOverrides::default());
         assert!(

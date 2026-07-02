@@ -45,6 +45,8 @@ pub enum Command {
     Stop,
     /// Ask the running goose to reload runtime options.
     Reload,
+    /// Show the running goose's platform and capability status.
+    Status,
     /// Open the terminal config editor.
     Config,
     /// Poke the running goose into a specific action.
@@ -107,7 +109,7 @@ impl Cli {
     pub fn is_client_command(&self) -> bool {
         matches!(
             self.command,
-            Some(Command::Stop | Command::Reload | Command::Do { .. })
+            Some(Command::Stop | Command::Reload | Command::Status | Command::Do { .. })
         )
     }
 }
@@ -195,12 +197,15 @@ mod tests {
     }
 
     #[test]
-    fn parses_stop_reload_and_do() {
+    fn parses_stop_reload_status_and_do() {
         let stop = Cli::try_parse_normalized(["honk300", "stop"]).unwrap();
         assert_eq!(stop.command, Some(Command::Stop));
 
         let reload = Cli::try_parse_normalized(["honk300", "reload"]).unwrap();
         assert_eq!(reload.command, Some(Command::Reload));
+
+        let status = Cli::try_parse_normalized(["honk300", "status"]).unwrap();
+        assert_eq!(status.command, Some(Command::Status));
 
         let do_note = Cli::try_parse_normalized(["honk300", "do", "note"]).unwrap();
         assert_eq!(
@@ -260,6 +265,7 @@ mod tests {
             ("uninstall", Command::Uninstall),
             ("update", Command::Update),
             ("setup", Command::Setup),
+            ("status", Command::Status),
         ] {
             let cli = Cli::try_parse_normalized(["goose", word]).unwrap();
             assert_eq!(cli.command, Some(expected));
