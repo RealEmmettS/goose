@@ -44,7 +44,7 @@ jobs:
       - name: Test
         run: cargo test --workspace
       - name: macOS bundle smoke
-        run: script/smoke_m16_macos.sh
+        run: bash script/smoke_m16_macos.sh
       - name: Archive universal2 app
         run: ditto -c -k --keepParent target/dist/macos-universal2/Honk300.app "Honk300-${{ matrix.runner }}.zip"
       - uses: actions/upload-artifact@v4
@@ -61,7 +61,7 @@ jobs:
       - name: Install Rust targets
         run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
       - name: Accessibility smoke
-        run: script/smoke_m16_macos_accessibility.sh
+        run: bash script/smoke_m16_macos_accessibility.sh
 
   linux:
     name: Linux visible smoke (${{ matrix.runner }})
@@ -85,7 +85,7 @@ jobs:
       - name: Test
         run: cargo test --workspace
       - name: Linux X11 and Wayland smoke
-        run: script/smoke_m17_m18_linux.sh
+        run: bash script/smoke_m17_m18_linux.sh
       - name: Linux target checks
         run: |
           cargo check --workspace --target x86_64-unknown-linux-gnu
