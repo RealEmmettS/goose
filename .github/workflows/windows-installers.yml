@@ -29,9 +29,11 @@ jobs:
           - triple: x86_64-pc-windows-msvc
             wix_arch: x64
             inno_arch: x64
+            vcvars_arch: x64
           - triple: aarch64-pc-windows-msvc
             wix_arch: arm64
             inno_arch: arm64
+            vcvars_arch: x64_arm64
 
     steps:
       - name: Enable Windows long paths
@@ -87,20 +89,61 @@ jobs:
         with:
           targets: ${{ matrix.triple }}
 
+      - name: Ensure ARM64 MSVC build tools
+        if: ${{ matrix.triple == 'aarch64-pc-windows-msvc' }}
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found at $vswhere" }
+
+          $installPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $installPath) { throw "Visual Studio C++ x64/x86 tools are not installed" }
+
+          $arm64Path = & $vswhere -products * -requires Microsoft.VisualStudio.Component.VC.Tools.ARM64 -property installationPath
+          if (-not $arm64Path) {
+            $setup = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+            if (-not (Test-Path $setup)) { throw "Visual Studio setup.exe not found at $setup" }
+            $args = @(
+              "modify",
+              "--installPath", $installPath,
+              "--add", "Microsoft.VisualStudio.Component.VC.Tools.ARM64",
+              "--quiet",
+              "--norestart",
+              "--nocache"
+            )
+            $proc = Start-Process -FilePath $setup -ArgumentList $args -Wait -PassThru
+            if ($proc.ExitCode -ne 0 -and $proc.ExitCode -ne 3010) {
+              throw "Visual Studio ARM64 tools install failed with exit $($proc.ExitCode)"
+            }
+          }
+
+          $arm64Path = & $vswhere -products * -requires Microsoft.VisualStudio.Component.VC.Tools.ARM64 -property installationPath
+          if (-not $arm64Path) { throw "Visual Studio ARM64 tools are still unavailable after install" }
+
       - name: Build honk300.exe
         shell: pwsh
-        run: cargo build --release --locked --target ${{ matrix.triple }}
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $installPath) { throw "Visual Studio C++ tools are not installed" }
+          $vcvars = Join-Path $installPath "VC\Auxiliary\Build\vcvarsall.bat"
+          if (-not (Test-Path $vcvars)) { throw "vcvarsall.bat not found at $vcvars" }
+          $cmd = 'call "' + $vcvars + '" ${{ matrix.vcvars_arch }} && cargo build --release --locked --target ${{ matrix.triple }}'
+          cmd.exe /c $cmd
+          if ($LASTEXITCODE -ne 0) { throw "cargo build failed with exit $LASTEXITCODE" }
 
       - name: Harvest Assets for WiX
         shell: pwsh
         run: |
           $heat = "$env:WIX\bin\heat.exe"
           if (-not (Test-Path $heat)) { throw "heat.exe not found at $heat" }
+          $sourceRoot = (Get-Location).Path
+          $assetsRoot = Join-Path $sourceRoot "Assets"
           New-Item -ItemType Directory -Force -Path target\wix | Out-Null
-          & $heat dir Assets -cg AssetsComponents -dr AssetsDir -srd -sreg -gg -var var.SourceRoot -out target\wix\assets.wxs
+          & $heat dir $assetsRoot -cg AssetsComponents -dr AssetsDir -srd -sreg -gg -var var.SourceRoot -out target\wix\assets.wxs
           if ($LASTEXITCODE -ne 0) { throw "heat failed with exit $LASTEXITCODE" }
 
-      - name: Build Corporate MSI
+      - name: Build Global and Corporate MSI
         shell: pwsh
         run: |
           $candle = "$env:WIX\bin\candle.exe"
@@ -118,10 +161,23 @@ jobs:
             wix-corporate\corporate.wxs
           if ($LASTEXITCODE -ne 0) { throw "corporate candle failed with exit $LASTEXITCODE" }
           & $candle -arch ${{ matrix.wix_arch }} `
-            "-dSourceRoot=$sourceRoot" `
+            "-dSourceRoot=$sourceRoot\Assets" `
             -out target\wix\assets.wixobj `
             target\wix\assets.wxs
           if ($LASTEXITCODE -ne 0) { throw "assets candle failed with exit $LASTEXITCODE" }
+          & $candle -arch ${{ matrix.wix_arch }} `
+            "-dVersion=${{ steps.tag.outputs.version }}" `
+            "-dCargoTargetBinDir=$binDir" `
+            "-dSourceRoot=$sourceRoot" `
+            "-dIncludeHarvestedAssets=1" `
+            -out target\wix\global.wixobj `
+            wix\main.wxs
+          if ($LASTEXITCODE -ne 0) { throw "global candle failed with exit $LASTEXITCODE" }
+          & $light -sice:ICE38 -sice:ICE64 -sice:ICE91 `
+            -ext WixUIExtension `
+            -out target\wix\honk300-${{ matrix.triple }}.msi `
+            target\wix\global.wixobj target\wix\assets.wixobj
+          if ($LASTEXITCODE -ne 0) { throw "global light failed with exit $LASTEXITCODE" }
           & $light -sice:ICE38 -sice:ICE64 -sice:ICE91 `
             -ext WixUIExtension `
             -out target\wix\honk300-${{ matrix.triple }}-corporate.msi `
@@ -166,6 +222,7 @@ jobs:
         shell: pwsh
         run: |
           $files = @(
+            "target\wix\honk300-${{ matrix.triple }}.msi",
             "target\wix\honk300-${{ matrix.triple }}-corporate.msi",
             "inno\Output\honk300-${{ matrix.triple }}-setup.exe",
             "inno\Output\honk300-${{ matrix.triple }}-corporate-setup.exe"
@@ -182,6 +239,8 @@ jobs:
         shell: pwsh
         run: |
           gh release upload "${{ steps.tag.outputs.tag }}" `
+            "target\wix\honk300-${{ matrix.triple }}.msi" `
+            "target\wix\honk300-${{ matrix.triple }}.msi.sha256" `
             "target\wix\honk300-${{ matrix.triple }}-corporate.msi" `
             "target\wix\honk300-${{ matrix.triple }}-corporate.msi.sha256" `
             "inno\Output\honk300-${{ matrix.triple }}-setup.exe" `
