@@ -126,7 +126,7 @@ added.
   `https://github.com/RealEmmettS/goose/actions/runs/28842489497` passed for x64 and ARM64 Global
   MSI, Corporate MSI, Global EXE, Corporate EXE, and sha256 sidecars.
 - 2026-07-07 - release asset evidence:
-  `https://github.com/RealEmmettS/goose/releases/tag/v0.0.0` contains 35 assets, including
+  `https://github.com/RealEmmettS/goose/releases/tag/v0.0.0` contains 34 assets, including
   Windows x64/ARM64 zip artifacts, Linux x64/ARM GNU/musl tarballs, shell/PowerShell installers,
   Windows x64/ARM64 Global/Corporate MSI and EXE installers, and sha256 sidecars. `#m16r` remains
   open and deferred for macOS Accessibility-granted host evidence.
