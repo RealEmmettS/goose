@@ -32,7 +32,7 @@ Implementation sequence:
    - `update` selects the arch-matched artifact for the current install source and never uses `cargo install`.
    - `setup` keeps config setup behavior and only expands if install-time setup requires it.
 5. Add package/release metadata:
-   - `[workspace.metadata.dist]` with cargo-dist 0.31.0, GitHub CI, shell/powershell/msi installers, full target matrix, `install-updater=false`, `publish-prereleases=false`, and no crates-publish workflow.
+   - `[workspace.metadata.dist]` with cargo-dist 0.31.0, GitHub CI, shell/powershell installers, full target matrix, `install-updater=false`, `publish-prereleases=false`, and no crates-publish workflow.
    - fresh WiX GUIDs.
    - include required assets/scripts/installer files.
 6. Add Windows installers:

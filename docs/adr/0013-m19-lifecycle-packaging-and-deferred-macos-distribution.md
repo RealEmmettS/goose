@@ -35,13 +35,15 @@ personal-use slice to resume later.
   - `honk300 setup` keeps its existing config-creation behavior.
 - No update strategy may invoke `cargo install`; releases remain builds, installers, and scripts
   only.
-- Add cargo-dist metadata for the Windows and Linux M19 matrix:
+- Add cargo-dist metadata for shell/PowerShell installers and core archive artifacts across the
+  Windows and Linux M19 matrix:
   `x86_64-pc-windows-msvc`, `aarch64-pc-windows-msvc`,
   `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`,
   `x86_64-unknown-linux-musl`, and `aarch64-unknown-linux-musl`.
 - Add a tag-triggered `Release` workflow and a chained `Windows Installers` workflow. The Windows
-  workflow is matrixed over x64 and ARM64, adds Corporate MSI plus Global/Corporate Inno EXE
-  artifacts, writes `.sha256` sidecars, and refuses to attach extras to a torn cargo-dist release.
+  workflow is matrixed over x64 and ARM64, builds the hand-authored Global/Corporate MSI and
+  Global/Corporate Inno EXE artifacts, writes `.sha256` sidecars, and refuses to attach extras to
+  a torn cargo-dist release.
 - Leave macOS DMG/signing/notarization out of this continuation pass. When macOS packaging resumes,
   the default artifact is unsigned personal-use unless signing and notarization credentials are
   intentionally added.
@@ -55,6 +57,9 @@ personal-use slice to resume later.
 - Linux install support is implemented through the binary lifecycle command and cargo-dist shell
   installer target. The binary installs aliases under `~/.local/bin`, assets under the user
   install root, `honk300.desktop`, and optional autostart.
+- cargo-dist does not produce Windows MSI artifacts for M19. The dedicated Windows installer
+  workflow owns MSI/EXE generation so both installer families include aliases, assets,
+  install-source markers, shortcuts, optional autostart, and matching sidecars.
 - macOS users still use `script/package_macos_app.sh` for local app staging until the deferred
   distribution slice resumes.
 - `#a8d` remains open after code lands if cargo-dist planning, installer artifact inspection, or

@@ -649,10 +649,12 @@ Reuse the QubeTX family pipeline, minus crates.io, plus GUI bundling, **across e
 OS and architecture**.
 
 ### 13.1 cargo-dist (`[workspace.metadata.dist]`)
-`cargo-dist-version = "0.31.0"`, `ci = "github"`, `installers = ["shell","powershell","msi"]`,
-`pr-run-mode = "plan"`, `install-updater = false`, `allow-dirty = ["msi"]`,
-`publish-prereleases = false`. `[package.metadata.wix]` with **freshly generated** `upgrade-guid`
-+ `path-guid`. `[profile.dist] inherits="release"; lto="thin"`. **No `crates-publish.yml`.**
+`cargo-dist-version = "0.31.0"`, `ci = "github"`, `installers = ["shell","powershell"]`,
+`pr-run-mode = "plan"`, `install-updater = false`, `allow-dirty = ["ci"]`,
+`publish-prereleases = false`. Windows MSI/EXE artifacts are built by the dedicated
+hand-authored Windows installer workflow in §13.2 so aliases, assets, shortcuts, autostart, and
+install-source markers stay identical across Global/Corporate installer variants.
+`[profile.dist] inherits="release"; lto="thin"`. **No `crates-publish.yml`.**
 `windows_subsystem = "windows"` with a CLI fallback path for `--help`/`config`/`install`/`update`/
 `stop`/`do` (allocate a console when run from a terminal).
 
@@ -670,7 +672,7 @@ honk300\bin`, `msi-corporate`), `inno/global.iss` (`exe-global`), `inno/corporat
 (`exe-corporate`). **For a GUI pet:** a Start-Menu (and optional desktop) shortcut, and an
 **optional** `HKCU\…\Run` autostart entry (checkbox, default off). Install **all three name
 aliases** (`honk300`/`honk`/`goose`). Port `windows-installers.yml` (fires via `workflow_run`
-after cargo-dist's `Release`, torn-release guard via `dist-manifest.json` + the Global MSI, WiX
+after cargo-dist's `Release`, torn-release guard via `dist-manifest.json` + the Windows zip, WiX
 `candle`/`light` with `-sice:ICE38 -sice:ICE64 -sice:ICE91`, Inno EXEs, `.sha256` sidecars,
 `gh release upload --clobber`), **matrixed over arch** → up to 8 Windows installer artifacts. CI
 builds ARM64 via the MSVC ARM64 toolchain (native ARM runner or cross), honestly noting any
