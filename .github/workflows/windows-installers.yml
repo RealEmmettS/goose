@@ -89,6 +89,10 @@ jobs:
         with:
           targets: ${{ matrix.triple }}
 
+      - name: Install target for pinned toolchain
+        shell: pwsh
+        run: rustup target add ${{ matrix.triple }}
+
       - name: Ensure ARM64 MSVC build tools
         if: ${{ matrix.triple == 'aarch64-pc-windows-msvc' }}
         shell: pwsh
