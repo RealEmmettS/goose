@@ -1,0 +1,142 @@
+<?xml version='1.0' encoding='windows-1252'?>
+
+<?if $(sys.BUILDARCH) = x64 or $(sys.BUILDARCH) = arm64 ?>
+    <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+<?else ?>
+    <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+<?endif ?>
+
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+    <Product
+        Id='*'
+        Name='honk300'
+        UpgradeCode='327D92E2-33FA-4B3B-887B-D37745A7A7E6'
+        Manufacturer='Emmett S'
+        Language='1033'
+        Codepage='1252'
+        Version='$(var.Version)'>
+
+        <Package
+            Id='*'
+            Keywords='Installer'
+            Description='Desktop goose for your screen'
+            Manufacturer='Emmett S'
+            InstallerVersion='450'
+            Languages='1033'
+            Compressed='yes'
+            InstallScope='perMachine'
+            SummaryCodepage='1252'/>
+
+        <MajorUpgrade
+            Schedule='afterInstallInitialize'
+            DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
+
+        <Media Id='1' Cabinet='media1.cab' EmbedCab='yes'/>
+        <Property Id='ApplicationFolderName' Value='honk300'/>
+
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
+                <Directory Id='APPLICATIONFOLDER' Name='honk300'>
+                    <Directory Id='Bin' Name='bin'>
+                        <Directory Id='AssetsDir' Name='Assets'/>
+                        <Component Id='Path' Guid='A563EAE7-451A-48C3-8AB0-1A998F9AF47F' KeyPath='yes'>
+                            <Environment
+                                Id='PATH'
+                                Name='PATH'
+                                Value='[Bin]'
+                                Permanent='no'
+                                Part='last'
+                                Action='set'
+                                System='yes'/>
+                        </Component>
+                        <Component Id='Honk300Exe' Guid='*'>
+                            <File Id='Honk300ExeFile' Name='honk300.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300.exe' KeyPath='yes'/>
+                        </Component>
+                        <Component Id='HonkAliasExe' Guid='*'>
+                            <File Id='HonkAliasExeFile' Name='honk.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300.exe' KeyPath='yes'/>
+                        </Component>
+                        <Component Id='GooseAliasExe' Guid='*'>
+                            <File Id='GooseAliasExeFile' Name='goose.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300.exe' KeyPath='yes'/>
+                        </Component>
+                        <Component Id='InstallSourceMarkerFile' Guid='*'>
+                            <File Id='InstallSourceFile' Name='install-source.txt' DiskId='1' Source='wix\install-source-msi-global.txt' KeyPath='yes'/>
+                        </Component>
+                    </Directory>
+                </Directory>
+            </Directory>
+            <Directory Id='ProgramMenuFolder'>
+                <Directory Id='ApplicationProgramsFolder' Name='honk300'/>
+            </Directory>
+        </Directory>
+
+        <DirectoryRef Id='APPLICATIONFOLDER'>
+            <Component Id='InstallSourceMarker' Guid='*'>
+                <RegistryValue
+                    Root='HKCU'
+                    Key='Software\Honk300'
+                    Name='InstallSource'
+                    Type='string'
+                    Value='msi-global'
+                    KeyPath='yes'/>
+            </Component>
+        </DirectoryRef>
+
+        <DirectoryRef Id='ApplicationProgramsFolder'>
+            <Component Id='StartMenuShortcut' Guid='*'>
+                <Shortcut
+                    Id='StartMenuShortcut'
+                    Name='Honk300'
+                    Target='[Bin]honk300.exe'
+                    Arguments='start'
+                    WorkingDirectory='Bin'/>
+                <RemoveFolder Id='RemoveApplicationProgramsFolder' On='uninstall'/>
+                <RegistryValue Root='HKCU' Key='Software\Honk300' Name='StartMenuShortcut' Type='integer' Value='1' KeyPath='yes'/>
+            </Component>
+        </DirectoryRef>
+
+        <DirectoryRef Id='APPLICATIONFOLDER'>
+            <Component Id='LoginAutostart' Guid='*'>
+                <RegistryValue
+                    Root='HKCU'
+                    Key='Software\Microsoft\Windows\CurrentVersion\Run'
+                    Name='Honk300'
+                    Type='string'
+                    Value='"[Bin]honk300.exe" start'
+                    KeyPath='yes'/>
+            </Component>
+        </DirectoryRef>
+
+        <Feature
+            Id='Binaries'
+            Title='honk300'
+            Description='Installs honk300, honk, and goose command aliases.'
+            Level='1'
+            ConfigurableDirectory='APPLICATIONFOLDER'
+            AllowAdvertise='no'
+            Display='expand'
+            Absent='disallow'>
+            <ComponentRef Id='Honk300Exe'/>
+            <ComponentRef Id='HonkAliasExe'/>
+            <ComponentRef Id='GooseAliasExe'/>
+            <ComponentRef Id='InstallSourceMarkerFile'/>
+            <ComponentRef Id='InstallSourceMarker'/>
+            <ComponentRef Id='StartMenuShortcut'/>
+            <?ifdef IncludeHarvestedAssets ?>
+            <ComponentGroupRef Id='AssetsComponents'/>
+            <?endif ?>
+            <Feature Id='Environment' Title='PATH Environment Variable' Description='Add honk300 to the system PATH.' Level='1' Absent='allow'>
+                <ComponentRef Id='Path'/>
+            </Feature>
+            <Feature Id='Autostart' Title='Login Autostart' Description='Start honk300 when this user logs in.' Level='2' Absent='allow'>
+                <ComponentRef Id='LoginAutostart'/>
+            </Feature>
+        </Feature>
+
+        <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
+        <Property Id='ARPHELPLINK' Value='https://github.com/RealEmmettS/goose'/>
+
+        <UI>
+            <UIRef Id='WixUI_FeatureTree'/>
+        </UI>
+    </Product>
+</Wix>

@@ -5,7 +5,9 @@
 //! allowed desktop goose instance.
 
 mod cli;
+mod install;
 mod runtime;
+mod update;
 
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 mod assets;
@@ -31,9 +33,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         Some(Command::Config) => run_config(cli),
-        Some(Command::Install) => lifecycle_placeholder("install"),
-        Some(Command::Uninstall) => lifecycle_placeholder("uninstall"),
-        Some(Command::Update) => lifecycle_placeholder("update"),
+        Some(Command::Install { autostart }) => install::install(autostart),
+        Some(Command::Uninstall { purge }) => install::uninstall(purge),
+        Some(Command::Update) => update::run(),
         Some(Command::Setup) => run_setup(cli),
         Some(Command::Start) | None => run_start(cli),
         Some(Command::Stop | Command::Reload | Command::Status | Command::Do { .. }) => {
@@ -51,8 +53,8 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Some(
             Command::Start
             | Command::Config
-            | Command::Install
-            | Command::Uninstall
+            | Command::Install { .. }
+            | Command::Uninstall { .. }
             | Command::Update
             | Command::Setup,
         )
@@ -121,11 +123,6 @@ fn run_setup(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let loaded = Config::load_or_default(cli.config)?;
     loaded.config.save_atomic(&loaded.path)?;
     println!("honk300: config ready at {}.", loaded.path.display());
-    Ok(())
-}
-
-fn lifecycle_placeholder(action: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("honk300 {action}: installer lifecycle commands land in M19.");
     Ok(())
 }
 

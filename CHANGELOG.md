@@ -12,12 +12,30 @@ All notable changes to this project are documented here. Format based on
 > ratatui config TUI, dynamic moods, the local on-hour double honk, quiet-hours/DND/fullscreen
 > manners, built-in Autumn leaves, Windows multi-monitor chase, and live appearance/recolor
 > controls, plus macOS runtime/status/app-bundle staging, Linux X11 visible overlay support,
-> native Wayland reduced-mode rendering, and CI smoke gates; there is no release yet. A plain-English companion lives in
+> native Wayland reduced-mode rendering, CI smoke gates, and first-pass M19 Windows/Linux lifecycle
+> and release scaffolding; release artifact evidence is still pending. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
 
 ### Added
+- **M19 lifecycle commands and update safety** — replaced the placeholder lifecycle commands with
+  real `honk300 install [--autostart]`, `honk300 uninstall [--purge]`, and `honk300 update`
+  behavior. `install` copies the current executable into the user install location, installs the
+  `honk300`/`honk`/`goose` aliases, copies `Assets/` next to the binary, writes install-source
+  markers, creates Windows shortcuts or Linux `.desktop` entries, and enables login autostart
+  only when requested. `uninstall --purge` backs up user memes/notes before removing config/state.
+  `update` reads install-source markers, chooses the matching arch-specific release installer,
+  downloads and verifies the `.sha256` sidecar, runs the installer, and verifies post-install
+  `--version`; tests pin that no update path uses `cargo install`.
+- **M19 cargo-dist and Windows installer scaffolding** — added cargo-dist 0.31 metadata for the
+  Windows x64/ARM64 and Linux x64/ARM GNU/musl matrix, a tag-triggered `Release` workflow, a
+  chained `Windows Installers` workflow, WiX Global/Corporate MSI manifests, Inno Global/Corporate
+  EXE manifests, fresh WiX/Inno GUIDs, per-arch artifact names, install-source marker files,
+  optional default-off autostart, alias binaries, asset harvesting, and `.sha256` sidecar upload.
+  macOS DMG/signing/notarization remain intentionally deferred behind ADR 0013 and `#m16r`; later
+  macOS packaging defaults to unsigned personal-use artifacts unless signing credentials are
+  intentionally added.
 - **M16 macOS backend, status, and `.app` staging (implementation in-tree; Accessibility-granted
   smoke pending)** — added `crates/honk-platform-macos` with AppKit/CoreGraphics/ApplicationServices
   dependencies, macOS `start` runtime wiring through the existing Unix IPC transport, one
@@ -132,8 +150,7 @@ All notable changes to this project are documented here. Format based on
   `--version`, `--config <path>`, and `--wayland`. `honk plz`, `goose plz`, and `honk300 plz`
   all start; `bad`, `no`, and `no honk` stop; pokes stay explicit through `do <action>`,
   including `do honk`. `install`, `uninstall`, `update`, and `setup` now parse for
-  discoverability, with M19 placeholder messages where installer/update behavior is not yet
-  implemented.
+  discoverability and M19 implements the lifecycle behavior.
 - **CLI/TUI control plane (milestone M10, complete)** — the root binary is now split into
   `src/cli.rs`, `src/control/`, and `src/runtime/windows.rs`. `honk300` defaults to `start`;
   `honk300 start` refuses to create a second goose; and `honk300 stop`, `honk300 reload`, and

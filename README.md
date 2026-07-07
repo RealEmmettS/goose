@@ -10,7 +10,8 @@ FOR REFERENCE:
 
 ## Status
 
-**Stage:** implementation in progress. Milestones **M0-M18** are implemented in-tree, and
+**Stage:** implementation in progress. Milestones **M0-M18** are implemented in-tree, M19
+lifecycle/release work is now underway for Windows and Linux, and
 M16.1-M18.1 readiness is now wired for CI proof instead of Windows-host claims. The current
 Windows build renders the procedural goose on the desktop,
 walks it, leaves mud, plays sounds, reacts to pat/click input, can perform bounded cursor
@@ -29,7 +30,9 @@ foreign-window snapshots, and Unix IPC status/reload/stop/poke. M18 adds native 
 mode with layer-shell rendering, IPC control, and explicit unsupported reporting for mischief
 Wayland does not expose. Linux collect-window support remains unsupported and is reported that
 way. `docs/readiness/m16-m18-readiness.md` records the local gate, CI smoke gates, and pending
-run evidence. There is no installer or release artifact yet.
+run evidence. M19 now has real `install`, `uninstall --purge`, and `update` command
+implementations plus cargo-dist and Windows installer workflow scaffolding; release artifact
+evidence is still required before the M19 card closes.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
@@ -43,7 +46,8 @@ while `codex_plan.md`'s guessed speed values were wrong.)
 that should survive individual task-board updates. ADR 0010 records the M16 macOS agent-bundle,
 permission-degradation, status protocol, and TUI-only control decisions. ADR 0011 records the
 M17/M18 Linux control-runtime foundation and degraded Wayland contract. ADR 0012 records the
-CI-proven readiness contract for M16.1-M18.1.
+CI-proven readiness contract for M16.1-M18.1. ADR 0013 records the M19 lifecycle/release
+contract and the deferred macOS distribution slice.
 
 **Decided direction (see `honk300_plan.md` for the full detail):**
 
@@ -72,6 +76,9 @@ CI-proven readiness contract for M16.1-M18.1.
 - **Built for every OS + architecture:** Windows x64 **and ARM64**, macOS Intel **and Apple
   Silicon** (universal2), Linux x64 **and ARM** (gnu + musl where packaging supports it).
   Native + CLI installers like TR300/ND300/WB300; **no crates.io**.
+- M19 currently focuses on Windows and Linux packaging. macOS DMG/signing/notarization and
+  Accessibility-granted evidence remain deferred; when that slice resumes, unsigned personal-use
+  artifacts are the default unless signing credentials are intentionally added.
 - Linux is **X11-first** (runs under XWayland); native Wayland is an opt-in `--wayland` mode with
   reduced mischief. The current Linux runtime has visible X11 and reduced Wayland presentation
   paths plus CI smoke scripts; readiness cards close only after the host CI evidence is recorded.

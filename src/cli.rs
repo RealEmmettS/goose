@@ -10,7 +10,7 @@ use std::path::PathBuf;
     name = "honk300",
     version,
     about = "A desktop goose for your screen",
-    after_help = "Goose-speak:\n  <name> plz                 Start the goose\n  <name> bad | no | no honk  Stop the goose\n  <name> do honk             Poke a honk\n\nInstalled names planned for M19: honk300, honk, goose."
+    after_help = "Goose-speak:\n  <name> plz                 Start the goose\n  <name> bad | no | no honk  Stop the goose\n  <name> do honk             Poke a honk\n\nInstalled names: honk300, honk, goose."
 )]
 pub struct Cli {
     /// Start the goose muted.
@@ -54,11 +54,19 @@ pub enum Command {
         #[arg(value_enum)]
         action: CliPokeAction,
     },
-    /// Placeholder for the M19 installer flow.
-    Install,
-    /// Placeholder for the M19 uninstaller flow.
-    Uninstall,
-    /// Placeholder for the M19 updater flow.
+    /// Install honk300 assets, aliases, desktop shortcuts, and optional autostart.
+    Install {
+        /// Start honk300 when the user logs in.
+        #[arg(long)]
+        autostart: bool,
+    },
+    /// Remove installed honk300 aliases, shortcuts, markers, and optionally user state.
+    Uninstall {
+        /// Back up user memes/notes, then remove config/state as well as app files.
+        #[arg(long)]
+        purge: bool,
+    },
+    /// Download and run the matching release installer for this install source.
     Update,
     /// Create or refresh the user config file.
     Setup,
@@ -261,8 +269,8 @@ mod tests {
         assert_eq!(cli.config, Some(PathBuf::from("C:\\tmp\\goose.toml")));
 
         for (word, expected) in [
-            ("install", Command::Install),
-            ("uninstall", Command::Uninstall),
+            ("install", Command::Install { autostart: false }),
+            ("uninstall", Command::Uninstall { purge: false }),
             ("update", Command::Update),
             ("setup", Command::Setup),
             ("status", Command::Status),
@@ -281,6 +289,15 @@ mod tests {
                 action: CliPokeAction::Honk
             })
         );
+    }
+
+    #[test]
+    fn parses_lifecycle_flags() {
+        let install = Cli::try_parse_normalized(["honk300", "install", "--autostart"]).unwrap();
+        assert_eq!(install.command, Some(Command::Install { autostart: true }));
+
+        let uninstall = Cli::try_parse_normalized(["honk300", "uninstall", "--purge"]).unwrap();
+        assert_eq!(uninstall.command, Some(Command::Uninstall { purge: true }));
     }
 
     #[test]

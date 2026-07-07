@@ -5,9 +5,9 @@
 # crate. The shipped artifact still remains ONE binary (installed under three names),
 # which keeps cargo-dist / the installers happy in a later packaging round.
 #
-# Round 1 (M0) ships only `honk-engine`. Later rounds add the platform backend crates,
-# the config-TUI crate, the assets crate, and the root `honk300` binary, plus the
-# [workspace.metadata.dist] / wix / CI blocks (deferred to the M19 packaging round).
+# M19 owns the release metadata and installer/update lifecycle. macOS DMG/signing remains
+# deferred behind the M16.1 Accessibility evidence gate; the current dist matrix is Windows
+# and Linux only.
 
 [workspace]
 resolver = "2"
@@ -49,6 +49,24 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 default-run = "honk300"
+include = [
+    "/Cargo.lock",
+    "/Cargo.toml",
+    "/README.md",
+    "/Assets/**",
+    "/crates/**",
+    "/src/**",
+    "/script/**",
+    "/wix/**",
+    "/wix-corporate/**",
+    "/inno/**",
+]
+
+[package.metadata.wix]
+upgrade-guid = "327D92E2-33FA-4B3B-887B-D37745A7A7E6"
+path-guid = "A563EAE7-451A-48C3-8AB0-1A998F9AF47F"
+license = false
+eula = false
 
 [[bin]]
 name = "honk300"
@@ -60,12 +78,15 @@ honk-config = { path = "crates/honk-config" }
 honk-config-tui = { path = "crates/honk-config-tui" }
 honk-control = { path = "crates/honk-control" }
 honk-engine = { path = "crates/honk-engine" }
+serde_json = "1"
+sha2 = "0.10"
 
 [target.'cfg(windows)'.dependencies]
 honk-platform-windows = { path = "crates/honk-platform-windows" }
 # Audio playback (honks/bite/mud/pat). Pure-Rust decode via symphonia; cpal backend.
 # Windows-scoped for now; the macOS/Linux backends wire audio in M16/M17.
 rodio = "0.20"
+winreg = "0.52"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 honk-platform-macos = { path = "crates/honk-platform-macos" }
@@ -77,3 +98,21 @@ honk-platform-linux = { path = "crates/honk-platform-linux" }
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+[workspace.metadata.dist]
+cargo-dist-version = "0.31.0"
+ci = "github"
+allow-dirty = ["ci", "msi"]
+installers = ["shell", "powershell", "msi"]
+targets = [
+    "aarch64-pc-windows-msvc",
+    "x86_64-pc-windows-msvc",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-unknown-linux-musl",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+]
+pr-run-mode = "plan"
+install-updater = false
+install-path = "CARGO_HOME"
+publish-prereleases = false

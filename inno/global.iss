@@ -1,0 +1,117 @@
+#ifndef MyAppVersion
+  #define MyAppVersion "0.0.0-dev"
+#endif
+#ifndef TargetTriple
+  #define TargetTriple "x86_64-pc-windows-msvc"
+#endif
+#ifndef SourceBinDir
+  #define SourceBinDir "..\target\release"
+#endif
+#ifndef InnoArchitecturesAllowed
+  #define InnoArchitecturesAllowed "x64"
+#endif
+
+#define MyAppName "honk300"
+#define MyAppPublisher "Emmett S"
+#define MyAppURL "https://github.com/RealEmmettS/goose"
+#define MyAppExeName "honk300.exe"
+
+[Setup]
+AppId={{5A94FBD0-DA02-4F63-9363-7D9CE0E280F5}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppVerName={#MyAppName} {#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+AppPublisherURL={#MyAppURL}
+AppSupportURL={#MyAppURL}
+AppUpdatesURL={#MyAppURL}/releases
+DefaultDirName={commonpf}\{#MyAppName}
+DefaultGroupName={#MyAppName}
+DisableDirPage=auto
+PrivilegesRequired=admin
+PrivilegesRequiredOverridesAllowed=
+ArchitecturesAllowed={#InnoArchitecturesAllowed}
+ArchitecturesInstallIn64BitMode={#InnoArchitecturesAllowed}
+OutputBaseFilename=honk300-{#TargetTriple}-setup
+OutputDir=Output
+Compression=lzma
+SolidCompression=yes
+WizardStyle=modern
+ChangesEnvironment=yes
+UninstallDisplayName={#MyAppName}
+SetupLogging=yes
+CloseApplications=yes
+
+[Tasks]
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
+Name: "autostart"; Description: "Start honk300 when this user logs in"; GroupDescription: "Startup:"; Flags: unchecked
+
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Files]
+Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "honk300.exe"; Flags: ignoreversion
+Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "honk.exe"; Flags: ignoreversion
+Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "goose.exe"; Flags: ignoreversion
+Source: "install-source-exe-global.txt"; DestDir: "{app}"; DestName: "install-source.txt"; Flags: ignoreversion
+Source: "..\Assets\*"; DestDir: "{app}\bin\Assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Icons]
+Name: "{group}\Honk300"; Filename: "{app}\bin\honk300.exe"; Parameters: "start"; WorkingDir: "{app}\bin"
+Name: "{commondesktop}\Honk300"; Filename: "{app}\bin\honk300.exe"; Parameters: "start"; WorkingDir: "{app}\bin"; Tasks: desktopicon
+
+[Registry]
+Root: HKCU; Subkey: "Software\Honk300"; ValueType: string; ValueName: "InstallSource"; ValueData: "exe-global"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Honk300"; Flags: uninsdeletekeyifempty
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Honk300"; ValueData: """{app}\bin\honk300.exe"" start"; Tasks: autostart; Flags: uninsdeletevalue
+
+[Code]
+const
+  EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
+
+procedure EnvAddPath(Path: string);
+var
+  Paths: string;
+begin
+  if not RegQueryStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Paths) then
+    Paths := '';
+
+  if Pos(';' + Uppercase(Path) + ';', ';' + Uppercase(Paths) + ';') > 0 then exit;
+
+  if Length(Paths) > 0 then
+    Paths := Paths + ';' + Path
+  else
+    Paths := Path;
+
+  RegWriteExpandStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Paths);
+end;
+
+procedure EnvRemovePath(Path: string);
+var
+  Paths: string;
+  P: Integer;
+begin
+  if not RegQueryStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Paths) then exit;
+
+  P := Pos(';' + Uppercase(Path) + ';', ';' + Uppercase(Paths) + ';');
+  if P = 0 then exit;
+
+  if P = 1 then
+    Delete(Paths, 1, Length(Path) + 1)
+  else
+    Delete(Paths, P - 1, Length(Path) + 1);
+
+  RegWriteExpandStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Paths);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    EnvAddPath(ExpandConstant('{app}') + '\bin');
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usPostUninstall then
+    EnvRemovePath(ExpandConstant('{app}') + '\bin');
+end;

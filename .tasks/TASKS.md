@@ -13,11 +13,29 @@
 - [ ] **Measure and optimize fullscreen overlay present cost** - M7.0 audit found the current M3+ fullscreen primary-monitor layered overlay is correct for world-space trails but no longer matches the old small-window dirty-rect claim; measure CPU/GPU cost and plan dirty-rect/per-monitor optimization before packaging #p4d
 
 ## To-Do
-- [ ] **M19 — packaging (all OS/arch) + install/update/uninstall** - cargo-dist + windows-installers.yml; 3 name aliases; autostart #a8d
-- [ ] **M16.1 — macOS host readiness smoke** - hosted macOS bundle/status smoke plus Accessibility granted evidence from a pre-granted self-hosted/manual macOS run #m16r
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
 
 ## Active
+- [ ] **M16.1 — macOS host readiness smoke** - hosted macOS bundle/status smoke plus Accessibility granted evidence from a pre-granted self-hosted/manual macOS run #m16r
+  - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
+    > Latest checked successful run `28569889803` still skipped the optional Accessibility job.
+  - [ ] Run `script/smoke_m16_macos_accessibility.sh` on a pre-granted self-hosted/manual macOS host.
+    > Deferred until a pre-granted Mac or self-hosted runner is available; no more macOS Accessibility work in the current M19-first pass.
+  - [ ] Record Accessibility-granted evidence in `docs/readiness/m16-m18-readiness.md`.
+  - [ ] Verify or waive every `#m16r` verification item before moving the card to Done.
+- [ ] **M19 — packaging (all OS/arch) + install/update/uninstall** - cargo-dist + windows-installers.yml; 3 name aliases; autostart #a8d
+  - [x] Investigate and write the M19 resolution plan.
+    > See `docs/thinking/2026-07-06-active-task-resolution-plan.md` and `.tasks/tasks/a8d.md`.
+  - [x] Reconcile packaging contract across `honk300_plan.md`, ADRs, current CLI placeholders, and TR300/ND300 sibling patterns.
+    > ADR 0013 records the Windows/Linux-first M19 continuation and deferred macOS distribution slice.
+  - [x] Implement lifecycle commands: install, uninstall, update, setup, `--purge`, and install-source detection.
+  - [x] Add cargo-dist metadata, release workflow, and fresh WiX GUIDs without crates.io publishing.
+  - [x] Add Windows Global/Corporate MSI and EXE installers for x64 and ARM64, with aliases, shortcuts, autostart, and sha256 sidecars.
+  - [x] Defer macOS universal2 `.app`/DMG/signing/notarization work until the macOS slice resumes, defaulting later artifacts to unsigned personal use.
+  - [x] Add Linux desktop/autostart installation across GNU/musl x64/ARM targets.
+  - [ ] Run local gate, package/release dry-runs, platform smoke checks, and record artifact evidence before closing.
+    > Local Rust gate, `dist plan`, and Windows/Linux target checks passed on the Windows host; WiX/Inno artifact builds and release evidence remain pending.
+
 ## Done
 - [x] **M18.1 — native Wayland reduced-mode readiness** - CI-smoked visible layer-shell reduced mode with IPC stop/poke/reload/status and explicit unsupported mischief evidence on Linux x64/ARM (done 2026-07-02) #m18r
 - [x] **M17.1 — Linux X11 visible backend readiness** - CI-smoked the visible transparent X11/XWayland overlay, input shaping/click-through, pointer/window support, terminal filtering, and Linux x64/ARM evidence (done 2026-07-02) #m17r

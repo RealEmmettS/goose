@@ -16,14 +16,26 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > seasonal Autumn leaves. It now supports Windows multi-monitor chasing and fuller appearance
 > controls. Mac support and the Linux desktop paths are now in the codebase, with repeatable
 > CI smoke proof for hosted Mac bundle checks and Linux desktop behavior. Mac Accessibility-granted
-> desktop tricks still need a pre-approved Mac smoke run. There's
-> no installer yet — that comes later.
+> desktop tricks still need a pre-approved Mac smoke run. The first Windows/Linux installer and
+> update work is now in the codebase, but release artifact proof is still pending.
 
 ---
 
 ## Latest — July 2026
 
 **Added**
+- The installer words are no longer just placeholders. The app can now install itself for the
+  current user, add the three command names, copy its assets, create Windows shortcuts or Linux
+  desktop entries, optionally start at login, uninstall itself, and back up user-added memes and
+  notes before a full purge.
+- The updater now follows the release installer path instead of trying to use Cargo. It detects
+  how the app was installed, chooses the matching download for the computer's architecture, checks
+  the published checksum before running it, and verifies the installed version afterward.
+- The release setup now has cargo-dist metadata, a release workflow, Windows x64 and ARM64
+  installer workflows, WiX and Inno installer manifests, install-source markers, and checksum
+  sidecars. Mac disk images, signing, notarization, and Accessibility-granted proof are still
+  deliberately deferred; later Mac packaging defaults to unsigned personal-use builds unless
+  signing credentials are added on purpose.
 - Mac support is now in the app's codebase. It has a real Mac app identity for permissions,
   starts through the same command system as Windows, can show the goose through Mac desktop
   windows, can play sounds, can use Mac-owned note and meme windows, and reports permission
@@ -91,8 +103,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   `honk plz`, `goose plz`, and `honk300 plz` start it; `honk bad`, `goose no`, and
   `goose no honk` stop it; and pokes like honk, wander, mud, note, meme, or nab stay explicit
   through the `do` command.
-- Installer, uninstaller, updater, and setup words are now recognized so help can list them, but
-  the real installer/update work still waits for the packaging milestone.
+- Installer, uninstaller, updater, and setup words are now recognized by help, and the
+  Windows/Linux installer and updater behavior has started landing as real behavior.
 - You can now control the running goose from commands. Starting a second goose is blocked, and
   commands can tell the current goose to stop, reload its options, honk, wander, track mud, or
   bring in a note or meme. This is also the foundation for the future settings screen.

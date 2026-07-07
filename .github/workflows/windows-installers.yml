@@ -1,0 +1,191 @@
+name: Windows Installers
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach installers to, for example v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-installers:
+    name: ${{ matrix.triple }} extra installers
+    runs-on: windows-2022
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - triple: x86_64-pc-windows-msvc
+            wix_arch: x64
+            inno_arch: x64
+          - triple: aarch64-pc-windows-msvc
+            wix_arch: arm64
+            inno_arch: arm64
+
+    steps:
+      - name: Enable Windows long paths
+        shell: pwsh
+        run: git config --global core.longpaths true
+
+      - name: Resolve target tag
+        id: tag
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ inputs.tag }}"
+          } else {
+            $tag = "${{ github.event.workflow_run.head_branch }}"
+          }
+          if (-not $tag.StartsWith("v")) {
+            throw "Expected tag to start with v, got '$tag'"
+          }
+          $version = $tag -replace '^v', ''
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "tag=$tag"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "version=$version"
+
+      - name: Verify upstream cargo-dist release is complete
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.tag.outputs.tag }}"
+          $repo = "${{ github.repository }}"
+          $assets = (gh release view $tag --repo $repo --json assets --jq '.assets[].name') -split "`n"
+          $required = @(
+            "dist-manifest.json",
+            "honk300-${{ matrix.triple }}.msi"
+          )
+          $missing = @()
+          foreach ($asset in $required) {
+            if ($assets -notcontains $asset) { $missing += $asset }
+          }
+          if ($missing.Count -gt 0) {
+            Write-Host "Upstream release is incomplete. Missing assets:"
+            $missing | ForEach-Object { Write-Host "  $_" }
+            exit 1
+          }
+
+      - name: Checkout tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          persist-credentials: false
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.triple }}
+
+      - name: Build honk300.exe
+        shell: pwsh
+        run: cargo build --release --locked --target ${{ matrix.triple }}
+
+      - name: Harvest Assets for WiX
+        shell: pwsh
+        run: |
+          $heat = "$env:WIX\bin\heat.exe"
+          if (-not (Test-Path $heat)) { throw "heat.exe not found at $heat" }
+          New-Item -ItemType Directory -Force -Path target\wix | Out-Null
+          & $heat dir Assets -cg AssetsComponents -dr AssetsDir -srd -sreg -gg -var var.SourceRoot -out target\wix\assets.wxs
+          if ($LASTEXITCODE -ne 0) { throw "heat failed with exit $LASTEXITCODE" }
+
+      - name: Build Corporate MSI
+        shell: pwsh
+        run: |
+          $candle = "$env:WIX\bin\candle.exe"
+          $light  = "$env:WIX\bin\light.exe"
+          if (-not (Test-Path $candle)) { throw "candle.exe not found at $candle" }
+          if (-not (Test-Path $light))  { throw "light.exe not found at $light" }
+          $binDir = "target\${{ matrix.triple }}\release"
+          $sourceRoot = (Get-Location).Path
+          & $candle -arch ${{ matrix.wix_arch }} `
+            "-dVersion=${{ steps.tag.outputs.version }}" `
+            "-dCargoTargetBinDir=$binDir" `
+            "-dSourceRoot=$sourceRoot" `
+            "-dIncludeHarvestedAssets=1" `
+            -out target\wix\corporate.wixobj `
+            wix-corporate\corporate.wxs
+          if ($LASTEXITCODE -ne 0) { throw "corporate candle failed with exit $LASTEXITCODE" }
+          & $candle -arch ${{ matrix.wix_arch }} `
+            "-dSourceRoot=$sourceRoot" `
+            -out target\wix\assets.wixobj `
+            target\wix\assets.wxs
+          if ($LASTEXITCODE -ne 0) { throw "assets candle failed with exit $LASTEXITCODE" }
+          & $light -sice:ICE38 -sice:ICE64 -sice:ICE91 `
+            -ext WixUIExtension `
+            -out target\wix\honk300-${{ matrix.triple }}-corporate.msi `
+            target\wix\corporate.wixobj target\wix\assets.wixobj
+          if ($LASTEXITCODE -ne 0) { throw "light failed with exit $LASTEXITCODE" }
+
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress --no-color
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\iscc.exe")) {
+            throw "Inno Setup install failed; iscc.exe missing"
+          }
+
+      - name: Build Global EXE installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" `
+            "/DMyAppVersion=${{ steps.tag.outputs.version }}" `
+            "/DTargetTriple=${{ matrix.triple }}" `
+            "/DSourceBinDir=..\target\${{ matrix.triple }}\release" `
+            "/DInnoArchitecturesAllowed=${{ matrix.inno_arch }}" `
+            inno\global.iss
+          if (-not (Test-Path "inno\Output\honk300-${{ matrix.triple }}-setup.exe")) {
+            throw "Global EXE installer output missing"
+          }
+
+      - name: Build Corporate EXE installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" `
+            "/DMyAppVersion=${{ steps.tag.outputs.version }}" `
+            "/DTargetTriple=${{ matrix.triple }}" `
+            "/DSourceBinDir=..\target\${{ matrix.triple }}\release" `
+            "/DInnoArchitecturesAllowed=${{ matrix.inno_arch }}" `
+            inno\corporate.iss
+          if (-not (Test-Path "inno\Output\honk300-${{ matrix.triple }}-corporate-setup.exe")) {
+            throw "Corporate EXE installer output missing"
+          }
+
+      - name: Compute SHA256 sidecars
+        shell: pwsh
+        run: |
+          $files = @(
+            "target\wix\honk300-${{ matrix.triple }}-corporate.msi",
+            "inno\Output\honk300-${{ matrix.triple }}-setup.exe",
+            "inno\Output\honk300-${{ matrix.triple }}-corporate-setup.exe"
+          )
+          foreach ($file in $files) {
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            $name = Split-Path $file -Leaf
+            [System.IO.File]::WriteAllText("$file.sha256", "$hash *$name")
+          }
+
+      - name: Upload artifacts to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          gh release upload "${{ steps.tag.outputs.tag }}" `
+            "target\wix\honk300-${{ matrix.triple }}-corporate.msi" `
+            "target\wix\honk300-${{ matrix.triple }}-corporate.msi.sha256" `
+            "inno\Output\honk300-${{ matrix.triple }}-setup.exe" `
+            "inno\Output\honk300-${{ matrix.triple }}-setup.exe.sha256" `
+            "inno\Output\honk300-${{ matrix.triple }}-corporate-setup.exe" `
+            "inno\Output\honk300-${{ matrix.triple }}-corporate-setup.exe.sha256" `
+            --clobber
