@@ -4,16 +4,16 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); the project will adopt
 [Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
 
-> **Project stage: implementation in progress.** Milestones M0-M18 are implemented in-tree, and
-> M16.1-M18.1 readiness is now gated on CI host evidence rather than Windows-host claims. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
+> **Project stage: implementation in progress.** Milestones M0-M19 are implemented in-tree, and
+> M16.1 macOS Accessibility readiness remains gated on pre-granted host evidence rather than Windows-host claims. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
 > Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
 > ratatui config TUI, dynamic moods, the local on-hour double honk, quiet-hours/DND/fullscreen
 > manners, built-in Autumn leaves, Windows multi-monitor chase, and live appearance/recolor
 > controls, plus macOS runtime/status/app-bundle staging, Linux X11 visible overlay support,
-> native Wayland reduced-mode rendering, CI smoke gates, and first-pass M19 Windows/Linux lifecycle
-> and release scaffolding; release artifact evidence is still pending. A plain-English companion lives in
+> native Wayland reduced-mode rendering, CI smoke gates, and M19 Windows/Linux lifecycle plus
+> release packaging with artifact evidence. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
@@ -28,14 +28,18 @@ All notable changes to this project are documented here. Format based on
   `update` reads install-source markers, chooses the matching arch-specific release installer,
   downloads and verifies the `.sha256` sidecar, runs the installer, and verifies post-install
   `--version`; tests pin that no update path uses `cargo install`.
-- **M19 cargo-dist and Windows installer scaffolding** — added cargo-dist 0.31 metadata for the
+- **M19 cargo-dist and Windows installer release artifacts** — added cargo-dist 0.31 metadata for the
   Windows x64/ARM64 and Linux x64/ARM GNU/musl matrix, a tag-triggered `Release` workflow, a
   chained `Windows Installers` workflow, WiX Global/Corporate MSI manifests, Inno Global/Corporate
   EXE manifests, fresh WiX/Inno GUIDs, per-arch artifact names, install-source marker files,
   optional default-off autostart, alias binaries, asset harvesting, and `.sha256` sidecar upload.
-  macOS DMG/signing/notarization remain intentionally deferred behind ADR 0013 and `#m16r`; later
-  macOS packaging defaults to unsigned personal-use artifacts unless signing credentials are
-  intentionally added.
+  Release run <https://github.com/RealEmmettS/goose/actions/runs/28842068256> produced the
+  cargo-dist shell/PowerShell installers plus Windows and Linux archives; Windows installer run
+  <https://github.com/RealEmmettS/goose/actions/runs/28842489497> attached x64/ARM64
+  Global/Corporate MSI and EXE artifacts plus sidecars to
+  <https://github.com/RealEmmettS/goose/releases/tag/v0.0.0>. macOS DMG/signing/notarization
+  remain intentionally deferred behind ADR 0013 and `#m16r`; later macOS packaging defaults to
+  unsigned personal-use artifacts unless signing credentials are intentionally added.
 - **M16 macOS backend, status, and `.app` staging (implementation in-tree; Accessibility-granted
   smoke pending)** — added `crates/honk-platform-macos` with AppKit/CoreGraphics/ApplicationServices
   dependencies, macOS `start` runtime wiring through the existing Unix IPC transport, one
@@ -367,9 +371,10 @@ All notable changes to this project are documented here. Format based on
   readiness pass, M9's collect-window asset/ADR/target-readiness work, and M10's IPC/control
   readiness work, plus M11 CLI grammar, M12 config/TUI readiness work, M13 moods/hourly-honk
   closure, M14 schedule/Autumn closure, and M15 multi-monitor/appearance closure.
-- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M18 implementation in
-  tree, the M16.1-M18.1 CI evidence gate, Linux X11/Wayland presentation support, and the ADR
-  0001/0002/0003/0004/0007/0008/0009/0010/0011/0012 location and maintenance rules.
+- `README.md`, `AGENTS.md`, and `CLAUDE.md` were updated to reflect M0-M19 implementation in
+  tree, the M16.1 macOS Accessibility evidence gate, Linux X11/Wayland presentation support,
+  M19 release evidence, and the ADR
+  0001/0002/0003/0004/0007/0008/0009/0010/0011/0012/0013 location and maintenance rules.
 - Added **ADR 0005** (M11 three-name CLI, goose-speak, and the poke-outcome round-trip) and
   **ADR 0006** (M12 config TUI, durable TOML, and the capability/preference boundary), recording
   the previously-undocumented M11/M12 decisions and the four contract corrections from the
@@ -461,7 +466,7 @@ All notable changes to this project are documented here. Format based on
   `crates-publish.yml` intentionally dropped from the family pipeline.
 
 ### Notes
-- There is still no public release or installer artifact. The workspace now builds locally, but
-  release packaging remains a later milestone. `DESKTOP-GOOSE/` remains the reference copy of the
-  original app and contains third-party copyrighted assets; handle redistribution according to the
-  current project asset policy before any public release.
+- A personal-use `v0.0.0` GitHub release now exists with Windows/Linux archives, shell/
+  PowerShell installers, Windows x64/ARM64 MSI/EXE installers, and checksum sidecars.
+  `DESKTOP-GOOSE/` remains the reference copy of the original app and contains third-party
+  copyrighted assets; do not redistribute those bundled assets publicly.

@@ -23,7 +23,9 @@
     > Deferred until a pre-granted Mac or self-hosted runner is available; no more macOS Accessibility work in the current M19-first pass.
   - [ ] Record Accessibility-granted evidence in `docs/readiness/m16-m18-readiness.md`.
   - [ ] Verify or waive every `#m16r` verification item before moving the card to Done.
-- [ ] **M19 — packaging (all OS/arch) + install/update/uninstall** - cargo-dist + windows-installers.yml; 3 name aliases; autostart #a8d
+
+## Done
+- [x] **M19 — packaging (all OS/arch) + install/update/uninstall** - cargo-dist + windows-installers.yml; 3 name aliases; autostart (done 2026-07-07) #a8d
   - [x] Investigate and write the M19 resolution plan.
     > See `docs/thinking/2026-07-06-active-task-resolution-plan.md` and `.tasks/tasks/a8d.md`.
   - [x] Reconcile packaging contract across `honk300_plan.md`, ADRs, current CLI placeholders, and TR300/ND300 sibling patterns.
@@ -33,10 +35,8 @@
   - [x] Add Windows Global/Corporate MSI and EXE installers for x64 and ARM64, with aliases, shortcuts, autostart, and sha256 sidecars.
   - [x] Defer macOS universal2 `.app`/DMG/signing/notarization work until the macOS slice resumes, defaulting later artifacts to unsigned personal use.
   - [x] Add Linux desktop/autostart installation across GNU/musl x64/ARM targets.
-  - [ ] Run local gate, package/release dry-runs, platform smoke checks, and record artifact evidence before closing.
-    > Local Rust gate, `dist plan`, and Windows/Linux target checks passed on the Windows host; WiX/Inno artifact builds and release evidence remain pending.
-
-## Done
+  - [x] Run local gate, package/release dry-runs, platform smoke checks, and record artifact evidence before closing.
+    > Local Rust gate, `dist plan`, local x64 WiX/Inno artifact inspection, release run `28842068256`, Windows installer run `28842489497`, and release asset list for `v0.0.0` are recorded in `.tasks/tasks/a8d.md`.
 - [x] **M18.1 — native Wayland reduced-mode readiness** - CI-smoked visible layer-shell reduced mode with IPC stop/poke/reload/status and explicit unsupported mischief evidence on Linux x64/ARM (done 2026-07-02) #m18r
 - [x] **M17.1 — Linux X11 visible backend readiness** - CI-smoked the visible transparent X11/XWayland overlay, input shaping/click-through, pointer/window support, terminal filtering, and Linux x64/ARM evidence (done 2026-07-02) #m17r
 - [x] **M16–M18 — macOS / Linux X11 / Wayland backends** - in-tree macOS backend plus Linux control-runtime foundation, status/TUI capability reporting, scripts/readiness handoff, ADRs, docs/changelogs, and full Windows-host gate/cross-target checks complete; host GUI smoke split to #m16r/#m17r/#m18r (done 2026-07-01) #f7c

@@ -10,9 +10,8 @@ FOR REFERENCE:
 
 ## Status
 
-**Stage:** implementation in progress. Milestones **M0-M18** are implemented in-tree, M19
-lifecycle/release work is now underway for Windows and Linux, and
-M16.1-M18.1 readiness is now wired for CI proof instead of Windows-host claims. The current
+**Stage:** implementation in progress. Milestones **M0-M19** are implemented in-tree, and
+M16.1 macOS Accessibility readiness remains open for pre-granted host evidence. The current
 Windows build renders the procedural goose on the desktop,
 walks it, leaves mud, plays sounds, reacts to pat/click input, can perform bounded cursor
 nabbing when cursor warping is enabled, and can perch on a user-dragged foreign window until
@@ -30,9 +29,10 @@ foreign-window snapshots, and Unix IPC status/reload/stop/poke. M18 adds native 
 mode with layer-shell rendering, IPC control, and explicit unsupported reporting for mischief
 Wayland does not expose. Linux collect-window support remains unsupported and is reported that
 way. `docs/readiness/m16-m18-readiness.md` records the local gate, CI smoke gates, and pending
-run evidence. M19 now has real `install`, `uninstall --purge`, and `update` command
-implementations plus cargo-dist and Windows installer workflow scaffolding; release artifact
-evidence is still required before the M19 card closes.
+macOS Accessibility evidence. M19 adds real `install`, `uninstall --purge`, and `update` command
+implementations plus cargo-dist shell/PowerShell installers, Linux archives, and Windows x64/ARM64
+Global/Corporate MSI and EXE installers with sha256 sidecars; the `v0.0.0` release and Windows
+installer workflow evidence close the M19 card.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
@@ -76,7 +76,7 @@ contract and the deferred macOS distribution slice.
 - **Built for every OS + architecture:** Windows x64 **and ARM64**, macOS Intel **and Apple
   Silicon** (universal2), Linux x64 **and ARM** (gnu + musl where packaging supports it).
   Native + CLI installers like TR300/ND300/WB300; **no crates.io**.
-- M19 currently focuses on Windows and Linux packaging. macOS DMG/signing/notarization and
+- M19 completed Windows and Linux packaging first. macOS DMG/signing/notarization and
   Accessibility-granted evidence remain deferred; when that slice resumes, unsigned personal-use
   artifacts are the default unless signing credentials are intentionally added.
 - Linux is **X11-first** (runs under XWayland); native Wayland is an opt-in `--wayland` mode with

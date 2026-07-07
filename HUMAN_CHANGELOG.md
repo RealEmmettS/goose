@@ -16,8 +16,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > seasonal Autumn leaves. It now supports Windows multi-monitor chasing and fuller appearance
 > controls. Mac support and the Linux desktop paths are now in the codebase, with repeatable
 > CI smoke proof for hosted Mac bundle checks and Linux desktop behavior. Mac Accessibility-granted
-> desktop tricks still need a pre-approved Mac smoke run. The first Windows/Linux installer and
-> update work is now in the codebase, but release artifact proof is still pending.
+> desktop tricks still need a pre-approved Mac smoke run. The Windows/Linux installer and update
+> work now has release artifact proof, including Windows installers for both regular x64 and ARM64
+> machines.
 
 ---
 
@@ -33,9 +34,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   the published checksum before running it, and verifies the installed version afterward.
 - The release setup now has cargo-dist metadata, a release workflow, Windows x64 and ARM64
   installer workflows, WiX and Inno installer manifests, install-source markers, and checksum
-  sidecars. Mac disk images, signing, notarization, and Accessibility-granted proof are still
-  deliberately deferred; later Mac packaging defaults to unsigned personal-use builds unless
-  signing credentials are added on purpose.
+  sidecars. The first personal-use release now contains the Windows and Linux downloads, shell and
+  PowerShell installers, and both Global and Corporate Windows installers for x64 and ARM64. Mac
+  disk images, signing, notarization, and Accessibility-granted proof are still deliberately
+  deferred; later Mac packaging defaults to unsigned personal-use builds unless signing
+  credentials are added on purpose.
 - Mac support is now in the app's codebase. It has a real Mac app identity for permissions,
   starts through the same command system as Windows, can show the goose through Mac desktop
   windows, can play sounds, can use Mac-owned note and meme windows, and reports permission
@@ -188,6 +191,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   saved as a local comparison, then replaced because it did not feel as much like the original.
 
 **Behind the scenes**
+- The project guidance and task board now show the Windows/Linux installer milestone as done, with
+  the remaining Mac Accessibility proof kept as its own separate open task.
 - The Linux backend foundation now has its own architecture record. It says Linux should use the
   more capable X11 path by default, only use native Wayland when asked or when X11 is not
   available, and keep unsupported tricks disabled instead of pretending they work.

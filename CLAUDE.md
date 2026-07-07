@@ -8,8 +8,9 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M18 are implemented in-tree, M19 lifecycle/release
-work is underway for Windows and Linux, and M16.1-M18.1 readiness is gated on CI host evidence rather than Windows-host claims. The Cargo workspace exists: `honk-engine` (platform-free
+**Current stage: implementation in progress.** M0-M19 are implemented in-tree, and M16.1 macOS
+Accessibility readiness remains gated on pre-granted host evidence rather than Windows-host
+claims. The Cargo workspace exists: `honk-engine` (platform-free
 core), `honk-control` (shared IPC protocol/client/server), `honk-config` (versioned TOML
 configuration), `honk-config-tui` (ratatui reducer UI), `honk-platform-windows` (the layered
 overlay), `honk-platform-macos` (AppKit/CoreGraphics backend), `honk-platform-linux` (Linux
@@ -28,9 +29,10 @@ visible overlay path with input shaping, pointer sampling/warp, terminal-filtere
 snapshots, and Unix IPC control; M18 adds native Wayland reduced mode with layer-shell rendering,
 IPC control, and explicit unsupported reporting for blocked mischief. Linux collect-window support
 remains unsupported and is reported honestly. `docs/readiness/m16-m18-readiness.md` records the
-local gate, CI smoke gates, and pending host evidence log. M19 adds real `install`,
-`uninstall --purge`, and `update` code paths plus cargo-dist and Windows installer workflow
-scaffolding; release artifact evidence is still required before `#a8d` closes.
+local gate, CI smoke gates, and pending macOS Accessibility evidence log. M19 adds real
+`install`, `uninstall --purge`, and `update` code paths plus cargo-dist shell/PowerShell
+installers, Linux archives, and Windows x64/ARM64 Global/Corporate MSI and EXE installers with
+sha256 sidecars; `#a8d` is closed from release artifact evidence.
 `honk300_plan.md` is the canonical plan (milestones M0–M19); the two superseded drafts remain as
 reference.
 
@@ -94,7 +96,7 @@ reference.
   flag (reduced mischief).
 - Packaging: Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) + shell/PowerShell
   installers + macOS `.app`/`.dmg` + Linux `.desktop`. **No crates.io.**
-- M19 currently advances Windows/Linux packaging first. macOS DMG/signing/notarization and
+- M19 advanced Windows/Linux packaging first. macOS DMG/signing/notarization and
   Accessibility-granted evidence remain deferred; later macOS packaging defaults to unsigned
   personal-use artifacts unless signing credentials are intentionally added.
 - Starting, stopping, and configuration are **CLI/TUI-only over local IPC**. There is no system
