@@ -1,8 +1,8 @@
 # Changelog
 
 All notable changes to this project are documented here. Format based on
-[Keep a Changelog](https://keepachangelog.com/); the project will adopt
-[Semantic Versioning](https://semver.org/) once it produces releasable artifacts.
+[Keep a Changelog](https://keepachangelog.com/); release versions follow
+[Semantic Versioning](https://semver.org/).
 
 > **Project stage: implementation in progress.** Milestones M0-M19 are implemented in-tree, and
 > M16.1 macOS Accessibility readiness remains gated on pre-granted host evidence rather than Windows-host claims. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
@@ -17,6 +17,8 @@ All notable changes to this project are documented here. Format based on
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-07-07
 
 ### Added
 - **M19 lifecycle commands and update safety** — replaced the placeholder lifecycle commands with
@@ -37,7 +39,7 @@ All notable changes to this project are documented here. Format based on
   cargo-dist shell/PowerShell installers plus Windows and Linux archives; Windows installer run
   <https://github.com/RealEmmettS/goose/actions/runs/28842489497> attached x64/ARM64
   Global/Corporate MSI and EXE artifacts plus sidecars to
-  <https://github.com/RealEmmettS/goose/releases/tag/v0.0.0>. macOS DMG/signing/notarization
+  the first release artifacts. macOS DMG/signing/notarization
   remain intentionally deferred behind ADR 0013 and `#m16r`; later macOS packaging defaults to
   unsigned personal-use artifacts unless signing credentials are intentionally added.
 - **M16 macOS backend, status, and `.app` staging (implementation in-tree; Accessibility-granted
@@ -466,7 +468,7 @@ All notable changes to this project are documented here. Format based on
   `crates-publish.yml` intentionally dropped from the family pipeline.
 
 ### Notes
-- A personal-use `v0.0.0` GitHub release now exists with Windows/Linux archives, shell/
+- A personal-use `v0.1.0` GitHub release now exists with Windows/Linux archives, shell/
   PowerShell installers, Windows x64/ARM64 MSI/EXE installers, and checksum sidecars.
   `DESKTOP-GOOSE/` remains the reference copy of the original app and contains third-party
   copyrighted assets; do not redistribute those bundled assets publicly.

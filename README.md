@@ -31,7 +31,7 @@ Wayland does not expose. Linux collect-window support remains unsupported and is
 way. `docs/readiness/m16-m18-readiness.md` records the local gate, CI smoke gates, and pending
 macOS Accessibility evidence. M19 adds real `install`, `uninstall --purge`, and `update` command
 implementations plus cargo-dist shell/PowerShell installers, Linux archives, and Windows x64/ARM64
-Global/Corporate MSI and EXE installers with sha256 sidecars; the `v0.0.0` release and Windows
+Global/Corporate MSI and EXE installers with sha256 sidecars; the `v0.1.0` release and Windows
 installer workflow evidence close the M19 card.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested

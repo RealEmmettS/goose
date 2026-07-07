@@ -130,6 +130,11 @@ added.
   Windows x64/ARM64 zip artifacts, Linux x64/ARM GNU/musl tarballs, shell/PowerShell installers,
   Windows x64/ARM64 Global/Corporate MSI and EXE installers, and sha256 sidecars. `#m16r` remains
   open and deferred for macOS Accessibility-granted host evidence.
+- 2026-07-07 - prepared the real first release version `v0.1.0` from current `main` so downloads
+  are tied to the final M19 workflow/docs state rather than the internal `v0.0.0` evidence tag.
+- 2026-07-07 - verified the `v0.1.0` release prep locally with `cargo fmt --all -- --check`,
+  `git diff --check`, clippy with warnings denied, workspace tests, release build,
+  `dist plan --tag v0.1.0`, and a `honk300 0.1.0` binary version smoke.
 - 2026-07-07 - implemented the M19 Windows/Linux-first pass: `src/install.rs`, `src/update.rs`,
   CLI lifecycle flags, cargo-dist metadata, tag-triggered release workflow, matrixed Windows
   installer workflow, WiX/Inno manifests, ADR 0013, docs, and changelogs. Focused `cargo test -p

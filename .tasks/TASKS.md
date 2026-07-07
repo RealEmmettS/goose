@@ -36,7 +36,7 @@
   - [x] Defer macOS universal2 `.app`/DMG/signing/notarization work until the macOS slice resumes, defaulting later artifacts to unsigned personal use.
   - [x] Add Linux desktop/autostart installation across GNU/musl x64/ARM targets.
   - [x] Run local gate, package/release dry-runs, platform smoke checks, and record artifact evidence before closing.
-    > Local Rust gate, `dist plan`, local x64 WiX/Inno artifact inspection, release run `28842068256`, Windows installer run `28842489497`, and release asset list for `v0.0.0` are recorded in `.tasks/tasks/a8d.md`.
+    > Local Rust gate, `dist plan`, local x64 WiX/Inno artifact inspection, release workflow evidence, Windows installer workflow evidence, and release asset lists are recorded in `.tasks/tasks/a8d.md`.
 - [x] **M18.1 — native Wayland reduced-mode readiness** - CI-smoked visible layer-shell reduced mode with IPC stop/poke/reload/status and explicit unsupported mischief evidence on Linux x64/ARM (done 2026-07-02) #m18r
 - [x] **M17.1 — Linux X11 visible backend readiness** - CI-smoked the visible transparent X11/XWayland overlay, input shaping/click-through, pointer/window support, terminal filtering, and Linux x64/ARM evidence (done 2026-07-02) #m17r
 - [x] **M16–M18 — macOS / Linux X11 / Wayland backends** - in-tree macOS backend plus Linux control-runtime foundation, status/TUI capability reporting, scripts/readiness handoff, ADRs, docs/changelogs, and full Windows-host gate/cross-target checks complete; host GUI smoke split to #m16r/#m17r/#m18r (done 2026-07-01) #f7c
