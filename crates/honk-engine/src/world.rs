@@ -205,7 +205,9 @@ impl World {
         if manners_active {
             return pickable;
         }
-        if options.mouse_steal.active() {
+        // Spontaneous cursor attacks are original-parity `AttackRandomly` behavior and
+        // stay OFF by default: without it, nabs come only from clicks and `do nab`.
+        if options.mouse_steal.active() && options.mouse_steal.attack_randomly {
             pickable.push(|| Box::new(NabMouseTask::new()) as Box<dyn Task>);
         }
         if options.collect_window.active() {
@@ -215,7 +217,9 @@ impl World {
             pickable.push(|| Box::new(AutumnLeafPileTask::new()) as Box<dyn Task>);
         }
         if mood == MoodKind::Mischievous {
-            if options.mouse_steal.active() {
+            // Duplicates only tasks already in the deck: spontaneous nab stays gated
+            // on `attack_randomly` even for a mischievous goose.
+            if options.mouse_steal.active() && options.mouse_steal.attack_randomly {
                 pickable.push(|| Box::new(NabMouseTask::new()) as Box<dyn Task>);
             }
             if options.collect_window.active() {

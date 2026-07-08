@@ -659,6 +659,7 @@ impl Config {
                 grab_distance: self.mouse.grab_distance,
                 drop_distance: self.mouse.drop_distance,
                 succ_time: self.mouse.succ_time,
+                attack_randomly: self.behavior.attack_randomly,
             },
             foreign_window,
             collect_window,

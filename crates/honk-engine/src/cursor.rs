@@ -33,6 +33,9 @@ pub struct MouseStealOptions {
     pub drop_distance: f32,
     /// Seconds to keep dragging before the goose lets go.
     pub succ_time: f32,
+    /// Original-parity `AttackRandomly`: when true (default off), spontaneous cursor
+    /// nabs join the roaming deck instead of only firing on clicks/pokes.
+    pub attack_randomly: bool,
 }
 
 impl Default for MouseStealOptions {
@@ -43,6 +46,7 @@ impl Default for MouseStealOptions {
             grab_distance: 60.0,
             drop_distance: 200.0,
             succ_time: 2.5,
+            attack_randomly: false,
         }
     }
 }
@@ -53,10 +57,13 @@ impl MouseStealOptions {
         self.enabled && self.warp_supported
     }
 
-    /// Default M7 tuning with the backend capability filled in by the platform layer.
+    /// Default M7 tuning with the backend capability filled in — the "nab fully
+    /// available" scenario, including spontaneous deck attacks (tests/tools; the real
+    /// runtime builds options from config, where `attack_randomly` defaults off).
     pub fn with_backend_support(warp_supported: bool) -> Self {
         Self {
             warp_supported,
+            attack_randomly: true,
             ..Self::default()
         }
     }

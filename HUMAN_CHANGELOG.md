@@ -41,6 +41,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   `goose stop`.
 - **Two more sliders in settings** for how close the goose must get to grab the cursor and how
   far it drags it.
+- **A dormant setting now works.** "Attack randomly" — the goose occasionally deciding on its own
+  to grab your cursor — was saved in settings but never actually did anything. It works now, off
+  by default, with its own switch in the settings screen.
 
 ### Changed
 - The goose's default colors are a touch softer and more designed; if you liked the old stark

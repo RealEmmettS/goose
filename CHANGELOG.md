@@ -41,6 +41,10 @@ All notable changes to this project are documented here. Format based on
 - **`exit` / `quit` stop synonyms** - the goose-speak grammar now accepts `<name> exit` and
   `<name> quit` alongside `bad` / `no` / `no honk`.
 - **TUI mouse rows** - `mouse.grab_distance` and `mouse.drop_distance` are now editable.
+- **`behavior.attack_randomly` is wired** (was persisted but dead): when enabled, spontaneous
+  cursor nabs join the roaming deck (and the mischievous-mood bias), matching the original's
+  `AttackRandomly`. Default stays off — without it, nabs come only from clicks and `do nab`.
+  New "Attack randomly" TUI toggle.
 
 ### Changed
 - **Wandering no longer starts mud tracking** (previously a 50% roll at every waypoint) — mud is

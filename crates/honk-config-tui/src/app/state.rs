@@ -99,6 +99,7 @@ pub enum ToggleField {
     OnHourHonk,
     MultiMonitorChase,
     CanAttackMouse,
+    AttackRandomly,
     PatStreak,
     DynamicMoods,
     PerchAndRide,
@@ -333,6 +334,9 @@ impl AppState {
             }
             ToggleField::CanAttackMouse => {
                 self.config.behavior.can_attack_mouse = !self.config.behavior.can_attack_mouse
+            }
+            ToggleField::AttackRandomly => {
+                self.config.behavior.attack_randomly = !self.config.behavior.attack_randomly
             }
             ToggleField::PatStreak => {
                 self.config.interaction.pat_streak = !self.config.interaction.pat_streak
@@ -591,6 +595,11 @@ impl AppState {
                     "Can attack mouse",
                     on_off(self.config.behavior.can_attack_mouse),
                     RowKind::Toggle(ToggleField::CanAttackMouse),
+                ),
+                row(
+                    "Attack randomly",
+                    on_off(self.config.behavior.attack_randomly),
+                    RowKind::Toggle(ToggleField::AttackRandomly),
                 ),
                 row(
                     "Pat streak",
