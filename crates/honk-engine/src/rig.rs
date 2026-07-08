@@ -395,7 +395,9 @@ fn assemble_side(input: &RigInput, feet: &FeetState, ch: &SharedChannels, mirror
     // Neck spine: shoulder → head anchor, eased between tucked and raised.
     let p = ch.neck;
     let eased = p * p * (3.0 - 2.0 * p);
-    let neck_base = rp(50.0, 80.0) + bob_v;
+    // Base buried in the shoulder mass so the ribbon's lower edge is covered by the
+    // body fill — the visible neck emerges cleanly at the shoulder line with no seam.
+    let neck_base = rp(52.0, 92.0) + bob_v;
     let head_tucked = rp(51.0, 46.0);
     let head_raised = rp(44.0, 20.0);
     // Arc the travel slightly forward so the raise reads organic, not linear.
@@ -403,9 +405,11 @@ fn assemble_side(input: &RigInput, feet: &FeetState, ch: &SharedChannels, mirror
     let neck_head = Vec2::lerp(head_tucked, head_raised, eased) + arc + bob_v * 0.6;
 
     let len = Vec2::distance(neck_base, neck_head);
-    // S-curve: lower control bows backward, upper control bows forward.
-    let neck_c1 = neck_base + UP * (len * 0.40) - fwd * (len * 0.16);
-    let neck_c2 = neck_head - UP * (len * 0.32) + fwd * (len * 0.18);
+    // Near-straight spine leaning gently forward, matching the reference art's back
+    // edge. The old backward bow at the base is gone (it read as the neck curving
+    // into the body); only a soft forward lean carries the head over the chest.
+    let neck_c1 = neck_base + UP * (len * 0.42) + fwd * (len * 0.02);
+    let neck_c2 = neck_head - UP * (len * 0.30) + fwd * (len * 0.12);
 
     // Head tilt: level when raised, dipping slightly when tucked.
     let head_tilt = (1.0 - eased) * 0.16;

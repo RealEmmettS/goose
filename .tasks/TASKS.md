@@ -23,13 +23,15 @@
   - [x] `docs/readiness/macos-handson-checklist.md` (feeds #m16r); ADR 0017; ADR indexes backfilled; changelogs lockstep.
   - [x] Gate green (16 suites, clippy, both apple cargo checks); v0.2.0 tagged — Release + installer workflows running.
   - [x] v0.2.0 workflow chain verified: Release + macOS Packaging + Windows Installers all green; universal2 DMG + sha256 + darwin tar.xz live on the release.
-- [ ] **R4 — website evaluation + improvements** - `C:\Users\hey\git\desktop-goose-site`; commit Codex's uncommitted live-release layer FIRST (deploy-regression risk), then refinements (owner fable-orchestrator) #r4w
-  - [ ] R4.0 commit uncommitted `src/main.jsx` + `src/styles.css` live-release layer as-is.
-  - [ ] Split `createRoot` into entry module (restore Fast Refresh).
-  - [ ] Usage table: install/uninstall/setup/reload + global flags; OG/SEO meta; honk300 favicon + OG image.
-  - [ ] Design refinement pass: typographic scale, spacing system, alignment, breakpoints, state consistency (identity unchanged; before/after screenshots).
-  - [ ] macOS download column light-up (after R3 release).
-  - [ ] Refresh goose art (hero SVG + golden PNGs) to Renderer V2 look; optional What's-new from HUMAN_CHANGELOG.
+- [x] **R4 — website evaluation + improvements** - `C:\Users\hey\git\desktop-goose-site`; committed the live-release layer first, then full elevation; deployed live to https://thegoose.app (done 2026-07-08; commit d6ebbc1) #r4w
+  - [x] Real-renderer site assets: `render_rig_scaled` + preview `frames` mode (commit d4d561a); 12-frame walk spritesheet + 4 large poses copied to site `public/assets/goose/`.
+  - [x] R4.0 commit uncommitted `src/main.jsx` + `src/styles.css` live-release layer as-is (commit 6592a16).
+  - [x] Split `createRoot` into entry module (restore Fast Refresh) (commit fdb5251).
+  - [x] Usage table: install/uninstall/setup/reload + global flags; OG/SEO meta; honk300 favicon + OG image (commit 9c1be9c).
+  - [x] Design refinement pass: typographic scale, spacing system, alignment, breakpoints, state consistency (commit 63acc51).
+  - [x] R4b elevation (Fable hands-on): accurate hero from real walk frames, OS-aware download surfacing, Corporate-MSI-first Windows ordering, macOS column live (v0.2.0), micro-interactions, thegoose.app domain meta (commit d6ebbc1).
+    > Done 2026-07-08 hands-on (spend limit blocked the delegated subagent). Hero now animates the real 12-frame sprite sheet; OS detect reorders columns + adapts hero CTA; Windows leads with per-user Corporate MSI then global; macOS live with universal2 DMG + apple-darwin tarballs; honk easter egg, scroll bar, magnetic CTA, typewriter terminal. `npm run build` clean, no console errors, verified in Chrome at desktop + 390px mobile.
+  - [x] Vercel deploy verify: d6ebbc1 built and live at https://thegoose.app (walking-goose sprite + OS badge + v0.2.0 confirmed serving in prod).
 - [ ] **M16.1 — macOS host readiness smoke** - hosted macOS bundle/status smoke plus Accessibility granted evidence from a pre-granted self-hosted/manual macOS run #m16r
   - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
     > Latest checked successful run `28569889803` still skipped the optional Accessibility job.
@@ -70,6 +72,7 @@
     > 6 goldens (side rest/reach/left/stride, top-down ×2); preview harness added.
   - [x] ADR 0014 written (supersedes ADR 0001 renderer direction; full decision log).
   - [x] Neck seam fix per Emmett's live review: body+neck+head as one outline-then-fill mass; goldens re-blessed.
+  - [x] Neck refinement pass 2 (Emmett 2026-07-08): removed the backward bow at `neck_c1` (near-straight forward lean per reference) and buried `neck_base` (ref y80→y92, width 30→32) so no seam at the shoulders; goldens re-blessed; site frames regenerated.
   - [x] Meander walking (ADR 0016): rng-driven lateral wobble on wander/excursion paths, fades near targets.
   - [x] Story-driven mud (ADR 0016): wander no longer muds; off-screen puddle hops (8-15s away) return tracking mud 30-90s.
   - [x] Off-screen errands (ADR 0016): every 4-7min, away 90-120s, horizontal-edge preference, 40% return with a collect prank.
