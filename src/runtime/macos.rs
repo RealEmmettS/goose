@@ -442,6 +442,8 @@ fn runtime_status(
         running: true,
         platform: PlatformStatus::Macos,
         bundle: macos_bundle_status(),
+        // Reached only after `Overlay::new()?` succeeded, so the AppKit overlay is live.
+        overlay: CapabilityStatus::Supported,
         accessibility: capability_status(accessibility_capability()),
         cursor: capability_status(cursor),
         window: capability_status(window),

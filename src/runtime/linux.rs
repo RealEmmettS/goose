@@ -172,6 +172,7 @@ pub fn run(
                 }
                 ControlCommand::Status => {
                     request.respond(ControlResponse::Status(runtime_status(
+                        overlay_capability(overlay_mode, display_server),
                         cursor_warp,
                         window_watch,
                         collect_window,
@@ -389,7 +390,25 @@ fn capability_for(
     }
 }
 
+/// Map the live overlay to a status capability so `honk300 status` can tell a visible overlay
+/// apart from the invisible headless fallback (which only runs when `HONK300_ALLOW_HEADLESS=1`).
+fn overlay_capability(mode: OverlayMode, session: DisplayServer) -> CapabilityStatus {
+    match mode {
+        OverlayMode::X11 | OverlayMode::Wayland => CapabilityStatus::Supported,
+        OverlayMode::Headless => {
+            if session == DisplayServer::Unknown {
+                // No display server was ever detected: nothing to bring up, not a failure.
+                CapabilityStatus::Unsupported
+            } else {
+                // An X11/Wayland overlay was attempted and fell back headless.
+                CapabilityStatus::Failed
+            }
+        }
+    }
+}
+
 fn runtime_status(
+    overlay: CapabilityStatus,
     cursor: BackendCapability,
     window: BackendCapability,
     collect: BackendCapability,
@@ -402,6 +421,7 @@ fn runtime_status(
         running: true,
         platform: PlatformStatus::Linux,
         bundle: BundleStatus::Bare,
+        overlay,
         accessibility: CapabilityStatus::Unsupported,
         cursor: capability_status(cursor),
         window: capability_status(window),
@@ -488,6 +508,7 @@ mod tests {
     #[test]
     fn linux_runtime_status_keeps_platform_and_bundle_stable() {
         let status = runtime_status(
+            CapabilityStatus::Supported,
             BackendCapability::Unsupported,
             BackendCapability::Unsupported,
             BackendCapability::Unsupported,
@@ -498,8 +519,36 @@ mod tests {
         );
         assert_eq!(status.platform, PlatformStatus::Linux);
         assert_eq!(status.bundle, BundleStatus::Bare);
+        assert_eq!(status.overlay, CapabilityStatus::Supported);
         assert_eq!(status.audio, CapabilityStatus::Supported);
         assert_eq!(status.notes, 2);
         assert_eq!(status.memes, 3);
+    }
+
+    #[test]
+    fn overlay_capability_distinguishes_visible_from_headless_fallback() {
+        // A visible X11/Wayland overlay reports supported.
+        assert_eq!(
+            overlay_capability(OverlayMode::X11, DisplayServer::X11),
+            CapabilityStatus::Supported
+        );
+        assert_eq!(
+            overlay_capability(OverlayMode::Wayland, DisplayServer::Wayland),
+            CapabilityStatus::Supported
+        );
+        // A headless fallback after a real X11/Wayland attempt reports failed, not supported.
+        assert_eq!(
+            overlay_capability(OverlayMode::Headless, DisplayServer::X11),
+            CapabilityStatus::Failed
+        );
+        assert_eq!(
+            overlay_capability(OverlayMode::Headless, DisplayServer::Wayland),
+            CapabilityStatus::Failed
+        );
+        // No display server detected at all is unsupported, not a failure.
+        assert_eq!(
+            overlay_capability(OverlayMode::Headless, DisplayServer::Unknown),
+            CapabilityStatus::Unsupported
+        );
     }
 }

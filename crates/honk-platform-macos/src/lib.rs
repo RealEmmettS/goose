@@ -80,9 +80,9 @@ mod platform {
     use objc2::{AnyThread, MainThreadOnly};
     use objc2_app_kit::{
         NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSBitmapFormat,
-        NSBitmapImageRep, NSColor, NSDeviceRGBColorSpace, NSEvent, NSImage, NSImageRep,
-        NSImageView, NSRunningApplication, NSScreenSaverWindowLevel, NSTextField, NSWindow,
-        NSWindowCollectionBehavior, NSWindowStyleMask,
+        NSBitmapImageRep, NSColor, NSDeviceRGBColorSpace, NSEvent, NSEventMask, NSImage,
+        NSImageRep, NSImageView, NSRunningApplication, NSScreenSaverWindowLevel, NSTextField,
+        NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
     };
     use objc2_application_services::{
         AXError, AXIsProcessTrusted, AXUIElement, AXValue, AXValueType,
@@ -92,9 +92,11 @@ mod platform {
         CGDisplayBounds, CGError, CGEventSourceStateID, CGGetActiveDisplayList, CGMainDisplayID,
         CGMouseButton, CGWarpMouseCursorPosition,
     };
-    use objc2_foundation::{NSInteger, NSPoint, NSRect, NSSize, NSString};
+    use objc2_foundation::{
+        NSDate, NSDefaultRunLoopMode, NSInteger, NSPoint, NSRect, NSSize, NSString,
+    };
     use std::collections::HashMap;
-    use std::ffi::{c_uchar, c_void};
+    use std::ffi::c_void;
     use std::io;
     use std::ptr;
     use std::ptr::NonNull;
@@ -213,6 +215,19 @@ mod platform {
         }
 
         pub fn pump(&mut self) -> bool {
+            // Non-blocking drain of the AppKit event queue. Without this the queue is never
+            // serviced, so window-chrome events — including the Titled|Closable collect-window
+            // close button — are silently ignored. `distantPast` makes each poll return
+            // immediately, so we drain everything currently queued and stop as soon as it's empty.
+            let mode = unsafe { NSDefaultRunLoopMode };
+            while let Some(event) = self.app.nextEventMatchingMask_untilDate_inMode_dequeue(
+                NSEventMask::Any,
+                Some(&NSDate::distantPast()),
+                mode,
+                true,
+            ) {
+                self.app.sendEvent(&event);
+            }
             self.app.updateWindows();
             true
         }
@@ -318,7 +333,7 @@ mod platform {
             let width = clip.width().ceil().max(1.0) as u32;
             let height = clip.height().ceil().max(1.0) as u32;
             self.buffer = clipped_bgra(dirty, clip, pixmap, width, height);
-            let image = image_from_bgra(&mut self.buffer, width, height)?;
+            let image = image_from_bgra(&self.buffer, width, height)?;
             let local_frame = AppKitFrame {
                 x: (clip.min.x - self.info.bounds.min.x) as f64,
                 y: (self.info.bounds.max.y - clip.max.y) as f64,
@@ -416,16 +431,15 @@ mod platform {
         }
     }
 
-    fn image_from_bgra(
-        buffer: &mut [u8],
-        width: u32,
-        height: u32,
-    ) -> io::Result<Retained<NSImage>> {
-        let mut plane = buffer.as_mut_ptr() as *mut c_uchar;
+    fn image_from_bgra(buffer: &[u8], width: u32, height: u32) -> io::Result<Retained<NSImage>> {
+        // Pass NULL planes so AppKit allocates and owns the pixel storage for the rep's lifetime.
+        // The previous code handed AppKit a pointer into an external per-frame Vec that the caller
+        // reuses and reallocates, so the rep aliased memory that mutated or freed underneath it
+        // (tearing / use-after-free). With AppKit-owned storage we copy our rows in once.
         let rep = unsafe {
             NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bitmapFormat_bytesPerRow_bitsPerPixel(
                     NSBitmapImageRep::alloc(),
-                    &mut plane,
+                    ptr::null_mut(),
                     width as NSInteger,
                     height as NSInteger,
                     8,
@@ -439,6 +453,26 @@ mod platform {
                 )
         }
         .ok_or_else(|| io::Error::other("failed to create NSBitmapImageRep"))?;
+
+        // Copy each row into AppKit's buffer, honoring its (possibly padded) bytesPerRow rather
+        // than assuming a tight width*4 stride.
+        let dst = rep.bitmapData();
+        if dst.is_null() {
+            return Err(io::Error::other("NSBitmapImageRep provided no bitmap data"));
+        }
+        let dst_stride = rep.bytesPerRow() as usize;
+        let src_stride = width as usize * 4;
+        let row_bytes = src_stride.min(dst_stride);
+        for row in 0..height as usize {
+            unsafe {
+                ptr::copy_nonoverlapping(
+                    buffer.as_ptr().add(row * src_stride),
+                    dst.add(row * dst_stride),
+                    row_bytes,
+                );
+            }
+        }
+
         let image = NSImage::initWithSize(
             NSImage::alloc(),
             NSSize {
@@ -798,8 +832,8 @@ mod platform {
                 height: size.y as f64,
             });
             let image_view = NSImageView::initWithFrame(NSImageView::alloc(mtm), view_frame);
-            let mut buffer = pixmap_bgra(pixmap);
-            let image = image_from_bgra(&mut buffer, pixmap.width(), pixmap.height())?;
+            let buffer = pixmap_bgra(pixmap);
+            let image = image_from_bgra(&buffer, pixmap.width(), pixmap.height())?;
             image_view.setImage(Some(&image));
             window.setContentView(Some(&image_view));
             window.orderFrontRegardless();

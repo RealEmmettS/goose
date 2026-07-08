@@ -988,6 +988,7 @@ name = "honk-control"
 version = "0.0.0"
 dependencies = [
  "honk-engine",
+ "rustix",
  "windows 0.58.0",
 ]
 

@@ -24,6 +24,28 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Fixed
+- **Sharper, correctly-placed goose on high-resolution screens.** The app now tells Windows it
+  understands modern display scaling, so the goose is crisp and stands exactly where it should on
+  mixed-resolution monitor setups — and it adapts on the fly if you change scaling or plug in a
+  screen, no restart needed.
+- **No more freezes while the goose fetches a note.** Bringing in a Notepad window used to stall
+  the whole goose (and its remote controls) for up to a few seconds; it all happens in the
+  background now, so the goose keeps moving and commands keep answering.
+- **No leftover Notepad windows.** Notepads the goose opened are properly closed when it leaves —
+  quitting the goose no longer strands stray windows or background processes.
+- **Restarting after a crash works on Mac and Linux.** A crash used to leave behind a "still
+  running" marker that blocked the next start; the marker is now managed by the operating system
+  and clears itself no matter how the app ended.
+- **Smoother window handling on the Mac.** The Mac overlay now processes its window events
+  properly (close buttons on goose-made windows work), and screen drawing uses safer memory
+  handling.
+- **The goose won't pretend to run invisibly on Linux.** If the screen overlay can't be created,
+  starting now fails with a clear message instead of a silent, invisible "running" state — and a
+  new "overlay" line in the status output tells you exactly what the display is doing.
+- **Uninstalling no longer deletes your own memes and notes.** A plain uninstall now sets your
+  user-added content aside in a clearly-named folder and tells you where it is.
+
 **Added**
 - The installer words are no longer just placeholders. The app can now install itself for the
   current user, add the three command names, copy its assets, create Windows shortcuts or Linux

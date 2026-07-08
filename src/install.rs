@@ -145,10 +145,14 @@ pub fn install(_autostart: bool) -> Result<(), DynError> {
 pub fn uninstall(purge: bool) -> Result<(), DynError> {
     let root = windows_user_install_root()?;
     let bin_dir = root.join("bin");
-    let backup = if purge {
-        backup_user_content(&bin_dir.join("Assets"), &windows_backup_root()?)?
+    let assets = bin_dir.join("Assets");
+    let backup_root = windows_backup_root()?;
+    // Rescue user-supplied memes/notes before the install tree is deleted: `--purge` backs them up
+    // (then still removes them), while a plain uninstall preserves them and reports where.
+    let (backup, preserved) = if purge {
+        (backup_user_content(&assets, &backup_root)?, None)
     } else {
-        None
+        (None, preserve_user_content(&assets, &backup_root)?)
     };
 
     set_windows_autostart(None)?;
@@ -160,6 +164,8 @@ pub fn uninstall(purge: bool) -> Result<(), DynError> {
     if purge {
         purge_config_state(windows_config_state_root()?)?;
         report_backup(backup);
+    } else {
+        report_preserved(preserved);
     }
 
     println!("honk300: uninstalled.");
@@ -169,10 +175,14 @@ pub fn uninstall(purge: bool) -> Result<(), DynError> {
 #[cfg(target_os = "linux")]
 pub fn uninstall(purge: bool) -> Result<(), DynError> {
     let root = linux_user_install_root()?;
-    let backup = if purge {
-        backup_user_content(&root.join("bin").join("Assets"), &linux_backup_root()?)?
+    let assets = root.join("bin").join("Assets");
+    let backup_root = linux_backup_root()?;
+    // Rescue user-supplied memes/notes before the install tree is deleted: `--purge` backs them up
+    // (then still removes them), while a plain uninstall preserves them and reports where.
+    let (backup, preserved) = if purge {
+        (backup_user_content(&assets, &backup_root)?, None)
     } else {
-        None
+        (None, preserve_user_content(&assets, &backup_root)?)
     };
 
     for name in COMMAND_NAMES {
@@ -185,6 +195,8 @@ pub fn uninstall(purge: bool) -> Result<(), DynError> {
     if purge {
         purge_config_state(linux_config_state_root()?)?;
         report_backup(backup);
+    } else {
+        report_preserved(preserved);
     }
 
     println!("honk300: uninstalled.");
@@ -343,6 +355,31 @@ fn backup_user_content_at(
     backup_root: &Path,
     timestamp: u64,
 ) -> io::Result<Option<PathBuf>> {
+    copy_user_content_dirs(assets_dir, &backup_root.join(format!("purge-{timestamp}")))
+}
+
+/// Non-purge uninstall relocates the user's own memes/notes out of the install tree (which is
+/// deleted wholesale) into the backups area, so plain `uninstall` never destroys user-supplied
+/// content. Returns the preserved directory, or `None` when the user added nothing of their own.
+fn preserve_user_content(assets_dir: &Path, backup_root: &Path) -> io::Result<Option<PathBuf>> {
+    preserve_user_content_at(assets_dir, backup_root, unix_timestamp())
+}
+
+fn preserve_user_content_at(
+    assets_dir: &Path,
+    backup_root: &Path,
+    timestamp: u64,
+) -> io::Result<Option<PathBuf>> {
+    copy_user_content_dirs(
+        assets_dir,
+        &backup_root.join(format!("preserved-{timestamp}")),
+    )
+}
+
+/// Copy only the user-provenance asset directories (`.../Memes/user`, `.../NotepadMessages/user`)
+/// into `dest`, preserving their relative layout. Bundled `originals`/`custom` assets are left
+/// out on purpose — only user-supplied content is worth carrying across an uninstall.
+fn copy_user_content_dirs(assets_dir: &Path, dest: &Path) -> io::Result<Option<PathBuf>> {
     let mappings = [
         (
             assets_dir.join("Images").join("Memes").join("user"),
@@ -362,11 +399,10 @@ fn backup_user_content_at(
         return Ok(None);
     }
 
-    let backup = backup_root.join(format!("purge-{timestamp}"));
     for (source, relative) in existing {
-        copy_dir_recursive(source, &backup.join(relative))?;
+        copy_dir_recursive(source, &dest.join(relative))?;
     }
-    Ok(Some(backup))
+    Ok(Some(dest.to_path_buf()))
 }
 
 fn unix_timestamp() -> u64 {
@@ -385,6 +421,16 @@ fn report_backup(backup: Option<PathBuf>) {
         println!("honk300: backed up user memes/notes to {}.", path.display());
     } else {
         println!("honk300: no user memes/notes were present to back up.");
+    }
+}
+
+fn report_preserved(preserved: Option<PathBuf>) {
+    if let Some(path) = preserved {
+        println!(
+            "honk300: kept your memes/notes at {} (uninstall did not delete them).",
+            path.display()
+        );
+        println!("honk300: re-run with `uninstall --purge` to remove them too.");
     }
 }
 
@@ -741,6 +787,44 @@ mod tests {
         fs::create_dir_all(&assets).unwrap();
         assert_eq!(
             backup_user_content_at(&assets, &root.join("backups"), 123)
+                .unwrap()
+                .as_ref(),
+            None
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn non_purge_uninstall_preserves_user_memes_and_notes() {
+        let root = test_dir("preserve");
+        let assets = root.join("Assets");
+        let memes = assets.join("Images").join("Memes").join("user");
+        let notes = assets.join("Text").join("NotepadMessages").join("user");
+        fs::create_dir_all(&memes).unwrap();
+        fs::create_dir_all(&notes).unwrap();
+        fs::write(memes.join("mine.png"), b"png").unwrap();
+        fs::write(notes.join("mine.txt"), b"note").unwrap();
+
+        let preserved = preserve_user_content_at(&assets, &root.join("backups"), 123)
+            .unwrap()
+            .unwrap();
+
+        // Preserved under a distinct `preserved-*` dir (not the purge backup namespace).
+        assert!(preserved.ends_with("preserved-123"));
+        assert!(preserved.join("Images/Memes/user/mine.png").exists());
+        assert!(preserved
+            .join("Text/NotepadMessages/user/mine.txt")
+            .exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn non_purge_uninstall_reports_none_without_user_content() {
+        let root = test_dir("empty-preserve");
+        let assets = root.join("Assets");
+        fs::create_dir_all(&assets).unwrap();
+        assert_eq!(
+            preserve_user_content_at(&assets, &root.join("backups"), 123)
                 .unwrap()
                 .as_ref(),
             None

@@ -101,6 +101,7 @@ fn print_status(status: RuntimeStatus) {
     );
     println!("platform: {}", status.platform.label());
     println!("bundle: {}", status.bundle.label());
+    println!("overlay: {}", status.overlay.label());
     println!("accessibility: {}", status.accessibility.label());
     println!("cursor: {}", status.cursor.label());
     println!("window: {}", status.window.label());

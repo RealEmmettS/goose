@@ -316,53 +316,50 @@ mod imp {
 #[cfg(unix)]
 mod imp {
     use super::{dispatch, ControlCommand, ControlRequest, ControlResponse, SingletonStatus};
+    use rustix::fs::{flock, FlockOperation};
+    use rustix::io::Errno;
     use std::fs::{self, File, OpenOptions};
     use std::io::{self, Read, Write};
     use std::os::unix::net::{UnixListener, UnixStream};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::mpsc::Sender;
     use std::sync::Arc;
     use std::thread::{self, JoinHandle};
     use std::time::Duration;
 
+    /// Single-instance guard backed by an advisory `flock` on a lock file.
+    ///
+    /// The exclusive lock is held for the lifetime of the process and released by the kernel on
+    /// any exit — clean or crashed — so a leftover lock file never falsely reports "already
+    /// running". The file is intentionally never unlinked: unlinking it would let a second process
+    /// create a fresh inode at the same path and lock that independently, defeating the guard.
     pub struct Singleton {
-        _file: Option<File>,
-        path: PathBuf,
-        acquired: bool,
+        _lock: Option<File>,
     }
 
     impl Singleton {
         pub fn acquire() -> io::Result<(Self, SingletonStatus)> {
             let dir = runtime_dir()?;
             fs::create_dir_all(&dir)?;
-            let path = dir.join("lock");
-            match OpenOptions::new().write(true).create_new(true).open(&path) {
-                Ok(file) => Ok((
-                    Self {
-                        _file: Some(file),
-                        path,
-                        acquired: true,
-                    },
-                    SingletonStatus::Acquired,
-                )),
-                Err(err) if err.kind() == io::ErrorKind::AlreadyExists => Ok((
-                    Self {
-                        _file: None,
-                        path,
-                        acquired: false,
-                    },
-                    SingletonStatus::AlreadyRunning,
-                )),
-                Err(err) => Err(err),
-            }
+            Self::acquire_at(&dir.join("lock"))
         }
-    }
 
-    impl Drop for Singleton {
-        fn drop(&mut self) {
-            if self.acquired {
-                let _ = fs::remove_file(&self.path);
+        fn acquire_at(path: &Path) -> io::Result<(Self, SingletonStatus)> {
+            // Open (creating if needed) without truncating: the file is a lock target only, and a
+            // concurrent holder's inode must be preserved so its lock stays meaningful.
+            let file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(path)?;
+            match flock(&file, FlockOperation::NonBlockingLockExclusive) {
+                Ok(()) => Ok((Self { _lock: Some(file) }, SingletonStatus::Acquired)),
+                Err(err) if err == Errno::WOULDBLOCK || err == Errno::AGAIN => {
+                    Ok((Self { _lock: None }, SingletonStatus::AlreadyRunning))
+                }
+                Err(err) => Err(io::Error::from(err)),
             }
         }
     }
@@ -379,6 +376,9 @@ mod imp {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
+            // A crashed prior server can leave a stale socket file that would make `bind` fail with
+            // EADDRINUSE. We only reach here after the `flock` singleton was acquired, so no other
+            // honk300 owns this path — unlinking any leftover before binding is safe and crash-safe.
             let _ = fs::remove_file(&path);
             let listener = UnixListener::bind(&path)?;
             listener.set_nonblocking(true)?;
@@ -455,6 +455,45 @@ mod imp {
         std::env::var("USER")
             .or_else(|_| std::env::var("LOGNAME"))
             .unwrap_or_else(|_| "unknown".into())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn flock_singleton_is_exclusive_and_survives_crash() {
+            let dir = std::env::temp_dir().join(format!(
+                "honk300-flock-test-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos())
+                    .unwrap_or_default()
+            ));
+            fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("lock");
+
+            // First acquirer takes the exclusive advisory lock.
+            let (first, status) = Singleton::acquire_at(&path).unwrap();
+            assert_eq!(status, SingletonStatus::Acquired);
+
+            // A second acquirer, while the first holds the lock, is denied -> AlreadyRunning.
+            let (second, status) = Singleton::acquire_at(&path).unwrap();
+            assert_eq!(status, SingletonStatus::AlreadyRunning);
+            drop(second);
+
+            // Dropping the holder closes the fd, which releases the kernel lock exactly as a crash
+            // would. The lock file still exists on disk, yet a fresh acquire must succeed — proving
+            // the old create_new stale-lock false positive is gone.
+            drop(first);
+            assert!(path.exists());
+            let (third, status) = Singleton::acquire_at(&path).unwrap();
+            assert_eq!(status, SingletonStatus::Acquired);
+            drop(third);
+
+            let _ = fs::remove_dir_all(&dir);
+        }
     }
 }
 
