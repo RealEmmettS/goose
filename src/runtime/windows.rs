@@ -16,8 +16,8 @@ use honk_engine::{
     Pointer, PresenceSnapshot, Rect, Sound, Vec2, World,
 };
 use honk_platform_windows::{
-    local_time, pointer_state, presence_state, warp_cursor, CollectWindowController,
-    ForeignWindowWatcher, Overlay,
+    init_dpi_awareness, local_time, pointer_state, presence_state, warp_cursor,
+    CollectWindowController, ForeignWindowWatcher, Overlay,
 };
 
 pub fn run(
@@ -27,6 +27,10 @@ pub fn run(
     let mut config = options.config.clone();
     let assets = assets::AssetCatalog::load();
     println!("honk300: loaded {}", assets.summary());
+
+    // Opt into Per-Monitor-V2 DPI awareness before creating any window or enumerating monitors, so
+    // every Win32 coordinate the backend and engine share is in one physical-pixel space.
+    init_dpi_awareness();
 
     let mut overlay = Overlay::new()?;
     let primary_bounds = overlay.primary_monitor_bounds();
@@ -121,6 +125,50 @@ pub fn run(
     loop {
         if !overlay.pump() {
             break;
+        }
+
+        // A monitor's DPI, resolution, or the display topology changed (WM_DPICHANGED /
+        // WM_DISPLAYCHANGE). Re-enumerate monitors, rebuild the per-monitor overlay windows, and
+        // apply the new world bounds so the goose keeps roaming the whole (possibly resized)
+        // desktop. Under PMv2 all coordinates stay in one physical-pixel space, so this is a pure
+        // bounds/window refresh with no scaling math.
+        if overlay.take_monitors_changed() {
+            match overlay.rebuild_monitors() {
+                Ok(_) => {
+                    let new_bounds = world_bounds_for(
+                        effective.world.multi_monitor_chase,
+                        overlay.primary_monitor_bounds(),
+                        overlay.virtual_desktop_bounds(),
+                    );
+                    world.bounds = new_bounds;
+                    // Overlay HWNDs may have been added/removed; rebuild the foreign-window
+                    // watcher so its own-overlay filter matches the new window set.
+                    if window_watcher.is_some() {
+                        match ForeignWindowWatcher::new(&overlay) {
+                            Ok(watcher) => window_watcher = Some(watcher),
+                            Err(err) => {
+                                window_watch = BackendCapability::Failed;
+                                window_watcher = None;
+                                world.set_foreign_window_watch_supported(false);
+                                if !warned_window_ride {
+                                    warned_window_ride = true;
+                                    eprintln!(
+                                        "honk300: window ride unavailable after monitor rebuild ({err})"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    // Force a full repaint on the next present against the rebuilt windows.
+                    last_render_bounds = None;
+                    eprintln!(
+                        "honk300: monitor topology changed; rebuilt overlay and world bounds."
+                    );
+                }
+                Err(err) => {
+                    eprintln!("honk300: monitor rebuild failed; keeping prior overlay ({err})");
+                }
+            }
         }
 
         while let Some(request) = server.try_recv() {
@@ -516,6 +564,8 @@ fn runtime_status(
         running: true,
         platform: PlatformStatus::Windows,
         bundle: BundleStatus::Bare,
+        // Reached only after `Overlay::new()?` succeeded, so the layered overlay is live.
+        overlay: CapabilityStatus::Supported,
         accessibility: CapabilityStatus::Unsupported,
         cursor: capability_status(cursor),
         window: capability_status(window),

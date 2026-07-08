@@ -18,6 +18,35 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Fixed
+- **Windows Per-Monitor-V2 DPI awareness (R1, ADR 0015)** - the process now declares
+  PMv2 DPI awareness before creating any window (`init_dpi_awareness()`), and handles
+  `WM_DPICHANGED`/`WM_DISPLAYCHANGE` by re-enumerating monitors, rebuilding the per-monitor
+  overlay windows, refreshing world bounds, and forcing a repaint. Mixed-DPI overlays are no
+  longer blurred or mispositioned, and display/DPI changes no longer need a restart.
+- **Non-blocking collect-window + Notepad lifecycle (R1, ADR 0015)** - Notepad spawning is a
+  polled state machine instead of a blocking up-to-3s wait, and typing is deferred until the
+  spawned window is foreground (best-effort; a focus steal skips the note instead of disabling
+  collect-window). The spawned Notepad child is tracked and closed (`WM_CLOSE`, then terminate)
+  on close/stop, so `honk300 stop` leaves no notepad.exe zombie and IPC `status`/`do`/`reload`
+  stay responsive mid-collect.
+- **Unix stale singleton lock (R1, ADR 0015)** - the single-instance guard on macOS/Linux is now
+  an advisory `flock` held for the process lifetime (released by the kernel on any death) instead
+  of a marker file; a crash can no longer cause a false "already running" refusal. Adds unix-only
+  `rustix` to honk-control.
+- **macOS event pump + present safety (R1, ADR 0015)** - the overlay pump now drains the
+  NSApplication event queue (collect-window close buttons work), and frame presents copy pixels
+  into AppKit-owned `NSBitmapImageRep` storage instead of aliasing a reused buffer.
+- **Linux degraded-overlay honesty (R1, ADR 0015)** - overlay-creation failure now fails start
+  loudly (exit nonzero, clear message) unless `HONK300_ALLOW_HEADLESS=1` explicitly opts into the
+  invisible headless mode; a new `overlay` capability rides the status protocol and shows in
+  `honk300 status` and the TUI Status tab. X11 also stops re-creating the XFixes input region and
+  re-setting the event mask every frame.
+- **Non-purge uninstall preserves user content (R1, ADR 0015)** - plain `honk300 uninstall` now
+  relocates user-supplied memes/notes to a timestamped `preserved-` folder and prints the
+  location instead of deleting them; `--purge` keeps its backup-then-remove behavior.
+
+
 ## [0.1.0] - 2026-07-07
 
 ### Added

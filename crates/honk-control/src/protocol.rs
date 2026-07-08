@@ -50,6 +50,7 @@ pub struct RuntimeStatus {
     pub running: bool,
     pub platform: PlatformStatus,
     pub bundle: BundleStatus,
+    pub overlay: CapabilityStatus,
     pub accessibility: CapabilityStatus,
     pub cursor: CapabilityStatus,
     pub window: CapabilityStatus,
@@ -194,6 +195,7 @@ impl RuntimeStatus {
             running: false,
             platform: PlatformStatus::current(),
             bundle: BundleStatus::Unknown,
+            overlay: CapabilityStatus::Unsupported,
             accessibility: CapabilityStatus::Unsupported,
             cursor: CapabilityStatus::Unsupported,
             window: CapabilityStatus::Unsupported,
@@ -207,10 +209,11 @@ impl RuntimeStatus {
 
     fn encode(&self) -> String {
         format!(
-            "STATUS G={} P={} B={} A={} C={} W={} K={} R={} O={} N={} M={}\n",
+            "STATUS G={} P={} B={} V={} A={} C={} W={} K={} R={} O={} N={} M={}\n",
             u8::from(self.running),
             self.platform.encode(),
             self.bundle.encode(),
+            self.overlay.encode(),
             self.accessibility.encode(),
             self.cursor.encode(),
             self.window.encode(),
@@ -245,6 +248,10 @@ impl RuntimeStatus {
                 "B" => {
                     status.bundle = BundleStatus::decode(value)?;
                     seen |= 1 << 2;
+                }
+                "V" => {
+                    status.overlay = CapabilityStatus::decode(value)?;
+                    seen |= 1 << 11;
                 }
                 "A" => {
                     status.accessibility = CapabilityStatus::decode(value)?;
@@ -285,7 +292,7 @@ impl RuntimeStatus {
                 _ => return Err(ProtocolError::MalformedResponse),
             }
         }
-        if seen == 0b111_1111_1111 {
+        if seen == 0b1111_1111_1111 {
             Ok(status)
         } else {
             Err(ProtocolError::MalformedResponse)
@@ -511,6 +518,7 @@ mod tests {
             running: true,
             platform: PlatformStatus::Macos,
             bundle: BundleStatus::App,
+            overlay: CapabilityStatus::Supported,
             accessibility: CapabilityStatus::Denied,
             cursor: CapabilityStatus::Denied,
             window: CapabilityStatus::Supported,
@@ -535,7 +543,15 @@ mod tests {
             Err(ProtocolError::MalformedResponse)
         );
         assert_eq!(
-            ControlResponse::decode(b"STATUS G=1 P=MAC B=APP A=X C=S W=S K=S R=S O=S N=1 M=2\n"),
+            ControlResponse::decode(
+                b"STATUS G=1 P=MAC B=APP V=S A=X C=S W=S K=S R=S O=S N=1 M=2\n"
+            ),
+            Err(ProtocolError::MalformedResponse)
+        );
+        // The overlay field (V=) is part of the required set, mirroring how every other status
+        // key is mandatory: an otherwise-complete frame that omits it is malformed.
+        assert_eq!(
+            ControlResponse::decode(b"STATUS G=1 P=MAC B=APP A=S C=S W=S K=S R=S O=S N=1 M=2\n"),
             Err(ProtocolError::MalformedResponse)
         );
     }

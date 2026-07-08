@@ -822,6 +822,11 @@ impl AppState {
                     RowKind::Static,
                 ),
                 row(
+                    "Overlay",
+                    self.runtime_status.overlay.label().into(),
+                    RowKind::Static,
+                ),
+                row(
                     "Accessibility",
                     self.runtime_status.accessibility.label().into(),
                     RowKind::Static,
@@ -1208,6 +1213,7 @@ mod tests {
             "Running",
             "Platform",
             "Bundle",
+            "Overlay",
             "Accessibility",
             "Cursor",
             "Window ride",

@@ -151,23 +151,25 @@ mod platform {
             let inner = match preferred {
                 DisplayServer::X11 => match x11::X11Overlay::new() {
                     Ok(overlay) => OverlayInner::X11(overlay),
-                    Err(err) => {
-                        eprintln!(
-                            "honk300: X11 overlay unavailable; falling back headless ({err})"
-                        );
-                        OverlayInner::Headless(HeadlessOverlay::new(DisplayServer::X11))
-                    }
+                    Err(err) => OverlayInner::Headless(headless_fallback_or_fail(
+                        DisplayServer::X11,
+                        "X11",
+                        Some(&err),
+                    )?),
                 },
                 DisplayServer::Wayland => match wayland::WaylandOverlay::new() {
                     Ok(overlay) => OverlayInner::Wayland(overlay),
-                    Err(err) => {
-                        eprintln!(
-                            "honk300: Wayland layer-shell overlay unavailable; falling back headless ({err})"
-                        );
-                        OverlayInner::Headless(HeadlessOverlay::new(DisplayServer::Wayland))
-                    }
+                    Err(err) => OverlayInner::Headless(headless_fallback_or_fail(
+                        DisplayServer::Wayland,
+                        "Wayland layer-shell",
+                        Some(&err),
+                    )?),
                 },
-                DisplayServer::Unknown => OverlayInner::Headless(HeadlessOverlay::new(preferred)),
+                DisplayServer::Unknown => OverlayInner::Headless(headless_fallback_or_fail(
+                    DisplayServer::Unknown,
+                    "Linux display server",
+                    None,
+                )?),
             };
             Ok(Self { inner })
         }
@@ -264,6 +266,48 @@ mod platform {
         }
     }
 
+    /// Opt-in escape hatch that permits the invisible headless overlay fallback.
+    ///
+    /// Without it, a failed (or entirely absent) X11/Wayland overlay is a hard, fatal start
+    /// error instead of a silent no-op that leaves the process reporting "running" while it
+    /// renders nothing. Hosted CI runners with no display set this to exercise headless on
+    /// purpose.
+    const ALLOW_HEADLESS_ENV: &str = "HONK300_ALLOW_HEADLESS";
+
+    fn headless_allowed() -> bool {
+        std::env::var(ALLOW_HEADLESS_ENV)
+            .map(|value| value.trim() == "1")
+            .unwrap_or(false)
+    }
+
+    /// Either build the invisible headless fallback (only when explicitly allowed) or fail loudly.
+    ///
+    /// `backend` names the visible overlay we could not bring up. `cause` carries the creation
+    /// error when there was an attempt (X11/Wayland) and is `None` when no display server was
+    /// detected at all. On refusal the returned error names the tried backend and the escape
+    /// hatch so the failure is diagnosable rather than a zombie process.
+    fn headless_fallback_or_fail(
+        server: DisplayServer,
+        backend: &str,
+        cause: Option<&io::Error>,
+    ) -> io::Result<HeadlessOverlay> {
+        let reason = match cause {
+            Some(err) => format!("{backend} overlay creation failed ({err})"),
+            None => format!("no {backend} available (DISPLAY/WAYLAND_DISPLAY unset)"),
+        };
+        if headless_allowed() {
+            eprintln!(
+                "honk300: {reason}; {ALLOW_HEADLESS_ENV}=1 set — running headless (invisible, no rendering)."
+            );
+            Ok(HeadlessOverlay::new(server))
+        } else {
+            Err(io::Error::other(format!(
+                "honk300: {reason}; refusing to run a headless no-op overlay. \
+                 Set {ALLOW_HEADLESS_ENV}=1 to allow an invisible headless run."
+            )))
+        }
+    }
+
     fn maybe_write_smoke_frame(pixmap: &Pixmap) {
         let Ok(path) = std::env::var("HONK300_SMOKE_FRAME") else {
             return;
@@ -304,7 +348,7 @@ mod platform {
         use x11rb::protocol::xfixes::ConnectionExt as XFixesConnectionExt;
         use x11rb::protocol::xinerama::ConnectionExt as XineramaConnectionExt;
         use x11rb::protocol::xproto::{
-            AtomEnum, ButtonMask, ChangeWindowAttributesAux, ColormapAlloc, ConfigureWindowAux,
+            AtomEnum, ButtonMask, ColormapAlloc, ConfigureWindowAux,
             ConnectionExt as XprotoConnectionExt, CreateGCAux, CreateWindowAux, EventMask,
             GetPropertyReply, ImageFormat, PropMode, Rectangle, StackMode, Visualid, Window,
             WindowClass,
@@ -333,6 +377,9 @@ mod platform {
             colormap: Option<u32>,
             bounds: Rect,
             atoms: Atoms,
+            // Last input region actually applied (post-intersection with `bounds`), so an
+            // unchanged bbox skips re-creating and re-setting the XFixes region every frame.
+            last_input_region: Option<Option<Rect>>,
         }
 
         impl X11Overlay {
@@ -438,6 +485,7 @@ mod platform {
                     colormap,
                     bounds,
                     atoms,
+                    last_input_region: None,
                 })
             }
 
@@ -522,9 +570,15 @@ mod platform {
             }
 
             pub fn set_input_region(&mut self, rect: Option<Rect>) -> io::Result<()> {
+                // `bounds` is fixed for the overlay's lifetime, so the applied region is a pure
+                // function of the intersected rect: skip the whole XFixes round-trip when it is
+                // unchanged from the frame before.
+                let effective = rect.and_then(|rect| rect.intersection(self.bounds));
+                if self.last_input_region == Some(effective) {
+                    return Ok(());
+                }
                 let region = self.conn.generate_id().map_err(to_io)?;
-                let rectangles = rect
-                    .and_then(|rect| rect.intersection(self.bounds))
+                let rectangles = effective
                     .map(|rect| {
                         vec![Rectangle {
                             x: clamp_i16(rect.min.x - self.bounds.min.x),
@@ -541,7 +595,10 @@ mod platform {
                     .xfixes_set_window_shape_region(self.window, shape::SK::INPUT, 0, 0, region)
                     .map_err(to_io)?;
                 self.conn.xfixes_destroy_region(region).map_err(to_io)?;
-                self.conn.flush().map_err(to_io)
+                self.conn.flush().map_err(to_io)?;
+                // Only cache after a fully applied+flushed region, so a mid-way error retries.
+                self.last_input_region = Some(effective);
+                Ok(())
             }
 
             pub fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<()> {
@@ -567,11 +624,9 @@ mod platform {
             }
 
             pub fn pump(&mut self) -> io::Result<bool> {
+                // The event mask is selected once at window creation; draining the queue here is
+                // all that's needed each frame (events are intentionally discarded).
                 while self.conn.poll_for_event().map_err(to_io)?.is_some() {}
-                let _ = self.conn.change_window_attributes(
-                    self.window,
-                    &ChangeWindowAttributesAux::new().event_mask(EventMask::EXPOSURE),
-                );
                 Ok(true)
             }
 
