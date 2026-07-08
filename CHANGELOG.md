@@ -18,6 +18,8 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-08
+
 ### Changed
 - **Side-view neck refinement (renderer polish, per live review)** - the side-profile goose's neck
   no longer bows backward toward the body, and no longer shows a seam where it meets the shoulders.
