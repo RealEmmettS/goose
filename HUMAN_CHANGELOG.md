@@ -24,6 +24,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Improved
+- **A better goose neck.** Seen from the side, the goose's neck used to curve slightly backward
+  into its body and showed a faint line where the neck met the shoulders. It now rises in a clean,
+  natural sweep that leans gently forward and blends smoothly into the body, with no seam. The
+  walking goose on the website was refreshed to match.
+
 ### Added
 - **A brand-new goose.** The goose has been completely redrawn in a clean, modern flat style —
   layered dark wing with feathered tips, two-tone beak, proper little legs with webbed feet, a

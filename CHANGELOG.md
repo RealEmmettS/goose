@@ -18,6 +18,16 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Changed
+- **Side-view neck refinement (renderer polish, per live review)** - the side-profile goose's neck
+  no longer bows backward toward the body, and no longer shows a seam where it meets the shoulders.
+  The neck spine is now a near-straight, gently forward-leaning curve matching the reference art's
+  back edge (`rig.rs` drops the backward bow at `neck_c1`), and its base is buried in the shoulder
+  mass so the ribbon outline is covered by the body fill (`neck_base` lowered to reference y92,
+  base ribbon width 30→32 in `render/side.rs`). Goldens re-blessed (four side frames plus the
+  crossfade-band `top_down_diag`); the website's walk-cycle and pose frames were regenerated to
+  match.
+
 ## [0.2.0] - 2026-07-08
 
 ### Added

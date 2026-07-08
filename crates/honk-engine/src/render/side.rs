@@ -109,7 +109,7 @@ pub fn paint_side(layer: &mut Pixmap, rig: &Rig, layer_origin: Vec2, ss: f32, pa
             to_layer(rig.neck_c1),
             to_layer(rig.neck_c2),
             to_layer(rig.neck_head),
-            30.0 * k,
+            32.0 * k,
             16.0 * k,
         );
         let skull_c = head.pt(44.0, 19.5);
