@@ -51,7 +51,8 @@
   - [x] Off-screen errands (ADR 0016): every 4-7min, away 90-120s, horizontal-edge preference, 40% return with a collect prank.
   - [x] `exit`/`quit` stop synonyms in goose-speak grammar; all stop commands verified live.
   - [x] Live Windows smoke ×2 with screenshots: dual-view transition, serpentine mud trail, clean stop, no notepad zombies.
-  - [ ] honk300_plan.md §5.2 + README/AGENTS/CLAUDE sync + changelogs (with round commit).
+  - [x] Committed `6bd6c8e` on r2-renderer with Emmett's go-ahead (2026-07-08).
+  - [ ] Merge r1-reliability in; changelogs + honk300_plan §5.2 + README/AGENTS/CLAUDE sync; final gate; merge to main.
 - [ ] **R3 — macOS packaging + lifecycle** - apple triples in cargo-dist, universal2 .app + DMG CI job (version-stamped, unsigned personal-use), macOS install/uninstall/update, hands-on Mac checklist; ADR 0016 supersedes 0013 deferral (owner fable-orchestrator) #r3m
   - [ ] Add apple triples to `[workspace.metadata.dist].targets`; regenerate release.yml (dist v0.31).
   - [ ] Hand-authored `macos-packaging.yml`: lipo universal2, package_macos_app.sh (fix 0.0.0 version stamp), hdiutil DMG, sha256 sidecars.

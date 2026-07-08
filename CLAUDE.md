@@ -22,8 +22,8 @@ M10 adds single-instance local control for `start`, `stop`, `reload`, and `do <a
 M11 adds the three-name goose-speak grammar; M12 adds durable config and the terminal UI; M13
 adds dynamic moods and the local on-hour double honk; M14 adds quiet-hours/DND/fullscreen calm
 suppression and built-in procedural Autumn leaves; M15 adds signed virtual-desktop multi-monitor
-chase, one Windows overlay HWND per monitor, live Calm Goose, and RGB editing for the original
-three-color goose palette; M16 adds macOS runtime wiring, `honk300 status`, a TUI Status tab,
+chase, one Windows overlay HWND per monitor, live Calm Goose, and RGB palette editing (expanded
+to the six-tone V2 palette by ADR 0014); M16 adds macOS runtime wiring, `honk300 status`, a TUI Status tab,
 bundle-aware assets/start handling, and `script/package_macos_app.sh`; M17 adds the Linux X11
 visible overlay path with input shaping, pointer sampling/warp, terminal-filtered foreign-window
 snapshots, and Unix IPC control; M18 adds native Wayland reduced mode with layer-shell rendering,
@@ -32,7 +32,15 @@ remains unsupported and is reported honestly. `docs/readiness/m16-m18-readiness.
 local gate, CI smoke gates, and pending macOS Accessibility evidence log. M19 adds real
 `install`, `uninstall --purge`, and `update` code paths plus cargo-dist shell/PowerShell
 installers, Linux archives, and Windows x64/ARM64 Global/Corporate MSI and EXE installers with
-sha256 sidecars; `#a8d` is closed from release artifact evidence.
+sha256 sidecars; `#a8d` is closed from release artifact evidence. Post-M19 rounds **R1/R2**
+(ADRs 0014–0016) add Per-Monitor-V2 DPI awareness and the cross-platform reliability contract
+(non-blocking collect, Notepad lifecycle, Unix flock singleton, macOS event-drain/present
+safety, Linux loud-failure + `overlay` status capability, user-content-preserving uninstall);
+replace the renderer with **Procedural Vector V2** — the flat-illustration dual-view goose
+adapted from the project's own reference art (`docs/art-reference/`), with plant-and-swing
+feet, a six-tone configurable palette, and blink/breath/tail secondary motion; and add the
+idle-life behaviors (meandering walks, story-driven mud via off-screen puddle hops, timed
+off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
 `honk300_plan.md` is the canonical plan (milestones M0–M19); the two superseded drafts remain as
 reference.
 
@@ -66,14 +74,19 @@ reference.
   permission degradation, status protocol, and TUI-only control contract; ADR 0011 records the
   M17/M18 Linux control-runtime foundation and degraded Wayland contract; ADR 0012 records the
   M16.1-M18.1 CI-proven readiness contract; ADR 0013 records the M19 lifecycle/release contract
-  and deferred macOS distribution slice.
+  and deferred macOS distribution slice; ADR 0014 records Renderer V2 (flat-illustration
+  dual-view procedural vector — supersedes ADR 0001's sprite/atlas direction); ADR 0015 records
+  the R1 reliability/platform-safety contract (amends ADR 0013's uninstall semantics); ADR 0016
+  records the idle-life behaviors (meander, puddle-hop mud, off-screen errands).
 
 ## Big-picture architecture (original → planned port)
 
 - **The goose is procedurally rendered, not a sprite** — there is no sprite art anywhere.
-  It's drawn each frame from a geometric rig (body/neck/head/eyes/procedural feet) whose
-  constants live in `Exports.cs`. The port reimplements this renderer clean-room (no asset
-  extraction).
+  It's drawn each frame from a geometric rig whose verified constants live in `Exports.cs`.
+  Renderer V2 (ADR 0014) draws it in the flat-illustration style of the **project's own
+  reference art** (`docs/art-reference/`, Emmett's generated SVGs — design-time reference only;
+  path geometry was transcribed into code and no image assets load at runtime). The original
+  app's assets remain untouched (no extraction).
 - **Engine = fixed 120 Hz tick + a Task state machine.** A default "roaming" state picks
   random tasks via a shuffle-bag (`Deck`); a task only sets `targetPos`/acceleration and the
   engine auto-locomotes toward it. Mod hooks fire Pre/Post Tick / UpdateRig / Render.
@@ -181,7 +194,10 @@ This is a **personal tool the owner builds for and self-distributes to his own m
 only** — not a public release. On that basis screened original sounds, memes, and notes from
 `DESKTOP-GOOSE/` are bundled 1:1 into `Assets/`, with one complete custom in-house counterpart per
 copied meme/note original. The goose **visual** is still clean-room procedural (drawn from the
-rig, no sprite art exists to extract). Do **not** publicly redistribute these bundled third-party
+rig, no sprite art exists to extract). Renderer V2's look is adapted from **Emmett's own
+generated reference SVGs** in `docs/art-reference/` (ADR 0014): adapting their path geometry
+into code is permitted, they never ship or load at runtime, and the original app's art remains
+off-limits. Do **not** publicly redistribute these bundled third-party
 assets, and do not ship old donate pages or old developer references.
 
 ## Changelog rule

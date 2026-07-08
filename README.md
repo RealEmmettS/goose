@@ -21,7 +21,7 @@ M10 adds a single-instance local control channel for `start`, `stop`, `reload`, 
 configuration plus the terminal config TUI. M13 adds deterministic dynamic moods and the local
 on-hour double honk; M14 adds quiet-hours/DND/fullscreen calm suppression and built-in procedural
 Autumn leaves. M15 adds Windows multi-monitor chase, per-monitor dirty-region presentation, live
-Calm Goose, and full RGB editing for the original three-color goose palette. M16 adds the macOS
+Calm Goose, and full RGB palette editing (six tones as of Renderer V2). M16 adds the macOS
 platform crate, AppKit/CoreGraphics runtime path, `honk300 status`, a TUI Status tab,
 bundle-aware asset/start handling, and `script/package_macos_app.sh`. M17 adds a Linux X11
 visible overlay path with input shaping, pointer sampling/warp, terminal-filtered
@@ -32,7 +32,13 @@ way. `docs/readiness/m16-m18-readiness.md` records the local gate, CI smoke gate
 macOS Accessibility evidence. M19 adds real `install`, `uninstall --purge`, and `update` command
 implementations plus cargo-dist shell/PowerShell installers, Linux archives, and Windows x64/ARM64
 Global/Corporate MSI and EXE installers with sha256 sidecars; the `v0.1.0` release and Windows
-installer workflow evidence close the M19 card.
+installer workflow evidence close the M19 card. Post-M19 rounds R1/R2 (ADRs 0014–0016) fix the
+cross-platform reliability defects (Per-Monitor-V2 DPI, non-blocking window collection, crash-safe
+Unix single-instance, macOS event/present safety, honest Linux overlay failure, user-content-
+preserving uninstall), redraw the goose as the flat-illustration dual-view **Renderer V2** (planted
+feet, S-curve neck, six-tone palette, blink/breath/tail motion), and give it an idle life:
+meandering walks, mud that comes home from off-screen puddle hops, and periodic off-screen
+errands that sometimes return with a prank. `goose exit` / `goose quit` now stop it too.
 
 **Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
 *hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
@@ -47,7 +53,9 @@ that should survive individual task-board updates. ADR 0010 records the M16 macO
 permission-degradation, status protocol, and TUI-only control decisions. ADR 0011 records the
 M17/M18 Linux control-runtime foundation and degraded Wayland contract. ADR 0012 records the
 CI-proven readiness contract for M16.1-M18.1. ADR 0013 records the M19 lifecycle/release
-contract and the deferred macOS distribution slice.
+contract and the deferred macOS distribution slice. ADR 0014 records Renderer V2 (supersedes
+ADR 0001's renderer direction), ADR 0015 the R1 reliability contract, and ADR 0016 the
+idle-life behaviors.
 
 **Decided direction (see `honk300_plan.md` for the full detail):**
 

@@ -18,6 +18,37 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- **Renderer V2: flat-illustration dual-view goose (R2, ADR 0014)** - the goose is now drawn in
+  the flat-illustration style of the project's own reference art (`docs/art-reference/`): a
+  dual-view rig with a mirrored side profile for shallow headings and a freely-rotating top-down
+  view for steep ones (125 ms crossfade with 55°/45° hysteresis), stateful plant-and-swing feet
+  (planted feet never slide; footmarks stamp at real plant events), a seamless S-curve neck
+  ribbon, layered slate wing with scalloped feathers, two-tone beak and webbed-foot legs, eased
+  neck posture, blink/breath/honk-tail-flick secondary motion, and 2x-supersampled per-view layer
+  compositing. Goldens re-blessed and expanded to six frames; `examples/preview.rs` renders
+  contact-sheet/zoom/walk strips for visual tuning.
+- **Six-tone configurable palette** - `[colors]` gains optional `goose_shade`, `goose_wing`, and
+  `goose_orange_dark` keys (derived coherently from the legacy three when absent, so old config
+  files keep working); all six tones edit as R/G/B rows in the TUI, which materializes explicit
+  keys on first edit. New defaults follow the reference art.
+- **Idle-life behaviors (ADR 0016)** - wander paths meander (rng-driven lateral wobble that fades
+  near targets); mud now only comes home from quick off-screen puddle hops (away 8-15 s, tracking
+  mud 30-90 s afterward); every 4-7 minutes the goose takes a longer off-screen errand (away
+  90-120 s, horizontal-edge preference) and 40% of errands chain a collect-window prank on
+  return. All excursion behavior respects manners, never interrupts mischief-in-progress, and
+  stays deterministic per seed.
+- **`exit` / `quit` stop synonyms** - the goose-speak grammar now accepts `<name> exit` and
+  `<name> quit` alongside `bad` / `no` / `no honk`.
+- **TUI mouse rows** - `mouse.grab_distance` and `mouse.drop_distance` are now editable.
+
+### Changed
+- **Wandering no longer starts mud tracking** (previously a 50% roll at every waypoint) — mud is
+  an occasional narrative event, not a constant state. `do mud` still forces it.
+- **Default goose look** - the default palette moves from pure white/orange to the softer
+  reference tones (off-white body, slate wing); the previous look remains reachable via the
+  palette config.
+
 ### Fixed
 - **Windows Per-Monitor-V2 DPI awareness (R1, ADR 0015)** - the process now declares
   PMv2 DPI awareness before creating any window (`init_dpi_awareness()`), and handles

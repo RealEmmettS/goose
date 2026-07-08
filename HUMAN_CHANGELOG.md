@@ -24,6 +24,28 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Added
+- **A brand-new goose.** The goose has been completely redrawn in a clean, modern flat style —
+  layered dark wing with feathered tips, two-tone beak, proper little legs with webbed feet, a
+  graceful curved neck — and it finally animates like a real bird: feet plant on the ground and
+  step (no more ice-skating), the neck raises and settles smoothly, it blinks, breathes when
+  idle, and flicks its tail when it honks. When it walks steeply up or down the screen you now
+  see it from above instead of a sideways-rotated bird.
+- **Recolor everything.** Six goose colors (body, shading, wing, beak, dark accents, outline) are
+  now adjustable from the settings screen, and old saved settings keep working.
+- **A goose with a life.** It wanders in curvy, gooselike paths instead of straight lines; every
+  few minutes it waddles off the edge of the screen, disappears for a bit, and comes back —
+  sometimes with a prank in tow. Muddy footprints now have a story: it only tracks mud after
+  nipping off-screen to (apparently) find a puddle, instead of being muddy all the time.
+- **More natural ways to say stop.** `goose exit` and `goose quit` now work just like
+  `goose stop`.
+- **Two more sliders in settings** for how close the goose must get to grab the cursor and how
+  far it drags it.
+
+### Changed
+- The goose's default colors are a touch softer and more designed; if you liked the old stark
+  white look you can dial it back in the color settings.
+
 ### Fixed
 - **Sharper, correctly-placed goose on high-resolution screens.** The app now tells Windows it
   understands modern display scaling, so the goose is crisp and stands exactly where it should on

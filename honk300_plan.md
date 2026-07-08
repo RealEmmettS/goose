@@ -283,6 +283,12 @@ CLI/TUI start, stop, and configuration control.
 > tilt, speed/accel tier, step cadence, honk frequency/pitch, color tint, footmark behavior, and
 > task-weight bias. **No hand-drawn frames, no sprite art.** Every behavior below stays inside
 > that envelope, and each is an independent toggle in the config TUI.
+>
+> *(ADR 0014 update: Renderer V2 draws the same rig in the flat-illustration style adapted from
+> the project's **own** reference art — `docs/art-reference/`, Emmett's generated SVGs. The
+> guardrail holds: the SVGs are design-time reference only, their geometry was transcribed into
+> code, and no image/sprite assets ship or load at runtime. ADR 0016 adds the idle-life
+> behaviors — meandering walks, puddle-hop mud, off-screen errands — inside the same envelope.)*
 
 ### 5.3 Quiet hours + DND / fullscreen respect *(default ON)*
 Dim honks / calm mischief during a configurable quiet window and whenever the OS reports
@@ -769,7 +775,7 @@ and optional Accessibility-granted macOS job record their run evidence in
 | G1 | AV/SmartScreen flags an unsigned app that warps cursor + synth keys + moves windows | HIGH | Personal use: document "Run anyway"; keep runtime control on local IPC; ship source. Optional Authenticode later. |
 | M_perm | macOS Accessibility/Input-Monitoring gates; a bare binary can't hold a stable grant | HIGH | universal2 `.app` (stable bundle-id) mandatory; `AXIsProcessTrusted()`, deep-link to Settings, degrade. |
 | E1 | 120 Hz full-screen layered redraw = CPU/battery killer | HIGH→mit | Per-monitor windows + present only the dirty rect; sim 120 Hz, present on-dirty ~60. Idle ≈ near-zero. |
-| W_dpi | Per-monitor DPI + signed/negative multi-monitor coords | MED-HIGH | Per-monitor windows (single-DPI each); Per-Monitor-V2 awareness; signed virtual space; handle `WM_DPICHANGED`. |
+| W_dpi | Per-monitor DPI + signed/negative multi-monitor coords | MED-HIGH | **CLOSED (ADR 0015):** PMv2 declared at startup; `WM_DPICHANGED`/`WM_DISPLAYCHANGE` rebuild per-monitor overlays; signed virtual space verified end-to-end. |
 | L_xwl | XWayland window-move no-ops on native-Wayland windows | MED | `enumerate()`/`watch_move()` return only X11 windows; tasks targeting non-enumerable windows self-skip. |
 | T_term | Goose mischief targets a terminal window and disrupts active CLI/TUI work | HIGH | Backend protected-window filters exclude terminal windows before foreign-window ride, collect-window, or spicy behavior code can target them. |
 | E_rng | Original Deck shuffle is biased | LOW | Port faithfully with a `// faithful-to-original (biased)` note; M0 pins it. Verify `gooseTaskWeightedList`. |

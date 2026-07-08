@@ -17,7 +17,7 @@ reference, the canonical planning docs, and ADRs under `docs/adr/`. M13's dynami
 on-hour double honk use runtime-injected local time; M14's quiet-hours/DND/fullscreen manners and
 built-in Autumn leaves use platform-neutral schedule/presence state; M15's multi-monitor chase
 uses signed virtual-desktop bounds and one Windows overlay HWND per monitor while appearance
-recolor stays scoped to the original three-color goose palette. M16 adds macOS AppKit/CoreGraphics
+recolor covers the six-tone V2 goose palette (ADR 0014). M16 adds macOS AppKit/CoreGraphics
 runtime wiring, universal2 app staging, `honk300 status`, and a TUI Status tab. M17 adds the
 Linux X11 visible overlay path with input shaping, pointer sampling/warp, terminal-filtered
 foreign-window snapshots, and Unix IPC control. M18 adds native Wayland reduced mode with
@@ -27,7 +27,12 @@ Linux collect-window support remains unsupported and is reported honestly.
 Accessibility evidence log. M19 adds real `install`, `uninstall --purge`, and `update` code paths
 plus cargo-dist shell/PowerShell installers, Linux archives, and Windows x64/ARM64
 Global/Corporate MSI and EXE installers with sha256 sidecars; `#a8d` is closed from release
-artifact evidence.
+artifact evidence. Post-M19 rounds R1/R2 (ADRs 0014–0016) add the cross-platform reliability
+contract (PMv2 DPI, non-blocking collect, flock singleton, macOS pump/present safety, Linux
+loud-failure + `overlay` status, user-content-preserving uninstall), replace the renderer with
+the flat-illustration dual-view Procedural Vector V2 goose (six-tone palette, reference art in
+`docs/art-reference/`), and add idle-life behaviors (meandering walks, puddle-hop mud,
+off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
 
 ## Read these first (source-of-truth pointers)
 
@@ -59,13 +64,16 @@ artifact evidence.
   permission degradation, status protocol, and TUI-only control contract; ADR 0011 records the
   M17/M18 Linux control-runtime foundation and degraded Wayland contract; ADR 0012 records the
   M16.1-M18.1 CI-proven readiness contract; ADR 0013 records the M19 lifecycle/release contract
-  and deferred macOS distribution slice.
+  and deferred macOS distribution slice; ADR 0014 records Renderer V2 (flat-illustration
+  dual-view procedural vector — supersedes ADR 0001's sprite/atlas direction); ADR 0015 records
+  the R1 reliability/platform-safety contract; ADR 0016 records the idle-life behaviors.
 
 ## Big-picture architecture (original → planned port)
 
 - **The goose is procedurally rendered, not a sprite** — there is no sprite art anywhere.
-  It's drawn each frame from a geometric rig (body/neck/head/eyes/procedural feet) whose
-  constants live in `Exports.cs`. The port reimplements this renderer clean-room (no asset
+  Renderer V2 (ADR 0014) draws it in the flat-illustration style of the project's own reference
+  art (`docs/art-reference/`, design-time only; nothing loads at runtime), on a rig whose
+  verified constants live in `Exports.cs`. The port reimplements this renderer clean-room (no asset
   extraction).
 - **Engine = fixed 120 Hz tick + a Task state machine.** A default "roaming" state picks
   random tasks via a shuffle-bag (`Deck`); a task only sets `targetPos`/acceleration and the
