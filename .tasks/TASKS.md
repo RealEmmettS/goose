@@ -15,6 +15,11 @@
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
 
 ## Active
+- [x] **Name interchangeability + site usage clarity** - verified `honk300`/`honk`/`goose` are fully interchangeable across every command (install aliases all three → same binary; `normalize_args` never branches on arg0; only internal `honk300 --version` self-call in update.rs). Locked in with `all_three_names_are_fully_interchangeable` test (13 CLI tests green). Site usage section reworked: consistent `honk300` display (no more honk300↔goose switching), natural order (start/stop → configure → install/autostart → pokes → flags), goose-speak kept as "Also:" notes, interchangeability banner (done 2026-07-08) #names
+- [x] **v0.2.1 release — side-view neck refinement** - version bump + changelog cut (commit eb40260); tag `v0.2.1` drove cargo-dist Release → chained macOS Packaging + Windows Installers; wrap-up email sent (done 2026-07-08) #v021
+  - [x] Release + macOS Packaging + Windows Installers workflows green; full 40-asset set verified (universal2 DMG + darwin tarballs + Windows MSI/EXE ×2 arch); v0.2.1 is latest, latest/download serves real bytes.
+  - [x] Site `releaseFallback` → v0.2.1 (commit 3015992, site pushed).
+  - [x] Wrap-up email sent to hey@emmetts.dev via Pipedream/SES us-east-1 (Message ID 0100019f426158d8-…); saved SES region to memory.
 - [x] **R3 — macOS packaging + lifecycle** - apple triples in cargo-dist, universal2 .app + DMG CI job (version-stamped, unsigned personal-use), macOS install/uninstall/update, hands-on Mac checklist; ADR 0017 supersedes 0013 deferral (done 2026-07-08; commit 2980cbc; tag v0.2.0 cut) #r3m
   - [x] Apple triples added to `[workspace.metadata.dist].targets`; `dist generate --check` clean (matrix is data-driven, no release.yml edit).
   - [x] `macos-packaging.yml`: workflow_run-chained universal2 .app (lipo + ad-hoc codesign) + UDZO DMG + sha256 + `gh release upload`; `package_macos_app.sh` version-stamped via HONK300_VERSION.

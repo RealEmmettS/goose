@@ -255,6 +255,81 @@ mod tests {
     }
 
     #[test]
+    fn all_three_names_are_fully_interchangeable() {
+        // Every command form the CLI accepts, as the argument tail after the program name.
+        // Parsing must be identical whether the goose was invoked as honk300, honk, or goose.
+        let tails: &[&[&str]] = &[
+            &[],
+            &["start"],
+            &["plz"],
+            &["stop"],
+            &["bad"],
+            &["no"],
+            &["no", "honk"],
+            &["exit"],
+            &["quit"],
+            &["reload"],
+            &["status"],
+            &["config"],
+            &["setup"],
+            &["update"],
+            &["do", "honk"],
+            &["do", "wander"],
+            &["do", "mud"],
+            &["do", "meme"],
+            &["do", "note"],
+            &["do", "nab"],
+            &["install"],
+            &["install", "--autostart"],
+            &["uninstall"],
+            &["uninstall", "--purge"],
+            &["--no-sound", "start"],
+            &["--no-mouse-steal", "start"],
+            &["--no-window-ride", "start"],
+            &["--wayland", "config"],
+            &["--config", "C:\\tmp\\g.toml", "reload"],
+        ];
+
+        for tail in tails {
+            let baseline_args: Vec<&str> = std::iter::once("honk300")
+                .chain(tail.iter().copied())
+                .collect();
+            let baseline = Cli::try_parse_normalized(baseline_args)
+                .unwrap_or_else(|e| panic!("honk300 {tail:?} should parse: {e}"));
+
+            for name in ["honk", "goose"] {
+                let args: Vec<&str> = std::iter::once(name).chain(tail.iter().copied()).collect();
+                let cli = Cli::try_parse_normalized(args)
+                    .unwrap_or_else(|e| panic!("{name} {tail:?} should parse: {e}"));
+                assert_eq!(
+                    cli.command, baseline.command,
+                    "`{name} {tail:?}` command differs"
+                );
+                assert_eq!(
+                    cli.no_sound, baseline.no_sound,
+                    "`{name} {tail:?}` no_sound differs"
+                );
+                assert_eq!(
+                    cli.no_mouse_steal, baseline.no_mouse_steal,
+                    "`{name} {tail:?}` no_mouse_steal differs"
+                );
+                assert_eq!(
+                    cli.no_window_ride, baseline.no_window_ride,
+                    "`{name} {tail:?}` no_window_ride differs"
+                );
+                assert_eq!(
+                    cli.wayland, baseline.wayland,
+                    "`{name} {tail:?}` wayland differs"
+                );
+                assert_eq!(
+                    cli.config, baseline.config,
+                    "`{name} {tail:?}` config differs"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn honk_plz_is_start_not_do_honk() {
         let cli = Cli::try_parse_normalized(["honk", "plz"]).unwrap();
         assert_eq!(cli.command, Some(Command::Start));
