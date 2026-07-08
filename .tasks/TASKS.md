@@ -15,13 +15,14 @@
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
 
 ## Active
-- [ ] **R3 — macOS packaging + lifecycle** - apple triples in cargo-dist, universal2 .app + DMG CI job (version-stamped, unsigned personal-use), macOS install/uninstall/update, hands-on Mac checklist; ADR 0017 supersedes 0013 deferral (owner fable-orchestrator) #r3m
-  - [ ] Add apple triples to `[workspace.metadata.dist].targets`; regenerate release.yml (dist v0.31).
-  - [ ] Hand-authored `macos-packaging.yml`: lipo universal2, package_macos_app.sh (fix 0.0.0 version stamp), hdiutil DMG, sha256 sidecars.
-  - [ ] macOS `install`/`uninstall` (`~/Applications`, `~/.local/bin` symlinks, LaunchAgent autostart, `--purge`).
-  - [ ] macOS `update` via shell-installer pattern.
-  - [ ] `docs/readiness/macos-handson-checklist.md` for #m16r evidence.
-  - [ ] ADR 0017 + changelogs; workflow dry-run evidence; then tag v0.2.0.
+- [x] **R3 — macOS packaging + lifecycle** - apple triples in cargo-dist, universal2 .app + DMG CI job (version-stamped, unsigned personal-use), macOS install/uninstall/update, hands-on Mac checklist; ADR 0017 supersedes 0013 deferral (done 2026-07-08; commit 2980cbc; tag v0.2.0 cut) #r3m
+  - [x] Apple triples added to `[workspace.metadata.dist].targets`; `dist generate --check` clean (matrix is data-driven, no release.yml edit).
+  - [x] `macos-packaging.yml`: workflow_run-chained universal2 .app (lipo + ad-hoc codesign) + UDZO DMG + sha256 + `gh release upload`; `package_macos_app.sh` version-stamped via HONK300_VERSION.
+  - [x] macOS `install`/`uninstall`: ~/Applications/Honk300.app, 3 CLI symlinks, LaunchAgent autostart, ADR 0015-style user-content preservation; `InstallSource::MacApp`.
+  - [x] macOS `update`: DMG swap (hdiutil + ditto) for app installs; shell installer otherwise; sha256-verified.
+  - [x] `docs/readiness/macos-handson-checklist.md` (feeds #m16r); ADR 0017; ADR indexes backfilled; changelogs lockstep.
+  - [x] Gate green (16 suites, clippy, both apple cargo checks); v0.2.0 tagged — Release + installer workflows running.
+  - [x] v0.2.0 workflow chain verified: Release + macOS Packaging + Windows Installers all green; universal2 DMG + sha256 + darwin tar.xz live on the release.
 - [ ] **R4 — website evaluation + improvements** - `C:\Users\hey\git\desktop-goose-site`; commit Codex's uncommitted live-release layer FIRST (deploy-regression risk), then refinements (owner fable-orchestrator) #r4w
   - [ ] R4.0 commit uncommitted `src/main.jsx` + `src/styles.css` live-release layer as-is.
   - [ ] Split `createRoot` into entry module (restore Fast Refresh).

@@ -290,6 +290,29 @@ pub fn render_rig_with_palette(
     render_rig_layer(pixmap, rig, origin, palette, 1.0);
 }
 
+/// Render one goose view into a fresh transparent pixmap at an arbitrary vector scale
+/// (px per world px) with **no** downsampling — crisp output for tools/marketing/site
+/// assets. `origin` is the world point mapped to the pixmap's top-left; the pixmap is
+/// `width`×`height` *world units* large before scaling.
+pub fn render_rig_scaled(
+    rig: &Rig,
+    origin: Vec2,
+    world_width: f32,
+    world_height: f32,
+    scale: f32,
+    palette: RenderPalette,
+) -> Option<Pixmap> {
+    let w = (world_width * scale).ceil() as u32;
+    let h = (world_height * scale).ceil() as u32;
+    let mut pixmap = Pixmap::new(w.max(1), h.max(1))?;
+    pixmap.fill(Color::TRANSPARENT);
+    match rig.view {
+        RigView::Side { .. } => side::paint_side(&mut pixmap, rig, origin, scale, &palette),
+        RigView::TopDown { .. } => top::paint_top(&mut pixmap, rig, origin, scale, &palette),
+    }
+    Some(pixmap)
+}
+
 /// Convenience for tests/tools: allocate a `width`×`height` transparent pixmap and
 /// render the goose so its bounding box is centred. Returns `None` if allocation fails.
 pub fn render_centered(width: u32, height: u32, rig: &Rig) -> Option<Pixmap> {

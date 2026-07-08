@@ -57,10 +57,12 @@ fn main() {
         .unwrap_or_else(|| "preview.png".to_string());
 
     // `-- <out.png> big` renders a 3-pose zoomed strip instead of the contact sheet;
-    // `-- <out.png> walk` renders 8 sequential walk frames with a ground ruler.
+    // `-- <out.png> walk` renders 8 sequential walk frames with a ground ruler;
+    // `-- <out-dir> frames` exports crisp site/marketing assets (walk spritesheet + poses).
     match std::env::args().nth(2).as_deref() {
         Some("big") => return big_strip(&out),
         Some("walk") => return walk_strip(&out),
+        Some("frames") => return export_frames(&out),
         _ => {}
     }
 
@@ -253,4 +255,78 @@ fn walk_strip(out: &str) {
     }
     sheet.save_png(out).expect("write walk strip");
     println!("wrote {out} ({}x{})", sheet.width(), sheet.height());
+}
+
+/// Export crisp, registration-consistent renderer output for the website/marketing:
+/// a 12-frame walk-cycle spritesheet (one stride, loopable), the individual frames,
+/// and large rest / reach / left / top-down poses — all true vector renders.
+fn export_frames(out_dir: &str) {
+    use honk_engine::render::render_rig_scaled;
+    std::fs::create_dir_all(out_dir).expect("create out dir");
+
+    // World-space window around the goose: the ground point sits at (W/2, H*0.82).
+    const W: f32 = 130.0;
+    const H: f32 = 110.0;
+    const SCALE: f32 = 3.0;
+    let anchor = |ground: Vec2| ground - Vec2::new(W * 0.5, H * 0.82);
+    let pal = RenderPalette::default();
+
+    // One full stride is two step intervals (~0.4 s at walk tier): 12 frames sample a
+    // loopable cycle after the gait has settled.
+    let mut s = Sim::new(0.0);
+    s.run(1.0, 0.0, 80.0, 0.55, 0.2);
+    let mut frames = Vec::new();
+    for _ in 0..12 {
+        let pose = s.run(0.4 / 12.0, 0.0, 80.0, 0.55, 0.2);
+        let rig = pose.primary;
+        let px = render_rig_scaled(&rig, anchor(rig.ground), W, H, SCALE, pal).expect("frame");
+        frames.push(px);
+    }
+    let fw = frames[0].width();
+    let fh = frames[0].height();
+    let mut sheet = Pixmap::new(fw * frames.len() as u32, fh).expect("sheet alloc");
+    sheet.fill(Color::TRANSPARENT);
+    for (i, f) in frames.iter().enumerate() {
+        use honk_engine::tiny_skia::{PixmapPaint, Transform};
+        sheet.draw_pixmap(
+            (i as u32 * fw) as i32,
+            0,
+            f.as_ref(),
+            &PixmapPaint::default(),
+            Transform::identity(),
+            None,
+        );
+        f.save_png(format!("{out_dir}/walk-{i:02}.png"))
+            .expect("frame png");
+    }
+    sheet
+        .save_png(format!("{out_dir}/walk-sheet.png"))
+        .expect("sheet png");
+    println!(
+        "walk-sheet.png: {} frames of {}x{} (cycle 0.4s)",
+        frames.len(),
+        fw,
+        fh
+    );
+
+    // Large poses at 6x (~450 px tall), same registration window.
+    for (name, pose) in [
+        ("pose-rest", Sim::new(0.0).run(1.0, 0.0, 0.0, 0.45, 0.2)),
+        ("pose-reach", Sim::new(0.0).run(1.2, 0.0, 0.0, 1.0, 0.2)),
+        (
+            "pose-rest-left",
+            Sim::new(180.0).run(1.0, 180.0, 0.0, 0.45, 0.2),
+        ),
+        ("pose-top", {
+            let mut s = Sim::new(0.0);
+            s.run(0.2, 0.0, 80.0, 0.45, 0.2);
+            s.run(0.8, 270.0, 120.0, 0.55, 0.2)
+        }),
+    ] {
+        let rig = pose.primary;
+        let px = render_rig_scaled(&rig, anchor(rig.ground), W, H, 6.0, pal).expect("pose");
+        px.save_png(format!("{out_dir}/{name}.png"))
+            .expect("pose png");
+        println!("{name}.png: {}x{}", px.width(), px.height());
+    }
 }
