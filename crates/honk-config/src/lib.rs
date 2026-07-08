@@ -62,6 +62,41 @@ impl Default for Config {
     }
 }
 
+impl ColorConfig {
+    fn derived_palette(&self) -> RenderPalette {
+        let d = RenderPalette::default();
+        RenderPalette::from_legacy(
+            parse_hex_rgb(&self.goose_white).unwrap_or(d.goose_white),
+            parse_hex_rgb(&self.goose_orange).unwrap_or(d.goose_orange),
+            parse_hex_rgb(&self.goose_outline).unwrap_or(d.goose_outline),
+        )
+    }
+
+    /// Effective V2 tones as hex strings: the explicit key when set, else the tone
+    /// derived from the legacy three (what the renderer will actually use).
+    pub fn shade_hex(&self) -> String {
+        self.goose_shade
+            .clone()
+            .unwrap_or_else(|| hex_string(self.derived_palette().goose_shade))
+    }
+
+    pub fn wing_hex(&self) -> String {
+        self.goose_wing
+            .clone()
+            .unwrap_or_else(|| hex_string(self.derived_palette().goose_wing))
+    }
+
+    pub fn orange_dark_hex(&self) -> String {
+        self.goose_orange_dark
+            .clone()
+            .unwrap_or_else(|| hex_string(self.derived_palette().goose_orange_dark))
+    }
+}
+
+fn hex_string(rgb: (u8, u8, u8)) -> String {
+    format!("#{:02x}{:02x}{:02x}", rgb.0, rgb.1, rgb.2)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct BehaviorConfig {
@@ -94,14 +129,23 @@ pub struct ColorConfig {
     pub goose_white: String,
     pub goose_orange: String,
     pub goose_outline: String,
+    /// Renderer-V2 tones (ADR 0014). Absent in pre-V2 config files: `None` derives a
+    /// coherent tone from the legacy three so old files keep working.
+    pub goose_shade: Option<String>,
+    pub goose_wing: Option<String>,
+    pub goose_orange_dark: Option<String>,
 }
 
 impl Default for ColorConfig {
     fn default() -> Self {
+        // Reference-art tones (docs/art-reference/, ADR 0014).
         Self {
-            goose_white: "#ffffff".into(),
-            goose_orange: "#ffa500".into(),
-            goose_outline: "#d3d3d3".into(),
+            goose_white: "#ededed".into(),
+            goose_orange: "#fc7927".into(),
+            goose_outline: "#c9c9c9".into(),
+            goose_shade: Some("#c6c6c6".into()),
+            goose_wing: Some("#515557".into()),
+            goose_orange_dark: Some("#d1551b".into()),
         }
     }
 }
@@ -522,6 +566,15 @@ impl Config {
             &self.colors.goose_orange,
             &mut errors,
         );
+        if let Some(v) = &self.colors.goose_shade {
+            validate_hex_color("colors.goose_shade", v, &mut errors);
+        }
+        if let Some(v) = &self.colors.goose_wing {
+            validate_hex_color("colors.goose_wing", v, &mut errors);
+        }
+        if let Some(v) = &self.colors.goose_orange_dark {
+            validate_hex_color("colors.goose_orange_dark", v, &mut errors);
+        }
         validate_hex_color(
             "colors.goose_outline",
             &self.colors.goose_outline,
@@ -619,6 +672,9 @@ impl Config {
                 first_wander_time: self.behavior.first_wander_time_seconds,
                 min_wandering_time: self.behavior.min_wandering_time_seconds,
                 max_wandering_time: self.behavior.max_wandering_time_seconds,
+                // Excursion/puddle cadences ride the engine defaults (ADR 0016); not
+                // yet config-exposed.
+                ..TimingOptions::default()
             },
             parameters: ParametersTable {
                 walk_speed: self.speeds.walk_speed,
@@ -636,14 +692,23 @@ impl Config {
                 shrink_time: self.mud.footmark_shrink_seconds,
             },
             palette: if self.behavior.use_custom_colors {
-                RenderPalette {
-                    goose_white: parse_hex_rgb(&self.colors.goose_white)
-                        .unwrap_or(RenderPalette::default().goose_white),
-                    goose_orange: parse_hex_rgb(&self.colors.goose_orange)
-                        .unwrap_or(RenderPalette::default().goose_orange),
-                    goose_outline: parse_hex_rgb(&self.colors.goose_outline)
-                        .unwrap_or(RenderPalette::default().goose_outline),
+                let d = RenderPalette::default();
+                let white = parse_hex_rgb(&self.colors.goose_white).unwrap_or(d.goose_white);
+                let orange = parse_hex_rgb(&self.colors.goose_orange).unwrap_or(d.goose_orange);
+                let outline = parse_hex_rgb(&self.colors.goose_outline).unwrap_or(d.goose_outline);
+                // Derive the V2 tones from the legacy three, then let explicit keys win.
+                let mut palette = RenderPalette::from_legacy(white, orange, outline);
+                let explicit = |v: &Option<String>| v.as_deref().and_then(parse_hex_rgb);
+                if let Some(c) = explicit(&self.colors.goose_shade) {
+                    palette.goose_shade = c;
                 }
+                if let Some(c) = explicit(&self.colors.goose_wing) {
+                    palette.goose_wing = c;
+                }
+                if let Some(c) = explicit(&self.colors.goose_orange_dark) {
+                    palette.goose_orange_dark = c;
+                }
+                palette
             } else {
                 RenderPalette::default()
             },
@@ -708,6 +773,15 @@ impl Config {
         set_str(colors, "goose_white", &self.colors.goose_white);
         set_str(colors, "goose_orange", &self.colors.goose_orange);
         set_str(colors, "goose_outline", &self.colors.goose_outline);
+        if let Some(v) = &self.colors.goose_shade {
+            set_str(colors, "goose_shade", v);
+        }
+        if let Some(v) = &self.colors.goose_wing {
+            set_str(colors, "goose_wing", v);
+        }
+        if let Some(v) = &self.colors.goose_orange_dark {
+            set_str(colors, "goose_orange_dark", v);
+        }
 
         let speeds = table_mut(doc, "speeds");
         set_float(speeds, "walk_speed", self.speeds.walk_speed);
@@ -963,7 +1037,14 @@ fn known_section_keys(section: &str) -> &'static [&'static str] {
             "min_wandering_time_seconds",
             "max_wandering_time_seconds",
         ],
-        "colors" => &["goose_white", "goose_orange", "goose_outline"],
+        "colors" => &[
+            "goose_white",
+            "goose_orange",
+            "goose_outline",
+            "goose_shade",
+            "goose_wing",
+            "goose_orange_dark",
+        ],
         "speeds" => &[
             "walk_speed",
             "run_speed",

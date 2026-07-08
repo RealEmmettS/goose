@@ -186,17 +186,116 @@ impl Task for WanderTask {
         }
         if arrived(goose, 1.5) {
             goose.target_pos = random_point(ctx);
-            // Sometimes the goose tracks mud on its way to the next spot.
-            if ctx.rng.next_f64() < 0.5 {
-                goose.track_mud_end_time = ctx.now + goose.parameters.duration_to_track_mud;
-            }
-            // And sometimes it honks for no reason at all — unless it's been freshly patted,
-            // when it stays content and quiet for the calm window (§5.9).
+            // Sometimes it honks for no reason at all — unless it's been freshly patted,
+            // when it stays content and quiet for the calm window (§5.9). Mud tracking no
+            // longer starts here: it comes home from off-screen puddle hops (ADR 0016), so
+            // muddy feet read as an event with a story instead of a constant state.
             if !ctx.calm && ctx.rng.next_f64() < 0.25 {
                 ctx.sounds.push(Sound::honk());
             }
         }
         ctx.now >= self.end_time.unwrap()
+    }
+}
+
+/// Why the goose is leaving the screen, and what it brings back (ADR 0016).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ExcursionKind {
+    /// A long "errand" — gone ~1.5–2 minutes; the world may chain a collect-window
+    /// prank onto the return.
+    Errand,
+    /// A quick hop just past the edge; the goose comes back seconds later tracking
+    /// mud for `mud_secs` — as if it found a puddle out there.
+    Puddle { mud_secs: f32 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ExcursionState {
+    Depart,
+    Away { until: f32 },
+    Return,
+}
+
+/// Waddle off-screen, disappear for a while, and come back somewhere else — the
+/// "goose has other business" behavior (ADR 0016). Installed by the world as a timed
+/// interrupt over wandering; parameters (exit/entry points, away time) are chosen by
+/// the world's RNG so the whole thing stays deterministic per seed.
+pub struct ExcursionTask {
+    kind: ExcursionKind,
+    /// Off-screen point the goose walks out to.
+    exit: Vec2,
+    /// Off-screen point it reappears at after the away timer.
+    entry: Vec2,
+    /// On-screen point it walks back in to.
+    return_target: Vec2,
+    away_secs: f32,
+    state: ExcursionState,
+}
+
+impl ExcursionTask {
+    pub fn new(
+        kind: ExcursionKind,
+        exit: Vec2,
+        entry: Vec2,
+        return_target: Vec2,
+        away_secs: f32,
+    ) -> Self {
+        Self {
+            kind,
+            exit,
+            entry,
+            return_target,
+            away_secs,
+            state: ExcursionState::Depart,
+        }
+    }
+}
+
+impl Task for ExcursionTask {
+    fn id(&self) -> &'static str {
+        "excursion"
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        match self.state {
+            ExcursionState::Depart => {
+                // A casual waddle out — deliberately NOT clamped to bounds.
+                goose.current_speed = goose.parameters.walk_speed;
+                goose.current_acceleration = goose.parameters.acceleration_normal;
+                goose.target_pos = self.exit;
+                if arrived(goose, 8.0) {
+                    self.state = ExcursionState::Away {
+                        until: ctx.now + self.away_secs,
+                    };
+                }
+                false
+            }
+            ExcursionState::Away { until } => {
+                // Parked out of sight; hold still (no footsteps, no drift).
+                goose.target_pos = goose.position;
+                goose.velocity = Vec2::ZERO;
+                if ctx.now >= until {
+                    // Reappear at the staged entry point (still off-screen) and walk in.
+                    goose.position = self.entry;
+                    goose.target_pos = self.return_target;
+                    self.state = ExcursionState::Return;
+                }
+                false
+            }
+            ExcursionState::Return => {
+                goose.current_speed = goose.parameters.walk_speed;
+                goose.current_acceleration = goose.parameters.acceleration_normal;
+                goose.target_pos = self.return_target;
+                if arrived(goose, 6.0) {
+                    if let ExcursionKind::Puddle { mud_secs } = self.kind {
+                        // Came home through a puddle: track mud for a while.
+                        goose.track_mud_end_time = ctx.now + mud_secs;
+                    }
+                    return true;
+                }
+                false
+            }
+        }
     }
 }
 

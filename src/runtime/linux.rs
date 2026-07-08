@@ -7,7 +7,7 @@ use honk_control::{
     RuntimeStatus,
 };
 use honk_engine::render::{
-    render_autumn_leaves, render_footmarks_with_timing, render_hearts, render_rig_with_palette,
+    render_autumn_leaves, render_footmarks_with_timing, render_hearts, render_pose_with_palette,
     render_sleepies, AutumnRenderLayer,
 };
 use honk_engine::tiny_skia::{Color, Pixmap};
@@ -266,7 +266,7 @@ pub fn run(
                 world.goose.position,
                 AutumnRenderLayer::BelowGoose,
             );
-            render_rig_with_palette(&mut canvas, world.rig(), origin, world.render_palette());
+            render_pose_with_palette(&mut canvas, world.pose(), origin, world.render_palette());
             render_autumn_leaves(
                 &mut canvas,
                 world.autumn(),

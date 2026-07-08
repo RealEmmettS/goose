@@ -10,7 +10,7 @@ use std::path::PathBuf;
     name = "honk300",
     version,
     about = "A desktop goose for your screen",
-    after_help = "Goose-speak:\n  <name> plz                 Start the goose\n  <name> bad | no | no honk  Stop the goose\n  <name> do honk             Poke a honk\n\nInstalled names: honk300, honk, goose."
+    after_help = "Goose-speak:\n  <name> plz                 Start the goose\n  <name> bad | no | no honk  Stop the goose\n  <name> exit | quit         Stop the goose\n  <name> do honk             Poke a honk\n\nInstalled names: honk300, honk, goose."
 )]
 pub struct Cli {
     /// Start the goose muted.
@@ -144,6 +144,8 @@ where
     let token = args[command_idx].to_ascii_lowercase();
     match token.as_str() {
         "plz" => args[command_idx] = "start".into(),
+        // Natural stop synonyms: `goose exit` / `goose quit` behave exactly like stop.
+        "exit" | "quit" => args[command_idx] = "stop".into(),
         "bad" | "no" => {
             if token == "no"
                 && args
@@ -246,6 +248,10 @@ mod tests {
         assert_eq!(no.command, Some(Command::Stop));
         let no_honk = Cli::try_parse_normalized(["goose", "no", "honk"]).unwrap();
         assert_eq!(no_honk.command, Some(Command::Stop));
+        let exit = Cli::try_parse_normalized(["goose", "exit"]).unwrap();
+        assert_eq!(exit.command, Some(Command::Stop));
+        let quit = Cli::try_parse_normalized(["honk", "quit"]).unwrap();
+        assert_eq!(quit.command, Some(Command::Stop));
     }
 
     #[test]

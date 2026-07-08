@@ -1,8 +1,7 @@
 # Tasks
 
 ## Backlog
-- [ ] **Refine goose rendering + UI polish** - further tune the procedural goose (proportions, beak/eye, shading, animation easing) and any on-screen UI toward the original's feel (needs #a8d) #c0d
-- [ ] **Renderer V2 sprite-atlas renderer** - replace per-frame procedural goose drawing with a custom CPU sprite/atlas blitter while keeping platform backends on premultiplied pixels and preserving clean-room art/animation controls #r2v
+- [ ] **Runtime-loop dedup** - extract the three hand-cloned platform runtime loops (`src/runtime/{windows,macos,linux}.rs`) into a shared skeleton; deferred until after R1-R3 stabilize (regression-risky) #r5d
 - [ ] **Native Wayland full-support research + integration path** - Emmett or a follow-up agent researches what fully integrated native Wayland support would require, then turns the findings into an accepted implementation plan #a6e
   - [ ] Read the current Wayland assumptions in `honk300_plan.md`, `AGENTS.md`, and the queued `M16-M18` board item.
   - [ ] Research current Wayland protocol and compositor-extension support for overlay surfaces, input regions, global pointer observation, pointer warping, synthetic input, and foreign-window enumeration/move.
@@ -16,6 +15,57 @@
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
 
 ## Active
+- [ ] **R1 — reliability + correctness fixes (all platforms)** - the ranked defect list from the 2026-07-07 Fable evaluation; gates R2's visual verification (DPI first). Plan: `~/.claude/plans/examine-this-goose-program-enchanted-charm.md` (owner fable-orchestrator) #r1f
+  - [x] Windows PMv2 DPI awareness + `WM_DPICHANGED`/`WM_DISPLAYCHANGE` monitor rebuild.
+  - [x] Non-blocking collect-window state machine + Notepad child kill on close/stop (fixes sim freeze, IPC TIMEOUT, zombie leak).
+    > Typing is now best-effort (focus steal skips a note instead of latching collect off) — deliberate, in ADR 0015.
+  - [x] Unix singleton flock liveness (replaces stale `create_new` lockfile).
+    > rustix flock, kernel-released on crash; lock file intentionally never unlinked.
+  - [x] macOS NSApp event-drain pump + rep-owned bitmap present (no external Vec aliasing).
+  - [x] Linux degraded-overlay honesty: loud failure unless `HONK300_ALLOW_HEADLESS=1`; `overlay` capability in status protocol.
+    > + X11 XFixes region caching, event mask set once. CI smoke uses real Xvfb/sway — env var NOT added there.
+  - [ ] Wire `behavior.attack_randomly` into the roam deck (default off, capability-gated) — Fable/engine.
+  - [x] TUI rows for `mouse.grab_distance`/`drop_distance` (landed with R2 TUI work on r2-renderer).
+  - [x] Non-purge `uninstall` relocates user memes/notes to `preserved-<ts>` with printed location.
+  - [x] ADR 0015 written; CHANGELOG + HUMAN_CHANGELOG lockstep entries staged on r1-reliability.
+  - [x] Local gate green on integrated branch (223 tests) + cross-target checks; Windows live smoke on r2 passed.
+  - [x] Committed `90ad936` on r1-reliability with Emmett's go-ahead (2026-07-08); merging into r2 then main.
+- [ ] **R2 — Renderer V2 "Procedural Vector V2"** - supersedes the sprite-atlas direction (ADR 0001) per Emmett's 2026-07-07 approval; folds in old #c0d polish scope. Flat-illustration goose per Emmett's reference art (`docs/art-reference/`), dual-view rig (side + top-down, crossfade), stateful plant-and-swing feet, S-curve neck, 6-tone palette, secondary motion. Fable hands-on (owner fable-orchestrator) #r2v
+  - [x] Copy reference SVGs into `docs/art-reference/` and extract part geometry.
+    > Offline absolutizer transcribed the paths; no SVG dep in honk-engine.
+  - [x] Stateful `FeetState` plant-and-swing gait (no foot slide) + invariant test.
+  - [x] Dual-view rig state (side mirrored / top-down rotating) + crossfade with hysteresis.
+    > 55°/45° hysteresis, 125ms fade, GoosePose union dirty rects.
+  - [x] Part-builder renderer: wing layers, two-tone beak, shading, legs/webbed feet, tail.
+    > 2x supersampled per-view layers composited with opacity.
+  - [x] Damped mood posture, eased neck lerp, blink/breath/head-bob secondary motion.
+    > Neck eases at 10/s; idle posture raised to 0.45 baseline; honk tail-flick.
+  - [x] Palette 3→6 tones: config keys + `RenderPalette` + TUI RGB rows (back-compat).
+    > New optional keys derive from legacy three; TUI materializes on first edit.
+  - [x] Re-bless goldens + new top-down/walk-cycle frames; preview PNG review.
+    > 6 goldens (side rest/reach/left/stride, top-down ×2); preview harness added.
+  - [x] ADR 0014 written (supersedes ADR 0001 renderer direction; full decision log).
+  - [x] Neck seam fix per Emmett's live review: body+neck+head as one outline-then-fill mass; goldens re-blessed.
+  - [x] Meander walking (ADR 0016): rng-driven lateral wobble on wander/excursion paths, fades near targets.
+  - [x] Story-driven mud (ADR 0016): wander no longer muds; off-screen puddle hops (8-15s away) return tracking mud 30-90s.
+  - [x] Off-screen errands (ADR 0016): every 4-7min, away 90-120s, horizontal-edge preference, 40% return with a collect prank.
+  - [x] `exit`/`quit` stop synonyms in goose-speak grammar; all stop commands verified live.
+  - [x] Live Windows smoke ×2 with screenshots: dual-view transition, serpentine mud trail, clean stop, no notepad zombies.
+  - [ ] honk300_plan.md §5.2 + README/AGENTS/CLAUDE sync + changelogs (with round commit).
+- [ ] **R3 — macOS packaging + lifecycle** - apple triples in cargo-dist, universal2 .app + DMG CI job (version-stamped, unsigned personal-use), macOS install/uninstall/update, hands-on Mac checklist; ADR 0016 supersedes 0013 deferral (owner fable-orchestrator) #r3m
+  - [ ] Add apple triples to `[workspace.metadata.dist].targets`; regenerate release.yml (dist v0.31).
+  - [ ] Hand-authored `macos-packaging.yml`: lipo universal2, package_macos_app.sh (fix 0.0.0 version stamp), hdiutil DMG, sha256 sidecars.
+  - [ ] macOS `install`/`uninstall` (`~/Applications`, `~/.local/bin` symlinks, LaunchAgent autostart, `--purge`).
+  - [ ] macOS `update` via shell-installer pattern.
+  - [ ] `docs/readiness/macos-handson-checklist.md` for #m16r evidence.
+  - [ ] ADR 0016 + changelogs; workflow dry-run evidence; then tag v0.2.0 (after R1-R2 land).
+- [ ] **R4 — website evaluation + improvements** - `C:\Users\hey\git\desktop-goose-site`; commit Codex's uncommitted live-release layer FIRST (deploy-regression risk), then refinements (owner fable-orchestrator) #r4w
+  - [ ] R4.0 commit uncommitted `src/main.jsx` + `src/styles.css` live-release layer as-is.
+  - [ ] Split `createRoot` into entry module (restore Fast Refresh).
+  - [ ] Usage table: install/uninstall/setup/reload + global flags; OG/SEO meta; honk300 favicon + OG image.
+  - [ ] Design refinement pass: typographic scale, spacing system, alignment, breakpoints, state consistency (identity unchanged; before/after screenshots).
+  - [ ] macOS download column light-up (after R3 release).
+  - [ ] Refresh goose art (hero SVG + golden PNGs) to Renderer V2 look; optional What's-new from HUMAN_CHANGELOG.
 - [ ] **M16.1 — macOS host readiness smoke** - hosted macOS bundle/status smoke plus Accessibility granted evidence from a pre-granted self-hosted/manual macOS run #m16r
   - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
     > Latest checked successful run `28569889803` still skipped the optional Accessibility job.

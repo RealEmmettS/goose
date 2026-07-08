@@ -60,7 +60,7 @@ pub use cursor::{
     WorldOptions,
 };
 pub use entity::{GooseEntity, ParametersTable, SpeedTier};
-pub use feet::Feet;
+pub use feet::{Feet, FeetState, FootPose};
 pub use footmarks::{FootMark, FootMarkTiming, FootMarks};
 pub use foreign_window::{
     ForeignWindowCapabilities, ForeignWindowId, ForeignWindowOptions, ForeignWindowSnapshot,
@@ -72,8 +72,8 @@ pub use mood::{
     HourlyHonkOptions, LocalHour, LocalTime, MoodIntensity, MoodKind, MoodMachine, MoodOptions,
     ZParticle, ZParticles,
 };
-pub use render::{AutumnRenderLayer, RenderPalette};
-pub use rig::Rig;
+pub use render::{AutumnRenderLayer, RenderPalette, GOOSE_SUPERSAMPLE};
+pub use rig::{GoosePose, Rig, RigAnim, RigInput, RigView};
 pub use rng::{Deck, RandomSource, SplitMix64};
 pub use schedule::{LocalMinute, PresenceSnapshot, PresenceState, ScheduleOptions};
 pub use sound::{HonkTone, Sound};

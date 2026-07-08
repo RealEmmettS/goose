@@ -136,6 +136,8 @@ pub enum AdjustField {
     FootmarkLifetime,
     FootmarkShrink,
     MouseSucc,
+    GrabDistance,
+    DropDistance,
     QuietStart,
     QuietEnd,
     Color(ColorSlot, ColorChannel),
@@ -146,6 +148,9 @@ pub enum ColorSlot {
     White,
     Orange,
     Outline,
+    Shade,
+    Wing,
+    OrangeDark,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -485,6 +490,14 @@ impl AppState {
                 self.config.mouse.succ_time =
                     clamp(self.config.mouse.succ_time + delta_f * 0.25, 0.25, 10.0);
             }
+            AdjustField::GrabDistance => {
+                self.config.mouse.grab_distance =
+                    clamp(self.config.mouse.grab_distance + delta_f * 5.0, 10.0, 400.0);
+            }
+            AdjustField::DropDistance => {
+                self.config.mouse.drop_distance =
+                    clamp(self.config.mouse.drop_distance + delta_f * 5.0, 20.0, 600.0);
+            }
             AdjustField::QuietStart => {
                 self.config.schedule.quiet_start =
                     adjust_time_15(&self.config.schedule.quiet_start, delta);
@@ -498,13 +511,35 @@ impl AppState {
     }
 
     fn adjust_color_channel(&mut self, slot: ColorSlot, channel: ColorChannel, delta: i8) {
-        let color = match slot {
-            ColorSlot::White => &mut self.config.colors.goose_white,
-            ColorSlot::Orange => &mut self.config.colors.goose_orange,
-            ColorSlot::Outline => &mut self.config.colors.goose_outline,
-        };
-        let next = adjust_color_channel(color.as_str(), channel, delta);
-        *color = next;
+        match slot {
+            ColorSlot::White => {
+                self.config.colors.goose_white =
+                    adjust_color_channel(&self.config.colors.goose_white, channel, delta);
+            }
+            ColorSlot::Orange => {
+                self.config.colors.goose_orange =
+                    adjust_color_channel(&self.config.colors.goose_orange, channel, delta);
+            }
+            ColorSlot::Outline => {
+                self.config.colors.goose_outline =
+                    adjust_color_channel(&self.config.colors.goose_outline, channel, delta);
+            }
+            // V2 tones materialize their effective (possibly derived) value on first
+            // edit, so old configs gain an explicit key only when the user changes it.
+            ColorSlot::Shade => {
+                let next = adjust_color_channel(&self.config.colors.shade_hex(), channel, delta);
+                self.config.colors.goose_shade = Some(next);
+            }
+            ColorSlot::Wing => {
+                let next = adjust_color_channel(&self.config.colors.wing_hex(), channel, delta);
+                self.config.colors.goose_wing = Some(next);
+            }
+            ColorSlot::OrangeDark => {
+                let next =
+                    adjust_color_channel(&self.config.colors.orange_dark_hex(), channel, delta);
+                self.config.colors.goose_orange_dark = Some(next);
+            }
+        }
     }
 
     fn cycle_mood(&mut self, delta: i8) {
@@ -631,6 +666,16 @@ impl AppState {
                     "Mouse succ time",
                     seconds(self.config.mouse.succ_time),
                     RowKind::Adjust(AdjustField::MouseSucc),
+                ),
+                row(
+                    "Mouse grab distance",
+                    number(self.config.mouse.grab_distance),
+                    RowKind::Adjust(AdjustField::GrabDistance),
+                ),
+                row(
+                    "Mouse drop distance",
+                    number(self.config.mouse.drop_distance),
+                    RowKind::Adjust(AdjustField::DropDistance),
                 ),
                 row(
                     "Mud duration",
@@ -771,6 +816,60 @@ impl AppState {
                     "Outline B",
                     &self.config.colors.goose_outline,
                     ColorSlot::Outline,
+                    ColorChannel::Blue,
+                ),
+                color_row(
+                    "Shade R",
+                    &self.config.colors.shade_hex(),
+                    ColorSlot::Shade,
+                    ColorChannel::Red,
+                ),
+                color_row(
+                    "Shade G",
+                    &self.config.colors.shade_hex(),
+                    ColorSlot::Shade,
+                    ColorChannel::Green,
+                ),
+                color_row(
+                    "Shade B",
+                    &self.config.colors.shade_hex(),
+                    ColorSlot::Shade,
+                    ColorChannel::Blue,
+                ),
+                color_row(
+                    "Wing R",
+                    &self.config.colors.wing_hex(),
+                    ColorSlot::Wing,
+                    ColorChannel::Red,
+                ),
+                color_row(
+                    "Wing G",
+                    &self.config.colors.wing_hex(),
+                    ColorSlot::Wing,
+                    ColorChannel::Green,
+                ),
+                color_row(
+                    "Wing B",
+                    &self.config.colors.wing_hex(),
+                    ColorSlot::Wing,
+                    ColorChannel::Blue,
+                ),
+                color_row(
+                    "Dark orange R",
+                    &self.config.colors.orange_dark_hex(),
+                    ColorSlot::OrangeDark,
+                    ColorChannel::Red,
+                ),
+                color_row(
+                    "Dark orange G",
+                    &self.config.colors.orange_dark_hex(),
+                    ColorSlot::OrangeDark,
+                    ColorChannel::Green,
+                ),
+                color_row(
+                    "Dark orange B",
+                    &self.config.colors.orange_dark_hex(),
+                    ColorSlot::OrangeDark,
                     ColorChannel::Blue,
                 ),
             ],

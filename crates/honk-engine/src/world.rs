@@ -16,13 +16,13 @@ use crate::locomotion;
 use crate::math::{Rect, Vec2};
 use crate::mood::{LocalHour, LocalTime, MoodKind, MoodMachine, ZParticles};
 use crate::render::RenderPalette;
-use crate::rig::Rig;
+use crate::rig::{GoosePose, Rig, RigAnim, RigInput};
 use crate::rng::{Deck, RandomSource, SplitMix64};
 use crate::schedule::PresenceSnapshot;
 use crate::sound::Sound;
 use crate::task::{
-    AutumnLeafPileTask, CollectWindowTask, FirstUxTask, HyperTask, NabMouseTask, PerchRideTask,
-    Task, TaskCtx, WanderTask,
+    AutumnLeafPileTask, CollectWindowTask, ExcursionKind, ExcursionTask, FirstUxTask, HyperTask,
+    NabMouseTask, PerchRideTask, Task, TaskCtx, WanderTask,
 };
 use crate::time::DT;
 
@@ -41,8 +41,6 @@ pub struct World {
     /// Shuffle-bag over `pickable` indices (no repeats until exhausted).
     deck: Deck<SplitMix64>,
     elapsed: f32,
-    /// Index of the last gait half-step a footmark was considered for.
-    last_step: i64,
     /// Sound requests produced this tick, drained by the platform audio backend.
     pending_sounds: Vec<Sound>,
     /// Cursor requests produced this tick, drained by the platform backend.
@@ -90,6 +88,18 @@ pub struct World {
     pending_collect: Option<CollectWindowKind>,
     /// The task that was running before a transient interrupt (hyper), restored when it ends.
     interrupted: Option<Box<dyn Task>>,
+    /// When the next long off-screen errand is due (ADR 0016).
+    next_excursion_at: f32,
+    /// When the next quick puddle hop (the mud source) is due (ADR 0016).
+    next_puddle_at: f32,
+    /// The current errand should chain a collect-window prank on return.
+    excursion_prank: bool,
+    /// Wander-path meander state (ADR 0016): phase, smoothed amplitude, its target,
+    /// and when the amplitude re-rolls.
+    meander_phase: f32,
+    meander_amp: f32,
+    meander_amp_target: f32,
+    next_meander_shift: f32,
 }
 
 use crate::entity::GooseEntity;
@@ -111,7 +121,12 @@ impl World {
         goose.target_pos = center;
         goose.current_speed = goose.parameters.walk_speed;
         goose.current_acceleration = goose.parameters.acceleration_normal;
-        goose.rig = Rig::update(goose.position, goose.direction, 0.0, 0.0);
+        goose.anim = RigAnim::new(goose.position, goose.direction);
+        goose.pose =
+            goose
+                .anim
+                .update(&RigInput::static_pose(goose.position, goose.direction, 0.0));
+        goose.rig = goose.pose.primary;
 
         let mut rng = SplitMix64::seed(seed);
         let mood = MoodMachine::new(0.0, options.mood, &mut rng);
@@ -127,6 +142,12 @@ impl World {
         );
         let deck = Deck::new(pickable.len(), SplitMix64::seed(seed ^ 0x9E37_79B9));
 
+        // First excursion/puddle cadences are drawn up front so the goose settles in
+        // before its first off-screen trip (ADR 0016).
+        let t = options.timing;
+        let next_excursion_at = rng.range(t.excursion_min_gap, t.excursion_max_gap);
+        let next_puddle_at = rng.range(t.puddle_min_gap, t.puddle_max_gap);
+
         Self {
             goose,
             bounds,
@@ -135,7 +156,6 @@ impl World {
             pickable,
             deck,
             elapsed: 0.0,
-            last_step: 0,
             pending_sounds: Vec::new(),
             pending_cursor_commands: Vec::new(),
             pending_collect_window_commands: Vec::new(),
@@ -156,6 +176,13 @@ impl World {
             collect_window_snapshot: None,
             prev_left_down: false,
             pending_hyper: false,
+            next_excursion_at,
+            next_puddle_at,
+            excursion_prank: false,
+            meander_phase: 0.0,
+            meander_amp: 0.0,
+            meander_amp_target: 0.0,
+            next_meander_shift: 0.0,
             pending_nab: false,
             pending_collect: None,
             interrupted: None,
@@ -390,7 +417,9 @@ impl World {
     /// World-space area that can contain visible pixels this frame, optionally unioned with the
     /// previous frame so moving pixels get cleared by dirty-region presentation.
     pub fn render_bounds(&self, previous: Option<Rect>) -> Rect {
-        let mut rect = self.goose.rig.bounding_box();
+        // The full pose: during a view crossfade both views must stay inside the
+        // presented dirty rect.
+        let mut rect = self.goose.pose.bounding_box();
         for (mark, scale) in self
             .goose
             .foot_marks
@@ -681,6 +710,9 @@ impl World {
             self.start_perch_ride();
         }
 
+        // Off-screen excursions (ADR 0016): timed interrupts over plain wandering.
+        self.maybe_start_excursion();
+
         // Run the current task (it only sets targets/params); pick the next when it's done.
         let calm = self.pat.is_calm(self.elapsed) || manners_active;
         let autumn_targets = if !manners_active && self.autumn_active() {
@@ -710,51 +742,102 @@ impl World {
             self.current.run(&mut self.goose, &mut ctx)
         };
         if done {
-            // A finished interrupt resumes the task it suspended; otherwise draw next.
-            self.current = match self.interrupted.take() {
-                Some(prev) => prev,
-                None => self.next_task(),
-            };
+            if self.current.id() == "excursion" && self.excursion_prank {
+                // Came back from the errand with mischief in mind: chain a collect
+                // right away; the suspended task resumes when the collect finishes.
+                self.excursion_prank = false;
+                self.current = Box::new(CollectWindowTask::new());
+            } else {
+                // A finished interrupt resumes the task it suspended; otherwise draw next.
+                self.current = match self.interrupted.take() {
+                    Some(prev) => prev,
+                    None => self.next_task(),
+                };
+            }
         }
 
         self.apply_mood_locomotion_modulation();
         self.apply_manners_locomotion_modulation();
 
-        // Auto-locomotion toward the task's target.
+        // Auto-locomotion toward the task's target, with a goosey meander on casual
+        // walks (ADR 0016): a smoothly-varying lateral offset bends straight lines
+        // into wandering curves, fading out near the target so arrivals still land.
         let before = self.goose.position;
-        locomotion::step(&mut self.goose, DT);
+        let meander = self.meander_offset();
+        if meander != Vec2::ZERO {
+            let saved = self.goose.target_pos;
+            self.goose.target_pos = saved + meander;
+            locomotion::step(&mut self.goose, DT);
+            self.goose.target_pos = saved;
+        } else {
+            locomotion::step(&mut self.goose, DT);
+        }
 
         // Advance the walking gait by distance travelled (a stopped goose stands still).
         let moved = Vec2::distance(before, self.goose.position);
         self.goose.gait_phase += moved * (std::f32::consts::TAU / GAIT_CYCLE_DISTANCE);
 
-        let speed_frac =
-            (self.goose.velocity.magnitude() / self.goose.parameters.walk_speed).min(1.0);
-        let neck_lerp = self.mood_neck_lerp(speed_frac * 0.4);
-        self.goose.rig = Rig::update(
-            self.goose.position,
-            self.goose.direction,
-            neck_lerp,
-            self.goose.gait_phase,
-        );
+        let speed = self.goose.velocity.magnitude();
+        let speed_frac = (speed / self.goose.parameters.walk_speed).min(1.0);
+        // A goose stands tall: partly-raised neck at idle, rising a little with speed
+        // (mood modifiers then scale the whole posture — sad/sleepy still droop).
+        let neck_target = self.mood_neck_lerp(0.45 + speed_frac * 0.25);
+
+        // Blink scheduling stays with the world (it owns the RNG and the clock); the
+        // rig animates the lid deterministically from the start time.
+        if self.elapsed >= self.goose.anim.next_blink {
+            self.goose.anim.start_blink(self.elapsed);
+            self.goose.anim.next_blink = self.elapsed + 2.0 + self.rng.next_f64() as f32 * 4.5;
+        }
+        // A honk this tick kicks the tail.
+        if self
+            .pending_sounds
+            .iter()
+            .any(|s| matches!(s, Sound::Honk(_)))
+        {
+            self.goose.anim.flick_tail();
+        }
+
+        // Per-step interval: the task-set value when present, else by speed tier.
+        let step_time = if self.goose.step_interval > 1e-3 {
+            self.goose.step_interval
+        } else if self.goose.current_speed > self.goose.parameters.run_speed {
+            self.goose.parameters.step_time_charged
+        } else {
+            self.goose.parameters.step_time_normal
+        };
+
+        let pose = self.goose.anim.update(&RigInput {
+            center: self.goose.position,
+            direction_deg: self.goose.direction,
+            neck_target,
+            speed,
+            velocity: self.goose.velocity,
+            step_time,
+            now: self.elapsed,
+            dt: DT,
+        });
+        self.goose.rig = pose.primary;
+        self.goose.pose = pose;
         self.goose.extending_neck = false;
 
-        // Drop a fading muddy print at each foot-plant (half gait cycle) while tracking mud.
-        let step = (self.goose.gait_phase / std::f32::consts::PI).floor() as i64;
-        if step > self.last_step {
-            if self.elapsed < self.goose.track_mud_end_time {
-                let foot = if step % 2 == 0 {
-                    self.goose.rig.feet.left
-                } else {
-                    self.goose.rig.feet.right
-                };
-                self.goose.foot_marks.add(foot, self.elapsed);
-                // A wet squelch now and then while squishing through mud.
-                if self.rng.next_f64() < 0.35 {
-                    self.pending_sounds.push(Sound::MudSquish);
+        // Drop a fading muddy print exactly where a foot actually lands while tracking mud.
+        let tracking_mud = self.elapsed < self.goose.track_mud_end_time;
+        let elapsed = self.elapsed;
+        let mut planted = 0u32;
+        {
+            let anim = &mut self.goose.anim;
+            let marks = &mut self.goose.foot_marks;
+            anim.feet.drain_plants(|foot| {
+                if tracking_mud {
+                    marks.add(foot, elapsed);
+                    planted += 1;
                 }
-            }
-            self.last_step = step;
+            });
+        }
+        if planted > 0 && self.rng.next_f64() < 0.35 {
+            // A wet squelch now and then while squishing through mud.
+            self.pending_sounds.push(Sound::MudSquish);
         }
 
         let had_autumn_pickable = self.autumn_pickable();
@@ -771,9 +854,14 @@ impl World {
         }
     }
 
-    /// The current rig, for the renderer.
+    /// The current rig (active view), for attach points and single-view rendering.
     pub fn rig(&self) -> &Rig {
         &self.goose.rig
+    }
+
+    /// The full drawable pose (active view + optional crossfading view).
+    pub fn pose(&self) -> &GoosePose {
+        &self.goose.pose
     }
 
     fn apply_hourly_honk(&mut self) {
@@ -799,6 +887,144 @@ impl World {
             self.second_hourly_honk_at = Some(self.elapsed + SECOND_HOURLY_HONK_DELAY);
             self.last_hourly_honk = Some(hour);
         }
+    }
+
+    /// Start a long errand or a quick puddle hop when due (ADR 0016). Only plain
+    /// wandering is interrupted, never mischief-in-progress, FirstUX, or manners time.
+    fn maybe_start_excursion(&mut self) {
+        let errand_due = self.elapsed >= self.next_excursion_at;
+        let puddle_due = self.elapsed >= self.next_puddle_at;
+        if !errand_due && !puddle_due {
+            return;
+        }
+        let t = self.options.timing;
+        if self.manners_active() || self.current.id() != "wander" || self.interrupted.is_some() {
+            // Blocked right now: check again shortly instead of spinning.
+            if errand_due {
+                self.next_excursion_at = self.elapsed + 10.0;
+            }
+            if puddle_due {
+                self.next_puddle_at = self.elapsed + 10.0;
+            }
+            return;
+        }
+
+        let kind = if errand_due {
+            self.next_excursion_at =
+                self.elapsed + self.rng.range(t.excursion_min_gap, t.excursion_max_gap);
+            // An errand supersedes a due puddle hop; push the hop out.
+            if puddle_due {
+                self.next_puddle_at =
+                    self.elapsed + self.rng.range(t.puddle_min_gap, t.puddle_max_gap);
+            }
+            self.excursion_prank =
+                self.options.collect_window.active() && self.rng.next_f64() < 0.4;
+            ExcursionKind::Errand
+        } else {
+            self.next_puddle_at = self.elapsed + self.rng.range(t.puddle_min_gap, t.puddle_max_gap);
+            ExcursionKind::Puddle {
+                mud_secs: self.rng.range(t.puddle_mud_min, t.puddle_mud_max),
+            }
+        };
+        let away = match kind {
+            ExcursionKind::Errand => self.rng.range(t.excursion_away_min, t.excursion_away_max),
+            ExcursionKind::Puddle { .. } => self.rng.range(t.puddle_away_min, t.puddle_away_max),
+        };
+
+        // Exit: prefer the nearest horizontal edge (a goose strolls off left/right);
+        // occasionally the far side or a vertical edge for variety.
+        let b = self.bounds;
+        let pos = self.goose.position;
+        let margin = 90.0;
+        let roll = self.rng.next_f64();
+        let near_left = (pos.x - b.min.x) <= (b.max.x - pos.x);
+        let exit = if roll < 0.8 {
+            let x = if near_left {
+                b.min.x - margin
+            } else {
+                b.max.x + margin
+            };
+            Vec2::new(x, pos.y.clamp(b.min.y + 40.0, b.max.y - 40.0))
+        } else if roll < 0.9 {
+            let x = if near_left {
+                b.max.x + margin
+            } else {
+                b.min.x - margin
+            };
+            Vec2::new(x, pos.y.clamp(b.min.y + 40.0, b.max.y - 40.0))
+        } else {
+            let y = if (pos.y - b.min.y) <= (b.max.y - pos.y) {
+                b.min.y - margin
+            } else {
+                b.max.y + margin
+            };
+            Vec2::new(pos.x.clamp(b.min.x + 40.0, b.max.x - 40.0), y)
+        };
+
+        // Entry: puddle hops come back near where they left (it went to *that* puddle);
+        // errands may reappear anywhere along a horizontal edge.
+        let entry = match kind {
+            ExcursionKind::Puddle { .. } => Vec2::new(
+                exit.x,
+                (exit.y + self.rng.range(-60.0, 60.0)).clamp(b.min.y + 40.0, b.max.y - 40.0),
+            ),
+            ExcursionKind::Errand => {
+                let left = self.rng.next_f64() < 0.5;
+                let x = if left {
+                    b.min.x - margin
+                } else {
+                    b.max.x + margin
+                };
+                Vec2::new(x, self.rng.range(b.min.y + 60.0, b.max.y - 60.0))
+            }
+        };
+        let inward_x = if entry.x < b.min.x {
+            1.0
+        } else if entry.x > b.max.x {
+            -1.0
+        } else {
+            0.0
+        };
+        let inward_y = if entry.y < b.min.y {
+            1.0
+        } else if entry.y > b.max.y {
+            -1.0
+        } else {
+            0.0
+        };
+        let return_target = Vec2::new(
+            (entry.x + inward_x * self.rng.range(160.0, 380.0))
+                .clamp(b.min.x + 60.0, b.max.x - 60.0),
+            (entry.y + inward_y * self.rng.range(160.0, 380.0))
+                .clamp(b.min.y + 60.0, b.max.y - 60.0),
+        );
+
+        let task = Box::new(ExcursionTask::new(kind, exit, entry, return_target, away));
+        self.interrupted = Some(std::mem::replace(&mut self.current, task as Box<dyn Task>));
+    }
+
+    /// Lateral wander offset for casual walks; `Vec2::ZERO` when meander is inactive.
+    fn meander_offset(&mut self) -> Vec2 {
+        let id = self.current.id();
+        if id != "wander" && id != "excursion" {
+            return Vec2::ZERO;
+        }
+        self.meander_phase += DT * 2.2;
+        if self.elapsed >= self.next_meander_shift {
+            self.meander_amp_target = (self.rng.next_f64() as f32) * 2.0 - 1.0;
+            self.next_meander_shift = self.elapsed + 0.8 + (self.rng.next_f64() as f32) * 1.4;
+        }
+        let k = 1.0 - (-3.0 * DT).exp();
+        self.meander_amp += (self.meander_amp_target - self.meander_amp) * k;
+
+        let to_target = self.goose.target_pos - self.goose.position;
+        let dist = to_target.magnitude();
+        if dist <= 25.0 {
+            return Vec2::ZERO;
+        }
+        let fade = ((dist - 25.0) / 120.0).clamp(0.0, 1.0);
+        let perp = to_target.normalize().perpendicular();
+        perp * (self.meander_amp * self.meander_phase.sin() * 48.0 * fade)
     }
 
     fn apply_mood_locomotion_modulation(&mut self) {
@@ -1003,6 +1229,107 @@ mod tests {
     }
 
     #[test]
+    fn excursions_walk_off_screen_and_back() {
+        let mut w = World::with_options(
+            bounds(),
+            7,
+            WorldOptions {
+                timing: TimingOptions {
+                    first_wander_time: 0.1,
+                    excursion_min_gap: 1.0,
+                    excursion_max_gap: 1.5,
+                    excursion_away_min: 0.4,
+                    excursion_away_max: 0.6,
+                    // Keep puddle hops out of this test's way.
+                    puddle_min_gap: 100_000.0,
+                    puddle_max_gap: 100_001.0,
+                    ..TimingOptions::default()
+                },
+                ..WorldOptions::default()
+            },
+        );
+        let b = bounds();
+        let mut saw_excursion = false;
+        let mut left_bounds = false;
+        for _ in 0..(120 * 90) {
+            w.tick();
+            if w.current_task() == "excursion" {
+                saw_excursion = true;
+            }
+            if !b.contains(w.goose.position) {
+                left_bounds = true;
+            }
+            if saw_excursion
+                && left_bounds
+                && w.current_task() == "wander"
+                && b.contains(w.goose.position)
+            {
+                return; // A full round trip: left the screen and came back to roaming.
+            }
+        }
+        panic!("no completed excursion (started={saw_excursion}, left_bounds={left_bounds})");
+    }
+
+    #[test]
+    fn puddle_hops_bring_back_mud() {
+        let mut w = World::with_options(
+            bounds(),
+            11,
+            WorldOptions {
+                timing: TimingOptions {
+                    first_wander_time: 0.1,
+                    puddle_min_gap: 1.0,
+                    puddle_max_gap: 1.4,
+                    puddle_away_min: 0.3,
+                    puddle_away_max: 0.4,
+                    puddle_mud_min: 5.0,
+                    puddle_mud_max: 6.0,
+                    // Keep long errands out of this test's way.
+                    excursion_min_gap: 100_000.0,
+                    excursion_max_gap: 100_001.0,
+                    ..TimingOptions::default()
+                },
+                ..WorldOptions::default()
+            },
+        );
+        for _ in 0..(120 * 90) {
+            w.tick();
+            if w.goose.track_mud_end_time > 0.0 {
+                return; // Mud started — and only a puddle hop can start it now.
+            }
+        }
+        panic!("puddle hop never delivered mud");
+    }
+
+    #[test]
+    fn plain_wandering_never_tracks_mud() {
+        let mut w = World::with_options(
+            bounds(),
+            9,
+            WorldOptions {
+                timing: TimingOptions {
+                    first_wander_time: 0.1,
+                    min_wandering_time: 0.5,
+                    max_wandering_time: 1.0,
+                    excursion_min_gap: 100_000.0,
+                    excursion_max_gap: 100_001.0,
+                    puddle_min_gap: 100_000.0,
+                    puddle_max_gap: 100_001.0,
+                    ..TimingOptions::default()
+                },
+                ..WorldOptions::default()
+            },
+        );
+        for _ in 0..(120 * 30) {
+            w.tick();
+            assert!(
+                w.goose.track_mud_end_time < 0.0,
+                "mud started without a puddle hop"
+            );
+        }
+    }
+
+    #[test]
     fn deterministic_for_seed() {
         let mut a = World::new(bounds(), 42);
         let mut b = World::new(bounds(), 42);
@@ -1036,7 +1363,13 @@ mod tests {
     fn render_bounds_include_previous_frame_and_clip_to_world() {
         let mut w = World::new(bounds(), 500);
         w.goose.position = Vec2::new(5.0, 6.0);
-        w.goose.rig = Rig::update(w.goose.position, w.goose.direction, 0.0, 0.0);
+        w.goose.anim = RigAnim::new(w.goose.position, w.goose.direction);
+        w.goose.pose = w.goose.anim.update(&RigInput::static_pose(
+            w.goose.position,
+            w.goose.direction,
+            0.0,
+        ));
+        w.goose.rig = w.goose.pose.primary;
         w.goose.foot_marks.add(Vec2::new(900.0, 700.0), w.now());
 
         let previous = Rect::new(Vec2::new(990.0, 790.0), Vec2::new(1040.0, 850.0));

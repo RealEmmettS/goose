@@ -127,6 +127,21 @@ pub struct TimingOptions {
     pub first_wander_time: f32,
     pub min_wandering_time: f32,
     pub max_wandering_time: f32,
+    /// Gap between long off-screen "errand" excursions (ADR 0016).
+    pub excursion_min_gap: f32,
+    pub excursion_max_gap: f32,
+    /// How long an errand keeps the goose off-screen.
+    pub excursion_away_min: f32,
+    pub excursion_away_max: f32,
+    /// Gap between quick off-screen puddle hops (the mud source).
+    pub puddle_min_gap: f32,
+    pub puddle_max_gap: f32,
+    /// How long a puddle hop keeps the goose off-screen.
+    pub puddle_away_min: f32,
+    pub puddle_away_max: f32,
+    /// How long the goose tracks mud after a puddle hop.
+    pub puddle_mud_min: f32,
+    pub puddle_mud_max: f32,
 }
 
 impl Default for TimingOptions {
@@ -135,6 +150,16 @@ impl Default for TimingOptions {
             first_wander_time: 20.0,
             min_wandering_time: 20.0,
             max_wandering_time: 40.0,
+            excursion_min_gap: 240.0,
+            excursion_max_gap: 420.0,
+            excursion_away_min: 90.0,
+            excursion_away_max: 120.0,
+            puddle_min_gap: 70.0,
+            puddle_max_gap: 160.0,
+            puddle_away_min: 8.0,
+            puddle_away_max: 15.0,
+            puddle_mud_min: 30.0,
+            puddle_mud_max: 90.0,
         }
     }
 }

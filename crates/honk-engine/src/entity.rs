@@ -6,7 +6,7 @@
 
 use crate::footmarks::FootMarks;
 use crate::math::Vec2;
-use crate::rig::Rig;
+use crate::rig::{GoosePose, Rig, RigAnim, RigInput};
 
 /// The three speed tiers the goose moves at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,8 +114,13 @@ pub struct GooseEntity {
     pub track_mud_end_time: f32,
     /// Muddy footprints left behind.
     pub foot_marks: FootMarks,
-    /// Computed body geometry for rendering.
+    /// Computed body geometry for rendering (the active view of `pose`).
     pub rig: Rig,
+    /// The full drawable pose: active view + optional crossfading view (V2).
+    pub pose: GoosePose,
+    /// Persistent animation state: plant-and-swing feet, view/facing, eased neck,
+    /// blink/breath/tail channels (V2).
+    pub anim: RigAnim,
     /// Accumulated walking-gait phase (radians), advanced by distance travelled.
     pub gait_phase: f32,
     /// Tunable parameters.
@@ -124,10 +129,14 @@ pub struct GooseEntity {
 
 impl Default for GooseEntity {
     fn default() -> Self {
+        let position = Vec2::new(300.0, 300.0);
+        let direction = 90.0;
+        let mut anim = RigAnim::new(position, direction);
+        let pose = anim.update(&RigInput::static_pose(position, direction, 0.0));
         Self {
-            position: Vec2::new(300.0, 300.0),
+            position,
             velocity: Vec2::ZERO,
-            direction: 90.0,
+            direction,
             target_direction: Vec2::ZERO,
             extending_neck: false,
             target_pos: Vec2::new(300.0, 300.0),
@@ -137,7 +146,9 @@ impl Default for GooseEntity {
             can_decelerate_immediately: true,
             track_mud_end_time: -1.0,
             foot_marks: FootMarks::new(),
-            rig: Rig::default(),
+            rig: pose.primary,
+            pose,
+            anim,
             gait_phase: 0.0,
             parameters: ParametersTable::default(),
         }
