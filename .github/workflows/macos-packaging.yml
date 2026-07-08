@@ -1,0 +1,129 @@
+name: macOS Packaging
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the universal2 app/DMG to, for example v0.2.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos-app:
+    name: universal2 .app + DMG
+    runs-on: macos-15
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
+
+    steps:
+      - name: Resolve target tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${{ github.event.workflow_run.head_branch }}"
+          fi
+          case "$tag" in
+            v*) : ;;
+            *) echo "Expected tag to start with v, got '$tag'" >&2; exit 1 ;;
+          esac
+          version="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify upstream cargo-dist release is complete
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          tag="${{ steps.tag.outputs.tag }}"
+          repo="${{ github.repository }}"
+          assets="$(gh release view "$tag" --repo "$repo" --json assets --jq '.assets[].name')"
+          required=(
+            "dist-manifest.json"
+            "honk300-x86_64-apple-darwin.tar.xz"
+            "honk300-aarch64-apple-darwin.tar.xz"
+          )
+          missing=()
+          for asset in "${required[@]}"; do
+            if ! printf '%s\n' "$assets" | grep -qxF "$asset"; then
+              missing+=("$asset")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Upstream release is incomplete. Missing assets:"
+            printf '  %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+      - name: Checkout tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          persist-credentials: false
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+
+      - name: Install Apple targets
+        shell: bash
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+
+      - name: Stage universal2 Honk300.app
+        shell: bash
+        env:
+          HONK300_VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          bash script/package_macos_app.sh
+          app="target/dist/macos-universal2/Honk300.app"
+          test -d "$app" || { echo "app bundle was not staged at $app" >&2; exit 1; }
+          # Confirm the fat binary carries both slices and the stamped version.
+          lipo "$app/Contents/MacOS/honk300" -verify_arch x86_64 arm64
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Contents/Info.plist"
+
+      - name: Build compressed universal2 DMG
+        shell: bash
+        run: |
+          app="target/dist/macos-universal2/Honk300.app"
+          stage="$RUNNER_TEMP/dmg-stage"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          cp -R "$app" "$stage/Honk300.app"
+          ln -s /Applications "$stage/Applications"
+          hdiutil create \
+            -volname "Honk300" \
+            -srcfolder "$stage" \
+            -fs HFS+ \
+            -format UDZO \
+            -ov \
+            "honk300-universal2.dmg"
+          test -f "honk300-universal2.dmg" || { echo "DMG was not produced" >&2; exit 1; }
+
+      - name: Compute SHA256 sidecar
+        shell: bash
+        run: |
+          shasum -a 256 "honk300-universal2.dmg" > "honk300-universal2.dmg.sha256"
+          cat "honk300-universal2.dmg.sha256"
+
+      - name: Upload artifacts to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release upload "${{ steps.tag.outputs.tag }}" \
+            "honk300-universal2.dmg" \
+            "honk300-universal2.dmg.sha256" \
+            --repo "${{ github.repository }}" \
+            --clobber

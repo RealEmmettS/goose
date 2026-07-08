@@ -24,3 +24,7 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0011 — M17/M18 Linux Control Runtime And Degraded Wayland Foundation](./0011-m17-m18-linux-control-runtime-and-degraded-wayland.md)
 - [0012 — M16.1-M18.1 CI-Proven Backend Readiness](./0012-m16-1-m18-1-ci-proven-backend-readiness.md)
 - [0013 — M19 Lifecycle Packaging And Deferred macOS Distribution](./0013-m19-lifecycle-packaging-and-deferred-macos-distribution.md)
+- [0014 — Renderer V2: Flat-Illustration Dual-View](./0014-renderer-v2-flat-illustration-dual-view.md)
+- [0015 — Reliability And Platform-Safety Fixes (R1)](./0015-reliability-and-platform-safety-fixes.md)
+- [0016 — Idle-Life Behaviors: Meander, Mud, Off-Screen Excursions](./0016-idle-life-behaviors-meander-mud-excursions.md)
+- [0017 — macOS Packaging And Lifecycle (R3)](./0017-macos-packaging-and-lifecycle.md)

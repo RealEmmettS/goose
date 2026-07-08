@@ -15,7 +15,30 @@
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
 
 ## Active
-- [ ] **R1 — reliability + correctness fixes (all platforms)** - the ranked defect list from the 2026-07-07 Fable evaluation; gates R2's visual verification (DPI first). Plan: `~/.claude/plans/examine-this-goose-program-enchanted-charm.md` (owner fable-orchestrator) #r1f
+- [ ] **R3 — macOS packaging + lifecycle** - apple triples in cargo-dist, universal2 .app + DMG CI job (version-stamped, unsigned personal-use), macOS install/uninstall/update, hands-on Mac checklist; ADR 0017 supersedes 0013 deferral (owner fable-orchestrator) #r3m
+  - [ ] Add apple triples to `[workspace.metadata.dist].targets`; regenerate release.yml (dist v0.31).
+  - [ ] Hand-authored `macos-packaging.yml`: lipo universal2, package_macos_app.sh (fix 0.0.0 version stamp), hdiutil DMG, sha256 sidecars.
+  - [ ] macOS `install`/`uninstall` (`~/Applications`, `~/.local/bin` symlinks, LaunchAgent autostart, `--purge`).
+  - [ ] macOS `update` via shell-installer pattern.
+  - [ ] `docs/readiness/macos-handson-checklist.md` for #m16r evidence.
+  - [ ] ADR 0017 + changelogs; workflow dry-run evidence; then tag v0.2.0.
+- [ ] **R4 — website evaluation + improvements** - `C:\Users\hey\git\desktop-goose-site`; commit Codex's uncommitted live-release layer FIRST (deploy-regression risk), then refinements (owner fable-orchestrator) #r4w
+  - [ ] R4.0 commit uncommitted `src/main.jsx` + `src/styles.css` live-release layer as-is.
+  - [ ] Split `createRoot` into entry module (restore Fast Refresh).
+  - [ ] Usage table: install/uninstall/setup/reload + global flags; OG/SEO meta; honk300 favicon + OG image.
+  - [ ] Design refinement pass: typographic scale, spacing system, alignment, breakpoints, state consistency (identity unchanged; before/after screenshots).
+  - [ ] macOS download column light-up (after R3 release).
+  - [ ] Refresh goose art (hero SVG + golden PNGs) to Renderer V2 look; optional What's-new from HUMAN_CHANGELOG.
+- [ ] **M16.1 — macOS host readiness smoke** - hosted macOS bundle/status smoke plus Accessibility granted evidence from a pre-granted self-hosted/manual macOS run #m16r
+  - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
+    > Latest checked successful run `28569889803` still skipped the optional Accessibility job.
+  - [ ] Run `script/smoke_m16_macos_accessibility.sh` on a pre-granted self-hosted/manual macOS host.
+    > Deferred until a pre-granted Mac or self-hosted runner is available; no more macOS Accessibility work in the current M19-first pass.
+  - [ ] Record Accessibility-granted evidence in `docs/readiness/m16-m18-readiness.md`.
+  - [ ] Verify or waive every `#m16r` verification item before moving the card to Done.
+
+## Done
+- [x] **R1 — reliability + correctness fixes (all platforms)** - the ranked defect list from the 2026-07-07 Fable evaluation; gates R2's visual verification (DPI first). Plan: `~/.claude/plans/examine-this-goose-program-enchanted-charm.md` (done 2026-07-08; commits 90ad936 + b65424f) #r1f
   - [x] Windows PMv2 DPI awareness + `WM_DPICHANGED`/`WM_DISPLAYCHANGE` monitor rebuild.
   - [x] Non-blocking collect-window state machine + Notepad child kill on close/stop (fixes sim freeze, IPC TIMEOUT, zombie leak).
     > Typing is now best-effort (focus steal skips a note instead of latching collect off) — deliberate, in ADR 0015.
@@ -24,13 +47,13 @@
   - [x] macOS NSApp event-drain pump + rep-owned bitmap present (no external Vec aliasing).
   - [x] Linux degraded-overlay honesty: loud failure unless `HONK300_ALLOW_HEADLESS=1`; `overlay` capability in status protocol.
     > + X11 XFixes region caching, event mask set once. CI smoke uses real Xvfb/sway — env var NOT added there.
-  - [ ] Wire `behavior.attack_randomly` into the roam deck (default off, capability-gated) — Fable/engine.
+  - [x] Wire `behavior.attack_randomly` into the roam deck (default off, capability-gated; TUI toggle; commit b65424f).
   - [x] TUI rows for `mouse.grab_distance`/`drop_distance` (landed with R2 TUI work on r2-renderer).
   - [x] Non-purge `uninstall` relocates user memes/notes to `preserved-<ts>` with printed location.
   - [x] ADR 0015 written; CHANGELOG + HUMAN_CHANGELOG lockstep entries staged on r1-reliability.
   - [x] Local gate green on integrated branch (223 tests) + cross-target checks; Windows live smoke on r2 passed.
   - [x] Committed `90ad936` on r1-reliability with Emmett's go-ahead (2026-07-08); merging into r2 then main.
-- [ ] **R2 — Renderer V2 "Procedural Vector V2"** - supersedes the sprite-atlas direction (ADR 0001) per Emmett's 2026-07-07 approval; folds in old #c0d polish scope. Flat-illustration goose per Emmett's reference art (`docs/art-reference/`), dual-view rig (side + top-down, crossfade), stateful plant-and-swing feet, S-curve neck, 6-tone palette, secondary motion. Fable hands-on (owner fable-orchestrator) #r2v
+- [x] **R2 — Renderer V2 "Procedural Vector V2"** - supersedes the sprite-atlas direction (ADR 0001) per Emmett's 2026-07-07 approval; folds in old #c0d polish scope. Flat-illustration goose per Emmett's reference art (`docs/art-reference/`), dual-view rig (side + top-down, crossfade), stateful plant-and-swing feet, S-curve neck, 6-tone palette, secondary motion. Fable hands-on (done 2026-07-08; commits 6bd6c8e + 30aeb79) #r2v
   - [x] Copy reference SVGs into `docs/art-reference/` and extract part geometry.
     > Offline absolutizer transcribed the paths; no SVG dep in honk-engine.
   - [x] Stateful `FeetState` plant-and-swing gait (no foot slide) + invariant test.
@@ -52,30 +75,7 @@
   - [x] `exit`/`quit` stop synonyms in goose-speak grammar; all stop commands verified live.
   - [x] Live Windows smoke ×2 with screenshots: dual-view transition, serpentine mud trail, clean stop, no notepad zombies.
   - [x] Committed `6bd6c8e` on r2-renderer with Emmett's go-ahead (2026-07-08).
-  - [ ] Merge r1-reliability in; changelogs + honk300_plan §5.2 + README/AGENTS/CLAUDE sync; final gate; merge to main.
-- [ ] **R3 — macOS packaging + lifecycle** - apple triples in cargo-dist, universal2 .app + DMG CI job (version-stamped, unsigned personal-use), macOS install/uninstall/update, hands-on Mac checklist; ADR 0016 supersedes 0013 deferral (owner fable-orchestrator) #r3m
-  - [ ] Add apple triples to `[workspace.metadata.dist].targets`; regenerate release.yml (dist v0.31).
-  - [ ] Hand-authored `macos-packaging.yml`: lipo universal2, package_macos_app.sh (fix 0.0.0 version stamp), hdiutil DMG, sha256 sidecars.
-  - [ ] macOS `install`/`uninstall` (`~/Applications`, `~/.local/bin` symlinks, LaunchAgent autostart, `--purge`).
-  - [ ] macOS `update` via shell-installer pattern.
-  - [ ] `docs/readiness/macos-handson-checklist.md` for #m16r evidence.
-  - [ ] ADR 0016 + changelogs; workflow dry-run evidence; then tag v0.2.0 (after R1-R2 land).
-- [ ] **R4 — website evaluation + improvements** - `C:\Users\hey\git\desktop-goose-site`; commit Codex's uncommitted live-release layer FIRST (deploy-regression risk), then refinements (owner fable-orchestrator) #r4w
-  - [ ] R4.0 commit uncommitted `src/main.jsx` + `src/styles.css` live-release layer as-is.
-  - [ ] Split `createRoot` into entry module (restore Fast Refresh).
-  - [ ] Usage table: install/uninstall/setup/reload + global flags; OG/SEO meta; honk300 favicon + OG image.
-  - [ ] Design refinement pass: typographic scale, spacing system, alignment, breakpoints, state consistency (identity unchanged; before/after screenshots).
-  - [ ] macOS download column light-up (after R3 release).
-  - [ ] Refresh goose art (hero SVG + golden PNGs) to Renderer V2 look; optional What's-new from HUMAN_CHANGELOG.
-- [ ] **M16.1 — macOS host readiness smoke** - hosted macOS bundle/status smoke plus Accessibility granted evidence from a pre-granted self-hosted/manual macOS run #m16r
-  - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
-    > Latest checked successful run `28569889803` still skipped the optional Accessibility job.
-  - [ ] Run `script/smoke_m16_macos_accessibility.sh` on a pre-granted self-hosted/manual macOS host.
-    > Deferred until a pre-granted Mac or self-hosted runner is available; no more macOS Accessibility work in the current M19-first pass.
-  - [ ] Record Accessibility-granted evidence in `docs/readiness/m16-m18-readiness.md`.
-  - [ ] Verify or waive every `#m16r` verification item before moving the card to Done.
-
-## Done
+  - [x] Merged r1-reliability in; changelogs + honk300_plan §5.2 + README/AGENTS/CLAUDE sync; final gate; merged + pushed to main (30aeb79, b65424f).
 - [x] **M19 — packaging (all OS/arch) + install/update/uninstall** - cargo-dist + windows-installers.yml; 3 name aliases; autostart (done 2026-07-07) #a8d
   - [x] Investigate and write the M19 resolution plan.
     > See `docs/thinking/2026-07-06-active-task-resolution-plan.md` and `.tasks/tasks/a8d.md`.

@@ -65,7 +65,11 @@ Accessibility-granted evidence.
 - `#m16r` remains open. Hosted macOS bundle/status smoke passed on both arm64 and Intel hosted
   runners, but the Accessibility-granted smoke job was skipped because the self-hosted
   pre-granted runner gate was not enabled. Hosted macOS proves app bundle/status/IPC and
-  denied/degraded behavior; it cannot grant durable Accessibility permission.
+  denied/degraded behavior; it cannot grant durable Accessibility permission. R3 (ADR 0017) adds
+  the macOS release slice — universal2 `.app`/DMG packaging (`macos-packaging.yml`) plus real
+  `install`/`uninstall`/`update` — so the remaining gap is purely the hands-on grant + visual
+  pass. Follow **`docs/readiness/macos-handson-checklist.md`** on a pre-granted Mac to produce and
+  record that evidence here, then close `#m16r`.
 - `#m17r` is closed. Linux x64 and ARM hosted X11 visible smoke passed, including
   internal frame proof, root screenshot proof, IPC status/reload/stop/poke, terminal-filter
   fixture coverage, and GNU/musl target checks.

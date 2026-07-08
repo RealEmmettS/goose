@@ -138,6 +138,10 @@ reference.
 - M17/M18's Linux control-runtime foundation lives in `docs/adr/0011-m17-m18-linux-control-runtime-and-degraded-wayland.md`.
 - M16.1-M18.1's CI-proven readiness contract lives in `docs/adr/0012-m16-1-m18-1-ci-proven-backend-readiness.md`.
 - M19's lifecycle/release split and macOS packaging deferral live in `docs/adr/0013-m19-lifecycle-packaging-and-deferred-macos-distribution.md`.
+- Renderer V2's flat-illustration dual-view direction lives in `docs/adr/0014-renderer-v2-flat-illustration-dual-view.md`.
+- R1's reliability/platform-safety contract lives in `docs/adr/0015-reliability-and-platform-safety-fixes.md`.
+- R2's idle-life behaviors live in `docs/adr/0016-idle-life-behaviors-meander-mud-excursions.md`.
+- R3's macOS packaging + lifecycle slice (universal2 `.app`/DMG, macOS `install`/`uninstall`/`update`, unsigned personal-use; supersedes ADR 0013's macOS deferral) lives in `docs/adr/0017-macos-packaging-and-lifecycle.md`.
 
 ## Task management system
 

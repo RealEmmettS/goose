@@ -44,6 +44,15 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - **A dormant setting now works.** "Attack randomly" — the goose occasionally deciding on its own
   to grab your cursor — was saved in settings but never actually did anything. It works now, off
   by default, with its own switch in the settings screen.
+- **The goose can now be installed on a Mac.** There's a proper Mac app now: a single download
+  (a disk image) that works on both Intel and Apple Silicon Macs, which you drag into your
+  Applications folder like any other app. Because it isn't signed by Apple (it's a personal build),
+  the very first time you open it you right-click the app and choose "Open" once to approve it —
+  after that it launches normally. You can also have it start automatically when you log in.
+- **Installing, removing, and updating all work on the Mac too.** The goose sets itself up under
+  three names, can start at login, cleans itself up when removed (keeping any memes or notes you
+  added), and can update itself in place — the same convenience the Windows and Linux versions
+  already had.
 
 ### Changed
 - The goose's default colors are a touch softer and more designed; if you liked the old stark

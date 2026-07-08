@@ -9,6 +9,9 @@ fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Honk300"
 BUNDLE_ID="dev.emmetts.honk300"
+# Stamp the bundle version from HONK300_VERSION (the release workflow passes the resolved tag
+# without its leading `v`); default to 0.0.0 for local/unversioned staging.
+VERSION="${HONK300_VERSION:-0.0.0}"
 STAGE_DIR="${1:-"$ROOT/target/dist/macos-universal2"}"
 APP_DIR="$STAGE_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
@@ -53,9 +56,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.0.0</string>
+  <string>$VERSION</string>
   <key>CFBundleVersion</key>
-  <string>0</string>
+  <string>$VERSION</string>
   <key>LSMinimumSystemVersion</key>
   <string>11.0</string>
   <key>LSUIElement</key>

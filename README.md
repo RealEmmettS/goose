@@ -54,8 +54,9 @@ permission-degradation, status protocol, and TUI-only control decisions. ADR 001
 M17/M18 Linux control-runtime foundation and degraded Wayland contract. ADR 0012 records the
 CI-proven readiness contract for M16.1-M18.1. ADR 0013 records the M19 lifecycle/release
 contract and the deferred macOS distribution slice. ADR 0014 records Renderer V2 (supersedes
-ADR 0001's renderer direction), ADR 0015 the R1 reliability contract, and ADR 0016 the
-idle-life behaviors.
+ADR 0001's renderer direction), ADR 0015 the R1 reliability contract, ADR 0016 the
+idle-life behaviors, and ADR 0017 the R3 macOS packaging + lifecycle slice (supersedes ADR 0013's
+macOS deferral).
 
 **Decided direction (see `honk300_plan.md` for the full detail):**
 
@@ -84,9 +85,12 @@ idle-life behaviors.
 - **Built for every OS + architecture:** Windows x64 **and ARM64**, macOS Intel **and Apple
   Silicon** (universal2), Linux x64 **and ARM** (gnu + musl where packaging supports it).
   Native + CLI installers like TR300/ND300/WB300; **no crates.io**.
-- M19 completed Windows and Linux packaging first. macOS DMG/signing/notarization and
-  Accessibility-granted evidence remain deferred; when that slice resumes, unsigned personal-use
-  artifacts are the default unless signing credentials are intentionally added.
+- M19 completed Windows and Linux packaging first; **R3 (ADR 0017) added the macOS slice** —
+  cargo-dist Apple targets, a universal2 `.app`/DMG CI job, and macOS `install`/`uninstall`/`update`.
+  macOS artifacts are **unsigned personal-use** (ad-hoc codesign only; first launch needs a
+  one-time right-click → Open); Developer ID signing/notarization stay out of scope, and the
+  Accessibility-granted hands-on evidence (`docs/readiness/macos-handson-checklist.md`) is still
+  pending a real Mac.
 - Linux is **X11-first** (runs under XWayland); native Wayland is an opt-in `--wayland` mode with
   reduced mischief. The current Linux runtime has visible X11 and reduced Wayland presentation
   paths plus CI smoke scripts; readiness cards close only after the host CI evidence is recorded.

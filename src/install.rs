@@ -19,6 +19,10 @@ pub enum InstallSource {
     ManualLocal,
     Shell,
     PowerShell,
+    /// A macOS `honk300.app` bundle installed under `~/Applications` (R3, ADR 0017). Distinct
+    /// from `ManualLocal` because its `update` path replaces the bundle from a DMG rather than
+    /// re-running a per-user installer.
+    MacApp,
     Unknown,
 }
 
@@ -32,6 +36,7 @@ impl InstallSource {
             "manual-local" => Self::ManualLocal,
             "shell" => Self::Shell,
             "powershell" => Self::PowerShell,
+            "mac-app" => Self::MacApp,
             _ => Self::Unknown,
         }
     }
@@ -45,6 +50,7 @@ impl InstallSource {
             Self::ManualLocal => "manual-local",
             Self::Shell => "shell",
             Self::PowerShell => "powershell",
+            Self::MacApp => "mac-app",
             Self::Unknown => "unknown",
         }
     }
@@ -60,7 +66,31 @@ pub fn detect_install_source() -> InstallSource {
         return source;
     }
 
+    // A macOS bundle install is authoritative from the running executable's own location: the
+    // `~/.local/bin` aliases resolve (via `current_exe`) into `…/honk300.app/Contents/MacOS`, so
+    // `update` can pick the DMG replacement path. Anything else on macOS (shell/cargo-home/bare)
+    // falls through to the shell-installer path like Linux.
+    if cfg!(target_os = "macos") && current_exe_is_app_bundle() {
+        return InstallSource::MacApp;
+    }
+
     classify_current_exe_install_source()
+}
+
+/// True when the running executable lives inside a `*.app` bundle. Kept non-`cfg` (and exercised
+/// on every host) so it never reads as dead code on non-macOS builds; the `cfg!` guard above keeps
+/// the `MacApp` verdict macOS-only in practice.
+fn current_exe_is_app_bundle() -> bool {
+    std::env::current_exe()
+        .ok()
+        .as_deref()
+        .map(path_is_in_app_bundle)
+        .unwrap_or(false)
+}
+
+fn path_is_in_app_bundle(path: &Path) -> bool {
+    path.ancestors()
+        .any(|ancestor| ancestor.extension().and_then(|ext| ext.to_str()) == Some("app"))
 }
 
 #[cfg(windows)]
@@ -132,8 +162,83 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
 }
 
 #[cfg(target_os = "macos")]
-pub fn install(_autostart: bool) -> Result<(), DynError> {
-    Err("honk300 install: macOS packaging is intentionally deferred; use script/package_macos_app.sh for unsigned personal-use app staging when that slice resumes.".into())
+pub fn install(autostart: bool) -> Result<(), DynError> {
+    let app_dir = macos_app_install_path()?;
+    let contents = app_dir.join("Contents");
+    let macos_dir = contents.join("MacOS");
+    let resources = contents.join("Resources");
+    let installed_bin = macos_dir.join("honk300");
+
+    // Two provenance cases, mirroring package_macos_app.sh's staging: when running from an
+    // already-staged bundle (DMG/app), copy the whole `.app`; when running as a bare binary,
+    // synthesize the same bundle layout (Info.plist + Contents/MacOS/honk300 + Resources/Assets).
+    let source_bundle = current_exe_app_bundle();
+    let already_in_place = source_bundle
+        .as_deref()
+        .map(|bundle| same_file_best_effort(bundle, &app_dir))
+        .unwrap_or(false);
+
+    if !already_in_place {
+        remove_dir_if_exists(&app_dir)?;
+        match &source_bundle {
+            Some(bundle) => copy_dir_recursive(bundle, &app_dir)?,
+            None => stage_macos_app_bundle(&macos_dir, &resources, &installed_bin)?,
+        }
+    }
+
+    write_install_marker(&resources, InstallSource::MacApp)?;
+
+    let aliases_dir = macos_user_alias_dir()?;
+    fs::create_dir_all(&aliases_dir)?;
+    for name in COMMAND_NAMES {
+        replace_unix_symlink(&aliases_dir.join(name), &installed_bin)?;
+    }
+
+    let plist_path = macos_launch_agent_path()?;
+    if autostart {
+        write_text_file(&plist_path, &macos_launch_agent_plist(&installed_bin))?;
+    } else {
+        remove_file_if_exists(&plist_path)?;
+    }
+
+    println!("honk300: installed {}.", app_dir.display());
+    println!("honk300: aliases linked in {}.", aliases_dir.display());
+    if !path_contains(&aliases_dir) {
+        println!(
+            "honk300: {} is not currently on PATH; add it or open a shell that loads it.",
+            aliases_dir.display()
+        );
+    }
+    println!("honk300: first launch is Gatekeeper-quarantined (unsigned) — right-click the app in Finder and choose Open once to approve it.");
+    if autostart {
+        println!("honk300: login autostart enabled via LaunchAgent.");
+    }
+    Ok(())
+}
+
+/// Build the `honk300.app` layout for a bare-binary install, matching `script/package_macos_app.sh`:
+/// the running executable becomes `Contents/MacOS/honk300`, `Assets/` land in
+/// `Contents/Resources/Assets`, and an LSUIElement `Info.plist` (version stamped from the running
+/// build) is written.
+#[cfg(target_os = "macos")]
+fn stage_macos_app_bundle(
+    macos_dir: &Path,
+    resources: &Path,
+    installed_bin: &Path,
+) -> Result<(), DynError> {
+    fs::create_dir_all(macos_dir)?;
+    fs::create_dir_all(resources)?;
+    copy_current_exe(installed_bin)?;
+    make_executable(installed_bin)?;
+    copy_assets_into(&resources.join("Assets"))?;
+    write_text_file(
+        &macos_dir
+            .parent()
+            .ok_or("app bundle Contents directory is missing")?
+            .join("Info.plist"),
+        &macos_info_plist(env!("CARGO_PKG_VERSION")),
+    )?;
+    Ok(())
 }
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
@@ -204,8 +309,33 @@ pub fn uninstall(purge: bool) -> Result<(), DynError> {
 }
 
 #[cfg(target_os = "macos")]
-pub fn uninstall(_purge: bool) -> Result<(), DynError> {
-    Err("honk300 uninstall: macOS packaging is intentionally deferred with M16.1 Accessibility evidence.".into())
+pub fn uninstall(purge: bool) -> Result<(), DynError> {
+    let app_dir = macos_app_install_path()?;
+    let assets = app_dir.join("Contents").join("Resources").join("Assets");
+    let backup_root = macos_backup_root()?;
+    // Rescue user-supplied memes/notes before the bundle is deleted: `--purge` backs them up
+    // (then still removes them), while a plain uninstall preserves them and reports where.
+    let (backup, preserved) = if purge {
+        (backup_user_content(&assets, &backup_root)?, None)
+    } else {
+        (None, preserve_user_content(&assets, &backup_root)?)
+    };
+
+    for name in COMMAND_NAMES {
+        remove_file_if_exists(&macos_user_alias_dir()?.join(name))?;
+    }
+    remove_file_if_exists(&macos_launch_agent_path()?)?;
+    remove_dir_if_exists(&app_dir)?;
+
+    if purge {
+        purge_config_state(macos_config_state_root()?)?;
+        report_backup(backup);
+    } else {
+        report_preserved(preserved);
+    }
+
+    println!("honk300: uninstalled.");
+    Ok(())
 }
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
@@ -241,13 +371,21 @@ fn same_file_best_effort(left: &Path, right: &Path) -> bool {
     }
 }
 
+#[cfg(any(windows, target_os = "linux"))]
 fn copy_assets_next_to_binary(bin_dir: &Path) -> io::Result<()> {
+    copy_assets_into(&bin_dir.join("Assets"))
+}
+
+/// Copy the source `Assets/` tree to `dest_assets`, or scaffold an empty tree when no source is
+/// found. Shared by the Windows/Linux "assets next to the binary" layout and the macOS
+/// "assets in `Contents/Resources/Assets`" bundle layout.
+fn copy_assets_into(dest_assets: &Path) -> io::Result<()> {
     let Some(source_assets) = find_source_assets() else {
         println!("honk300: no source Assets directory found; installed asset folders were created empty.");
-        create_empty_asset_tree(&bin_dir.join("Assets"))?;
+        create_empty_asset_tree(dest_assets)?;
         return Ok(());
     };
-    copy_dir_recursive(&source_assets, &bin_dir.join("Assets"))
+    copy_dir_recursive(&source_assets, dest_assets)
 }
 
 fn find_source_assets() -> Option<PathBuf> {
@@ -662,13 +800,13 @@ fn linux_desktop_entry(exe: &Path) -> String {
     )
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn replace_unix_symlink(link: &Path, target: &Path) -> io::Result<()> {
     remove_file_if_exists(link)?;
     std::os::unix::fs::symlink(target, link)
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn make_executable(path: &Path) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
 
@@ -691,7 +829,7 @@ fn xdg_config_home() -> Result<PathBuf, DynError> {
         .unwrap_or(home_dir()?.join(".config")))
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn home_dir() -> Result<PathBuf, DynError> {
     Ok(PathBuf::from(
         std::env::var_os("HOME").ok_or("HOME is not set")?,
@@ -711,12 +849,111 @@ fn desktop_exec_quote(path: &Path) -> String {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn path_contains(dir: &Path) -> bool {
     let Some(path) = std::env::var_os("PATH") else {
         return false;
     };
     std::env::split_paths(&path).any(|part| part == dir)
+}
+
+#[cfg(target_os = "macos")]
+fn macos_app_install_path() -> Result<PathBuf, DynError> {
+    Ok(home_dir()?.join("Applications").join("Honk300.app"))
+}
+
+#[cfg(target_os = "macos")]
+fn macos_user_alias_dir() -> Result<PathBuf, DynError> {
+    Ok(home_dir()?.join(".local").join("bin"))
+}
+
+#[cfg(target_os = "macos")]
+fn macos_launch_agent_path() -> Result<PathBuf, DynError> {
+    Ok(home_dir()?
+        .join("Library")
+        .join("LaunchAgents")
+        .join("dev.emmetts.honk300.plist"))
+}
+
+// Matches honk-config's macOS `default_config_path` root so `--purge` removes the same tree the
+// config/state actually lives in.
+#[cfg(target_os = "macos")]
+fn macos_config_state_root() -> Result<PathBuf, DynError> {
+    Ok(home_dir()?
+        .join("Library")
+        .join("Application Support")
+        .join(APP_NAME))
+}
+
+#[cfg(target_os = "macos")]
+fn macos_backup_root() -> Result<PathBuf, DynError> {
+    Ok(home_dir()?
+        .join("Library")
+        .join("Application Support")
+        .join("honk300-backups"))
+}
+
+/// The `*.app` directory that contains the running executable, when there is one. Used by `install`
+/// to copy an already-staged bundle into `~/Applications`.
+#[cfg(target_os = "macos")]
+fn current_exe_app_bundle() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    exe.ancestors()
+        .find(|ancestor| ancestor.extension().and_then(|ext| ext.to_str()) == Some("app"))
+        .map(Path::to_path_buf)
+}
+
+/// The LSUIElement agent `Info.plist`, kept 1:1 with `script/package_macos_app.sh` (bundle id,
+/// executable name, LSUIElement, high-res) with the version stamped from the running build.
+#[cfg(target_os = "macos")]
+fn macos_info_plist(version: &str) -> String {
+    let version = xml_escape(version);
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\"\n  \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
+<plist version=\"1.0\">\n\
+<dict>\n\
+  <key>CFBundleDevelopmentRegion</key>\n  <string>en</string>\n\
+  <key>CFBundleDisplayName</key>\n  <string>Honk300</string>\n\
+  <key>CFBundleExecutable</key>\n  <string>honk300</string>\n\
+  <key>CFBundleIdentifier</key>\n  <string>dev.emmetts.honk300</string>\n\
+  <key>CFBundleInfoDictionaryVersion</key>\n  <string>6.0</string>\n\
+  <key>CFBundleName</key>\n  <string>Honk300</string>\n\
+  <key>CFBundlePackageType</key>\n  <string>APPL</string>\n\
+  <key>CFBundleShortVersionString</key>\n  <string>{version}</string>\n\
+  <key>CFBundleVersion</key>\n  <string>{version}</string>\n\
+  <key>LSMinimumSystemVersion</key>\n  <string>11.0</string>\n\
+  <key>LSUIElement</key>\n  <true/>\n\
+  <key>NSHighResolutionCapable</key>\n  <true/>\n\
+</dict>\n\
+</plist>\n"
+    )
+}
+
+/// The login LaunchAgent that runs the bundle binary with `start` at login (`--autostart`).
+#[cfg(target_os = "macos")]
+fn macos_launch_agent_plist(program: &Path) -> String {
+    let program = xml_escape(&program.to_string_lossy());
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\"\n  \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
+<plist version=\"1.0\">\n\
+<dict>\n\
+  <key>Label</key>\n  <string>dev.emmetts.honk300</string>\n\
+  <key>ProgramArguments</key>\n  <array>\n    <string>{program}</string>\n    <string>start</string>\n  </array>\n\
+  <key>RunAtLoad</key>\n  <true/>\n\
+  <key>ProcessType</key>\n  <string>Interactive</string>\n\
+</dict>\n\
+</plist>\n"
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn xml_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 #[cfg(test)]
@@ -733,11 +970,26 @@ mod tests {
             ("manual-local", InstallSource::ManualLocal),
             ("shell", InstallSource::Shell),
             ("powershell", InstallSource::PowerShell),
+            ("mac-app", InstallSource::MacApp),
         ] {
             assert_eq!(InstallSource::from_marker(marker), source);
             assert_eq!(source.marker_value(), marker);
         }
         assert_eq!(InstallSource::from_marker("cargo"), InstallSource::Unknown);
+    }
+
+    #[test]
+    fn app_bundle_detection_matches_only_app_ancestors() {
+        assert!(path_is_in_app_bundle(Path::new(
+            "/Users/a/Applications/Honk300.app/Contents/MacOS/honk300"
+        )));
+        assert!(path_is_in_app_bundle(Path::new(
+            "/Volumes/Honk300/Honk300.app/Contents/MacOS/goose"
+        )));
+        assert!(!path_is_in_app_bundle(Path::new(
+            "/Users/a/.local/share/honk300/install/bin/honk300"
+        )));
+        assert!(!path_is_in_app_bundle(Path::new("/usr/local/bin/honk300")));
     }
 
     #[test]

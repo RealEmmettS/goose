@@ -61,6 +61,8 @@ enum UpdateStrategy {
     ExeCorporate,
     PowerShell,
     Shell,
+    /// macOS `.app` install: replace `~/Applications/Honk300.app` from the universal2 DMG.
+    MacDmg,
 }
 
 impl UpdateStrategy {
@@ -72,6 +74,7 @@ impl UpdateStrategy {
             Self::ExeCorporate => "Corporate EXE installer",
             Self::PowerShell => "PowerShell installer",
             Self::Shell => "shell installer",
+            Self::MacDmg => "universal2 .app DMG",
         }
     }
 }
@@ -149,10 +152,19 @@ fn current_release_target() -> Option<ReleaseTarget> {
 
 fn select_update_plan(source: InstallSource, target: ReleaseTarget) -> Result<UpdatePlan, String> {
     if target.is_macos() {
-        return Err(
-            "macOS update artifacts are deferred with the unsigned personal-use packaging slice"
-                .into(),
-        );
+        // `.app` bundle installs replace the whole bundle from the universal2 DMG; every other
+        // macOS provenance (cargo-dist shell/cargo-home/bare) re-runs the shell installer, exactly
+        // like Linux.
+        return Ok(match source {
+            InstallSource::MacApp => UpdatePlan {
+                strategy: UpdateStrategy::MacDmg,
+                artifact: "honk300-universal2.dmg".into(),
+            },
+            _ => UpdatePlan {
+                strategy: UpdateStrategy::Shell,
+                artifact: "honk300-installer.sh".into(),
+            },
+        });
     }
     if target.is_linux() {
         return Ok(UpdatePlan {
@@ -182,7 +194,8 @@ fn select_update_plan(source: InstallSource, target: ReleaseTarget) -> Result<Up
             strategy: UpdateStrategy::ExeCorporate,
             artifact: format!("honk300-{triple}-corporate-setup.exe"),
         },
-        InstallSource::ManualLocal | InstallSource::Unknown => UpdatePlan {
+        // `MacApp` never occurs on a Windows target; it shares the safe per-user EXE fallback.
+        InstallSource::ManualLocal | InstallSource::Unknown | InstallSource::MacApp => UpdatePlan {
             strategy: UpdateStrategy::ExeCorporate,
             artifact: format!("honk300-{triple}-corporate-setup.exe"),
         },
@@ -364,6 +377,11 @@ fn checksum_verdict(expected: &str, actual: &str) -> Result<(), String> {
 }
 
 fn run_installer(strategy: UpdateStrategy, path: &Path) -> Result<(), DynError> {
+    // The DMG replacement is a multi-step mount/copy/detach rather than a single installer run.
+    if strategy == UpdateStrategy::MacDmg {
+        return run_macos_dmg_update(path);
+    }
+
     let status = match strategy {
         UpdateStrategy::MsiGlobal | UpdateStrategy::MsiCorporate => Command::new("msiexec")
             .arg("/i")
@@ -379,6 +397,7 @@ fn run_installer(strategy: UpdateStrategy, path: &Path) -> Result<(), DynError> 
             .arg(path)
             .status(),
         UpdateStrategy::Shell => Command::new("sh").arg(path).status(),
+        UpdateStrategy::MacDmg => unreachable!("handled above"),
     }?;
 
     if status.success() {
@@ -391,6 +410,68 @@ fn run_installer(strategy: UpdateStrategy, path: &Path) -> Result<(), DynError> 
         )
         .into())
     }
+}
+
+/// Replace `~/Applications/Honk300.app` from a verified universal2 DMG: mount read-only, copy the
+/// bundle out with `ditto` (preserving the ad-hoc signature), then detach. Non-`cfg` so the match
+/// arm above compiles everywhere; only ever reached on macOS.
+fn run_macos_dmg_update(dmg: &Path) -> Result<(), DynError> {
+    let mount = macos_attach_dmg(dmg)?;
+    let outcome = macos_replace_app_from_mount(&mount);
+    // Always detach, even when the copy failed, so a retry can re-mount.
+    let _ = Command::new("hdiutil")
+        .args(["detach", "-quiet"])
+        .arg(&mount)
+        .status();
+    outcome
+}
+
+fn macos_attach_dmg(dmg: &Path) -> Result<String, DynError> {
+    let output = Command::new("hdiutil")
+        .args(["attach", "-nobrowse", "-readonly"])
+        .arg(dmg)
+        .output()?;
+    if !output.status.success() {
+        return Err(command_error("hdiutil attach", &output.stderr).into());
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // The last `/Volumes/...` token in the attach table is the mount point.
+    stdout
+        .split_whitespace()
+        .rfind(|token| token.starts_with("/Volumes/"))
+        .map(str::to_string)
+        .ok_or_else(|| "hdiutil attach did not report a /Volumes mount point".into())
+}
+
+fn macos_replace_app_from_mount(mount: &str) -> Result<(), DynError> {
+    let source_app = Path::new(mount).join("Honk300.app");
+    if !source_app.exists() {
+        return Err(format!("mounted DMG did not contain Honk300.app at {mount}").into());
+    }
+    let dest_app = macos_home_dir()?.join("Applications").join("Honk300.app");
+    if let Some(parent) = dest_app.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let _ = fs::remove_dir_all(&dest_app);
+    let status = Command::new("ditto")
+        .arg(&source_app)
+        .arg(&dest_app)
+        .status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "ditto failed to install the app bundle with exit code {}",
+            status.code().unwrap_or(-1)
+        )
+        .into())
+    }
+}
+
+fn macos_home_dir() -> Result<PathBuf, DynError> {
+    Ok(PathBuf::from(
+        std::env::var_os("HOME").ok_or("HOME is not set")?,
+    ))
 }
 
 fn verify_post_install(latest: &str) -> Result<(), DynError> {
@@ -513,10 +594,22 @@ mod tests {
     }
 
     #[test]
-    fn macos_update_is_explicitly_deferred() {
+    fn macos_app_updates_via_dmg_others_via_shell() {
         for target in [ReleaseTarget::MacosX64, ReleaseTarget::MacosArm64] {
-            let err = select_update_plan(InstallSource::Unknown, target).unwrap_err();
-            assert!(err.contains("deferred"));
+            let app = select_update_plan(InstallSource::MacApp, target).unwrap();
+            assert_eq!(app.strategy, UpdateStrategy::MacDmg);
+            assert_eq!(app.artifact, "honk300-universal2.dmg");
+
+            for source in [
+                InstallSource::Shell,
+                InstallSource::PowerShell,
+                InstallSource::ManualLocal,
+                InstallSource::Unknown,
+            ] {
+                let plan = select_update_plan(source, target).unwrap();
+                assert_eq!(plan.strategy, UpdateStrategy::Shell);
+                assert_eq!(plan.artifact, "honk300-installer.sh");
+            }
         }
     }
 

@@ -66,7 +66,8 @@ off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
   M16.1-M18.1 CI-proven readiness contract; ADR 0013 records the M19 lifecycle/release contract
   and deferred macOS distribution slice; ADR 0014 records Renderer V2 (flat-illustration
   dual-view procedural vector — supersedes ADR 0001's sprite/atlas direction); ADR 0015 records
-  the R1 reliability/platform-safety contract; ADR 0016 records the idle-life behaviors.
+  the R1 reliability/platform-safety contract; ADR 0016 records the idle-life behaviors; ADR 0017
+  records the R3 macOS packaging + lifecycle slice (supersedes ADR 0013's macOS deferral).
 
 ## Big-picture architecture (original → planned port)
 
@@ -125,6 +126,10 @@ off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
 - M17/M18's Linux control-runtime foundation lives in `docs/adr/0011-m17-m18-linux-control-runtime-and-degraded-wayland.md`.
 - M16.1-M18.1's CI-proven readiness contract lives in `docs/adr/0012-m16-1-m18-1-ci-proven-backend-readiness.md`.
 - M19's lifecycle/release split and macOS packaging deferral live in `docs/adr/0013-m19-lifecycle-packaging-and-deferred-macos-distribution.md`.
+- Renderer V2's flat-illustration dual-view direction lives in `docs/adr/0014-renderer-v2-flat-illustration-dual-view.md`.
+- R1's reliability/platform-safety contract lives in `docs/adr/0015-reliability-and-platform-safety-fixes.md`.
+- R2's idle-life behaviors live in `docs/adr/0016-idle-life-behaviors-meander-mud-excursions.md`.
+- R3's macOS packaging + lifecycle slice (universal2 `.app`/DMG, macOS `install`/`uninstall`/`update`, unsigned personal-use; supersedes ADR 0013's macOS deferral) lives in `docs/adr/0017-macos-packaging-and-lifecycle.md`.
 
 ## Task management system
 

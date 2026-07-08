@@ -1,0 +1,413 @@
+- generic [ref=f2e2]:
+  - banner [ref=f2e3]:
+    - link "honk300 home" [ref=f2e4] [cursor=pointer]:
+      - /url: "#top"
+      - img [ref=f2e7]
+      - generic [ref=f2e26]:
+        - generic [ref=f2e27]: honk300
+        - generic [ref=f2e28]: by SHAUGHV
+    - navigation "Primary navigation" [ref=f2e29]:
+      - link "Download" [ref=f2e30] [cursor=pointer]:
+        - /url: "#download"
+      - link "Usage" [ref=f2e31] [cursor=pointer]:
+        - /url: "#usage"
+      - link "Safety" [ref=f2e32] [cursor=pointer]:
+        - /url: "#safety"
+    - link "v0.1.0" [ref=f2e33] [cursor=pointer]:
+      - /url: https://github.com/RealEmmettS/goose/releases/tag/v0.1.0
+      - img [ref=f2e34]
+      - generic [ref=f2e38]: v0.1.0
+  - main [ref=f2e39]:
+    - generic [ref=f2e40]:
+      - generic [ref=f2e41]:
+        - generic [ref=f2e42]:
+          - paragraph [ref=f2e43]: Clean-room desktop goose | latest v0.1.0
+          - heading "honk300" [level=1] [ref=f2e44]
+          - paragraph [ref=f2e45]: A tiny desktop goose with a real command line.
+          - paragraph [ref=f2e46]: Install it, start it with goose-speak, calm it down from the terminal, and keep every release update on a verified GitHub path.
+          - generic "Primary actions" [ref=f2e47]:
+            - link "Download" [ref=f2e48] [cursor=pointer]:
+              - /url: "#download"
+              - img [ref=f2e49]
+              - text: Download
+            - button "Copy PowerShell" [ref=f2e52] [cursor=pointer]:
+              - img [ref=f2e53]
+              - text: Copy PowerShell
+          - generic "Goose-speak examples" [ref=f2e56]:
+            - generic [ref=f2e57]: goose plz
+            - generic [ref=f2e58]: goose no honk
+            - generic [ref=f2e59]: goose config
+          - generic "Release metadata" [ref=f2e60]:
+            - generic [ref=f2e61]: Released Jul 7, 2026
+            - generic [ref=f2e62]: Scripts use latest/download URLs
+            - generic [ref=f2e63]: No crates.io install path
+        - generic "Illustration of honk300 walking through a desktop" [ref=f2e64]:
+          - generic [ref=f2e69]:
+            - generic [ref=f2e70]: C:\Users\hey>
+            - code [ref=f2e71]: goose do honk
+            - code [ref=f2e72]: HONK300/1 OK
+          - generic [ref=f2e73]:
+            - generic [ref=f2e74]: Downloads
+            - generic [ref=f2e75]: honk300-installer.ps1
+            - generic [ref=f2e76]: sha256.sum
+          - img "Clean-room honk300 goose" [ref=f2e80]
+          - generic [ref=f2e99]:
+            - generic [ref=f2e100]: honk300
+            - generic [ref=f2e101]: "calm goose: on"
+      - generic [ref=f2e102]:
+        - generic [ref=f2e103]: Desktop chaos, reimplemented.
+        - generic [ref=f2e104]: Install first. Honk second.
+    - generic [ref=f2e106]:
+      - generic [ref=f2e107]:
+        - paragraph [ref=f2e108]: Install first
+        - heading "Download the goose" [level=2] [ref=f2e109]
+        - paragraph [ref=f2e110]: Version tag v0.1.0 is the verified fallback. The page checks GitHub live and keeps install links on latest/download if the API is unavailable.
+      - generic [ref=f2e111]:
+        - generic [ref=f2e112]:
+          - generic [ref=f2e114]: Verified fallback version
+          - link "v0.1.0" [ref=f2e115] [cursor=pointer]:
+            - /url: https://github.com/RealEmmettS/goose/releases/tag/v0.1.0
+            - text: v0.1.0
+            - img [ref=f2e116]
+        - generic [ref=f2e120]:
+          - text: Every direct artifact row includes its matching
+          - code [ref=f2e121]: .sha256
+          - text: sidecar.
+      - generic [ref=f2e122]:
+        - article [ref=f2e123]:
+          - generic [ref=f2e124]:
+            - generic [ref=f2e125]: WIN
+            - heading "Windows" [level=3] [ref=f2e126]
+            - paragraph [ref=f2e127]: Global and corporate installers for x64 and ARM64, with checksum sidecars.
+          - generic [ref=f2e128]:
+            - generic [ref=f2e129]:
+              - text: Windows PowerShell
+              - code [ref=f2e130]: powershell -ExecutionPolicy Bypass -c "irm https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.ps1 | iex"
+            - button "Copy" [ref=f2e131] [cursor=pointer]:
+              - img [ref=f2e132]
+              - text: Copy
+          - generic "Windows downloads" [ref=f2e135]:
+            - generic [ref=f2e136]:
+              - link "x64 ZIP Portable archive" [ref=f2e137] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc.zip
+                - generic [ref=f2e138]: x64 ZIP
+                - generic [ref=f2e139]: Portable archive
+              - link "sha256" [ref=f2e140] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc.zip.sha256
+            - generic [ref=f2e141]:
+              - link "ARM64 ZIP Portable archive" [ref=f2e142] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc.zip
+                - generic [ref=f2e143]: ARM64 ZIP
+                - generic [ref=f2e144]: Portable archive
+              - link "sha256" [ref=f2e145] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc.zip.sha256
+            - generic [ref=f2e146]:
+              - link "x64 MSI Global machine installer" [ref=f2e147] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc.msi
+                - generic [ref=f2e148]: x64 MSI
+                - generic [ref=f2e149]: Global machine installer
+              - link "sha256" [ref=f2e150] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc.msi.sha256
+            - generic [ref=f2e151]:
+              - link "ARM64 MSI Global machine installer" [ref=f2e152] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc.msi
+                - generic [ref=f2e153]: ARM64 MSI
+                - generic [ref=f2e154]: Global machine installer
+              - link "sha256" [ref=f2e155] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc.msi.sha256
+            - generic [ref=f2e156]:
+              - link "x64 EXE Global setup executable" [ref=f2e157] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc-setup.exe
+                - generic [ref=f2e158]: x64 EXE
+                - generic [ref=f2e159]: Global setup executable
+              - link "sha256" [ref=f2e160] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc-setup.exe.sha256
+            - generic [ref=f2e161]:
+              - link "ARM64 EXE Global setup executable" [ref=f2e162] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc-setup.exe
+                - generic [ref=f2e163]: ARM64 EXE
+                - generic [ref=f2e164]: Global setup executable
+              - link "sha256" [ref=f2e165] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc-setup.exe.sha256
+            - generic [ref=f2e166]:
+              - link "x64 Corporate MSI Per-user corporate installer" [ref=f2e167] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc-corporate.msi
+                - generic [ref=f2e168]: x64 Corporate MSI
+                - generic [ref=f2e169]: Per-user corporate installer
+              - link "sha256" [ref=f2e170] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc-corporate.msi.sha256
+            - generic [ref=f2e171]:
+              - link "ARM64 Corporate MSI Per-user corporate installer" [ref=f2e172] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc-corporate.msi
+                - generic [ref=f2e173]: ARM64 Corporate MSI
+                - generic [ref=f2e174]: Per-user corporate installer
+              - link "sha256" [ref=f2e175] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc-corporate.msi.sha256
+            - generic [ref=f2e176]:
+              - link "x64 Corporate EXE Per-user corporate setup" [ref=f2e177] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc-corporate-setup.exe
+                - generic [ref=f2e178]: x64 Corporate EXE
+                - generic [ref=f2e179]: Per-user corporate setup
+              - link "sha256" [ref=f2e180] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc-corporate-setup.exe.sha256
+            - generic [ref=f2e181]:
+              - link "ARM64 Corporate EXE Per-user corporate setup" [ref=f2e182] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc-corporate-setup.exe
+                - generic [ref=f2e183]: ARM64 Corporate EXE
+                - generic [ref=f2e184]: Per-user corporate setup
+              - link "sha256" [ref=f2e185] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc-corporate-setup.exe.sha256
+        - article [ref=f2e186]:
+          - generic [ref=f2e187]:
+            - generic [ref=f2e188]: LIN
+            - heading "Linux" [level=3] [ref=f2e189]
+            - paragraph [ref=f2e190]: X11-first release archives for GNU and musl targets, x64 and ARM64.
+          - generic [ref=f2e191]:
+            - generic [ref=f2e192]:
+              - text: Linux shell
+              - code [ref=f2e193]: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.sh | sh
+            - button "Copy" [ref=f2e194] [cursor=pointer]:
+              - img [ref=f2e195]
+              - text: Copy
+          - generic "Linux downloads" [ref=f2e198]:
+            - generic [ref=f2e199]:
+              - link "x64 GNU glibc archive" [ref=f2e200] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-unknown-linux-gnu.tar.xz
+                - generic [ref=f2e201]: x64 GNU
+                - generic [ref=f2e202]: glibc archive
+              - link "sha256" [ref=f2e203] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-unknown-linux-gnu.tar.xz.sha256
+            - generic [ref=f2e204]:
+              - link "ARM64 GNU glibc archive" [ref=f2e205] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-unknown-linux-gnu.tar.xz
+                - generic [ref=f2e206]: ARM64 GNU
+                - generic [ref=f2e207]: glibc archive
+              - link "sha256" [ref=f2e208] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-unknown-linux-gnu.tar.xz.sha256
+            - generic [ref=f2e209]:
+              - link "x64 musl static musl archive" [ref=f2e210] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-unknown-linux-musl.tar.xz
+                - generic [ref=f2e211]: x64 musl
+                - generic [ref=f2e212]: static musl archive
+              - link "sha256" [ref=f2e213] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-unknown-linux-musl.tar.xz.sha256
+            - generic [ref=f2e214]:
+              - link "ARM64 musl static musl archive" [ref=f2e215] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-unknown-linux-musl.tar.xz
+                - generic [ref=f2e216]: ARM64 musl
+                - generic [ref=f2e217]: static musl archive
+              - link "sha256" [ref=f2e218] [cursor=pointer]:
+                - /url: https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-unknown-linux-musl.tar.xz.sha256
+        - article [ref=f2e219]:
+          - generic [ref=f2e220]:
+            - generic [ref=f2e221]: MAC
+            - heading "macOS" [level=3] [ref=f2e222]
+            - paragraph [ref=f2e223]: Distribution is deferred. Local app staging exists, but public signing and notarization are not shipped yet.
+          - generic [ref=f2e224]:
+            - generic [ref=f2e225]:
+              - text: macOS local staging
+              - code [ref=f2e226]: git clone https://github.com/RealEmmettS/goose.git && cd goose && ./script/package_macos_app.sh
+            - button "Copy" [ref=f2e227] [cursor=pointer]:
+              - img [ref=f2e228]
+              - text: Copy
+          - generic [ref=f2e231]:
+            - text: Public installer status
+            - paragraph [ref=f2e232]: No signed or notarized public macOS download is advertised yet.
+            - link "Source repo" [ref=f2e233] [cursor=pointer]:
+              - /url: https://github.com/RealEmmettS/goose
+              - text: Source repo
+              - img [ref=f2e234]
+    - generic [ref=f2e239]:
+      - generic [ref=f2e240]:
+        - generic [ref=f2e241]:
+          - paragraph [ref=f2e242]: Goose-speak CLI
+          - heading "Use it like a command" [level=2] [ref=f2e243]
+          - paragraph [ref=f2e244]: The binary installs as honk300, honk, and goose. Friendly aliases normalize to the same finite command grammar before dispatch.
+        - generic "Command reference" [ref=f2e245]:
+          - generic [ref=f2e246]:
+            - generic [ref=f2e247]:
+              - generic [ref=f2e248]: Goose-speak
+              - generic [ref=f2e249]: Friendly aliases normalize to one grammar.
+            - generic [ref=f2e250]:
+              - generic [ref=f2e251]:
+                - code [ref=f2e252]: goose plz
+                - generic [ref=f2e253]: Start the goose using the friendly alias.
+                - button "Copy" [ref=f2e254] [cursor=pointer]:
+                  - img [ref=f2e255]
+                  - text: Copy
+              - generic [ref=f2e258]:
+                - code [ref=f2e259]: goose no honk
+                - generic [ref=f2e260]: Stop the running goose. bad and no work too.
+                - button "Copy" [ref=f2e261] [cursor=pointer]:
+                  - img [ref=f2e262]
+                  - text: Copy
+              - generic [ref=f2e265]:
+                - code [ref=f2e266]: goose exit
+                - generic [ref=f2e267]: Stop the goose. quit is the same command.
+                - button "Copy" [ref=f2e268] [cursor=pointer]:
+                  - img [ref=f2e269]
+                  - text: Copy
+              - generic [ref=f2e272]:
+                - code [ref=f2e273]: goose do honk
+                - generic [ref=f2e274]: Poke a direct honk without changing the session.
+                - button "Copy" [ref=f2e275] [cursor=pointer]:
+                  - img [ref=f2e276]
+                  - text: Copy
+          - generic [ref=f2e279]:
+            - generic [ref=f2e280]:
+              - generic [ref=f2e281]: Lifecycle
+              - generic [ref=f2e282]: Install, update, and remove honk300.
+            - generic [ref=f2e283]:
+              - generic [ref=f2e284]:
+                - code [ref=f2e285]: honk300 install --autostart
+                - generic [ref=f2e286]: Install assets and aliases, and start on login.
+                - button "Copy" [ref=f2e287] [cursor=pointer]:
+                  - img [ref=f2e288]
+                  - text: Copy
+              - generic [ref=f2e291]:
+                - code [ref=f2e292]: honk300 update
+                - generic [ref=f2e293]: Fetch the matching release installer and verify its sha256 sidecar.
+                - button "Copy" [ref=f2e294] [cursor=pointer]:
+                  - img [ref=f2e295]
+                  - text: Copy
+              - generic [ref=f2e298]:
+                - code [ref=f2e299]: honk300 setup
+                - generic [ref=f2e300]: Create or refresh the user config file.
+                - button "Copy" [ref=f2e301] [cursor=pointer]:
+                  - img [ref=f2e302]
+                  - text: Copy
+              - generic [ref=f2e305]:
+                - code [ref=f2e306]: honk300 uninstall --purge
+                - generic [ref=f2e307]: Remove honk300, back up memes and notes, then clear user state.
+                - button "Copy" [ref=f2e308] [cursor=pointer]:
+                  - img [ref=f2e309]
+                  - text: Copy
+          - generic [ref=f2e312]:
+            - generic [ref=f2e313]:
+              - generic [ref=f2e314]: Session
+              - generic [ref=f2e315]: Steer a running goose over local IPC.
+            - generic [ref=f2e316]:
+              - generic [ref=f2e317]:
+                - code [ref=f2e318]: goose config
+                - generic [ref=f2e319]: Open the terminal settings screen.
+                - button "Copy" [ref=f2e320] [cursor=pointer]:
+                  - img [ref=f2e321]
+                  - text: Copy
+              - generic [ref=f2e324]:
+                - code [ref=f2e325]: goose reload
+                - generic [ref=f2e326]: Reload runtime options without restarting.
+                - button "Copy" [ref=f2e327] [cursor=pointer]:
+                  - img [ref=f2e328]
+                  - text: Copy
+              - generic [ref=f2e331]:
+                - code [ref=f2e332]: honk300 status
+                - generic [ref=f2e333]: Print platform, bundle, and capability status.
+                - button "Copy" [ref=f2e334] [cursor=pointer]:
+                  - img [ref=f2e335]
+                  - text: Copy
+          - generic [ref=f2e338]:
+            - generic [ref=f2e339]:
+              - generic [ref=f2e340]: Global flags
+              - generic [ref=f2e341]: Add to any command to change one run.
+            - generic [ref=f2e342]:
+              - generic [ref=f2e343]:
+                - code [ref=f2e344]: "--no-sound"
+                - generic [ref=f2e345]: Start the goose muted for this run.
+                - button "Copy" [ref=f2e346] [cursor=pointer]:
+                  - img [ref=f2e347]
+                  - text: Copy
+              - generic [ref=f2e350]:
+                - code [ref=f2e351]: "--no-mouse-steal"
+                - generic [ref=f2e352]: Disable cursor-stealing behavior for this run.
+                - button "Copy" [ref=f2e353] [cursor=pointer]:
+                  - img [ref=f2e354]
+                  - text: Copy
+              - generic [ref=f2e357]:
+                - code [ref=f2e358]: "--no-window-ride"
+                - generic [ref=f2e359]: Disable foreign-window riding for this run.
+                - button "Copy" [ref=f2e360] [cursor=pointer]:
+                  - img [ref=f2e361]
+                  - text: Copy
+              - generic [ref=f2e364]:
+                - code [ref=f2e365]: "--wayland"
+                - generic [ref=f2e366]: Request native Wayland reduced mode on Linux.
+                - button "Copy" [ref=f2e367] [cursor=pointer]:
+                  - img [ref=f2e368]
+                  - text: Copy
+      - generic "honk300 status preview" [ref=f2e371]:
+        - generic [ref=f2e372]:
+          - img [ref=f2e373]
+          - generic [ref=f2e375]: honk300 status
+        - generic [ref=f2e376]:
+          - paragraph [ref=f2e377]:
+            - generic [ref=f2e378]: runtime
+            - text: running
+          - paragraph [ref=f2e379]:
+            - generic [ref=f2e380]: bundle
+            - text: assets found
+          - paragraph [ref=f2e381]:
+            - generic [ref=f2e382]: terminal_guard
+            - text: protected
+          - paragraph [ref=f2e383]:
+            - generic [ref=f2e384]: calm_goose
+            - text: enabled
+          - paragraph [ref=f2e385]:
+            - generic [ref=f2e386]: quiet_hours
+            - text: 22:00-08:00
+          - paragraph [ref=f2e387]:
+            - generic [ref=f2e388]: linux_mode
+            - text: X11 first
+          - paragraph [ref=f2e389]:
+            - generic [ref=f2e390]: wayland
+            - text: reduced, explicit
+        - generic "Clean-room golden goose frames" [ref=f2e391]:
+          - img "Clean-room resting goose frame" [ref=f2e392]
+          - img "Clean-room mid-stride goose frame" [ref=f2e393]
+          - img "Clean-room reaching goose frame" [ref=f2e394]
+    - generic [ref=f2e396]:
+      - generic [ref=f2e397]:
+        - paragraph [ref=f2e398]: Capabilities and manners
+        - heading "Mischief with boundaries" [level=2] [ref=f2e399]
+        - paragraph [ref=f2e400]: honk300 keeps the odd desktop energy, but reports capability gaps honestly and protects the places people do serious work.
+      - generic [ref=f2e401]:
+        - article [ref=f2e402]:
+          - img [ref=f2e403]
+          - heading "Terminal protection" [level=3] [ref=f2e406]
+          - paragraph [ref=f2e407]: Terminal windows are visible to the goose, but never targets for focus, typing, dragging, riding, or collect-window actions.
+        - article [ref=f2e408]:
+          - img [ref=f2e409]
+          - heading "Calm Goose" [level=3] [ref=f2e413]
+          - paragraph [ref=f2e414]: A real config switch for quieter sessions that disables surprise disruptions while keeping the goose present.
+        - article [ref=f2e415]:
+          - img [ref=f2e416]
+          - heading "Quiet hours and presence" [level=3] [ref=f2e418]
+          - paragraph [ref=f2e419]: Quiet hours, DND, and fullscreen focus calm the goose down instead of interrupting work, streams, or games.
+        - article [ref=f2e420]:
+          - img [ref=f2e421]
+          - heading "X11-first Linux" [level=3] [ref=f2e423]
+          - paragraph [ref=f2e424]: Linux defaults to X11 or XWayland when available. Native Wayland is explicit reduced mode with unsupported capabilities reported honestly.
+        - article [ref=f2e425]:
+          - img [ref=f2e426]
+          - heading "Deferred macOS distribution" [level=3] [ref=f2e429]
+          - paragraph [ref=f2e430]: macOS runtime and local app staging exist, while public signing, notarization, and DMG distribution remain deferred.
+        - article [ref=f2e431]:
+          - img [ref=f2e432]
+          - heading "Explicit pokes" [level=3] [ref=f2e434]
+          - paragraph [ref=f2e435]: Direct actions stay behind commands like do honk, do mud, do wander, do note, do meme, and do nab.
+  - contentinfo [ref=f2e436]:
+    - generic [ref=f2e437]:
+      - generic [ref=f2e438]:
+        - paragraph [ref=f2e439]: Source and releases
+        - generic [ref=f2e440]:
+          - link "GitHub source" [ref=f2e441] [cursor=pointer]:
+            - /url: https://github.com/RealEmmettS/goose
+            - img [ref=f2e442]
+            - text: GitHub source
+          - link "Latest release" [ref=f2e446] [cursor=pointer]:
+            - /url: https://github.com/RealEmmettS/goose/releases/latest
+            - img [ref=f2e447]
+            - text: Latest release
+      - generic "Made by SHAUGHV" [ref=f2e450]:
+        - generic "SHAUGHV" [ref=f2e451]:
+          - img "SHAUGHV" [ref=f2e452]
+        - generic [ref=f2e471]: Made by SHAUGHV

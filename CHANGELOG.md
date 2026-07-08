@@ -18,6 +18,8 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-08
+
 ### Added
 - **Renderer V2: flat-illustration dual-view goose (R2, ADR 0014)** - the goose is now drawn in
   the flat-illustration style of the project's own reference art (`docs/art-reference/`): a
@@ -45,6 +47,24 @@ All notable changes to this project are documented here. Format based on
   cursor nabs join the roaming deck (and the mischievous-mood bias), matching the original's
   `AttackRandomly`. Default stays off — without it, nabs come only from clicks and `do nab`.
   New "Attack randomly" TUI toggle.
+- **macOS packaging: universal2 `.app` + DMG (R3, ADR 0017)** - `x86_64-apple-darwin` and
+  `aarch64-apple-darwin` join `[workspace.metadata.dist].targets`, so cargo-dist emits
+  `honk300-<arch>-apple-darwin.tar.xz` (+ sha256) and a Darwin-capable shell installer. A
+  hand-authored `.github/workflows/macos-packaging.yml` (chained on the Release workflow, like the
+  Windows one) builds a `lipo`-fused universal2 `Honk300.app`, `hdiutil`-packs a compressed
+  `honk300-universal2.dmg` (with an `/Applications` symlink), writes a sha256 sidecar, and uploads
+  to the tag. `script/package_macos_app.sh` now stamps the real bundle version from
+  `HONK300_VERSION` instead of `0.0.0`. Artifacts are **unsigned personal-use** (ad-hoc codesign
+  only) — first launch needs a one-time right-click → Open. Supersedes ADR 0013's macOS deferral.
+- **macOS `install` / `uninstall` / `update` (R3, ADR 0017)** - `honk300 install` stages
+  `~/Applications/Honk300.app` (copying the bundle when run from one, else synthesizing the layout
+  from a bare binary), symlinks `honk300`/`honk`/`goose` into `~/.local/bin`, writes a `mac-app`
+  install marker, and with `--autostart` writes a `RunAtLoad` LaunchAgent
+  (`~/Library/LaunchAgents/dev.emmetts.honk300.plist`). `uninstall` removes those and preserves
+  user memes/notes (ADR 0015 §7 semantics); `--purge` also clears
+  `~/Library/Application Support/honk300`. `update` replaces the `.app` from the verified DMG for
+  bundle installs, and re-runs the cargo-dist shell installer for bare/symlink installs (Linux
+  parity, no `cargo install`).
 
 ### Changed
 - **Wandering no longer starts mud tracking** (previously a 50% roll at every waypoint) — mud is
