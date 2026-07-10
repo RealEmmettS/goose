@@ -65,6 +65,9 @@ All notable changes to this project are documented here. Format based on
   are rejected, foreign integrations are preserved, payload swaps and owned integrations roll
   back together, Windows hands privileged replacement to hidden post-exit installer helpers, and
   one draft-only release orchestration now publishes the complete immutable asset set at once.
+- **Deterministic hosted X11 readiness** - the Linux visible-overlay smoke gate now waits for the
+  compositing manager to own the same X11 selection required by the runtime before starting it,
+  and prints the runtime log when readiness fails instead of hiding the actionable cause.
 
 ### Security
 - **Hardened local boundaries and supply chain** - Windows named pipes are limited to the current

@@ -68,6 +68,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   owned by somebody else are left alone, interrupted replacements restore the prior install, and
   privileged Windows updates wait until the running app exits. A release becomes public only
   after every required download has been assembled and verified together.
+- **Linux release checks no longer race desktop startup.** The automated visible-desktop check
+  waits until its compositor is genuinely ready before launching the goose, and shows the real
+  startup error if readiness still fails. This makes Linux release evidence repeatable and easier
+  to diagnose.
 
 ### Security
 - **Local controls and downloaded installers are more tightly contained.** Only the signed-in

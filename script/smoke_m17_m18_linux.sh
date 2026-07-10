@@ -47,6 +47,7 @@ need_cmd() {
 }
 
 wait_for_status() {
+  runtime_log="$1"
   ready=0
   for _ in $(seq 1 100); do
     if "${BIN}" status >"${STATUS}" 2>&1 && grep -q "honk300: running" "${STATUS}"; then
@@ -56,10 +57,51 @@ wait_for_status() {
     sleep 0.25
   done
   if [ "${ready}" -ne 1 ]; then
+    cat "${runtime_log}" >&2 || true
     cat "${STATUS}" >&2 || true
     echo "smoke_m17_m18_linux: runtime did not answer status" >&2
     exit 1
   fi
+}
+
+wait_for_x11_compositor() {
+  for _ in $(seq 1 40); do
+    if python3 <<'PY'
+import ctypes
+
+x11 = ctypes.CDLL("libX11.so.6")
+x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+x11.XOpenDisplay.restype = ctypes.c_void_p
+x11.XDefaultScreen.argtypes = [ctypes.c_void_p]
+x11.XDefaultScreen.restype = ctypes.c_int
+x11.XInternAtom.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
+x11.XInternAtom.restype = ctypes.c_ulong
+x11.XGetSelectionOwner.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+x11.XGetSelectionOwner.restype = ctypes.c_ulong
+x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+
+display = x11.XOpenDisplay(None)
+if not display:
+    raise SystemExit(1)
+screen = x11.XDefaultScreen(display)
+atom = x11.XInternAtom(display, f"_NET_WM_CM_S{screen}".encode(), 0)
+owner = x11.XGetSelectionOwner(display, atom)
+x11.XCloseDisplay(display)
+raise SystemExit(0 if owner else 1)
+PY
+    then
+      return 0
+    fi
+    if ! kill -0 "${XCOMPMGR_PID}" >/dev/null 2>&1; then
+      cat "${WORK}/xcompmgr.log" >&2 || true
+      echo "smoke_m17_m18_linux: xcompmgr exited before claiming the compositor selection" >&2
+      exit 1
+    fi
+    sleep 0.25
+  done
+  cat "${WORK}/xcompmgr.log" >&2 || true
+  echo "smoke_m17_m18_linux: X11 compositor selection did not become ready" >&2
+  exit 1
 }
 
 wait_for_frame() {
@@ -223,6 +265,7 @@ start_x11_server() {
   need_cmd Xvfb
   need_cmd import
   need_cmd xsetroot
+  need_cmd xcompmgr
   export DISPLAY="${HONK300_XVFB_DISPLAY:-:99}"
   Xvfb "${DISPLAY}" -screen 0 1280x720x24 >"${WORK}/xvfb.log" 2>&1 &
   XVFB_PID="$!"
@@ -237,10 +280,9 @@ start_x11_server() {
     openbox >"${WORK}/openbox.log" 2>&1 &
     OPENBOX_PID="$!"
   fi
-  if command -v xcompmgr >/dev/null 2>&1; then
-    xcompmgr -a >"${WORK}/xcompmgr.log" 2>&1 &
-    XCOMPMGR_PID="$!"
-  fi
+  xcompmgr -a >"${WORK}/xcompmgr.log" 2>&1 &
+  XCOMPMGR_PID="$!"
+  wait_for_x11_compositor
 }
 
 start_sway_headless() {
@@ -334,7 +376,7 @@ exercise_mode() {
   echo "smoke_m17_m18_linux: starting ${label}"
   HONK300_SMOKE_FRAME="${frame}" "${BIN}" start --config "${CONFIG}" "$@" >"${log}" 2>&1 &
   PID="$!"
-  wait_for_status
+  wait_for_status "${log}"
   cat "${STATUS}"
   grep -q "platform: Linux" "${STATUS}"
   wait_for_frame "${frame}"
