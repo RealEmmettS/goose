@@ -47,6 +47,8 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("Candidate artifact set verified without publication", RELEASE)
         self.assertIn("if: ${{ !inputs.candidate }}", RELEASE)
         self.assertIn("candidate: ${{ inputs.candidate || false }}", RELEASE)
+        self.assertIn('$tagExists = [bool](git tag --list "${{ inputs.tag }}")', WINDOWS)
+        self.assertNotIn("git show-ref --verify --quiet", WINDOWS)
 
     def test_ci_requires_audit_and_project_owned_installer_tests(self) -> None:
         self.assertIn("cargo audit", CI)

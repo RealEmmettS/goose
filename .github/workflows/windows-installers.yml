@@ -87,8 +87,9 @@ jobs:
           if ($head -ne "${{ inputs.commit }}") {
             throw "Requested commit and checkout do not match"
           }
-          git show-ref --verify --quiet "refs/tags/${{ inputs.tag }}" *> $null
-          $tagExists = $LASTEXITCODE -eq 0
+          # A missing tag is normal in candidate mode. `git tag --list` keeps that probe at exit
+          # zero under GitHub's fail-on-native-error PowerShell wrapper.
+          $tagExists = [bool](git tag --list "${{ inputs.tag }}")
           if ($env:CANDIDATE -eq 'true') {
             if ($tagExists) {
               throw "Candidate tag already exists; use release mode or a new patch version"
