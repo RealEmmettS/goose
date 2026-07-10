@@ -6,12 +6,43 @@
 //! whole backend is a silent no-op, and individual decode/playback failures are ignored.
 
 use honk_engine::{HonkTone, Sound};
-#[cfg(windows)]
+#[cfg(any(
+    windows,
+    target_os = "macos",
+    all(target_os = "linux", target_env = "gnu")
+))]
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
-#[cfg(windows)]
+#[cfg(any(
+    windows,
+    target_os = "macos",
+    all(target_os = "linux", target_env = "gnu")
+))]
 use std::io::Cursor;
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "musl"))]
 use std::path::PathBuf;
+
+#[cfg(any(test, all(target_os = "linux", target_env = "musl")))]
+const MAX_AUDIO_CHILDREN: usize = 4;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlayOutcome {
+    Played,
+    #[allow(dead_code)]
+    Busy,
+    Failed,
+}
+
+#[cfg(test)]
+fn bounded_child_count(requested: usize) -> usize {
+    requested.min(MAX_AUDIO_CHILDREN)
+}
+
+#[cfg(any(test, all(target_os = "linux", target_env = "musl")))]
+fn path_candidates(name: &str, path: &std::ffi::OsStr) -> Vec<std::path::PathBuf> {
+    std::env::split_paths(path)
+        .map(|directory| directory.join(name))
+        .collect()
+}
 
 const HONKS: [&[u8]; 4] = [
     include_bytes!("../Assets/Sounds/Honk1.mp3"),
@@ -29,7 +60,11 @@ const PATS: [&[u8]; 3] = [
 
 /// Owns the output stream and plays sound clips. Keep the value alive for the whole run —
 /// dropping it closes the audio device.
-#[cfg(windows)]
+#[cfg(any(
+    windows,
+    target_os = "macos",
+    all(target_os = "linux", target_env = "gnu")
+))]
 pub struct Audio {
     // Held only to keep the device open; never touched directly.
     _stream: OutputStream,
@@ -37,7 +72,11 @@ pub struct Audio {
     counter: usize,
 }
 
-#[cfg(windows)]
+#[cfg(any(
+    windows,
+    target_os = "macos",
+    all(target_os = "linux", target_env = "gnu")
+))]
 impl Audio {
     /// Open the default output device. Returns `None` (the goose runs silent) when there is
     /// no audio device — e.g. a headless session.
@@ -55,8 +94,10 @@ impl Audio {
         self.counter
     }
 
+    pub fn poll(&mut self) {}
+
     /// Play `sound` fire-and-forget (honks/pats rotate through their variants).
-    pub fn play(&mut self, sound: Sound) {
+    pub fn play(&mut self, sound: Sound) -> PlayOutcome {
         let bytes: &'static [u8] = match sound {
             Sound::Honk(tone) => match tone {
                 HonkTone::Normal => HONKS[self.next() % HONKS.len()],
@@ -67,60 +108,30 @@ impl Audio {
             Sound::MudSquish => MUD,
             Sound::Pat => PATS[self.next() % PATS.len()],
         };
-        if let Ok(sink) = Sink::try_new(&self.handle) {
-            if let Ok(decoder) = Decoder::new(Cursor::new(bytes)) {
-                sink.append(decoder);
-                sink.detach(); // play to completion in the background
-            }
-        }
+        let Ok(sink) = Sink::try_new(&self.handle) else {
+            return PlayOutcome::Failed;
+        };
+        let Ok(decoder) = Decoder::new(Cursor::new(bytes)) else {
+            return PlayOutcome::Failed;
+        };
+        sink.append(decoder);
+        sink.detach(); // play to completion in the background
+        PlayOutcome::Played
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(all(target_os = "linux", target_env = "musl"))]
 pub struct Audio {
     dir: std::path::PathBuf,
     counter: usize,
-    #[cfg(target_os = "linux")]
+    children: Vec<std::process::Child>,
     player: LinuxAudioPlayer,
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "linux", target_env = "musl"))]
 impl Audio {
-    /// Open the macOS command-line sound backend. Returns `None` if `afplay` is missing or the
-    /// embedded clips cannot be staged to a private temp directory.
-    pub fn new() -> Option<Self> {
-        let afplay = std::path::Path::new("/usr/bin/afplay");
-        if !afplay.exists() {
-            return None;
-        }
-        let dir = std::env::temp_dir().join(format!("honk300-audio-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).ok()?;
-        for (name, bytes) in sound_files() {
-            std::fs::write(dir.join(name), bytes).ok()?;
-        }
-        Some(Self { dir, counter: 0 })
-    }
-
-    fn next(&mut self) -> usize {
-        self.counter = self.counter.wrapping_add(1);
-        self.counter
-    }
-
-    pub fn play(&mut self, sound: Sound) {
-        let name = sound_file_name(sound, || self.next());
-        let _ = std::process::Command::new("/usr/bin/afplay")
-            .arg(self.dir.join(name))
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn();
-    }
-}
-
-#[cfg(target_os = "linux")]
-impl Audio {
-    /// Open the Linux command-line sound backend. Returns `None` if no compatible player
-    /// for both MP3 and WAV clips is available, or the clips cannot be staged.
+    /// Open the musl command-line fallback. GNU Linux uses the in-process rodio backend above;
+    /// this path exists because the portable musl archive cannot assume a native audio library.
     pub fn new() -> Option<Self> {
         let player = LinuxAudioPlayer::detect()?;
         let dir = std::env::temp_dir().join(format!("honk300-audio-{}", std::process::id()));
@@ -131,6 +142,7 @@ impl Audio {
         Some(Self {
             dir,
             counter: 0,
+            children: Vec::new(),
             player,
         })
     }
@@ -140,45 +152,36 @@ impl Audio {
         self.counter
     }
 
-    pub fn play(&mut self, sound: Sound) {
+    pub fn poll(&mut self) {
+        reap_audio_children(&mut self.children);
+    }
+
+    pub fn play(&mut self, sound: Sound) -> PlayOutcome {
         let name = sound_file_name(sound, || self.next());
         let path = self.dir.join(name);
         let mut command = self.player.command(path);
-        let _ = command
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn();
+        spawn_audio_child(&mut self.children, &mut command)
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "musl"))]
 #[derive(Debug, Clone)]
 enum LinuxAudioPlayer {
     Ffplay(PathBuf),
     Mpv(PathBuf),
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "musl"))]
 impl LinuxAudioPlayer {
     fn detect() -> Option<Self> {
-        for path in [
-            "/usr/bin/ffplay",
-            "/usr/local/bin/ffplay",
-            "/opt/homebrew/bin/ffplay",
-        ] {
-            let path = PathBuf::from(path);
-            if path.exists() {
+        let search_path = std::env::var_os("PATH").unwrap_or_default();
+        for path in path_candidates("ffplay", &search_path) {
+            if is_executable_file(&path) {
                 return Some(Self::Ffplay(path));
             }
         }
-        for path in [
-            "/usr/bin/mpv",
-            "/usr/local/bin/mpv",
-            "/opt/homebrew/bin/mpv",
-        ] {
-            let path = PathBuf::from(path);
-            if path.exists() {
+        for path in path_candidates("mpv", &search_path) {
+            if is_executable_file(&path) {
                 return Some(Self::Mpv(path));
             }
         }
@@ -206,14 +209,63 @@ impl LinuxAudioPlayer {
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(all(target_os = "linux", target_env = "musl"))]
+fn is_executable_file(path: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    path.metadata()
+        .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+#[cfg(all(target_os = "linux", target_env = "musl"))]
+fn spawn_audio_child(
+    children: &mut Vec<std::process::Child>,
+    command: &mut std::process::Command,
+) -> PlayOutcome {
+    reap_audio_children(children);
+    if children.len() >= MAX_AUDIO_CHILDREN {
+        return PlayOutcome::Busy;
+    }
+    match command
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(child) => {
+            children.push(child);
+            PlayOutcome::Played
+        }
+        Err(_) => PlayOutcome::Failed,
+    }
+}
+
+#[cfg(all(target_os = "linux", target_env = "musl"))]
+fn reap_audio_children(children: &mut Vec<std::process::Child>) {
+    let mut index = 0;
+    while index < children.len() {
+        match children[index].try_wait() {
+            Ok(Some(_)) | Err(_) => {
+                let mut child = children.swap_remove(index);
+                let _ = child.wait();
+            }
+            Ok(None) => index += 1,
+        }
+    }
+}
+
+#[cfg(all(target_os = "linux", target_env = "musl"))]
 impl Drop for Audio {
     fn drop(&mut self) {
+        for child in &mut self.children {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
         let _ = std::fs::remove_dir_all(&self.dir);
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(all(target_os = "linux", target_env = "musl"))]
 fn sound_files() -> Vec<(&'static str, &'static [u8])> {
     vec![
         ("honk0.mp3", HONKS[0]),
@@ -228,7 +280,7 @@ fn sound_files() -> Vec<(&'static str, &'static [u8])> {
     ]
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(all(target_os = "linux", target_env = "musl"))]
 fn sound_file_name(sound: Sound, mut next: impl FnMut() -> usize) -> String {
     match sound {
         Sound::Honk(tone) => match tone {
@@ -241,5 +293,42 @@ fn sound_file_name(sound: Sound, mut next: impl FnMut() -> usize) -> String {
         Sound::Bite => "bite.mp3".into(),
         Sound::MudSquish => "mud.mp3".into(),
         Sound::Pat => format!("pat{}.wav", next() % PATS.len()),
+    }
+}
+
+#[cfg(test)]
+fn linux_audio_backend_for(target_env: &str) -> &'static str {
+    if target_env == "musl" {
+        "command-fallback"
+    } else {
+        "in-process"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fallback_audio_child_pool_is_bounded() {
+        assert_eq!(bounded_child_count(5), MAX_AUDIO_CHILDREN);
+    }
+
+    #[test]
+    fn linux_player_discovery_searches_path() {
+        let joined = std::env::join_paths([
+            std::path::PathBuf::from("custom/tools"),
+            std::path::PathBuf::from("usr/bin"),
+        ])
+        .unwrap();
+        assert!(path_candidates("ffplay", &joined)
+            .iter()
+            .any(|path| path.ends_with("custom/tools/ffplay")));
+    }
+
+    #[test]
+    fn linux_backend_selection_keeps_command_fallback_musl_only() {
+        assert_eq!(linux_audio_backend_for("gnu"), "in-process");
+        assert_eq!(linux_audio_backend_for("musl"), "command-fallback");
     }
 }

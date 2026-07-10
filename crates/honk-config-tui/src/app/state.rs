@@ -67,11 +67,12 @@ pub enum TuiCommand {
     Poke(PokeAction),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CommandResult {
     pub status: String,
     pub is_error: bool,
     pub mark_saved: bool,
+    pub saved_config: Option<Config>,
     pub runtime_status: Option<RuntimeStatus>,
 }
 
@@ -132,7 +133,6 @@ pub enum AdjustField {
     AccelCharged,
     StepNormal,
     StepCharged,
-    StopRadius,
     MudDuration,
     FootmarkLifetime,
     FootmarkShrink,
@@ -171,6 +171,7 @@ pub struct AppState {
     pub should_quit: bool,
     pub status: String,
     pub status_is_error: bool,
+    pub status_scroll: u16,
     pub runtime_status: RuntimeStatus,
     pending_commands: VecDeque<TuiCommand>,
     confirm_quit: bool,
@@ -187,6 +188,7 @@ impl AppState {
             should_quit: false,
             status: "ready".into(),
             status_is_error: false,
+            status_scroll: 0,
             runtime_status: RuntimeStatus::not_running(),
             pending_commands: VecDeque::new(),
             confirm_quit: false,
@@ -204,6 +206,7 @@ impl AppState {
     pub fn set_status(&mut self, status: String, is_error: bool) {
         self.status = status;
         self.status_is_error = is_error;
+        self.status_scroll = 0;
     }
 
     pub fn take_pending_command(&mut self) -> Option<TuiCommand> {
@@ -225,6 +228,8 @@ impl AppState {
             }
             KeyCode::Down | KeyCode::Char('j') => Action::MoveDown,
             KeyCode::Up | KeyCode::Char('k') => Action::MoveUp,
+            KeyCode::PageDown => Action::ScrollStatus(3),
+            KeyCode::PageUp => Action::ScrollStatus(-3),
             KeyCode::Enter | KeyCode::Char(' ') => Action::Toggle,
             KeyCode::Right | KeyCode::Char('+') | KeyCode::Char('=') => Action::Adjust(1),
             KeyCode::Left | KeyCode::Char('-') => Action::Adjust(-1),
@@ -264,6 +269,15 @@ impl AppState {
                 self.selected_row = (self.selected_row + 1).min(self.row_count().saturating_sub(1));
             }
             Action::MoveUp => self.selected_row = self.selected_row.saturating_sub(1),
+            Action::ScrollStatus(delta) => {
+                if delta.is_negative() {
+                    self.status_scroll = self
+                        .status_scroll
+                        .saturating_sub(delta.unsigned_abs() as u16);
+                } else {
+                    self.status_scroll = self.status_scroll.saturating_add(delta as u16);
+                }
+            }
             Action::Toggle => self.toggle_selected(),
             Action::Adjust(delta) => self.adjust_selected(delta),
             Action::Save => self.pending_commands.push_back(TuiCommand::Save),
@@ -273,7 +287,10 @@ impl AppState {
             Action::Start => self.pending_commands.push_back(TuiCommand::Start),
             Action::Poke(action) => self.pending_commands.push_back(TuiCommand::Poke(action)),
             Action::CommandResult(result) => {
-                if result.mark_saved {
+                let result = *result;
+                if let Some(saved_config) = result.saved_config {
+                    self.original = saved_config;
+                } else if result.mark_saved {
                     self.mark_saved();
                 }
                 if let Some(status) = result.runtime_status {
@@ -459,10 +476,6 @@ impl AppState {
                     1.0,
                 );
             }
-            AdjustField::StopRadius => {
-                self.config.speeds.stop_radius =
-                    clamp(self.config.speeds.stop_radius + delta_f, -100.0, 100.0);
-            }
             AdjustField::MudDuration => {
                 self.config.mud.duration_to_track_seconds = clamp(
                     self.config.mud.duration_to_track_seconds + delta_f,
@@ -586,7 +599,7 @@ impl AppState {
                 ),
                 row(
                     "Wayland backend",
-                    planned(self.config.platform.wayland),
+                    restart_required(self.config.platform.wayland),
                     RowKind::Toggle(ToggleField::Wayland),
                 ),
             ],
@@ -665,11 +678,6 @@ impl AppState {
                     "Charged step",
                     seconds(self.config.speeds.step_time_charged),
                     RowKind::Adjust(AdjustField::StepCharged),
-                ),
-                row(
-                    "Stop radius",
-                    number(self.config.speeds.stop_radius),
-                    RowKind::Adjust(AdjustField::StopRadius),
                 ),
                 row(
                     "Mouse succ time",
@@ -1036,10 +1044,6 @@ fn on_off(v: bool) -> String {
     if v { "on" } else { "off" }.into()
 }
 
-fn planned(v: bool) -> String {
-    format!("{} (planned)", if v { "on" } else { "off" })
-}
-
 fn restart_required(v: bool) -> String {
     format!("{} (restart)", if v { "on" } else { "off" })
 }
@@ -1141,6 +1145,13 @@ mod tests {
     }
 
     #[test]
+    fn behavior_rows_do_not_expose_retired_stop_radius() {
+        let mut app = app();
+        app.apply(Action::SelectCategory(Category::Behaviors));
+        assert!(!app.rows().iter().any(|row| row.label == "Stop radius"));
+    }
+
+    #[test]
     fn toggles_boolean_setting_and_tracks_dirty() {
         let mut app = app();
         assert!(app.config.audio.enabled);
@@ -1225,6 +1236,26 @@ mod tests {
     }
 
     #[test]
+    fn general_marks_native_wayland_backend_restart_required() {
+        let app = app();
+        let row = app
+            .rows()
+            .into_iter()
+            .find(|row| row.label == "Wayland backend")
+            .unwrap();
+        assert_eq!(row.value, "off (restart)");
+    }
+
+    #[test]
+    fn status_scroll_is_reducer_controlled_and_resets_on_new_status() {
+        let mut app = app();
+        app.apply(Action::ScrollStatus(3));
+        assert_eq!(app.status_scroll, 3);
+        app.set_status("replacement".into(), true);
+        assert_eq!(app.status_scroll, 0);
+    }
+
+    #[test]
     fn appearance_rows_are_live_m15_controls_with_rgb_channel_editing() {
         let mut app = app();
         app.config.colors.goose_white = "#102030".into();
@@ -1287,15 +1318,37 @@ mod tests {
     fn command_result_updates_status_through_reducer() {
         let mut app = app();
         app.apply(Action::Toggle);
-        app.apply(Action::CommandResult(CommandResult {
+        app.apply(Action::CommandResult(Box::new(CommandResult {
             status: "saved".into(),
             is_error: false,
             mark_saved: true,
+            saved_config: None,
             runtime_status: None,
-        }));
+        })));
         assert_eq!(app.status, "saved");
         assert!(!app.status_is_error);
         assert!(!app.dirty());
+    }
+
+    #[test]
+    fn async_save_result_does_not_mark_later_edits_as_saved() {
+        let mut app = app();
+        app.config.audio.enabled = false;
+        let saved_config = app.config.clone();
+        app.config.audio.honk = false;
+
+        app.apply(Action::CommandResult(Box::new(CommandResult {
+            status: "saved".into(),
+            is_error: false,
+            mark_saved: true,
+            saved_config: Some(saved_config),
+            runtime_status: None,
+        })));
+
+        assert!(
+            app.dirty(),
+            "edits made while save was in flight must stay dirty"
+        );
     }
 
     #[test]

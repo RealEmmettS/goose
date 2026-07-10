@@ -26,6 +26,55 @@ pub fn appkit_point_to_world(point: (f64, f64), desktop: Rect) -> Vec2 {
     Vec2::new(point.0 as f32, (desktop.max.y as f64 - point.1) as f32)
 }
 
+/// AppKit's global Y axis is anchored to the main display, not the union of all displays.
+pub fn appkit_coordinate_space(main_display: Rect, _virtual_desktop: Rect) -> Rect {
+    main_display
+}
+
+#[cfg(any(test, target_os = "macos"))]
+#[derive(Debug, Default)]
+struct DragClassifier {
+    candidate: Option<(u64, Vec2)>,
+    active: Option<u64>,
+}
+
+#[cfg(any(test, target_os = "macos"))]
+impl DragClassifier {
+    const MIN_MOVEMENT_SQUARED: f32 = 4.0;
+
+    fn release(&mut self) {
+        self.candidate = None;
+        self.active = None;
+    }
+
+    fn observe(&mut self, window_id: u64, origin: Vec2) -> bool {
+        if self.active == Some(window_id) {
+            return true;
+        }
+        match self.candidate {
+            Some((candidate_id, start)) if candidate_id == window_id => {
+                let delta = origin - start;
+                if delta.x * delta.x + delta.y * delta.y >= Self::MIN_MOVEMENT_SQUARED {
+                    self.active = Some(window_id);
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => {
+                self.candidate = Some((window_id, origin));
+                self.active = None;
+                false
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+fn reconciled_display_ids(_existing: &[u32], active: &[u32]) -> Vec<u32> {
+    active.to_vec()
+}
+
 pub fn is_protected_terminal_app(bundle_id: Option<&str>, app_name: Option<&str>) -> bool {
     let bundle_match = bundle_id
         .map(|id| id.to_ascii_lowercase())
@@ -67,7 +116,8 @@ pub fn is_protected_terminal_app(bundle_id: Option<&str>, app_name: Option<&str>
 #[cfg(target_os = "macos")]
 mod platform {
     use super::{
-        appkit_frame_for_world_rect, appkit_point_to_world, is_protected_terminal_app, AppKitFrame,
+        appkit_coordinate_space, appkit_frame_for_world_rect, appkit_point_to_world,
+        is_protected_terminal_app, AppKitFrame, DragClassifier,
     };
     use honk_engine::collect_window::{
         CollectWindowId, CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot,
@@ -100,9 +150,11 @@ mod platform {
     use std::io;
     use std::ptr;
     use std::ptr::NonNull;
+    use std::time::{Duration, Instant};
     use tiny_skia::Pixmap;
 
     const MAX_DISPLAYS: usize = 16;
+    const DISPLAY_REFRESH_INTERVAL: Duration = Duration::from_millis(500);
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum AccessibilityState {
@@ -119,11 +171,13 @@ mod platform {
     }
 
     pub fn pointer_state() -> (f32, f32, bool) {
-        let desktop = display_list()
-            .map(|displays| union_bounds(&displays))
+        let coordinate_space = display_list()
+            .map(|displays| {
+                appkit_coordinate_space(primary_bounds(&displays), union_bounds(&displays))
+            })
             .unwrap_or_else(|_| default_desktop_bounds());
         let point = NSEvent::mouseLocation();
-        let world = appkit_point_to_world((point.x, point.y), desktop);
+        let world = appkit_point_to_world((point.x, point.y), coordinate_space);
         let left_down = objc2_core_graphics::CGEventSource::button_state(
             CGEventSourceStateID::CombinedSessionState,
             CGMouseButton::Left,
@@ -188,6 +242,8 @@ mod platform {
         displays: Vec<DisplayWindow>,
         primary_bounds: Rect,
         virtual_bounds: Rect,
+        topology_changed: bool,
+        next_display_refresh: Instant,
     }
 
     impl Overlay {
@@ -202,15 +258,18 @@ mod platform {
             let display_infos = display_list()?;
             let primary_bounds = primary_bounds(&display_infos);
             let virtual_bounds = union_bounds(&display_infos);
+            let coordinate_space = appkit_coordinate_space(primary_bounds, virtual_bounds);
             let mut displays = Vec::with_capacity(display_infos.len());
             for info in display_infos {
-                displays.push(DisplayWindow::new(mtm, info, virtual_bounds)?);
+                displays.push(DisplayWindow::new(mtm, info, coordinate_space)?);
             }
             Ok(Self {
                 app,
                 displays,
                 primary_bounds,
                 virtual_bounds,
+                topology_changed: false,
+                next_display_refresh: Instant::now() + DISPLAY_REFRESH_INTERVAL,
             })
         }
 
@@ -229,6 +288,14 @@ mod platform {
                 self.app.sendEvent(&event);
             }
             self.app.updateWindows();
+            if Instant::now() >= self.next_display_refresh {
+                self.next_display_refresh = Instant::now() + DISPLAY_REFRESH_INTERVAL;
+                if let Err(err) = self.refresh_display_topology() {
+                    eprintln!(
+                        "honk300: macOS display refresh failed; keeping prior topology ({err})"
+                    );
+                }
+            }
             true
         }
 
@@ -240,10 +307,23 @@ mod platform {
             self.virtual_bounds
         }
 
+        pub fn monitor_bounds(&self) -> Vec<Rect> {
+            self.displays
+                .iter()
+                .map(|display| display.info.bounds)
+                .collect()
+        }
+
+        pub fn take_topology_changed(&mut self) -> bool {
+            std::mem::take(&mut self.topology_changed)
+        }
+
         pub fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<()> {
+            let coordinate_space =
+                appkit_coordinate_space(self.primary_bounds, self.virtual_bounds);
             for display in &mut self.displays {
                 if let Some(clip) = dirty.intersection(display.info.bounds) {
-                    display.present(dirty, clip, pixmap, self.virtual_bounds)?;
+                    display.present(dirty, clip, pixmap, coordinate_space)?;
                 } else {
                     display.clear();
                 }
@@ -256,10 +336,53 @@ mod platform {
                 display.window.setIgnoresMouseEvents(!over_goose);
             }
         }
+
+        fn refresh_display_topology(&mut self) -> io::Result<()> {
+            let infos = display_list()?;
+            if infos
+                == self
+                    .displays
+                    .iter()
+                    .map(|display| display.info)
+                    .collect::<Vec<_>>()
+            {
+                return Ok(());
+            }
+
+            let mtm = MainThreadMarker::new().ok_or_else(|| {
+                io::Error::other("macOS display refresh must run on the main thread")
+            })?;
+            let primary_bounds = primary_bounds(&infos);
+            let virtual_bounds = union_bounds(&infos);
+            let coordinate_space = appkit_coordinate_space(primary_bounds, virtual_bounds);
+            let mut existing = self
+                .displays
+                .drain(..)
+                .map(|display| (display.info.id, display))
+                .collect::<HashMap<_, _>>();
+            let mut displays = Vec::with_capacity(infos.len());
+            for info in infos {
+                let mut display = match existing.remove(&info.id) {
+                    Some(display) => display,
+                    None => DisplayWindow::new(mtm, info, coordinate_space)?,
+                };
+                display.update_info(info, coordinate_space);
+                displays.push(display);
+            }
+            // Removed displays are the only entries left. Their Drop impl closes just those
+            // AppKit windows; surviving display windows retain identity and pixel ownership.
+            drop(existing);
+            self.displays = displays;
+            self.primary_bounds = primary_bounds;
+            self.virtual_bounds = virtual_bounds;
+            self.topology_changed = true;
+            Ok(())
+        }
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     struct DisplayInfo {
+        id: u32,
         bounds: Rect,
         primary: bool,
     }
@@ -355,6 +478,19 @@ mod platform {
             self.image = None;
             self.buffer.clear();
         }
+
+        fn update_info(&mut self, info: DisplayInfo, coordinate_space: Rect) {
+            self.info = info;
+            let frame = appkit_frame_for_world_rect(info.bounds, coordinate_space);
+            self.window.setFrame_display(nsrect(frame), false);
+        }
+    }
+
+    impl Drop for DisplayWindow {
+        fn drop(&mut self) {
+            self.window.orderOut(None);
+            self.window.close();
+        }
     }
 
     fn display_list() -> io::Result<Vec<DisplayInfo>> {
@@ -374,12 +510,14 @@ mod platform {
             .copied()
             .take(count as usize)
             .map(|id| DisplayInfo {
+                id,
                 bounds: cg_rect_to_world(CGDisplayBounds(id)),
                 primary: id == primary,
             })
             .collect::<Vec<_>>();
         if displays.is_empty() {
             displays.push(DisplayInfo {
+                id: primary,
                 bounds: default_desktop_bounds(),
                 primary: true,
             });
@@ -509,6 +647,7 @@ mod platform {
     pub struct ForeignWindowWatcher {
         system: CFRetained<AXUIElement>,
         self_pid: libc::pid_t,
+        drag: DragClassifier,
     }
 
     impl ForeignWindowWatcher {
@@ -519,6 +658,7 @@ mod platform {
                 Ok(Self {
                     system,
                     self_pid: std::process::id() as libc::pid_t,
+                    drag: DragClassifier::default(),
                 })
             } else {
                 Err(io::Error::new(
@@ -534,6 +674,7 @@ mod platform {
                 CGMouseButton::Left,
             );
             if !left_down {
+                self.drag.release();
                 return Ok(None);
             }
 
@@ -574,6 +715,9 @@ mod platform {
                     (origin.y + size.height) as f32,
                 ),
             );
+            if !self.drag.observe(pid as u64, rect.min) {
+                return Ok(None);
+            }
             Ok(Some(ForeignWindowSnapshot::top_center(
                 ForeignWindowId(pid as u64),
                 rect,
@@ -732,18 +876,24 @@ mod platform {
         next_id: u64,
         windows: HashMap<CollectWindowId, ControlledWindow>,
         spawn_top_left: Vec2,
-        desktop: Rect,
+        coordinate_space: Rect,
     }
 
     impl CollectWindowController {
-        pub fn new(primary_bounds: Rect, desktop: Rect) -> Self {
+        pub fn new(primary_bounds: Rect, coordinate_space: Rect) -> Self {
             Self {
                 mtm: MainThreadMarker::new(),
                 next_id: 1,
                 windows: HashMap::new(),
                 spawn_top_left: Vec2::new(primary_bounds.min.x + 40.0, primary_bounds.min.y + 80.0),
-                desktop,
+                coordinate_space,
             }
+        }
+
+        pub fn update_display_bounds(&mut self, primary_bounds: Rect, coordinate_space: Rect) {
+            self.spawn_top_left =
+                Vec2::new(primary_bounds.min.x + 40.0, primary_bounds.min.y + 80.0);
+            self.coordinate_space = coordinate_space;
         }
 
         pub fn snapshot(&self) -> Option<CollectWindowSnapshot> {
@@ -754,7 +904,7 @@ mod platform {
                     id: *id,
                     request: window.request(),
                     kind: window.kind(),
-                    rect: window.frame(self.desktop),
+                    rect: window.frame(self.coordinate_space),
                     alive: true,
                 })
         }
@@ -775,7 +925,7 @@ mod platform {
                 mtm,
                 "Honk300 Note",
                 world_rect_at(self.spawn_top_left, size),
-                self.desktop,
+                self.coordinate_space,
             );
             let label_frame = nsrect(AppKitFrame {
                 x: 18.0,
@@ -823,7 +973,7 @@ mod platform {
                 mtm,
                 title,
                 world_rect_at(self.spawn_top_left, size),
-                self.desktop,
+                self.coordinate_space,
             );
             let view_frame = nsrect(AppKitFrame {
                 x: 0.0,
@@ -852,7 +1002,7 @@ mod platform {
 
         pub fn move_window(&mut self, id: CollectWindowId, top_left: Vec2) -> io::Result<()> {
             if let Some(window) = self.windows.get_mut(&id) {
-                window.move_to(top_left, self.desktop);
+                window.move_to(top_left, self.coordinate_space);
             }
             Ok(())
         }
@@ -972,6 +1122,41 @@ pub use platform::{
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn appkit_conversion_uses_main_display_not_virtual_desktop_height() {
+        let main_display = Rect::new(Vec2::ZERO, Vec2::new(1440.0, 900.0));
+        let virtual_desktop = Rect::new(Vec2::ZERO, Vec2::new(1440.0, 1500.0));
+        let rect_on_display_below_main =
+            Rect::new(Vec2::new(10.0, 1000.0), Vec2::new(110.0, 1100.0));
+
+        let coordinate_space = appkit_coordinate_space(main_display, virtual_desktop);
+        assert_eq!(coordinate_space, main_display);
+        assert_eq!(
+            appkit_frame_for_world_rect(rect_on_display_below_main, coordinate_space).y,
+            -200.0
+        );
+    }
+
+    #[test]
+    fn a_stationary_click_is_not_classified_as_a_window_drag() {
+        let mut classifier = DragClassifier::default();
+        assert!(!classifier.observe(42, Vec2::new(100.0, 100.0)));
+        assert!(!classifier.observe(42, Vec2::new(100.0, 100.0)));
+        assert!(classifier.observe(42, Vec2::new(103.0, 100.0)));
+        classifier.release();
+        assert!(!classifier.observe(42, Vec2::new(103.0, 100.0)));
+    }
+
+    #[test]
+    fn display_topology_refresh_keeps_one_window_per_active_display() {
+        let active_display_ids = vec![10_u32, 20, 30];
+        let current_window_display_ids = vec![10_u32];
+        assert_eq!(
+            reconciled_display_ids(&current_window_display_ids, &active_display_ids),
+            active_display_ids
+        );
+    }
 
     #[test]
     fn appkit_frame_converts_y_down_world_to_y_up_appkit() {

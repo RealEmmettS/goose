@@ -121,12 +121,12 @@ impl MoodEvent {
 pub struct MoodMachine {
     options: MoodOptions,
     current: MoodKind,
-    next_transition: f32,
-    next_sleepy_particle: f32,
+    next_transition: f64,
+    next_sleepy_particle: f64,
 }
 
 impl MoodMachine {
-    pub fn new(now: f32, options: MoodOptions, rng: &mut SplitMix64) -> Self {
+    pub fn new(now: f64, options: MoodOptions, rng: &mut SplitMix64) -> Self {
         let mut machine = Self {
             options,
             current: MoodKind::Content,
@@ -145,7 +145,7 @@ impl MoodMachine {
         self.options
     }
 
-    pub fn apply_options(&mut self, options: MoodOptions, now: f32, rng: &mut SplitMix64) {
+    pub fn apply_options(&mut self, options: MoodOptions, now: f64, rng: &mut SplitMix64) {
         self.options = options;
         if !options.dynamic_moods {
             self.current = MoodKind::Content;
@@ -153,7 +153,7 @@ impl MoodMachine {
         self.schedule_next_transition(now, rng);
     }
 
-    pub fn tick(&mut self, now: f32, rng: &mut SplitMix64) -> MoodEvent {
+    pub fn tick(&mut self, now: f64, rng: &mut SplitMix64) -> MoodEvent {
         if !self.options.dynamic_moods {
             self.current = MoodKind::Content;
             return MoodEvent::NONE;
@@ -174,7 +174,7 @@ impl MoodMachine {
 
         if self.current == MoodKind::Sleepy && now >= self.next_sleepy_particle {
             event.spawn_sleepy_particle = true;
-            self.next_sleepy_particle = now + self.sleepy_interval(rng);
+            self.next_sleepy_particle = now + self.sleepy_interval(rng) as f64;
         }
         event
     }
@@ -214,13 +214,13 @@ impl MoodMachine {
         MoodKind::Content
     }
 
-    fn schedule_next_transition(&mut self, now: f32, rng: &mut SplitMix64) {
+    fn schedule_next_transition(&mut self, now: f64, rng: &mut SplitMix64) {
         let (min, max) = match self.options.intensity {
             MoodIntensity::Calm => (90.0, 150.0),
             MoodIntensity::Normal => (60.0, 120.0),
             MoodIntensity::Spicy => (35.0, 85.0),
         };
-        self.next_transition = now + rng.range(min, max);
+        self.next_transition = now + rng.range(min, max) as f64;
     }
 
     fn sleepy_interval(&self, rng: &mut SplitMix64) -> f32 {
@@ -236,23 +236,23 @@ impl MoodMachine {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZParticle {
     pub origin: Vec2,
-    pub created: f32,
+    pub created: f64,
 }
 
 impl ZParticle {
-    fn age(self, now: f32) -> f32 {
-        now - self.created
+    fn age(self, now: f64) -> f32 {
+        (now - self.created) as f32
     }
 
-    pub fn is_alive(self, now: f32) -> bool {
+    pub fn is_alive(self, now: f64) -> bool {
         self.age(now) <= Z_LIFETIME
     }
 
-    pub fn alpha(self, now: f32) -> f32 {
+    pub fn alpha(self, now: f64) -> f32 {
         crate::math::clamp(1.0 - self.age(now) / Z_LIFETIME, 0.0, 1.0)
     }
 
-    pub fn position(self, now: f32) -> Vec2 {
+    pub fn position(self, now: f64) -> Vec2 {
         let frac = crate::math::clamp(self.age(now) / Z_LIFETIME, 0.0, 1.0);
         self.origin + UP * (Z_RISE * frac) + Vec2::new(10.0 * frac, 0.0)
     }
@@ -268,7 +268,7 @@ impl ZParticles {
         Self::default()
     }
 
-    pub fn add(&mut self, origin: Vec2, now: f32) {
+    pub fn add(&mut self, origin: Vec2, now: f64) {
         self.items.retain(|z| z.is_alive(now));
         self.items.push(ZParticle {
             origin,
@@ -276,7 +276,7 @@ impl ZParticles {
         });
     }
 
-    pub fn active(&self, now: f32) -> impl Iterator<Item = (Vec2, f32)> + '_ {
+    pub fn active(&self, now: f64) -> impl Iterator<Item = (Vec2, f32)> + '_ {
         self.items
             .iter()
             .copied()
@@ -284,7 +284,7 @@ impl ZParticles {
             .map(move |z| (z.position(now), z.alpha(now)))
     }
 
-    pub fn alive_count(&self, now: f32) -> usize {
+    pub fn alive_count(&self, now: f64) -> usize {
         self.active(now).count()
     }
 }
@@ -305,7 +305,7 @@ mod tests {
             &mut rng,
         );
         for tick in 0..1_000 {
-            machine.tick(tick as f32, &mut rng);
+            machine.tick(tick as f64, &mut rng);
             assert_eq!(machine.current(), MoodKind::Content);
         }
     }
@@ -319,10 +319,10 @@ mod tests {
         let mut a_seen = Vec::new();
         let mut b_seen = Vec::new();
         for second in 0..500 {
-            if a.tick(second as f32, &mut a_rng).changed {
+            if a.tick(second as f64, &mut a_rng).changed {
                 a_seen.push(a.current());
             }
-            if b.tick(second as f32, &mut b_rng).changed {
+            if b.tick(second as f64, &mut b_rng).changed {
                 b_seen.push(b.current());
             }
         }

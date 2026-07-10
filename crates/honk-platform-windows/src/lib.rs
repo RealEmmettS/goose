@@ -22,13 +22,16 @@ use honk_engine::{ForeignWindowId, ForeignWindowSnapshot, PresenceSnapshot};
 use honk_engine::{LocalTime, Vec2};
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::ffi::c_void;
+use std::ffi::{c_void, OsString};
+use std::fs;
+use std::os::windows::ffi::OsStringExt;
+use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tiny_skia::Pixmap;
-use windows::core::{w, Error, Result, PCWSTR};
+use windows::core::{w, Error, Result, BSTR, PCWSTR};
 use windows::Win32::Foundation::{
     BOOL, COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM,
 };
@@ -38,16 +41,20 @@ use windows::Win32::Graphics::Gdi::{
     BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ, HMONITOR,
     MONITORINFO,
 };
+use windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER,
+    COINIT_APARTMENTTHREADED,
+};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::SystemInformation::GetLocalTime;
-use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
+use windows::Win32::System::SystemInformation::{GetLocalTime, GetSystemDirectoryW};
+use windows::Win32::UI::Accessibility::{
+    CUIAutomation, IUIAutomation, IUIAutomationElement, IUIAutomationValuePattern, SetWinEventHook,
+    TreeScope_Descendants, UIA_ValuePatternId, UnhookWinEvent, HWINEVENTHOOK,
+};
 use windows::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
-    KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_LBUTTON,
-};
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
 use windows::Win32::UI::Shell::{
     SHQueryUserNotificationState, QUERY_USER_NOTIFICATION_STATE, QUNS_ACCEPTS_NOTIFICATIONS,
     QUNS_APP, QUNS_BUSY, QUNS_NOT_PRESENT, QUNS_PRESENTATION_MODE, QUNS_QUIET_TIME,
@@ -57,15 +64,15 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EnumWindows, GetAncestor,
     GetClassNameW, GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowLongPtrW,
     GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
-    PeekMessageW, PostMessageW, PostQuitMessage, RegisterClassExW, SetCursorPos,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow, TranslateMessage,
-    UpdateLayeredWindow, EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART, GA_ROOT,
-    GWL_EXSTYLE, MONITORINFOF_PRIMARY, MSG, OBJID_WINDOW, PM_REMOVE, SM_CXSCREEN,
-    SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
-    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_HIDE,
-    SW_SHOWNOACTIVATE, ULW_ALPHA, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_CLOSE,
-    WM_DESTROY, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_QUIT, WNDCLASSEXW, WS_EX_LAYERED,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    PeekMessageW, PostMessageW, RegisterClassExW, SetCursorPos, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowPos, ShowWindow, TranslateMessage, UpdateLayeredWindow,
+    EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART, GA_ROOT, GWL_EXSTYLE,
+    MONITORINFOF_PRIMARY, MSG, OBJID_WINDOW, PM_REMOVE, SM_CXSCREEN, SM_CXVIRTUALSCREEN,
+    SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SWP_FRAMECHANGED,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_SHOWNOACTIVATE, ULW_ALPHA,
+    WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE,
+    WM_DPICHANGED, WM_QUIT, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
 /// Set on `WM_DPICHANGED`/`WM_DISPLAYCHANGE` from the overlay wndproc; drained by the runtime
@@ -450,9 +457,10 @@ struct NotepadWindow {
 
 impl NotepadWindow {
     fn spawn(request: CollectWindowRequestId, spawn_top_left: Vec2) -> Result<Self> {
-        let child = Command::new("notepad.exe")
-            .spawn()
-            .map_err(|err| error_from_message(format!("failed to spawn notepad.exe: {err}")))?;
+        let notepad = system_notepad_path()?;
+        let child = Command::new(&notepad).spawn().map_err(|err| {
+            error_from_message(format!("failed to spawn {}: {err}", notepad.display()))
+        })?;
         let pid = child.id();
         let now = Instant::now();
         Ok(Self {
@@ -554,7 +562,10 @@ impl NotepadWindow {
         unsafe {
             if GetForegroundWindow() == hwnd {
                 if let Some(pending) = self.pending_type.take() {
-                    let _ = send_unicode_text(&pending.text);
+                    // UI Automation writes through the edit control rooted at this exact HWND.
+                    // If Notepad does not expose a writable value pattern, fail closed: never
+                    // fall back to process-global synthetic keyboard input.
+                    let _ = set_text_via_uia(hwnd, &pending.text);
                 }
             } else {
                 // Not foreground yet: re-assert and retry on a later tick.
@@ -737,8 +748,8 @@ impl CollectWindowController {
     }
 
     pub fn type_text(&mut self, id: CollectWindowId, text: &str) -> Result<()> {
-        // Queue the text; the actual `SendInput` is deferred to the per-tick poll once the window
-        // is confirmed foreground, so nothing sleeps on the sim thread. Best-effort by design.
+        // Queue the text; the target-specific UI Automation write is deferred to the per-tick
+        // poll, so nothing sleeps on the sim thread. Best-effort by design.
         if let Some(ControlledWindow::Notepad(window)) = self.windows.get_mut(&id) {
             window.begin_typing(text);
         }
@@ -881,36 +892,50 @@ fn find_process_window(pid: u32) -> Option<HWND> {
     (!data.hwnd.0.is_null()).then_some(data.hwnd)
 }
 
-fn send_unicode_text(text: &str) -> Result<()> {
-    let mut inputs = Vec::new();
-    for unit in text.encode_utf16() {
-        inputs.push(keyboard_input(unit, false));
-        inputs.push(keyboard_input(unit, true));
+fn set_text_via_uia(hwnd: HWND, text: &str) -> Result<()> {
+    unsafe {
+        let initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        if initialized.is_err() {
+            return Err(Error::from(initialized));
+        }
+
+        let result = (|| {
+            let automation: IUIAutomation =
+                CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER)?;
+            let root = automation.ElementFromHandle(hwnd)?;
+            if try_set_uia_value(&root, text)? {
+                return Ok(());
+            }
+
+            let condition = automation.CreateTrueCondition()?;
+            let descendants = root.FindAll(TreeScope_Descendants, &condition)?;
+            let count = descendants.Length()?.clamp(0, 256);
+            for index in 0..count {
+                let element = descendants.GetElement(index)?;
+                if try_set_uia_value(&element, text)? {
+                    return Ok(());
+                }
+            }
+            Err(error_from_message(
+                "spawned Notepad exposes no writable UI Automation value target",
+            ))
+        })();
+
+        CoUninitialize();
+        result
     }
-    let sent = unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
-    if sent != inputs.len() as u32 {
-        return Err(Error::from_win32());
-    }
-    Ok(())
 }
 
-fn keyboard_input(unit: u16, key_up: bool) -> INPUT {
-    INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: VIRTUAL_KEY(0),
-                wScan: unit,
-                dwFlags: if key_up {
-                    KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
-                } else {
-                    KEYEVENTF_UNICODE
-                },
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
+unsafe fn try_set_uia_value(element: &IUIAutomationElement, text: &str) -> Result<bool> {
+    let Ok(pattern) = element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId)
+    else {
+        return Ok(false);
+    };
+    if pattern.CurrentIsReadOnly()?.as_bool() {
+        return Ok(false);
     }
+    pattern.SetValue(&BSTR::from(text))?;
+    Ok(true)
 }
 
 fn present_layered(
@@ -986,6 +1011,40 @@ fn error_from_message(message: impl Into<String>) -> Error {
     )
 }
 
+fn system_notepad_path() -> Result<PathBuf> {
+    // SAFETY: GetSystemDirectoryW writes at most the supplied slice length and does not retain
+    // the buffer. The first call obtains the required length; the second owns the UTF-16 buffer
+    // for the duration of the call.
+    let required = unsafe { GetSystemDirectoryW(None) };
+    if required == 0 {
+        return Err(Error::from_win32());
+    }
+    let mut buffer = vec![0_u16; required as usize + 1];
+    let written = unsafe { GetSystemDirectoryW(Some(&mut buffer)) };
+    if written == 0 {
+        return Err(Error::from_win32());
+    }
+    if written as usize >= buffer.len() {
+        return Err(error_from_message(
+            "Windows system directory changed while it was queried",
+        ));
+    }
+    let path = PathBuf::from(OsString::from_wide(&buffer[..written as usize])).join("notepad.exe");
+    let metadata = fs::symlink_metadata(&path).map_err(|err| {
+        error_from_message(format!(
+            "could not validate system Notepad at {}: {err}",
+            path.display()
+        ))
+    })?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(error_from_message(format!(
+            "system Notepad is not a regular executable: {}",
+            path.display()
+        )));
+    }
+    Ok(path)
+}
+
 /// A reusable top-down 32-bpp DIB section we blit the goose into each frame.
 struct Dib {
     hdc: HDC,
@@ -1043,6 +1102,7 @@ impl Drop for Dib {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct MonitorBounds {
+    id: isize,
     bounds: Rect,
     primary: bool,
 }
@@ -1056,6 +1116,7 @@ pub struct Overlay {
 }
 
 struct OverlayWindow {
+    monitor_id: isize,
     hwnd: HWND,
     dib: Option<Dib>,
     bounds: Rect,
@@ -1063,7 +1124,12 @@ struct OverlayWindow {
 }
 
 impl OverlayWindow {
-    unsafe fn new(hinstance: HINSTANCE, class_name: PCWSTR, bounds: Rect) -> Result<Self> {
+    unsafe fn new(
+        hinstance: HINSTANCE,
+        class_name: PCWSTR,
+        monitor_id: isize,
+        bounds: Rect,
+    ) -> Result<Self> {
         let hwnd = CreateWindowExW(
             WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
             class_name,
@@ -1080,6 +1146,7 @@ impl OverlayWindow {
         )?;
         let _ = ShowWindow(hwnd, SW_HIDE);
         Ok(Self {
+            monitor_id,
             hwnd,
             dib: None,
             bounds,
@@ -1165,7 +1232,12 @@ impl Overlay {
             let primary_bounds = primary_monitor_bounds(&monitors);
             let mut windows = Vec::with_capacity(monitors.len());
             for monitor in monitors {
-                windows.push(OverlayWindow::new(hinstance, class_name, monitor.bounds)?);
+                windows.push(OverlayWindow::new(
+                    hinstance,
+                    class_name,
+                    monitor.id,
+                    monitor.bounds,
+                )?);
             }
 
             Ok(Overlay {
@@ -1184,6 +1256,11 @@ impl Overlay {
     /// The primary monitor bounds reported by the current overlay monitor set.
     pub fn primary_monitor_bounds(&self) -> Rect {
         self.primary_bounds
+    }
+
+    /// Current physical-pixel bounds for every active monitor, in overlay-window order.
+    pub fn monitor_bounds(&self) -> Vec<Rect> {
+        self.windows.iter().map(|window| window.bounds).collect()
     }
 
     /// Consume the pending monitor-topology-change flag raised by the wndproc on
@@ -1209,16 +1286,23 @@ impl Overlay {
             let hmodule = GetModuleHandleW(None)?;
             let hinstance = HINSTANCE(hmodule.0);
             let class_name = w!("honk300_overlay");
-            while self.windows.len() < monitors.len() {
-                let bounds = monitors[self.windows.len()].bounds;
-                self.windows
-                    .push(OverlayWindow::new(hinstance, class_name, bounds)?);
+            let mut existing = self
+                .windows
+                .drain(..)
+                .map(|window| (window.monitor_id, window))
+                .collect::<HashMap<_, _>>();
+            let mut reconciled = Vec::with_capacity(monitors.len());
+            for monitor in &monitors {
+                let mut window = match existing.remove(&monitor.id) {
+                    Some(window) => window,
+                    None => OverlayWindow::new(hinstance, class_name, monitor.id, monitor.bounds)?,
+                };
+                window.set_bounds(monitor.bounds);
+                reconciled.push(window);
             }
-            // Extra windows (a monitor was removed) are destroyed by `OverlayWindow`'s Drop.
-            self.windows.truncate(monitors.len());
-        }
-        for (window, monitor) in self.windows.iter_mut().zip(monitors.iter()) {
-            window.set_bounds(monitor.bounds);
+            // Only entries left in `existing` belonged to removed monitors. Dropping that map
+            // destroys exactly those HWNDs; surviving monitors retain their window identity.
+            self.windows = reconciled;
         }
 
         let changed =
@@ -1322,6 +1406,7 @@ fn enumerate_monitor_bounds() -> Vec<MonitorBounds> {
     }
     if monitors.is_empty() {
         monitors.push(MonitorBounds {
+            id: 0,
             bounds: Overlay::primary_bounds(),
             primary: true,
         });
@@ -1342,6 +1427,7 @@ unsafe extern "system" fn enum_monitor_proc(
     };
     if GetMonitorInfoW(monitor, &mut info).as_bool() {
         monitors.push(MonitorBounds {
+            id: monitor.0 as isize,
             bounds: rect_from_win32(info.rcMonitor),
             primary: info.dwFlags & MONITORINFOF_PRIMARY != 0,
         });
@@ -1366,22 +1452,40 @@ fn primary_monitor_bounds(monitors: &[MonitorBounds]) -> Rect {
         .unwrap_or_else(Overlay::primary_bounds)
 }
 
+#[cfg(test)]
+fn retained_monitor_ids(existing: &[isize], desired: &[isize]) -> Vec<isize> {
+    desired
+        .iter()
+        .copied()
+        .filter(|id| existing.contains(id))
+        .collect()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OverlayMessageAction {
+    MarkTopologyDirty,
+    Delegate,
+}
+
+fn overlay_message_action(msg: u32) -> OverlayMessageAction {
+    match msg {
+        WM_DPICHANGED | WM_DISPLAYCHANGE => OverlayMessageAction::MarkTopologyDirty,
+        _ => OverlayMessageAction::Delegate,
+    }
+}
+
 extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     unsafe {
-        match msg {
+        match overlay_message_action(msg) {
             // A monitor's DPI changed, or the display topology/resolution changed. Under PMv2 we
             // render in physical pixels, so there is no per-window rescale to do — we just flag
             // the monitor set as dirty and let the runtime re-enumerate and rebuild via
             // `Overlay::rebuild_monitors`. Both messages are broadcast to top-level windows.
-            WM_DPICHANGED | WM_DISPLAYCHANGE => {
+            OverlayMessageAction::MarkTopologyDirty => {
                 MONITORS_DIRTY.store(true, Ordering::SeqCst);
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            WM_DESTROY => {
-                PostQuitMessage(0);
-                LRESULT(0)
-            }
-            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+            OverlayMessageAction::Delegate => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
     }
 }
@@ -1398,6 +1502,41 @@ extern "system" fn image_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn monitor_reconciliation_preserves_surviving_overlay_identity() {
+        let existing_window_monitor_ids = [1_isize, 2, 3];
+        let new_monitor_ids = [1_isize, 3];
+        assert_eq!(
+            retained_monitor_ids(&existing_window_monitor_ids, &new_monitor_ids),
+            new_monitor_ids
+        );
+    }
+
+    #[test]
+    fn destroying_one_overlay_is_not_a_process_quit_signal() {
+        assert_eq!(
+            overlay_message_action(WM_DESTROY),
+            OverlayMessageAction::Delegate
+        );
+    }
+
+    #[test]
+    fn note_typing_is_target_scoped_not_global_input() {
+        fn requires_targeted_setter(_setter: fn(HWND, &str) -> Result<()>) {}
+        requires_targeted_setter(set_text_via_uia);
+    }
+
+    #[test]
+    fn note_process_uses_the_validated_windows_system_binary() {
+        let path = system_notepad_path().expect("Windows system Notepad should exist");
+        assert!(path.is_absolute());
+        assert_eq!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some("notepad.exe")
+        );
+        assert_ne!(path, PathBuf::from("notepad.exe"));
+    }
 
     #[test]
     fn win32_rect_conversion_preserves_signed_coordinates() {
@@ -1425,10 +1564,12 @@ mod tests {
     fn monitor_bounds_union_and_primary_selection_support_negative_coords() {
         let monitors = [
             MonitorBounds {
+                id: 1,
                 bounds: Rect::new(Vec2::new(-1280.0, 0.0), Vec2::new(0.0, 720.0)),
                 primary: false,
             },
             MonitorBounds {
+                id: 2,
                 bounds: Rect::new(Vec2::new(0.0, -80.0), Vec2::new(1920.0, 1000.0)),
                 primary: true,
             },

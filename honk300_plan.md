@@ -4,8 +4,9 @@
 > `honk300`. It is an adversarially-reviewed *hybrid* that merges the two earlier drafts —
 > `claude_plan.md` (the structural spine) and `codex_plan.md` (grafted enrichments) — and folds
 > in a round of new, user-approved scope (new autonomous behaviors, a ratatui config TUI, a
-> three-name CLI grammar, and a full all-OS/all-arch build matrix). **No application code is
-> written yet.** Implementation happens in a later, separate round, starting at milestone M0.
+> three-name CLI grammar, and a full all-OS/all-arch build matrix). Implementation now lives in
+> the Cargo workspace; this document records the research and milestone intent rather than a
+> dependency on the removed research-input tree.
 >
 > `claude_plan.md` and `codex_plan.md` are **retained** as provenance/reference; where any of
 > the three documents conflict, **this file wins**.
@@ -17,12 +18,11 @@
 The two drafts disagreed on load-bearing facts. Those disagreements were resolved by
 **claim-testing each against ground truth**, not by preference:
 
-- **Engine constants** were verified against the shipped, readable C# modding-API source
-  (`Exports.cs`, `SamEngine.cs`). `claude_plan.md` reproduced them **verbatim**; `codex_plan.md`
-  read binary *symbol names* but invented *values* (its Appendix B speeds are wrong). **This plan
-  uses the verified values.**
-- **The Deck RNG** is a *biased* shuffle in `SamEngine.cs` (not a weighted picker). Faithful-port
-  decision stands, pinned by tests.
+- **Engine constants** were checked during the original audit. `claude_plan.md` reproduced them;
+  `codex_plan.md` invented values in Appendix B. The accepted values now live in
+  `crates/honk-engine/src/{entity,rig}.rs` and are pinned by tests.
+- **The Deck RNG** uses the accepted biased-shuffle compatibility behavior, pinned by the
+  in-tree task/deck tests.
 - **The QubeTX family conventions** (editions, targets, cargo-dist version, ICE flags) were
   verified across `qube-machine-report` (TR300), `qube-network-diagnostics` (ND300), and
   `qube-workbranch-view` (WB300).
@@ -30,18 +30,18 @@ The two drafts disagreed on load-bearing facts. Those disagreements were resolve
   vs `WS_EX_TRANSPARENT`) follows the technically-correct resolution; the alternative spec is a
   click-through-vs-clickable contradiction and is explicitly avoided.
 
-Source-of-truth files (read directly):
-`DESKTOP-GOOSE/DesktopGoose v0.31/FOR MOD-MAKERS/GooseMod_DefaultSolution/GooseModdingAPI/{Exports.cs, SamEngine.cs}`,
-`…/DefaultMod/TaskDemo_FollowLowAccel.cs`, `…/config.ini`, the Mac `DesktopGoose.sdef` + notes,
-and `qube-{machine-report,network-diagnostics,workbranch-view}`.
+The historical research inputs were intentionally removed after the full custom rebuild. Active
+source of truth is now `crates/honk-engine/src/`, its tests and goldens, the asset descriptors,
+the platform crates, and `qube-{machine-report,network-diagnostics,workbranch-view}` for shared
+family conventions.
 
 ---
 
 ## 1. Context & locked decisions
 
 ### 1.1 What we're building
-`README.md` asks us to analyze the bundled Desktop Goose files and build **an entirely new
-version** — same functionality, same features — but in **Rust**, on **Windows, macOS, and
+The original brief asked for **an entirely new version** with the same core functionality and
+feel, but in **Rust**, on **Windows, macOS, and
 Linux**, with **native + CLI installers like TR300/ND300/WB300**, **except not distributed via
 crates.io** (builds, installers, and scripts only).
 
@@ -113,9 +113,9 @@ grammar is a fixed, finite phrase map — no model at runtime); networked featur
 
 ---
 
-## 3. Source analysis — the original Desktop Goose
+## 3. Historical source analysis — the original Desktop Goose
 
-Two distributions are bundled in `DESKTOP-GOOSE/`:
+The original research pass examined two distributions; they are no longer present in this tree:
 - **`DesktopGoose v0.31/`** (Windows): `GooseDesktop.exe`, `GooseModdingAPI.dll`, `MMQ.dll`,
   `config.ini`, an `Assets/` tree, a `FOR MOD-MAKERS/` Visual Studio solution, readme/text files.
 - **`Desktop Goose for Mac v0.22/`**: a Xamarin/Mono `.app` (`Desktop Goose.exe`), `Info.plist`
@@ -124,7 +124,7 @@ Two distributions are bundled in `DESKTOP-GOOSE/`:
 
 ### 3.1 The headline finding: the goose is **procedurally rendered**, not a sprite
 There is **no goose sprite anywhere**. It is drawn each frame from a geometric **rig** of
-primitives, confirmed by the shipped mod-maker source (`SamEngine.cs`, `Exports.cs`). The
+primitives, now represented directly by the rig implementation and goldens. The
 `config.ini` colors (`#ffffff` / `#ffa500` / `#d3d3d3`) map to the `brushGooseWhite/Orange/
 Outline` solid brushes in `GooseRenderData`. **Consequence:** we reimplement the *renderer*
 clean-room; no art extraction.
@@ -142,7 +142,7 @@ clean-room; no art extraction.
 - **Input:** `mouseX`, `mouseY`, `leftMouseButton` (`ButtonState` with `Held`/`Clicked`/
   `Released`), refreshed each frame.
 
-### 3.3 Goose entity + parameters — **exact verified constants** (`Exports.cs`)
+### 3.3 Goose entity + parameters — **accepted, test-pinned constants**
 `GooseEntity.ParametersTable`:
 
 | Constant | Value | Meaning |
@@ -161,7 +161,7 @@ which each frame sets `currentAcceleration = 100` + `targetPos = (mouseX,mouseY)
 `setTaskRoaming` after 5 s).
 `FootMark`: `Lifetime = 8.5 s`, `ShrinkTime = 1 s`; ring buffer `footMarks[64]`.
 
-### 3.4 The Rig — **exact verified geometry** (`Exports.cs`)
+### 3.4 The Rig — **accepted, test-pinned geometry**
 Drawn back-to-front: shadow → underbody → body → neck (two lerped positions) → head (two
 segments) → eyes → procedural feet.
 
@@ -181,7 +181,7 @@ tiers, step cadence, tint, and task weights — **never** by adding art.
 - `GooseTaskInfo { canBePickedRandomly, shortName, description, taskID, GetNewTaskData(goose),
   RunTask(goose) }`. A `TaskDatabase` holds tasks; the default **roaming/wandering** state picks
   a random pickable task via the `Deck`; `taskIndexQueue` lets a task queue successors.
-- Helpers to reimplement (`Exports.cs` `API.Goose`/`TaskDatabase`): `setSpeed`,
+- Helpers represented by the in-tree World/task APIs: `setSpeed`,
   `setTargetOffscreen(canExitTop)`, `isGooseAtTarget(dist)`, `getDistanceToTarget`,
   `setCurrentTaskByID`, `chooseRandomTask`, `setTaskRoaming`, `playHonckSound`,
   `getTaskIndexByID`, `getAllLoadedTaskIDs`, `getRandomTaskID`.
@@ -579,7 +579,7 @@ goose_white   = "#ffffff"
 goose_orange  = "#ffa500"
 goose_outline = "#d3d3d3"
 
-[speeds]                                   # verified from Exports.cs — DO NOT guess
+[speeds]                                   # pinned by honk-engine tests — DO NOT guess
 walk_speed           = 80.0
 run_speed            = 200.0
 charge_speed         = 400.0
@@ -640,8 +640,8 @@ no_mouse_steal      = false                # --no-mouse-steal sets this true
 
 ## 12. Asset & IP rule
 
-`DESKTOP-GOOSE/` contains Samperson's / third-party copyrighted assets and old developer donation
-material. This is a personal-use project, so screened original sounds, memes, and notes are
+`Assets/` contains approved personal-use compatibility media plus project-created counterparts;
+provenance is recorded in `THIRD_PARTY_ASSETS.md`. Screened sounds, memes, and notes are
 bundled 1:1 for the owner's machines, and each copied meme/note original gets one complete custom
 in-house counterpart. Do not publicly redistribute these bundled assets. The goose visual remains
 clean-room procedural. Old donate pages, Patreon links, social handles, and old-project branding
@@ -655,11 +655,12 @@ Reuse the QubeTX family pipeline, minus crates.io, plus GUI bundling, **across e
 OS and architecture**.
 
 ### 13.1 cargo-dist (`[workspace.metadata.dist]`)
-`cargo-dist-version = "0.31.0"`, `ci = "github"`, `installers = ["shell","powershell"]`,
+`cargo-dist-version = "0.31.0"`, `ci = "github"`, `installers = []`,
 `pr-run-mode = "plan"`, `install-updater = false`, `allow-dirty = ["ci"]`,
 `publish-prereleases = false`. Windows MSI/EXE artifacts are built by the dedicated
-hand-authored Windows installer workflow in §13.2 so aliases, assets, shortcuts, autostart, and
-install-source markers stay identical across Global/Corporate installer variants.
+hand-authored Windows installer workflow in §13.2; the version-stamped shell/PowerShell
+bootstraps are generated by `script/release_metadata.py` so aliases, assets, shortcuts,
+autostart, hashes, and install-source markers stay consistent.
 `[profile.dist] inherits="release"; lto="thin"`. **No `crates-publish.yml`.**
 `windows_subsystem = "windows"` with a CLI fallback path for `--help`/`config`/`install`/`update`/
 `stop`/`do` (allocate a console when run from a terminal).
@@ -874,9 +875,8 @@ intentionally limited.
 ---
 
 ## 20. Appendix
-- **Engine port source-of-truth:** `DESKTOP-GOOSE/DesktopGoose v0.31/FOR MOD-MAKERS/
-  GooseMod_DefaultSolution/GooseModdingAPI/{SamEngine.cs, Exports.cs}`; `…/DefaultMod/
-  {ModMain.cs, TaskDemo_FollowLowAccel.cs}`; `…/config.ini`; Mac `DesktopGoose.sdef` + `Notes/`.
+- **Engine source-of-truth:** `crates/honk-engine/src/{entity,rig,task,world}.rs`,
+  `crates/honk-engine/tests/`, committed renderer goldens, and the explicit asset catalog.
 - **Family conventions to mirror:** `qube-workbranch-view/{Cargo.toml, src/{app,ui,config}.rs,
   .github/workflows/windows-installers.yml, wix/, wix-corporate/, inno/}`;
   `qube-machine-report/src/{install/*, update.rs}`, `build.rs`.
@@ -888,6 +888,6 @@ intentionally limited.
 - **Control / poke / IPC matrix per OS:** §4 table + §8.
 
 ### Document control
-- **This round:** produce this plan only. **No goose code written.**
-- **Next round (separate):** execute from §14 milestones, starting at M0.
+- **Historical role:** this plan defined the original implementation sequence; current behavior
+  is governed by code, accepted ADRs, the active R5 task, and verification evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

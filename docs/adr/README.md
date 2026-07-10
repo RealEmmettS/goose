@@ -28,3 +28,5 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0015 — Reliability And Platform-Safety Fixes (R1)](./0015-reliability-and-platform-safety-fixes.md)
 - [0016 — Idle-Life Behaviors: Meander, Mud, Off-Screen Excursions](./0016-idle-life-behaviors-meander-mud-excursions.md)
 - [0017 — macOS Packaging And Lifecycle (R3)](./0017-macos-packaging-and-lifecycle.md)
+- [0018 — Distribution And Atomic Release](./0018-distribution-and-atomic-release.md)
+- [0019 — v0.3.0 Stabilization Contracts](./0019-stabilization-contracts.md)

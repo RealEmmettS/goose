@@ -2,7 +2,7 @@
 //!
 //! All engine geometry and physics use `f32` to match the original's `float`
 //! parameter table; keeping the numeric type identical avoids subtle drift when we
-//! assert ported constants against their verified source values.
+//! assert frozen constants against their in-tree compatibility values.
 
 /// Degrees → radians multiplier (`π / 180`).
 pub const DEG2RAD: f32 = std::f32::consts::PI / 180.0;

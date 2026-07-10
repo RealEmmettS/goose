@@ -1,8 +1,7 @@
 //! The goose entity: its tunable parameter table and per-frame state.
 //!
-//! Constants are ported **verbatim** from the verified source
-//! (`GooseModdingAPI/Exports.cs`, `GooseEntity.ParametersTable`). Do not "tidy" these
-//! values — they are tuned to the 120 Hz tick and pinned by tests.
+//! Constants are the project's frozen compatibility table. Do not "tidy" these values —
+//! they are tuned to the 120 Hz tick and pinned by the tests in this module.
 
 use crate::footmarks::FootMarks;
 use crate::math::Vec2;
@@ -16,7 +15,7 @@ pub enum SpeedTier {
     Charge,
 }
 
-/// Maximum speeds, accelerations, and timings. Verified values from `Exports.cs`.
+/// Maximum speeds, accelerations, and timings, frozen and pinned by in-tree tests.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ParametersTable {
     /// Max speed in the Walk tier.
@@ -111,7 +110,7 @@ pub struct GooseEntity {
     /// Whether the goose stops sharply at its target or drifts around it.
     pub can_decelerate_immediately: bool,
     /// Wall-clock time at which mud-tracking ends (`< 0` ⇒ not tracking).
-    pub track_mud_end_time: f32,
+    pub track_mud_end_time: f64,
     /// Muddy footprints left behind.
     pub foot_marks: FootMarks,
     /// Computed body geometry for rendering (the active view of `pose`).

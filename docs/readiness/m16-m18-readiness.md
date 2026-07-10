@@ -1,6 +1,6 @@
 # M16.1-M18.1 Backend Readiness
 
-Date: 2026-07-01
+Last updated: 2026-07-10
 
 ## Status
 
@@ -18,12 +18,15 @@ Accessibility-granted evidence.
 - M17 Linux X11 implementation is in-tree: X11/XWayland session selection, visible transparent
   overlay, XShape/XFixes input-region shaping, Xinerama/root bounds, pointer sampling, cursor
   warp, terminal-filtered foreign-window drag snapshots, Unix IPC status/reload/stop/poke,
-  Linux terminal classification, local-time sampling, command-player audio, and explicit
-  unsupported/failed capability reporting.
+  Linux terminal classification, local-time sampling, in-process GNU audio, a bounded and reaped
+  PATH-player fallback for musl, and explicit unsupported/failed capability reporting.
 - M18 native Wayland reduced mode is in-tree: layer-shell overlay presentation through
-  smithay-client-toolkit, Unix IPC status/reload/stop/poke, direct honk/mud/wander control, and
-  explicit unsupported status for cursor warp, foreign-window control, collect-window behavior,
-  and synthetic input.
+  smithay-client-toolkit, one surface per output, real prepare-read/poll/read/dispatch handling,
+  output configure/close/hotplug reconciliation, integer and fractional scale support, empty input
+  regions, no keyboard interactivity, and a released-buffer pool capped at three buffers per
+  output. Unix IPC status/reload/stop/poke and direct honk/mud/wander control remain available;
+  cursor warp, foreign-window control, collect-window behavior, and synthetic input report
+  explicitly unsupported.
 - `honk-engine` remains platform-free; backend crates own OS, display-server, permission, and
   presentation behavior.
 - Capability state flows through `BackendCapability` and the compact status protocol instead of
@@ -57,8 +60,9 @@ Accessibility-granted evidence.
   Xvfb/openbox/xcompmgr, checks status, captures an internal PNG smoke frame, verifies non-zero
   alpha pixels, captures the actual X11 root window, verifies the known background color remains
   visible outside the overlay, exercises honk/mud/wander/nab/reload/stop IPC, then starts
-  headless sway and verifies native Wayland reduced mode renders while mischief remains
-  unsupported.
+  headless sway with two virtual outputs at 1.5x and 2x scale and verifies native Wayland reduced
+  mode renders while mischief remains unsupported. Sway is intentional here because the runtime
+  requires the wlr layer-shell protocol; Weston does not provide that protocol.
 
 ## Readiness Evidence State
 

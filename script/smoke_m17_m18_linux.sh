@@ -245,6 +245,7 @@ start_x11_server() {
 
 start_sway_headless() {
   need_cmd sway
+  need_cmd swaymsg
   export XDG_RUNTIME_DIR="${WORK}/runtime"
   mkdir -p "${XDG_RUNTIME_DIR}"
   chmod 700 "${XDG_RUNTIME_DIR}"
@@ -253,21 +254,75 @@ start_sway_headless() {
   SWAY_PID="$!"
   for _ in $(seq 1 100); do
     if [ -S "${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}" ]; then
-      return 0
+      break
     fi
+    discovered_socket=""
     for socket in "${XDG_RUNTIME_DIR}"/wayland-*; do
       if [ -S "${socket}" ]; then
         WAYLAND_DISPLAY="$(basename "${socket}")"
         export WAYLAND_DISPLAY
         echo "smoke_m17_m18_linux: using Wayland display ${WAYLAND_DISPLAY}"
-        return 0
+        discovered_socket=1
+        break
+      fi
+    done
+    if [ -n "${discovered_socket}" ]; then
+      break
+    fi
+    sleep 0.25
+  done
+  if [ ! -S "${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}" ]; then
+    cat "${WORK}/sway.log" >&2 || true
+    echo "smoke_m17_m18_linux: sway headless socket did not appear" >&2
+    exit 1
+  fi
+
+  for _ in $(seq 1 100); do
+    for socket in "${XDG_RUNTIME_DIR}"/sway-ipc.*.sock; do
+      if [ -S "${socket}" ]; then
+        SWAYSOCK="${socket}"
+        export SWAYSOCK
+        break 2
       fi
     done
     sleep 0.25
   done
-  cat "${WORK}/sway.log" >&2 || true
-  echo "smoke_m17_m18_linux: sway headless socket did not appear" >&2
-  exit 1
+  if [ -z "${SWAYSOCK:-}" ]; then
+    cat "${WORK}/sway.log" >&2 || true
+    echo "smoke_m17_m18_linux: sway IPC socket did not appear" >&2
+    exit 1
+  fi
+
+  swaymsg create_output >/dev/null
+  for _ in $(seq 1 40); do
+    output_names="$(swaymsg -r -t get_outputs | python3 -c 'import json, sys; print(" ".join(output["name"] for output in json.load(sys.stdin) if output.get("active")))')"
+    # Virtual headless output names cannot contain spaces.
+    # shellcheck disable=SC2086
+    set -- ${output_names}
+    if [ "$#" -ge 2 ]; then
+      break
+    fi
+    sleep 0.25
+  done
+  if [ "$#" -lt 2 ]; then
+    swaymsg -r -t get_outputs >&2 || true
+    echo "smoke_m17_m18_linux: expected at least two active headless outputs" >&2
+    exit 1
+  fi
+  first_output="$1"
+  second_output="$2"
+  swaymsg output "${first_output}" scale 1.5 pos 0 0 >/dev/null
+  swaymsg output "${second_output}" scale 2 pos 1280 0 >/dev/null
+  swaymsg -r -t get_outputs | python3 -c '
+import json
+import sys
+
+active = [output for output in json.load(sys.stdin) if output.get("active")]
+scales = sorted(round(float(output.get("scale", 0)), 2) for output in active)
+if len(active) < 2 or 1.5 not in scales or 2.0 not in scales:
+    raise SystemExit(f"unexpected headless output topology: {active!r}")
+print(f"Wayland headless outputs: {len(active)}; scales: {scales}")
+'
 }
 
 exercise_mode() {

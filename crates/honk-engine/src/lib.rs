@@ -12,9 +12,8 @@
 //! local-time-driven schedule manners, and the built-in Autumn leaf-pile season. IPC/config and
 //! the non-Windows platform backends live outside the engine and build on the types defined here.
 //!
-//! Engine constants are ported verbatim from the verified modding-API source
-//! (`GooseModdingAPI/Exports.cs`, `SamEngine.cs`); the `updateRig` placement math and
-//! locomotion live only in the closed binary and are reconstructed clean-room.
+//! Engine constants live in this crate and are pinned by focused tests; rig placement and
+//! locomotion are clean-room implementations whose behavior is likewise tested in-tree.
 
 #![forbid(unsafe_code)]
 
@@ -33,6 +32,7 @@ pub mod footmarks;
 pub mod foreign_window;
 pub mod hearts;
 pub mod interaction;
+pub mod layout;
 pub mod locomotion;
 pub mod math;
 pub mod mood;
@@ -67,6 +67,7 @@ pub use foreign_window::{
 };
 pub use hearts::{Heart, Hearts};
 pub use interaction::{PatTracker, Pointer};
+pub use layout::{DesktopLayout, DesktopLayoutError};
 pub use math::{Rect, Vec2};
 pub use mood::{
     HourlyHonkOptions, LocalHour, LocalTime, MoodIntensity, MoodKind, MoodMachine, MoodOptions,

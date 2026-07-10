@@ -1,6 +1,7 @@
 use crate::assets;
 use crate::audio;
-use crate::runtime::RuntimeOptions;
+use crate::runtime::core::RuntimeCore;
+use crate::runtime::{audio_probe_capability, RuntimeOptions};
 use honk_config::{BackendCapability, BackendState, Config, EffectiveOptions};
 use honk_control::{
     BundleStatus, CapabilityStatus, CommandServer, ControlCommand, ControlResponse, PlatformStatus,
@@ -12,7 +13,7 @@ use honk_engine::render::{
 };
 use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
-    Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, CursorCommand, Pointer,
+    CollectWindowCommand, CollectWindowPayload, CursorCommand, DesktopLayout, Pointer,
     PresenceSnapshot, Rect, Sound, Vec2, World,
 };
 use honk_platform_macos::{
@@ -30,7 +31,6 @@ pub fn run(
 
     let mut overlay = Overlay::new()?;
     let primary_bounds = overlay.primary_monitor_bounds();
-    let virtual_bounds = overlay.virtual_desktop_bounds();
 
     let mut cursor_warp = accessibility_capability();
     let mut window_watch = accessibility_capability();
@@ -56,8 +56,8 @@ pub fn run(
     } else {
         audio::Audio::new()
     };
-    if !effective.no_sound && audio.is_none() {
-        audio_capability = BackendCapability::Failed;
+    if !effective.no_sound {
+        audio_capability = audio_probe_capability(audio.is_some());
     }
 
     let mut warned_window_ride = false;
@@ -88,19 +88,16 @@ pub fn run(
         ),
     );
 
-    let world_bounds = world_bounds_for(
+    let layout = desktop_layout_for(
         effective.world.multi_monitor_chase,
         primary_bounds,
-        virtual_bounds,
-    );
-    let mut world = World::with_options(world_bounds, seed_from_clock(), effective.world);
-    let mut collect_controller = CollectWindowController::new(primary_bounds, virtual_bounds);
-    let mut accumulator = Accumulator::new();
-    let clock = Clock::start();
-    let mut last = clock.elapsed_secs();
-    let mut last_present = f32::NEG_INFINITY;
-    let mut last_render_bounds: Option<Rect> = None;
-    const PRESENT_INTERVAL: f32 = 1.0 / 60.0;
+        overlay.monitor_bounds(),
+    )?;
+    let mut world = World::with_layout_and_options(layout, seed_from_clock(), effective.world);
+    let mut collect_controller = CollectWindowController::new(primary_bounds, primary_bounds);
+    let mut core = RuntimeCore::new();
+    const AUDIO_RETRY_INTERVAL: f64 = 5.0;
+    let mut next_audio_probe = 0.0;
     let mut warned_cursor_warp = false;
     let mut warned_collect_window = false;
 
@@ -111,6 +108,19 @@ pub fn run(
             break;
         }
 
+        if overlay.take_topology_changed() {
+            let primary = overlay.primary_monitor_bounds();
+            let layout = desktop_layout_for(
+                effective.world.multi_monitor_chase,
+                primary,
+                overlay.monitor_bounds(),
+            )?;
+            world.apply_layout(layout);
+            collect_controller.update_display_bounds(primary, primary);
+        }
+
+        let frame = core.begin_frame();
+
         while let Some(request) = server.try_recv() {
             match request.command() {
                 ControlCommand::Stop => {
@@ -120,8 +130,17 @@ pub fn run(
                 }
                 ControlCommand::Reload => {
                     let response = match Config::load_existing(&options.config_path) {
+                        Ok(next_config)
+                            if RuntimeCore::restart_required_reason(&config, &next_config)
+                                .is_some() =>
+                        {
+                            let reason =
+                                RuntimeCore::restart_required_reason(&config, &next_config)
+                                    .expect("guard established restart-required changes");
+                            eprintln!("honk300: reload rejected; restart required for {reason}");
+                            ControlResponse::Err("RESTART_REQUIRED".into())
+                        }
                         Ok(next_config) => {
-                            let prior_multi_monitor_chase = effective.world.multi_monitor_chase;
                             config = next_config;
                             cursor_warp = refresh_accessibility_capability(cursor_warp);
                             window_watch = refresh_accessibility_capability(window_watch);
@@ -159,14 +178,7 @@ pub fn run(
                                 audio = None;
                             } else if audio.is_none() {
                                 audio = audio::Audio::new();
-                                if audio.is_none() {
-                                    audio_capability = BackendCapability::Failed;
-                                }
-                            }
-                            if effective.world.multi_monitor_chase != prior_multi_monitor_chase {
-                                eprintln!(
-                                    "honk300: multi-monitor chase changed; restart required for bounds/window rebuild"
-                                );
+                                audio_capability = audio_probe_capability(audio.is_some());
                             }
                             world.apply_options(effective.world);
                             ControlResponse::Ok
@@ -200,9 +212,7 @@ pub fn run(
         world.set_local_time(local_time());
         world.set_presence(presence_state().unwrap_or_else(|_| PresenceSnapshot::unsupported()));
 
-        let now = clock.elapsed_secs();
-        let dt = now - last;
-        last = now;
+        let now = frame.now();
 
         let (mx, my, left_down) = pointer_state();
         let pointer = Vec2::new(mx, my);
@@ -236,9 +246,7 @@ pub fn run(
         world.set_foreign_window_drag(dragged_window);
         world.set_collect_window_snapshot(collect_controller.snapshot());
 
-        for _ in 0..accumulator.pump(dt) {
-            world.tick();
-        }
+        core.tick(&mut world, frame);
 
         for command in world.take_collect_window_commands() {
             let result = match command {
@@ -296,18 +304,32 @@ pub fn run(
             }
         }
 
+        if let Some(audio) = audio.as_mut() {
+            audio.poll();
+        }
+        if !effective.no_sound && audio.is_none() && now >= next_audio_probe {
+            audio = audio::Audio::new();
+            audio_capability = audio_probe_capability(audio.is_some());
+            next_audio_probe = now + AUDIO_RETRY_INTERVAL;
+        }
+
         let sounds = world.take_sounds();
+        let mut audio_failed = false;
         if let Some(a) = audio.as_mut() {
             for s in sounds {
-                if sound_enabled(effective.audio, s) {
-                    a.play(s);
+                if sound_enabled(effective.audio, s) && a.play(s) == audio::PlayOutcome::Failed {
+                    audio_failed = true;
+                    break;
                 }
             }
         }
+        if audio_failed {
+            audio = None;
+            audio_capability = BackendCapability::Failed;
+            next_audio_probe = now + AUDIO_RETRY_INTERVAL;
+        }
 
-        if now - last_present >= PRESENT_INTERVAL {
-            last_present = now;
-            let dirty = world.render_bounds(last_render_bounds);
+        if let Some(dirty) = core.damage(&world, frame) {
             let width = dirty.width().ceil().max(1.0) as u32;
             let height = dirty.height().ceil().max(1.0) as u32;
             let origin = dirty.min;
@@ -341,7 +363,6 @@ pub fn run(
             render_hearts(&mut canvas, world.hearts(), world.now(), origin);
             render_sleepies(&mut canvas, world.sleepies(), world.now(), origin);
             overlay.present(dirty, &canvas)?;
-            last_render_bounds = Some(dirty);
         }
 
         std::thread::sleep(std::time::Duration::from_millis(2));
@@ -390,6 +411,7 @@ fn sound_enabled(config: honk_config::AudioConfig, sound: Sound) -> bool {
     }
 }
 
+#[cfg(test)]
 fn world_bounds_for(multi_monitor_chase: bool, primary_bounds: Rect, virtual_bounds: Rect) -> Rect {
     if multi_monitor_chase {
         virtual_bounds
@@ -398,10 +420,29 @@ fn world_bounds_for(multi_monitor_chase: bool, primary_bounds: Rect, virtual_bou
     }
 }
 
+fn desktop_layout_for(
+    multi_monitor_chase: bool,
+    primary_bounds: Rect,
+    monitor_bounds: Vec<Rect>,
+) -> Result<DesktopLayout, honk_engine::DesktopLayoutError> {
+    if multi_monitor_chase {
+        DesktopLayout::new(monitor_bounds)
+    } else {
+        Ok(DesktopLayout::single(primary_bounds))
+    }
+}
+
 fn accessibility_capability() -> BackendCapability {
-    match accessibility_state() {
-        AccessibilityState::Trusted => BackendCapability::Supported,
-        AccessibilityState::Denied => BackendCapability::Denied,
+    accessibility_capability_with(|| Ok(accessibility_state()))
+}
+
+fn accessibility_capability_with(
+    probe: impl FnOnce() -> std::io::Result<AccessibilityState>,
+) -> BackendCapability {
+    match probe() {
+        Ok(AccessibilityState::Trusted) => BackendCapability::Supported,
+        Ok(AccessibilityState::Denied) => BackendCapability::Denied,
+        Err(err) => permission_or_failed(&err),
     }
 }
 
@@ -416,9 +457,18 @@ fn permission_or_failed(err: &std::io::Error) -> BackendCapability {
 }
 
 fn refresh_accessibility_capability(current: BackendCapability) -> BackendCapability {
+    refresh_accessibility_capability_with(current, || Ok(accessibility_state()))
+}
+
+fn refresh_accessibility_capability_with(
+    current: BackendCapability,
+    probe: impl FnOnce() -> std::io::Result<AccessibilityState>,
+) -> BackendCapability {
     match current {
-        BackendCapability::Failed | BackendCapability::Unsupported => current,
-        BackendCapability::Supported | BackendCapability::Denied => accessibility_capability(),
+        BackendCapability::Unsupported => BackendCapability::Unsupported,
+        BackendCapability::Supported | BackendCapability::Denied | BackendCapability::Failed => {
+            accessibility_capability_with(probe)
+        }
     }
 }
 
@@ -480,4 +530,62 @@ fn seed_from_clock() -> u64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0x9E37_79B9_7F4A_7C15)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hosted_accessibility_adapter_maps_granted_without_querying_host_permission() {
+        assert_eq!(
+            accessibility_capability_with(|| Ok(AccessibilityState::Trusted)),
+            BackendCapability::Supported
+        );
+    }
+
+    #[test]
+    fn hosted_accessibility_adapter_maps_denied_without_querying_host_permission() {
+        assert_eq!(
+            accessibility_capability_with(|| Ok(AccessibilityState::Denied)),
+            BackendCapability::Denied
+        );
+    }
+
+    #[test]
+    fn hosted_accessibility_adapter_maps_probe_errors() {
+        assert_eq!(
+            accessibility_capability_with(|| Err(std::io::Error::other("probe failed"))),
+            BackendCapability::Failed
+        );
+        assert_eq!(
+            accessibility_capability_with(|| Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "permission denied",
+            ))),
+            BackendCapability::Denied
+        );
+    }
+
+    #[test]
+    fn hosted_accessibility_adapter_recovers_after_denial_or_probe_error() {
+        for current in [BackendCapability::Denied, BackendCapability::Failed] {
+            assert_eq!(
+                refresh_accessibility_capability_with(current, || {
+                    Ok(AccessibilityState::Trusted)
+                }),
+                BackendCapability::Supported
+            );
+        }
+    }
+
+    #[test]
+    fn hosted_accessibility_adapter_keeps_unsupported_capability_stable() {
+        assert_eq!(
+            refresh_accessibility_capability_with(BackendCapability::Unsupported, || {
+                panic!("unsupported capability must not be re-probed")
+            }),
+            BackendCapability::Unsupported
+        );
+    }
 }

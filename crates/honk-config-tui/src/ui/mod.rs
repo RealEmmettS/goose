@@ -3,17 +3,33 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
 pub fn render(frame: &mut Frame<'_>, app: &AppState) {
+    if frame.area().width < 72 || frame.area().height < 20 {
+        let notice = format!(
+            "honk300 config needs at least 72x20; current terminal is {}x{}",
+            frame.area().width,
+            frame.area().height
+        );
+        frame.render_widget(
+            Paragraph::new(notice).wrap(Wrap { trim: false }).block(
+                Block::default()
+                    .title("Terminal too small")
+                    .borders(Borders::ALL),
+            ),
+            frame.area(),
+        );
+        return;
+    }
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
             Constraint::Min(8),
-            Constraint::Length(3),
+            Constraint::Length(5),
         ])
         .split(frame.area());
 
@@ -117,12 +133,19 @@ fn render_footer(frame: &mut Frame<'_>, area: ratatui::layout::Rect, app: &AppSt
     } else {
         Style::default().fg(Color::Green)
     };
-    let line = Line::from(vec![
-        Span::raw("j/k move  Tab category  Enter toggle  Left/Right adjust  S save  R reload  U status  X stop  G start  h/w/m/e/n/b poke  q quit  "),
-        Span::styled(&app.status, status_style),
-    ]);
+    let mut lines = vec![Line::raw(
+        "j/k move  Tab category  Enter toggle  Left/Right adjust  S save  R reload  U status  X stop  G start  q quit  PgUp/PgDn status",
+    )];
+    lines.extend(
+        app.status
+            .lines()
+            .map(|line| Line::from(Span::styled(line, status_style))),
+    );
     frame.render_widget(
-        Paragraph::new(line).block(Block::default().borders(Borders::ALL)),
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .scroll((app.status_scroll, 0))
+            .block(Block::default().borders(Borders::ALL)),
         area,
     );
 }
@@ -140,5 +163,60 @@ mod tests {
         let backend = TestBackend::new(100, 30);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal.draw(|frame| render(frame, &app)).unwrap();
+    }
+
+    #[test]
+    fn terminals_smaller_than_minimum_show_a_size_notice() {
+        let app = AppState::new(Config::default(), PathBuf::from("config.toml"));
+        let backend = TestBackend::new(71, 19);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(frame, &app)).unwrap();
+        let text = buffer_text(&terminal);
+        assert!(text.contains("needs at least 72x20"), "{text}");
+    }
+
+    #[test]
+    fn standard_eighty_by_twenty_four_layout_is_reachable() {
+        let app = AppState::new(Config::default(), PathBuf::from("config.toml"));
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(frame, &app)).unwrap();
+        let text = buffer_text(&terminal);
+        assert!(text.contains("honk300 config"), "{text}");
+        assert!(text.contains("Categories"), "{text}");
+        assert!(!text.contains("needs at least"), "{text}");
+    }
+
+    #[test]
+    fn long_status_and_errors_wrap_and_can_scroll() {
+        let mut app = AppState::new(Config::default(), PathBuf::from("config.toml"));
+        app.set_status(
+            (0..12)
+                .map(|line| format!("status-line-{line:02}"))
+                .chain(std::iter::once("TAILTOKEN".into()))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            true,
+        );
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(frame, &app)).unwrap();
+        assert!(!buffer_text(&terminal).contains("TAILTOKEN"));
+
+        app.apply(crate::app::Action::ScrollStatus(12));
+        terminal.draw(|frame| render(frame, &app)).unwrap();
+        let text = buffer_text(&terminal);
+        assert!(text.contains("TAILTOKEN"), "{text}");
+    }
+
+    fn buffer_text(terminal: &Terminal<TestBackend>) -> String {
+        let buffer = terminal.backend().buffer();
+        let width = buffer.area.width as usize;
+        buffer
+            .content()
+            .chunks(width)
+            .map(|row| row.iter().map(|cell| cell.symbol()).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }

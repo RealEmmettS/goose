@@ -1,0 +1,460 @@
+#!/bin/sh
+# honk300 managed installer for macOS and Linux. Rendered per release.
+
+set -eu
+umask 077
+
+VERSION="__VERSION__"
+TAG="__TAG__"
+COMMIT="__COMMIT__"
+PID="$$"
+REPOSITORY="https://github.com/RealEmmettS/goose"
+TEMP_ROOT=""
+STAGE_ROOT=""
+DEST=""
+PREVIOUS=""
+SWAPPED=0
+COMMITTED=0
+CREATED_LINKS=""
+REPLACED_LINKS=""
+PATH_PROFILE=""
+PATH_PROFILE_BACKUP=""
+PATH_MARKER_ADDED=0
+PATH_PROFILE_CREATED=0
+DESKTOP_PATH=""
+DESKTOP_BACKUP=""
+DESKTOP_CREATED=0
+RECEIPT=""
+RECEIPT_BACKUP=""
+RECEIPT_CREATED=0
+
+die() {
+  printf 'honk300 installer: %s\n' "$*" >&2
+  exit 1
+}
+
+has() { command -v "$1" >/dev/null 2>&1; }
+
+download() {
+  url="$1"
+  output="$2"
+  if has curl; then
+    curl --proto '=https' --tlsv1.2 -fL --retry 4 --retry-all-errors -o "$output" "$url"
+  elif has wget; then
+    wget -qO "$output" "$url"
+  else
+    die "curl or wget is required"
+  fi
+}
+
+file_sha256() {
+  path="$1"
+  if has sha256sum; then
+    sha256sum "$path" | awk '{print $1}'
+  elif has shasum; then
+    shasum -a 256 "$path" | awk '{print $1}'
+  elif has openssl; then
+    openssl dgst -sha256 "$path" | awk '{print $NF}'
+  else
+    die "no SHA-256 tool found (sha256sum, shasum, or openssl)"
+  fi
+}
+
+verify_file() {
+  path="$1"
+  expected="$2"
+  actual="$(file_sha256 "$path" | tr 'A-F' 'a-f')"
+  [ "$actual" = "$expected" ] || die "SHA-256 mismatch for $(basename "$path")"
+}
+
+reject_archive_entry() {
+  entry="$1"
+  case "$entry" in
+    ''|/*|\\*|../*|*/../*|*/..|..|*\\..\\*|?:*)
+      die "archive contains an unsafe path: $entry"
+      ;;
+  esac
+}
+
+validate_tar() {
+  archive="$1"
+  entries="$TEMP_ROOT/tar-entries"
+  tar -tJf "$archive" > "$entries"
+  while IFS= read -r entry; do reject_archive_entry "$entry"; done < "$entries"
+  duplicates="$(LC_ALL=C sort "$entries" | uniq -d || true)"
+  [ -z "$duplicates" ] || die "archive contains duplicate entries: $duplicates"
+  if tar -tvJf "$archive" | grep -E '^[lh]' >/dev/null 2>&1; then
+    die "archive contains links; refusing extraction"
+  fi
+}
+
+validate_zip() {
+  archive="$1"
+  has unzip || die "unzip is required to validate the macOS app archive"
+  entries="$TEMP_ROOT/zip-entries"
+  unzip -Z1 "$archive" > "$entries"
+  while IFS= read -r entry; do reject_archive_entry "$entry"; done < "$entries"
+  duplicates="$(LC_ALL=C sort "$entries" | uniq -d || true)"
+  [ -z "$duplicates" ] || die "archive contains duplicate entries: $duplicates"
+  if unzip -Z -l "$archive" | grep -E '^[[:space:]]*l' >/dev/null 2>&1; then
+    die "archive contains links; refusing extraction"
+  fi
+}
+
+reported_version() {
+  "$1" --version 2>/dev/null | awk '{print $NF}' | sed 's/[+-].*$//'
+}
+
+verify_binary() {
+  binary="$1"
+  [ -x "$binary" ] || die "staged binary is missing or not executable: $binary"
+  [ "$(reported_version "$binary")" = "$VERSION" ] || die "staged binary version does not match $VERSION"
+}
+
+stop_existing() {
+  binary="$1"
+  [ -x "$binary" ] || return 0
+  "$binary" stop >/dev/null 2>&1 &
+  stop_pid=$!
+  waited=0
+  while kill -0 "$stop_pid" >/dev/null 2>&1; do
+    [ "$waited" -lt 5 ] || { kill "$stop_pid" >/dev/null 2>&1 || true; break; }
+    sleep 1
+    waited=$((waited + 1))
+  done
+  wait "$stop_pid" >/dev/null 2>&1 || true
+}
+
+rollback() {
+  [ "$SWAPPED" -eq 1 ] || return 0
+  [ -n "$DEST" ] || return 0
+  rm -rf "$DEST"
+  if [ -n "$PREVIOUS" ] && [ -e "$PREVIOUS" ]; then
+    mv "$PREVIOUS" "$DEST"
+  fi
+  SWAPPED=0
+}
+
+rollback_integrations() {
+  if [ -n "$CREATED_LINKS" ]; then
+    printf '%s\n' "$CREATED_LINKS" | while IFS= read -r link; do
+      [ -n "$link" ] || continue
+      [ ! -L "$link" ] || rm -f "$link"
+    done
+  fi
+  if [ -n "$REPLACED_LINKS" ]; then
+    printf '%s\n' "$REPLACED_LINKS" | while IFS='|' read -r link old_target; do
+      [ -n "$link" ] || continue
+      rm -f "$link"
+      ln -s "$old_target" "$link"
+    done
+  fi
+  if [ "$PATH_MARKER_ADDED" -eq 1 ] && [ -n "$PATH_PROFILE" ]; then
+    if [ "$PATH_PROFILE_CREATED" -eq 1 ]; then
+      rm -f "$PATH_PROFILE"
+    elif [ -n "$PATH_PROFILE_BACKUP" ] && [ -f "$PATH_PROFILE_BACKUP" ]; then
+      cp -p "$PATH_PROFILE_BACKUP" "$PATH_PROFILE"
+    fi
+  fi
+  if [ -n "$DESKTOP_PATH" ]; then
+    if [ -n "$DESKTOP_BACKUP" ] && [ -f "$DESKTOP_BACKUP" ]; then
+      cp -p "$DESKTOP_BACKUP" "$DESKTOP_PATH"
+    elif [ "$DESKTOP_CREATED" -eq 1 ]; then
+      rm -f "$DESKTOP_PATH"
+    fi
+  fi
+  if [ -n "$RECEIPT" ]; then
+    if [ -n "$RECEIPT_BACKUP" ] && [ -f "$RECEIPT_BACKUP" ]; then
+      cp -p "$RECEIPT_BACKUP" "$RECEIPT"
+    elif [ "$RECEIPT_CREATED" -eq 1 ]; then
+      rm -f "$RECEIPT"
+    fi
+  fi
+}
+
+cleanup() {
+  status=$?
+  trap - EXIT HUP INT TERM
+  if [ "$status" -ne 0 ] && [ "$COMMITTED" -ne 1 ]; then
+    rollback || true
+    rollback_integrations || true
+  fi
+  [ -z "$TEMP_ROOT" ] || rm -rf "$TEMP_ROOT"
+  [ -z "$STAGE_ROOT" ] || rm -rf "$STAGE_ROOT"
+  exit "$status"
+}
+trap cleanup EXIT HUP INT TERM
+
+safe_link() {
+  link="$1"
+  target="$2"
+  if [ -L "$link" ]; then
+    old_target="$(readlink "$link")"
+    [ "$old_target" = "$target" ] && return 0
+    case "$old_target" in
+      "$HOME/Applications/Honk300.app/Contents/MacOS/honk300"|\
+      "$HOME/.local/share/honk300/install/bin/honk300"|\
+      "${XDG_DATA_HOME:-$HOME/.local/share}/honk300/install/bin/honk300") : ;;
+      *) die "refusing to replace foreign command symlink: $link -> $old_target" ;;
+    esac
+    REPLACED_LINKS="${REPLACED_LINKS}${REPLACED_LINKS:+
+}$link|$old_target"
+  elif [ -e "$link" ]; then
+    die "refusing to replace foreign command: $link"
+  else
+    CREATED_LINKS="${CREATED_LINKS}${CREATED_LINKS:+
+}$link"
+  fi
+  rm -f "$link"
+  ln -s "$target" "$link"
+}
+
+atomic_write() {
+  path="$1"
+  mode="$2"
+  content_file="$3"
+  parent="$(dirname "$path")"
+  mkdir -p "$parent"
+  temp="$parent/.honk300-write.$PID"
+  cp "$content_file" "$temp"
+  chmod "$mode" "$temp"
+  mv -f "$temp" "$path"
+}
+
+ensure_path_marker() {
+  case ":${PATH:-}:" in *:"$HOME/.local/bin":*) return 0 ;; esac
+  case "${SHELL:-}" in
+    */zsh) profile="${ZDOTDIR:-$HOME}/.zprofile" ;;
+    *) profile="$HOME/.profile" ;;
+  esac
+  if [ -L "$profile" ]; then
+    link_target="$(readlink "$profile")"
+    case "$link_target" in /*) profile="$link_target" ;; *) profile="$(dirname "$profile")/$link_target" ;; esac
+  fi
+  [ ! -e "$profile" ] || [ -f "$profile" ] || die "shell profile is not a regular file: $profile"
+  marker_start="# >>> honk300 managed PATH >>>"
+  if [ -f "$profile" ] && grep -F "$marker_start" "$profile" >/dev/null 2>&1; then return 0; fi
+  PATH_PROFILE="$profile"
+  PATH_MARKER_ADDED=1
+  if [ ! -e "$profile" ]; then
+    PATH_PROFILE_CREATED=1
+  else
+    PATH_PROFILE_BACKUP="$TEMP_ROOT/profile-backup"
+    cp -p "$profile" "$PATH_PROFILE_BACKUP"
+  fi
+  parent="$(dirname "$profile")"
+  mkdir -p "$parent"
+  temp="$parent/.honk300-profile.$PID"
+  if [ -f "$profile" ]; then cp -p "$profile" "$temp"; else : > "$temp"; chmod 600 "$temp"; fi
+  {
+    printf '\n%s\n' "$marker_start"
+    printf 'export PATH="$HOME/.local/bin:$PATH"\n'
+    printf '# <<< honk300 managed PATH <<<\n'
+  } >> "$temp"
+  mv -f "$temp" "$profile"
+}
+
+json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+write_receipt() {
+  receipt="$1"
+  layout="$2"
+  install_root="$3"
+  target="$4"
+  artifact="$5"
+  hash="$6"
+  autostart="$7"
+  [ ! -L "$receipt" ] || die "refusing to replace symlinked install receipt: $receipt"
+  if [ -e "$receipt" ]; then
+    [ -f "$receipt" ] || die "install receipt is not a regular file: $receipt"
+    grep -F '"schema": "honk300.install.v1"' "$receipt" >/dev/null 2>&1 || die "refusing to replace foreign install receipt: $receipt"
+    RECEIPT_BACKUP="$TEMP_ROOT/receipt-backup.json"
+    cp -p "$receipt" "$RECEIPT_BACKUP"
+  else
+    RECEIPT_CREATED=1
+  fi
+  temp="$TEMP_ROOT/receipt.json"
+  cat > "$temp" <<EOF
+{
+  "schema": "honk300.install.v1",
+  "version": "$(json_escape "$VERSION")",
+  "tag": "$(json_escape "$TAG")",
+  "commit": "$(json_escape "$COMMIT")",
+  "channel": "shell",
+  "layout": "$(json_escape "$layout")",
+  "target": "$(json_escape "$target")",
+  "artifact": { "name": "$(json_escape "$artifact")", "sha256": "$(json_escape "$hash")" },
+  "install_root": "$(json_escape "$install_root")",
+  "aliases": ["$(json_escape "$HOME/.local/bin/honk300")", "$(json_escape "$HOME/.local/bin/honk")", "$(json_escape "$HOME/.local/bin/goose")"],
+  "autostart": { "enabled": $autostart, "owner": "honk300-installer" }
+}
+EOF
+  atomic_write "$receipt" 600 "$temp"
+}
+
+swap_install() {
+  candidate="$1"
+  DEST="$2"
+  PREVIOUS="$DEST.previous.$PID"
+  [ ! -e "$PREVIOUS" ] && [ ! -L "$PREVIOUS" ] || die "stale rollback path exists: $PREVIOUS"
+  if [ -e "$DEST" ]; then mv "$DEST" "$PREVIOUS"; else PREVIOUS=""; fi
+  if ! mv "$candidate" "$DEST"; then
+    [ -z "$PREVIOUS" ] || mv "$PREVIOUS" "$DEST"
+    die "failed to activate staged install"
+  fi
+  SWAPPED=1
+}
+
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+case "$ARCH" in x86_64|amd64) ARCH=x86_64 ;; arm64|aarch64) ARCH=aarch64 ;; *) die "unsupported architecture: $ARCH" ;; esac
+
+if [ "$OS" = Darwin ]; then
+  TARGET="universal2-apple-darwin"
+  ARTIFACT="honk300-universal2.app.zip"
+  EXPECTED_SHA="__SHA_MAC_APP__"
+  DEST="$HOME/Applications/Honk300.app"
+  EXISTING_BINARY="$DEST/Contents/MacOS/honk300"
+  RECEIPT="$HOME/Library/Application Support/honk300/install-receipt.json"
+elif [ "$OS" = Linux ]; then
+  if [ "$ARCH" = x86_64 ]; then arch_name=x86_64; else arch_name=aarch64; fi
+  libc="${HONK300_LIBC:-}"
+  if [ -z "$libc" ] && has getconf && getconf GNU_LIBC_VERSION >/dev/null 2>&1; then libc=gnu; fi
+  if [ -z "$libc" ] && has ldd; then
+    ldd_text="$(ldd --version 2>&1 || true)"
+    case "$ldd_text" in *musl*) libc=musl ;; *GLIBC*|*GNU*) libc=gnu ;; esac
+  fi
+  if [ -z "$libc" ] && [ -f /etc/alpine-release ]; then libc=musl; fi
+  case "$libc" in gnu|musl) : ;; *) die "could not identify libc; retry with HONK300_LIBC=gnu or HONK300_LIBC=musl" ;; esac
+  TARGET="$arch_name-unknown-linux-$libc"
+  ARTIFACT="honk300-$TARGET.tar.xz"
+  case "$TARGET" in
+    x86_64-unknown-linux-gnu) EXPECTED_SHA="__SHA_LINUX_X64_GNU__" ;;
+    aarch64-unknown-linux-gnu) EXPECTED_SHA="__SHA_LINUX_ARM64_GNU__" ;;
+    x86_64-unknown-linux-musl) EXPECTED_SHA="__SHA_LINUX_X64_MUSL__" ;;
+    aarch64-unknown-linux-musl) EXPECTED_SHA="__SHA_LINUX_ARM64_MUSL__" ;;
+  esac
+  DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+  DEST="${XDG_DATA_HOME:-$HOME/.local/share}/honk300/install"
+  EXISTING_BINARY="$DEST/bin/honk300"
+  RECEIPT="$DATA_HOME/honk300/install-receipt.json"
+else
+  die "unsupported operating system: $OS"
+fi
+
+[ ! -L "$DEST" ] || die "refusing to replace symlinked install root: $DEST"
+[ ! -e "$DEST" ] || [ -d "$DEST" ] || die "install root is not a directory: $DEST"
+if [ "$OS" = Linux ] && [ -d "$DEST" ]; then
+  if ! grep -F '"schema": "honk300.install.v1"' "$RECEIPT" >/dev/null 2>&1 \
+     && [ ! -f "$DEST/install-source.txt" ]; then
+    die "refusing to replace an unrecognized Linux install root: $DEST"
+  fi
+fi
+if [ "$OS" = Darwin ] && [ -d "$DEST" ]; then
+  existing_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$DEST/Contents/Info.plist" 2>/dev/null || true)"
+  [ "$existing_id" = "dev.emmetts.honk300" ] || die "refusing to replace foreign app bundle: $DEST"
+fi
+
+TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/honk300.XXXXXX")"
+mkdir -p "$(dirname "$DEST")"
+STAGE_ROOT="$(mktemp -d "$(dirname "$DEST")/.honk300-stage.XXXXXX")"
+PAYLOAD="$TEMP_ROOT/$ARTIFACT"
+if [ -n "${HONK300_TEST_LOCAL_DIR:-}" ]; then
+  case "$HONK300_TEST_LOCAL_DIR" in /*) : ;; *) die "HONK300_TEST_LOCAL_DIR must be absolute" ;; esac
+  LOCAL_PAYLOAD="$HONK300_TEST_LOCAL_DIR/$ARTIFACT"
+  [ -f "$LOCAL_PAYLOAD" ] && [ ! -L "$LOCAL_PAYLOAD" ] || die "local test payload is missing or unsafe"
+  printf 'honk300 installer: staging local test payload %s\n' "$LOCAL_PAYLOAD"
+  cp "$LOCAL_PAYLOAD" "$PAYLOAD"
+elif [ -n "${HONK300_DOWNLOAD_BASE:-}" ]; then
+  URL="${HONK300_DOWNLOAD_BASE%/}/$ARTIFACT"
+  printf 'honk300 installer: downloading %s\n' "$URL"
+  download "$URL" "$PAYLOAD"
+else
+  URL="$REPOSITORY/releases/download/$TAG/$ARTIFACT"
+  printf 'honk300 installer: downloading %s\n' "$URL"
+  download "$URL" "$PAYLOAD"
+fi
+verify_file "$PAYLOAD" "$EXPECTED_SHA"
+
+stop_existing "$EXISTING_BINARY"
+
+if [ "$OS" = Darwin ]; then
+  validate_zip "$PAYLOAD"
+  ditto -x -k "$PAYLOAD" "$STAGE_ROOT"
+  CANDIDATE="$STAGE_ROOT/Honk300.app"
+  [ -d "$CANDIDATE" ] || die "archive does not contain Honk300.app"
+  [ -z "$(find "$CANDIDATE" -type l -print -quit)" ] || die "app archive contains an unexpected symlink"
+  STAGED_BINARY="$CANDIDATE/Contents/MacOS/honk300"
+  verify_binary "$STAGED_BINARY"
+  codesign --verify --deep --strict "$CANDIDATE"
+  lipo "$STAGED_BINARY" -verify_arch x86_64 arm64
+  bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$CANDIDATE/Contents/Info.plist")"
+  [ "$bundle_id" = "dev.emmetts.honk300" ] || die "unexpected bundle identifier: $bundle_id"
+  bundle_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$CANDIDATE/Contents/Info.plist")"
+  [ "$bundle_version" = "$VERSION" ] || die "unexpected bundle version: $bundle_version"
+  swap_install "$CANDIDATE" "$DEST"
+  INSTALLED_BINARY="$DEST/Contents/MacOS/honk300"
+  verify_binary "$INSTALLED_BINARY"
+  codesign --verify --deep --strict "$DEST"
+  layout=mac-app
+  autostart=false
+  [ ! -f "$HOME/Library/LaunchAgents/dev.emmetts.honk300.plist" ] || autostart=true
+else
+  validate_tar "$PAYLOAD"
+  mkdir -p "$STAGE_ROOT/extracted" "$STAGE_ROOT/install/bin"
+  tar -xJf "$PAYLOAD" -C "$STAGE_ROOT/extracted" --no-same-owner --no-same-permissions
+  binaries="$(find "$STAGE_ROOT/extracted" -type f -name honk300 -print)"
+  [ "$(printf '%s\n' "$binaries" | sed '/^$/d' | wc -l | tr -d ' ')" = 1 ] || die "archive must contain exactly one honk300 binary"
+  staged_source="$(printf '%s\n' "$binaries" | sed -n '1p')"
+  cp "$staged_source" "$STAGE_ROOT/install/bin/honk300"
+  chmod 755 "$STAGE_ROOT/install/bin/honk300"
+  verify_binary "$STAGE_ROOT/install/bin/honk300"
+  swap_install "$STAGE_ROOT/install" "$DEST"
+  INSTALLED_BINARY="$DEST/bin/honk300"
+  verify_binary "$INSTALLED_BINARY"
+  layout=linux-xdg
+  autostart=false
+  [ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/honk300.desktop" ] || autostart=true
+  applications="$DATA_HOME/applications"
+  mkdir -p "$applications"
+  DESKTOP_PATH="$applications/honk300.desktop"
+  [ ! -L "$DESKTOP_PATH" ] || die "refusing to replace symlinked desktop entry: $DESKTOP_PATH"
+  if [ -e "$DESKTOP_PATH" ]; then
+    [ -f "$DESKTOP_PATH" ] || die "desktop entry is not a regular file: $DESKTOP_PATH"
+    grep -F 'X-Honk300-Managed=true' "$DESKTOP_PATH" >/dev/null 2>&1 || die "refusing to replace foreign desktop entry: $DESKTOP_PATH"
+    DESKTOP_BACKUP="$TEMP_ROOT/desktop-backup.desktop"
+    cp -p "$DESKTOP_PATH" "$DESKTOP_BACKUP"
+  else
+    DESKTOP_CREATED=1
+  fi
+  desktop_temp="$TEMP_ROOT/honk300.desktop"
+  cat > "$desktop_temp" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Honk300
+Exec=$INSTALLED_BINARY start
+Terminal=false
+Categories=Utility;
+X-Honk300-Managed=true
+EOF
+  atomic_write "$DESKTOP_PATH" 644 "$desktop_temp"
+fi
+
+mkdir -p "$HOME/.local/bin"
+for name in honk300 honk goose; do safe_link "$HOME/.local/bin/$name" "$INSTALLED_BINARY"; done
+ensure_path_marker
+write_receipt "$RECEIPT" "$layout" "$DEST" "$TARGET" "$ARTIFACT" "$EXPECTED_SHA" "$autostart"
+
+if [ "${HONK300_TEST_FAIL_AFTER_SWAP:-0}" = 1 ]; then
+  die "fault injection after activation"
+fi
+
+COMMITTED=1
+[ -z "$PREVIOUS" ] || rm -rf "$PREVIOUS"
+SWAPPED=0
+
+printf 'honk300 %s installed at %s\n' "$VERSION" "$DEST"
+printf 'Open a new terminal, then run: honk300 start\n'
+if [ "$OS" = Darwin ]; then
+  printf 'This build is ad-hoc signed and not notarized. macOS may require approval in System Settings > Privacy & Security.\n'
+fi

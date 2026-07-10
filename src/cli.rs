@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use honk_engine::PokeAction;
 use std::ffi::OsString;
 #[cfg(test)]
@@ -13,34 +13,40 @@ use std::path::PathBuf;
     after_help = "Goose-speak:\n  <name> plz                 Start the goose\n  <name> bad | no | no honk  Stop the goose\n  <name> exit | quit         Stop the goose\n  <name> do honk             Poke a honk\n\nInstalled names: honk300, honk, goose."
 )]
 pub struct Cli {
+    #[command(subcommand)]
+    pub command: Option<Command>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Args)]
+pub struct StartOptions {
     /// Start the goose muted.
-    #[arg(long, alias = "silent", global = true)]
+    #[arg(long, alias = "silent")]
     pub no_sound: bool,
 
     /// Disable cursor-stealing behavior for this run.
-    #[arg(long, global = true)]
+    #[arg(long)]
     pub no_mouse_steal: bool,
 
     /// Disable foreign-window ride behavior for this run.
-    #[arg(long, global = true)]
+    #[arg(long)]
     pub no_window_ride: bool,
 
     /// Use a specific config.toml instead of the per-user default.
-    #[arg(long, global = true, value_name = "PATH")]
+    #[arg(long, value_name = "PATH")]
     pub config: Option<PathBuf>,
 
     /// Request native Wayland reduced mode on Linux.
-    #[arg(long, global = true)]
+    #[arg(long)]
     pub wayland: bool,
-
-    #[command(subcommand)]
-    pub command: Option<Command>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
 pub enum Command {
     /// Start the goose. This is also the default when no command is provided.
-    Start,
+    Start {
+        #[command(flatten)]
+        options: StartOptions,
+    },
     /// Stop the running goose through local IPC.
     Stop,
     /// Ask the running goose to reload runtime options.
@@ -48,7 +54,11 @@ pub enum Command {
     /// Show the running goose's platform and capability status.
     Status,
     /// Open the terminal config editor.
-    Config,
+    Config {
+        /// Use a specific config.toml instead of the per-user default.
+        #[arg(long, value_name = "PATH")]
+        config: Option<PathBuf>,
+    },
     /// Poke the running goose into a specific action.
     Do {
         #[arg(value_enum)]
@@ -69,7 +79,14 @@ pub enum Command {
     /// Download and run the matching release installer for this install source.
     Update,
     /// Create or refresh the user config file.
-    Setup,
+    Setup {
+        /// Use a specific config.toml instead of the per-user default.
+        #[arg(long, value_name = "PATH")]
+        config: Option<PathBuf>,
+        /// Back up the existing file and replace it with schema-current defaults.
+        #[arg(long)]
+        reset: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -111,7 +128,7 @@ impl Cli {
 
     #[cfg(test)]
     pub fn is_start(&self) -> bool {
-        self.command.is_none() || self.command == Some(Command::Start)
+        self.command.is_none() || matches!(self.command, Some(Command::Start { .. }))
     }
 
     pub fn is_client_command(&self) -> bool {
@@ -138,6 +155,9 @@ where
 
     let command_idx = first_command_index(&args);
     if command_idx >= args.len() {
+        if args.len() > 1 {
+            args.insert(1, "start".into());
+        }
         return args;
     }
 
@@ -157,6 +177,11 @@ where
             args[command_idx] = "stop".into();
         }
         _ => {}
+    }
+
+    if command_idx > 1 && matches!(args[command_idx].as_str(), "start" | "config" | "setup") {
+        let prefix: Vec<_> = args.drain(1..command_idx).collect();
+        args.splice(2..2, prefix);
     }
     args
 }
@@ -286,8 +311,9 @@ mod tests {
             &["--no-sound", "start"],
             &["--no-mouse-steal", "start"],
             &["--no-window-ride", "start"],
-            &["--wayland", "config"],
-            &["--config", "C:\\tmp\\g.toml", "reload"],
+            &["--wayland", "start"],
+            &["--config", "C:\\tmp\\g.toml", "config"],
+            &["setup", "--config", "C:\\tmp\\g.toml", "--reset"],
         ];
 
         for tail in tails {
@@ -305,26 +331,6 @@ mod tests {
                     cli.command, baseline.command,
                     "`{name} {tail:?}` command differs"
                 );
-                assert_eq!(
-                    cli.no_sound, baseline.no_sound,
-                    "`{name} {tail:?}` no_sound differs"
-                );
-                assert_eq!(
-                    cli.no_mouse_steal, baseline.no_mouse_steal,
-                    "`{name} {tail:?}` no_mouse_steal differs"
-                );
-                assert_eq!(
-                    cli.no_window_ride, baseline.no_window_ride,
-                    "`{name} {tail:?}` no_window_ride differs"
-                );
-                assert_eq!(
-                    cli.wayland, baseline.wayland,
-                    "`{name} {tail:?}` wayland differs"
-                );
-                assert_eq!(
-                    cli.config, baseline.config,
-                    "`{name} {tail:?}` config differs"
-                );
             }
         }
     }
@@ -332,28 +338,31 @@ mod tests {
     #[test]
     fn honk_plz_is_start_not_do_honk() {
         let cli = Cli::try_parse_normalized(["honk", "plz"]).unwrap();
-        assert_eq!(cli.command, Some(Command::Start));
+        assert!(matches!(cli.command, Some(Command::Start { .. })));
     }
 
     #[test]
     fn parses_config_flags_and_lifecycle_commands() {
-        let cli = Cli::try_parse_normalized([
-            "goose",
-            "--config",
-            "C:\\tmp\\goose.toml",
-            "--wayland",
-            "config",
-        ])
-        .unwrap();
-        assert_eq!(cli.command, Some(Command::Config));
-        assert!(cli.wayland);
-        assert_eq!(cli.config, Some(PathBuf::from("C:\\tmp\\goose.toml")));
+        let cli = Cli::try_parse_normalized(["goose", "config", "--config", "C:\\tmp\\goose.toml"])
+            .unwrap();
+        assert_eq!(
+            cli.command,
+            Some(Command::Config {
+                config: Some(PathBuf::from("C:\\tmp\\goose.toml")),
+            })
+        );
 
         for (word, expected) in [
             ("install", Command::Install { autostart: false }),
             ("uninstall", Command::Uninstall { purge: false }),
             ("update", Command::Update),
-            ("setup", Command::Setup),
+            (
+                "setup",
+                Command::Setup {
+                    config: None,
+                    reset: false,
+                },
+            ),
             ("status", Command::Status),
         ] {
             let cli = Cli::try_parse_normalized(["goose", word]).unwrap();
@@ -379,6 +388,75 @@ mod tests {
 
         let uninstall = Cli::try_parse_normalized(["honk300", "uninstall", "--purge"]).unwrap();
         assert_eq!(uninstall.command, Some(Command::Uninstall { purge: true }));
+    }
+
+    #[test]
+    fn runtime_overrides_are_scoped_to_start() {
+        for flag in [
+            "--no-sound",
+            "--silent",
+            "--no-mouse-steal",
+            "--no-window-ride",
+            "--wayland",
+        ] {
+            assert!(
+                Cli::try_parse_normalized(["honk300", "start", flag]).is_ok(),
+                "{flag} should be accepted by start"
+            );
+            assert!(
+                Cli::try_parse_normalized(["honk300", "status", flag]).is_err(),
+                "{flag} must be rejected by status"
+            );
+            assert!(
+                Cli::try_parse_normalized(["honk300", flag, "status"]).is_err(),
+                "a pre-command {flag} must not leak into status"
+            );
+        }
+    }
+
+    #[test]
+    fn config_path_is_scoped_to_start_config_and_setup() {
+        for command in ["start", "config", "setup"] {
+            assert!(
+                Cli::try_parse_normalized(["honk300", command, "--config", "custom.toml"]).is_ok(),
+                "{command} should accept --config"
+            );
+        }
+        for command in ["stop", "reload", "status", "update"] {
+            assert!(
+                Cli::try_parse_normalized(["honk300", command, "--config", "custom.toml"]).is_err(),
+                "{command} must reject unused --config"
+            );
+        }
+    }
+
+    #[test]
+    fn setup_accepts_explicit_reset_only_on_setup() {
+        let setup =
+            Cli::try_parse_normalized(["honk300", "setup", "--config", "custom.toml", "--reset"])
+                .unwrap();
+        assert_eq!(
+            setup.command,
+            Some(Command::Setup {
+                config: Some(PathBuf::from("custom.toml")),
+                reset: true,
+            })
+        );
+        assert!(Cli::try_parse_normalized(["honk300", "start", "--reset"]).is_err());
+    }
+
+    #[test]
+    fn default_start_keeps_pre_command_aliases_and_overrides() {
+        let cli =
+            Cli::try_parse_normalized(["goose", "--silent", "--config", "goose.toml"]).unwrap();
+        let Some(Command::Start { options }) = cli.command else {
+            panic!("start options should materialize an explicit normalized start command");
+        };
+        assert!(options.no_sound);
+        assert_eq!(options.config, Some(PathBuf::from("goose.toml")));
+
+        let cli = Cli::try_parse_normalized(["goose", "--silent", "plz"]).unwrap();
+        assert!(cli.is_start());
     }
 
     #[test]

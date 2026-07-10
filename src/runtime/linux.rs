@@ -1,6 +1,7 @@
 use crate::assets;
 use crate::audio;
-use crate::runtime::RuntimeOptions;
+use crate::runtime::core::RuntimeCore;
+use crate::runtime::{audio_probe_capability, RuntimeOptions};
 use honk_config::{BackendCapability, BackendState, Config, EffectiveOptions};
 use honk_control::{
     BundleStatus, CapabilityStatus, CommandServer, ControlCommand, ControlResponse, PlatformStatus,
@@ -12,8 +13,8 @@ use honk_engine::render::{
 };
 use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
-    Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, CursorCommand,
-    PresenceSnapshot, Sound, World,
+    CollectWindowCommand, CollectWindowPayload, CursorCommand, DesktopLayout, PresenceSnapshot,
+    Rect, Sound, World,
 };
 use honk_platform_linux::{
     display_collect_window_supported, display_cursor_mischief_supported,
@@ -29,10 +30,10 @@ pub fn run(
     let assets = assets::AssetCatalog::load();
     println!("honk300: loaded {}", assets.summary());
 
-    let mut session = SessionInfo::detect(options.cli_overrides.wayland || config.platform.wayland);
+    let session = SessionInfo::detect(options.cli_overrides.wayland || config.platform.wayland);
     let mut overlay = Overlay::new(session.display_server)?;
-    let mut overlay_mode = overlay.mode();
-    let mut display_server = overlay.display_server();
+    let overlay_mode = overlay.mode();
+    let display_server = overlay.display_server();
     eprintln!(
         "honk300: Linux {} runtime active; overlay mode is {:?}.",
         display_server.label(),
@@ -64,7 +65,7 @@ pub fn run(
         audio::Audio::new()
     };
     if !effective.no_sound && audio.is_none() {
-        audio_capability = BackendCapability::Failed;
+        audio_capability = audio_probe_capability(false);
         effective = effective_options(
             &config,
             &options,
@@ -80,19 +81,37 @@ pub fn run(
         );
     }
 
-    let mut world = World::with_options(overlay.bounds(), seed_from_clock(), effective.world);
-    let mut accumulator = Accumulator::new();
-    let clock = Clock::start();
-    let mut last = clock.elapsed_secs();
-    let mut last_present = f32::NEG_INFINITY;
-    let mut last_render_bounds = None;
-    const PRESENT_INTERVAL: f32 = 1.0 / 60.0;
+    let layout = desktop_layout_for(
+        effective.world.multi_monitor_chase,
+        overlay.monitor_bounds(),
+        overlay.bounds(),
+    )?;
+    let mut world = World::with_layout_and_options(layout, seed_from_clock(), effective.world);
+    let mut core = RuntimeCore::new();
+    const AUDIO_RETRY_INTERVAL: f64 = 5.0;
+    let mut next_audio_probe = 0.0;
     let mut warned_collect = false;
     let mut warned_cursor = false;
 
     println!("honk300: Linux goose control is live. Use `honk300 stop` to send it home.");
 
     loop {
+        if !overlay.pump() {
+            eprintln!("honk300: Linux overlay closed.");
+            return Ok(());
+        }
+
+        if overlay.take_topology_changed() {
+            let layout = desktop_layout_for(
+                effective.world.multi_monitor_chase,
+                overlay.monitor_bounds(),
+                overlay.bounds(),
+            )?;
+            world.apply_layout(layout);
+        }
+
+        let frame = core.begin_frame();
+
         while let Some(request) = server.try_recv() {
             match request.command() {
                 ControlCommand::Stop => {
@@ -102,27 +121,18 @@ pub fn run(
                 }
                 ControlCommand::Reload => {
                     let response = match Config::load_existing(&options.config_path) {
+                        Ok(next_config)
+                            if RuntimeCore::restart_required_reason(&config, &next_config)
+                                .is_some() =>
+                        {
+                            let reason =
+                                RuntimeCore::restart_required_reason(&config, &next_config)
+                                    .expect("guard established restart-required changes");
+                            eprintln!("honk300: reload rejected; restart required for {reason}");
+                            ControlResponse::Err("RESTART_REQUIRED".into())
+                        }
                         Ok(next_config) => {
-                            let prior_display = display_server;
                             config = next_config;
-                            session = SessionInfo::detect(
-                                options.cli_overrides.wayland || config.platform.wayland,
-                            );
-                            if session.display_server != display_server {
-                                match Overlay::new(session.display_server) {
-                                    Ok(next_overlay) => {
-                                        overlay = next_overlay;
-                                        overlay_mode = overlay.mode();
-                                        display_server = overlay.display_server();
-                                        last_render_bounds = None;
-                                    }
-                                    Err(err) => {
-                                        eprintln!(
-                                            "honk300: Linux overlay reload kept prior display mode; new overlay failed ({err})"
-                                        );
-                                    }
-                                }
-                            }
                             cursor_warp = cursor_capability(overlay_mode, display_server);
                             window_watch = window_capability(overlay_mode, display_server);
                             collect_window = collect_capability(overlay_mode, display_server);
@@ -143,16 +153,7 @@ pub fn run(
                                 audio = None;
                             } else if audio.is_none() {
                                 audio = audio::Audio::new();
-                                if audio.is_none() {
-                                    audio_capability = BackendCapability::Failed;
-                                }
-                            }
-                            if prior_display != display_server {
-                                eprintln!(
-                                    "honk300: Linux display mode changed from {} to {}; restart recommended once display backends are active.",
-                                    prior_display.label(),
-                                    display_server.label()
-                                );
+                                audio_capability = audio_probe_capability(audio.is_some());
                             }
                             world.apply_options(effective.world);
                             println!("honk300: reload command applied.");
@@ -185,11 +186,6 @@ pub fn run(
             }
         }
 
-        if !overlay.pump() {
-            eprintln!("honk300: Linux overlay closed.");
-            return Ok(());
-        }
-
         world.set_local_time(local_time());
         world.set_presence(PresenceSnapshot::unsupported());
         let pointer = overlay.pointer_state();
@@ -198,13 +194,8 @@ pub fn run(
         world.set_collect_window_snapshot(None);
         let _ = overlay.set_input_region(Some(world.rig().bounding_box()));
 
-        let now = clock.elapsed_secs();
-        let dt = now - last;
-        last = now;
-
-        for _ in 0..accumulator.pump(dt) {
-            world.tick();
-        }
+        let now = frame.now();
+        core.tick(&mut world, frame);
 
         let collect_commands = world.take_collect_window_commands();
         if !collect_commands.is_empty() {
@@ -234,18 +225,34 @@ pub fn run(
             }
         }
 
+        if let Some(audio) = audio.as_mut() {
+            audio.poll();
+        }
+        if !effective.no_sound && audio.is_none() && now >= next_audio_probe {
+            audio = audio::Audio::new();
+            audio_capability = audio_probe_capability(audio.is_some());
+            next_audio_probe = now + AUDIO_RETRY_INTERVAL;
+        }
+
         let sounds = world.take_sounds();
+        let mut audio_failed = false;
         if let Some(a) = audio.as_mut() {
             for sound in sounds {
-                if sound_enabled(effective.audio, sound) {
-                    a.play(sound);
+                if sound_enabled(effective.audio, sound)
+                    && a.play(sound) == audio::PlayOutcome::Failed
+                {
+                    audio_failed = true;
+                    break;
                 }
             }
         }
+        if audio_failed {
+            audio = None;
+            audio_capability = BackendCapability::Failed;
+            next_audio_probe = now + AUDIO_RETRY_INTERVAL;
+        }
 
-        if now - last_present >= PRESENT_INTERVAL {
-            last_present = now;
-            let dirty = world.render_bounds(last_render_bounds);
+        if let Some(dirty) = core.damage(&world, frame) {
             let width = dirty.width().ceil().max(1.0) as u32;
             let height = dirty.height().ceil().max(1.0) as u32;
             let origin = dirty.min;
@@ -279,7 +286,6 @@ pub fn run(
             render_hearts(&mut canvas, world.hearts(), world.now(), origin);
             render_sleepies(&mut canvas, world.sleepies(), world.now(), origin);
             overlay.present(dirty, &canvas)?;
-            last_render_bounds = Some(dirty);
         }
 
         std::thread::sleep(std::time::Duration::from_millis(2));
@@ -447,6 +453,20 @@ fn seed_from_clock() -> u64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0x9E37_79B9_7F4A_7C15)
+}
+
+fn desktop_layout_for(
+    multi_monitor_chase: bool,
+    monitor_bounds: Vec<Rect>,
+    fallback_bounds: Rect,
+) -> Result<DesktopLayout, honk_engine::DesktopLayoutError> {
+    if multi_monitor_chase {
+        DesktopLayout::new(monitor_bounds)
+    } else {
+        Ok(DesktopLayout::single(
+            monitor_bounds.into_iter().next().unwrap_or(fallback_bounds),
+        ))
+    }
 }
 
 #[cfg(test)]

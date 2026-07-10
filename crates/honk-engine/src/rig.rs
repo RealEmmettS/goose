@@ -14,16 +14,14 @@
 //! below 45°) switches between them; [`GoosePose`] carries the primary rig plus the
 //! optional fading one so the renderer composites both and dirty rects union both.
 //!
-//! The geometry **constants** remain verbatim from the verified source (`Exports.cs`,
-//! `Rig`/`ProceduralFeets`) and are pinned by test; the assembly math is clean-room,
-//! tuned against the reference art via the preview harness.
+//! The geometry constants remain the frozen in-tree compatibility values pinned by tests;
+//! assembly is clean-room and tuned against the reference art via the preview harness.
 
 use crate::feet::{Feet, FeetState, FootPose};
 use crate::math::{Rect, Vec2};
 
-// Verified rig constants (Exports.cs `Rig`) — pinned by test. V2 uses them as the
-// authoritative proportions they encode (neck travel, head/eye layout) scaled into the
-// reference-art coordinate frame.
+// Frozen rig constants, pinned by tests. V2 uses the authoritative proportions they
+// encode (neck travel, head/eye layout) scaled into the reference-art coordinate frame.
 pub const UNDERBODY_RADIUS: f32 = 15.0;
 pub const UNDERBODY_LENGTH: f32 = 7.0;
 pub const UNDERBODY_ELEVATION: f32 = 9.0;
@@ -65,8 +63,8 @@ pub const VIEW_FADE_SECS: f32 = 0.125;
 /// How quickly the smoothed neck chases its target (1/s).
 const NECK_SMOOTH_RATE: f32 = 10.0;
 /// Blink close/open times (seconds).
-const BLINK_CLOSE: f32 = 0.06;
-const BLINK_OPEN: f32 = 0.09;
+const BLINK_CLOSE: f64 = 0.06;
+const BLINK_OPEN: f64 = 0.09;
 /// Idle breathing rate (Hz) and how strongly speed suppresses it.
 const BREATH_HZ: f32 = 0.55;
 /// Tail-flick decay time constant (seconds).
@@ -164,7 +162,7 @@ pub struct RigInput {
     /// Per-step interval (seconds; `<=0` falls back to the walk default).
     pub step_time: f32,
     /// World clock (seconds) and tick delta.
-    pub now: f32,
+    pub now: f64,
     pub dt: f32,
 }
 
@@ -200,10 +198,10 @@ pub struct RigAnim {
     neck: f32,
     /// Breathing phase (radians).
     breath_phase: f32,
-    /// When the current/last blink started; `f32::NEG_INFINITY` = none yet.
-    blink_started: f32,
+    /// When the current/last blink started; negative infinity = none yet.
+    blink_started: f64,
     /// When the next blink is due (world seeds this from its RNG).
-    pub next_blink: f32,
+    pub next_blink: f64,
     /// Honk tail-flick energy `0..1`.
     tail_flick: f32,
 }
@@ -219,7 +217,7 @@ impl RigAnim {
             mirror: side_mirror(forward).unwrap_or(-1.0),
             neck: 0.0,
             breath_phase: 0.0,
-            blink_started: f32::NEG_INFINITY,
+            blink_started: f64::NEG_INFINITY,
             next_blink: 2.0,
             tail_flick: 0.0,
         }
@@ -227,7 +225,7 @@ impl RigAnim {
 
     /// Begin a blink now (world calls this when `now >= next_blink`, then reschedules
     /// `next_blink` from its RNG so blinking stays deterministic per seed).
-    pub fn start_blink(&mut self, now: f32) {
+    pub fn start_blink(&mut self, now: f64) {
         self.blink_started = now;
     }
 
@@ -236,14 +234,14 @@ impl RigAnim {
         self.tail_flick = 1.0;
     }
 
-    fn blink_amount(&self, now: f32) -> f32 {
+    fn blink_amount(&self, now: f64) -> f32 {
         let t = now - self.blink_started;
         if t < 0.0 {
             0.0
         } else if t < BLINK_CLOSE {
-            t / BLINK_CLOSE
+            (t / BLINK_CLOSE) as f32
         } else if t < BLINK_CLOSE + BLINK_OPEN {
-            1.0 - (t - BLINK_CLOSE) / BLINK_OPEN
+            (1.0 - (t - BLINK_CLOSE) / BLINK_OPEN) as f32
         } else {
             0.0
         }
@@ -295,7 +293,8 @@ impl RigAnim {
 
         // Breathing fades out with speed; tail flick decays exponentially.
         let idle = (1.0 - input.speed / 40.0).clamp(0.0, 1.0);
-        self.breath_phase += input.dt * std::f32::consts::TAU * BREATH_HZ;
+        self.breath_phase = (self.breath_phase + input.dt * std::f32::consts::TAU * BREATH_HZ)
+            .rem_euclid(std::f32::consts::TAU);
         let breath = self.breath_phase.sin() * idle;
         if input.dt > 0.0 {
             self.tail_flick *= (-input.dt / TAIL_FLICK_DECAY).exp();
@@ -625,7 +624,7 @@ mod tests {
         input.dt = DT;
         let mut raised = tucked;
         for i in 0..60 {
-            input.now = i as f32 * DT;
+            input.now = i as f64 * DT as f64;
             raised = anim.update(&input).primary;
         }
         assert!(raised.neck_head.y < tucked.neck_head.y - 5.0);
@@ -638,7 +637,7 @@ mod tests {
         let mut anim = RigAnim::new(center, 0.0);
         let mut input = RigInput::static_pose(center, 0.0, 1.0);
         input.dt = DT;
-        input.now = DT;
+        input.now = DT as f64;
         let after_one_tick = anim.update(&input).primary;
         // One tick toward a raised neck moves only a fraction of the way.
         assert!(after_one_tick.neck_lerp_percent < 0.2);
@@ -661,7 +660,7 @@ mod tests {
             speed: 80.0,
             velocity: Vec2::new(0.0, 80.0),
             step_time: 0.2,
-            now: DT,
+            now: DT as f64,
             dt: DT,
         };
         let pose = anim.update(&input);
@@ -672,11 +671,11 @@ mod tests {
         assert!(alpha > 0.0 && alpha < 1.0);
         // The fade completes within VIEW_FADE_SECS.
         for i in 2..30 {
-            input.now = i as f32 * DT;
+            input.now = i as f64 * DT as f64;
             input.center = input.center + input.velocity * DT;
             let pose = anim.update(&input);
             if pose.fading.is_none() {
-                assert!(input.now <= VIEW_FADE_SECS + 3.0 * DT);
+                assert!(input.now <= (VIEW_FADE_SECS + 3.0 * DT) as f64);
                 return;
             }
         }
@@ -724,7 +723,7 @@ mod tests {
             speed: 80.0,
             velocity: Vec2::new(0.0, 80.0),
             step_time: 0.2,
-            now: DT,
+            now: DT as f64,
             dt: DT,
         });
         let (fading, _) = pose.fading.expect("fade active");
@@ -756,5 +755,18 @@ mod tests {
         input.now = 1.3;
         let after = anim.update(&input).primary;
         assert_eq!(after.blink, 0.0, "blink should be over at t+300ms");
+    }
+
+    #[test]
+    fn visual_phase_wraps_before_float_precision_is_lost() {
+        let center = Vec2::new(300.0, 300.0);
+        let mut anim = RigAnim::new(center, 0.0);
+        anim.breath_phase = std::f32::consts::TAU * 100_000.0;
+        let mut input = RigInput::static_pose(center, 0.0, 0.45);
+        input.dt = DT;
+
+        anim.update(&input);
+
+        assert!(anim.breath_phase < std::f32::consts::TAU);
     }
 }

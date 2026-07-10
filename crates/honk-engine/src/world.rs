@@ -12,6 +12,7 @@ use crate::cursor::{CursorCommand, WorldOptions};
 use crate::foreign_window::ForeignWindowSnapshot;
 use crate::hearts::Hearts;
 use crate::interaction::{PatTracker, Pointer};
+use crate::layout::DesktopLayout;
 use crate::locomotion;
 use crate::math::{Rect, Vec2};
 use crate::mood::{LocalHour, LocalTime, MoodKind, MoodMachine, ZParticles};
@@ -28,19 +29,22 @@ use crate::time::DT;
 
 /// Distance travelled per full walking-gait cycle (radians of `gait_phase` per `TAU`).
 const GAIT_CYCLE_DISTANCE: f32 = 22.0;
-const SECOND_HOURLY_HONK_DELAY: f32 = 0.35;
+const SECOND_HOURLY_HONK_DELAY: f64 = 0.35;
 
 /// The whole simulation: one goose roaming within `bounds` (the virtual-desktop space).
 pub struct World {
     pub goose: GooseEntity,
+    /// Outer union bounds retained for compatibility and off-screen excursion edges.
     pub bounds: Rect,
+    /// Actual visible monitor regions used for targets, clipping, and hotplug recovery.
+    layout: DesktopLayout,
     rng: SplitMix64,
     current: Box<dyn Task>,
     /// Factories for the randomly-pickable roaming tasks (the original's `TaskDatabase`).
     pickable: Vec<fn() -> Box<dyn Task>>,
     /// Shuffle-bag over `pickable` indices (no repeats until exhausted).
     deck: Deck<SplitMix64>,
-    elapsed: f32,
+    elapsed: f64,
     /// Sound requests produced this tick, drained by the platform audio backend.
     pending_sounds: Vec<Sound>,
     /// Cursor requests produced this tick, drained by the platform backend.
@@ -70,7 +74,7 @@ pub struct World {
     /// Local hour that has already triggered its on-hour honks.
     last_hourly_honk: Option<LocalHour>,
     /// Pending second honk for the current on-hour double honk.
-    second_hourly_honk_at: Option<f32>,
+    second_hourly_honk_at: Option<f64>,
     /// Last pointer state fed in via [`World::set_pointer`].
     pointer: Pointer,
     /// Last platform-reported user-dragged foreign window.
@@ -89,9 +93,9 @@ pub struct World {
     /// The task that was running before a transient interrupt (hyper), restored when it ends.
     interrupted: Option<Box<dyn Task>>,
     /// When the next long off-screen errand is due (ADR 0016).
-    next_excursion_at: f32,
+    next_excursion_at: f64,
     /// When the next quick puddle hop (the mud source) is due (ADR 0016).
-    next_puddle_at: f32,
+    next_puddle_at: f64,
     /// The current errand should chain a collect-window prank on return.
     excursion_prank: bool,
     /// Wander-path meander state (ADR 0016): phase, smoothed amplitude, its target,
@@ -99,7 +103,7 @@ pub struct World {
     meander_phase: f32,
     meander_amp: f32,
     meander_amp_target: f32,
-    next_meander_shift: f32,
+    next_meander_shift: f64,
 }
 
 use crate::entity::GooseEntity;
@@ -113,6 +117,21 @@ impl World {
 
     /// Build a world with explicit runtime options/capabilities.
     pub fn with_options(bounds: Rect, seed: u64, options: WorldOptions) -> Self {
+        Self::with_layout_and_options(DesktopLayout::single(bounds), seed, options)
+    }
+
+    /// Build a world from real monitor regions with default runtime options.
+    pub fn with_layout(layout: DesktopLayout, seed: u64) -> Self {
+        Self::with_layout_and_options(layout, seed, WorldOptions::default())
+    }
+
+    /// Build a world from real monitor regions and explicit runtime options.
+    pub fn with_layout_and_options(
+        layout: DesktopLayout,
+        seed: u64,
+        options: WorldOptions,
+    ) -> Self {
+        let bounds = layout.bounds();
         let center = (bounds.min + bounds.max) * 0.5;
         let mut goose = GooseEntity::new();
         goose.parameters = options.parameters;
@@ -145,12 +164,13 @@ impl World {
         // First excursion/puddle cadences are drawn up front so the goose settles in
         // before its first off-screen trip (ADR 0016).
         let t = options.timing;
-        let next_excursion_at = rng.range(t.excursion_min_gap, t.excursion_max_gap);
-        let next_puddle_at = rng.range(t.puddle_min_gap, t.puddle_max_gap);
+        let next_excursion_at = rng.range(t.excursion_min_gap, t.excursion_max_gap) as f64;
+        let next_puddle_at = rng.range(t.puddle_min_gap, t.puddle_max_gap) as f64;
 
         Self {
             goose,
             bounds,
+            layout,
             rng,
             current: Box::new(FirstUxTask::new()), // scripted intro runs first
             pickable,
@@ -190,8 +210,54 @@ impl World {
     }
 
     /// The world's monotonic clock (seconds), the time base for footmark fade.
-    pub fn now(&self) -> f32 {
+    pub fn now(&self) -> f64 {
         self.elapsed
+    }
+
+    /// Current monitor-region topology.
+    pub fn layout(&self) -> &DesktopLayout {
+        &self.layout
+    }
+
+    /// Reconcile a live display-topology change without leaving active targets in removed
+    /// monitors or gaps. Transient desktop-control tasks are cancelled safely; ordinary
+    /// animation/task state survives with its position and target clamped to visible space.
+    pub fn apply_layout(&mut self, layout: DesktopLayout) {
+        let was_collecting = self.is_collect_window_active();
+        if was_collecting {
+            self.abandon_collect_window();
+        } else if matches!(self.current.id(), "excursion" | "nab_mouse" | "perch_ride") {
+            self.resume_or_wander();
+        }
+
+        self.bounds = layout.bounds();
+        self.layout = layout;
+        let clamped_position = self.layout.clamp_point(self.goose.position);
+        let clamped_target = self.layout.clamp_point(self.goose.target_pos);
+        if clamped_position != self.goose.position {
+            self.goose.position = clamped_position;
+            self.goose.velocity = Vec2::ZERO;
+            self.goose.anim = RigAnim::new(clamped_position, self.goose.direction);
+            self.goose.pose = self.goose.anim.update(&RigInput::static_pose(
+                clamped_position,
+                self.goose.direction,
+                0.45,
+            ));
+            self.goose.rig = self.goose.pose.primary;
+        }
+        self.goose.target_pos = clamped_target;
+        if !self.layout.contains(self.pointer.pos) {
+            self.pointer.present = false;
+            self.prev_left_down = false;
+        }
+        self.dragged_window = None;
+        self.collect_window_snapshot = None;
+        self.pending_nab = false;
+        self.pending_collect = None;
+        self.excursion_prank = false;
+        self.autumn.clear();
+        self.refresh_schedule_state();
+        self.rebuild_pickable();
     }
 
     fn pickable_for(
@@ -239,7 +305,7 @@ impl World {
         self.deck = Deck::new(
             self.pickable.len(),
             SplitMix64::seed(
-                (self.elapsed.to_bits() as u64)
+                self.elapsed.to_bits()
                     ^ ((self.pickable.len() as u64) << 32)
                     ^ 0xA076_1D64_78BD_642F,
             ),
@@ -276,7 +342,13 @@ impl World {
             self.dragged_window = None;
             self.resume_or_wander();
         }
-        if self.is_collect_window_active() && !options.collect_window.active() {
+        if self.is_collect_window_active()
+            && (!options.collect_window.active()
+                || self
+                    .current
+                    .collect_kind()
+                    .is_some_and(|kind| !options.collect_window.kind_active(kind)))
+        {
             self.abandon_collect_window();
         }
     }
@@ -290,7 +362,7 @@ impl World {
             }
             PokeAction::Mud => {
                 self.goose.track_mud_end_time =
-                    self.elapsed + self.goose.parameters.duration_to_track_mud;
+                    self.elapsed + self.goose.parameters.duration_to_track_mud as f64;
                 PokeOutcome::Applied
             }
             PokeAction::Wander => {
@@ -342,6 +414,10 @@ impl World {
     /// Reflect a backend capability change after startup, e.g. cursor warp failed.
     pub fn set_cursor_warp_supported(&mut self, supported: bool) {
         self.options.mouse_steal.warp_supported = supported;
+        if !supported && self.is_cursor_mischief_active() {
+            self.resume_or_wander();
+        }
+        self.rebuild_pickable();
     }
 
     /// Reflect a backend capability change after startup, e.g. move-size hook setup failed.
@@ -349,7 +425,11 @@ impl World {
         self.options.foreign_window.capabilities.watch_drag = supported;
         if !supported {
             self.dragged_window = None;
+            if self.is_perch_ride_active() {
+                self.resume_or_wander();
+            }
         }
+        self.rebuild_pickable();
     }
 
     /// Reflect backend collect-window movement/spawn/input capability changes.
@@ -366,6 +446,7 @@ impl World {
                 self.collect_window_snapshot = None;
             }
         }
+        self.rebuild_pickable();
     }
 
     /// Feed one frame of foreign-window drag state in world/desktop coordinates.
@@ -418,47 +499,61 @@ impl World {
         self.options.palette
     }
 
-    /// World-space area that can contain visible pixels this frame, optionally unioned with the
-    /// previous frame so moving pixels get cleared by dirty-region presentation.
-    pub fn render_bounds(&self, previous: Option<Rect>) -> Rect {
-        // The full pose: during a view crossfade both views must stay inside the
-        // presented dirty rect.
-        let mut rect = self.goose.pose.bounding_box();
+    /// World-space bounds of pixels that can be visible in the **current** frame.
+    ///
+    /// This never contains prior-frame damage. Callers store this value, derive damage with
+    /// [`World::damage_bounds`], present that damage, then retain this current value for the
+    /// next frame. A fully off-desktop/transparent scene is `None`.
+    pub fn visual_bounds(&self) -> Option<Rect> {
+        let mut rect = None;
+        let mut add = |candidate: Rect| {
+            if let Some(visible) = self.layout.clip_rect(candidate) {
+                rect = Some(rect.map_or(visible, |current: Rect| current.union(visible)));
+            }
+        };
+
+        // The full pose: during a view crossfade both views stay inside the current bounds.
+        add(self.goose.pose.bounding_box().grow(3.0));
         for (mark, scale) in self
             .goose
             .foot_marks
             .active_with_timing(self.elapsed, self.footmark_timing())
         {
-            rect = rect.union(Rect::new(mark.position, mark.position).grow(5.0 * scale + 2.0));
+            if scale > 0.0 {
+                add(Rect::new(mark.position, mark.position).grow(5.0 * scale + 5.0));
+            }
         }
-        for (pos, _) in self.hearts.active(self.elapsed) {
-            rect = rect.union(Rect::new(pos, pos).grow(12.0));
+        for (pos, alpha) in self.hearts.active(self.elapsed) {
+            if alpha > 0.0 {
+                add(Rect::new(pos, pos).grow(15.0));
+            }
         }
-        for (pos, _) in self.sleepies.active(self.elapsed) {
-            rect = rect.union(Rect::new(pos, pos).grow(14.0));
+        for (pos, alpha) in self.sleepies.active(self.elapsed) {
+            if alpha > 0.0 {
+                add(Rect::new(pos, pos).grow(17.0));
+            }
         }
         for pile in self.autumn.piles() {
             let spawn = pile.spawn_scale(self.elapsed);
-            rect =
-                rect.union(Rect::new(pile.position, pile.position).grow(pile.radius * spawn + 6.0));
+            if 1.0 - pile.fade_out(self.elapsed) <= 0.0 {
+                continue;
+            }
+            add(Rect::new(pile.position, pile.position).grow(pile.radius * spawn + 9.0));
             for leaf in &pile.leaves {
                 let pos = pile.position + leaf.screen_offset() * spawn;
-                rect = rect.union(Rect::new(pos, pos).grow(5.0));
+                add(Rect::new(pos, pos).grow(8.0));
             }
         }
-        if let Some(previous) = previous {
-            rect = rect.union(previous);
+        rect.map(Rect::pixel_aligned)
+    }
+
+    /// Union previous and current visual bounds into the one-shot region to clear/present.
+    pub fn damage_bounds(previous: Option<Rect>, current: Option<Rect>) -> Option<Rect> {
+        match (previous, current) {
+            (Some(previous), Some(current)) => Some(previous.union(current).pixel_aligned()),
+            (Some(rect), None) | (None, Some(rect)) => Some(rect.pixel_aligned()),
+            (None, None) => None,
         }
-        rect.grow(3.0)
-            .intersection(self.bounds)
-            .unwrap_or_else(|| {
-                self.goose
-                    .rig
-                    .bounding_box()
-                    .intersection(self.bounds)
-                    .unwrap_or(self.bounds)
-            })
-            .pixel_aligned()
     }
 
     /// Runtime footmark timing from config.
@@ -643,7 +738,7 @@ impl World {
 
     /// Advance the world by one fixed [`DT`] tick.
     pub fn tick(&mut self) {
-        self.elapsed += DT;
+        self.elapsed += DT as f64;
         self.refresh_schedule_state();
         let manners_active = self.manners_active();
         self.apply_hourly_honk();
@@ -652,7 +747,16 @@ impl World {
         if mood_event.changed {
             self.rebuild_pickable();
         }
-        if let Some(sound) = mood_event.sound.filter(|_| !manners_active) {
+        let start_mood_hyper = mood_event.trigger_hyper
+            && !manners_active
+            && !self.is_cursor_mischief_active()
+            && !self.is_perch_ride_active()
+            && !self.is_collect_window_active()
+            && self.interrupted.is_none();
+        if let Some(sound) = mood_event
+            .sound
+            .filter(|_| !manners_active && !start_mood_hyper)
+        {
             self.pending_sounds.push(sound);
         }
         if mood_event.spawn_sleepy_particle {
@@ -660,13 +764,7 @@ impl World {
             self.sleepies
                 .add(self.goose.rig.neck_head + jitter, self.elapsed);
         }
-        if mood_event.trigger_hyper
-            && !manners_active
-            && !self.is_cursor_mischief_active()
-            && !self.is_perch_ride_active()
-            && !self.is_collect_window_active()
-            && self.interrupted.is_none()
-        {
+        if start_mood_hyper {
             self.start_hyper();
         }
 
@@ -729,6 +827,7 @@ impl World {
                 now: self.elapsed,
                 dt: DT,
                 bounds: self.bounds,
+                layout: &self.layout,
                 rng: &mut self.rng,
                 sounds: &mut self.pending_sounds,
                 cursor_commands: &mut self.pending_cursor_commands,
@@ -746,12 +845,19 @@ impl World {
             self.current.run(&mut self.goose, &mut ctx)
         };
         if done {
-            if self.current.id() == "excursion" && self.excursion_prank {
+            if self.current.id() == "excursion"
+                && self.excursion_prank
+                && !manners_active
+                && self.options.collect_window.active()
+            {
                 // Came back from the errand with mischief in mind: chain a collect
                 // right away; the suspended task resumes when the collect finishes.
                 self.excursion_prank = false;
                 self.current = Box::new(CollectWindowTask::new());
             } else {
+                if self.current.id() == "excursion" {
+                    self.excursion_prank = false;
+                }
                 // A finished interrupt resumes the task it suspended; otherwise draw next.
                 self.current = match self.interrupted.take() {
                     Some(prev) => prev,
@@ -779,7 +885,9 @@ impl World {
 
         // Advance the walking gait by distance travelled (a stopped goose stands still).
         let moved = Vec2::distance(before, self.goose.position);
-        self.goose.gait_phase += moved * (std::f32::consts::TAU / GAIT_CYCLE_DISTANCE);
+        self.goose.gait_phase = (self.goose.gait_phase
+            + moved * (std::f32::consts::TAU / GAIT_CYCLE_DISTANCE))
+            .rem_euclid(std::f32::consts::TAU);
 
         let speed = self.goose.velocity.magnitude();
         let speed_frac = (speed / self.goose.parameters.walk_speed).min(1.0);
@@ -791,7 +899,7 @@ impl World {
         // rig animates the lid deterministically from the start time.
         if self.elapsed >= self.goose.anim.next_blink {
             self.goose.anim.start_blink(self.elapsed);
-            self.goose.anim.next_blink = self.elapsed + 2.0 + self.rng.next_f64() as f32 * 4.5;
+            self.goose.anim.next_blink = self.elapsed + 2.0 + self.rng.next_f64() * 4.5;
         }
         // A honk this tick kicks the tail.
         if self
@@ -845,10 +953,10 @@ impl World {
         }
 
         let had_autumn_pickable = self.autumn_pickable();
-        self.autumn.tick(
+        self.autumn.tick_layout(
             self.elapsed,
             self.autumn_active(),
-            self.bounds,
+            &self.layout,
             &self.goose,
             &mut self.rng,
         );
@@ -915,17 +1023,18 @@ impl World {
 
         let kind = if errand_due {
             self.next_excursion_at =
-                self.elapsed + self.rng.range(t.excursion_min_gap, t.excursion_max_gap);
+                self.elapsed + self.rng.range(t.excursion_min_gap, t.excursion_max_gap) as f64;
             // An errand supersedes a due puddle hop; push the hop out.
             if puddle_due {
                 self.next_puddle_at =
-                    self.elapsed + self.rng.range(t.puddle_min_gap, t.puddle_max_gap);
+                    self.elapsed + self.rng.range(t.puddle_min_gap, t.puddle_max_gap) as f64;
             }
             self.excursion_prank =
                 self.options.collect_window.active() && self.rng.next_f64() < 0.4;
             ExcursionKind::Errand
         } else {
-            self.next_puddle_at = self.elapsed + self.rng.range(t.puddle_min_gap, t.puddle_max_gap);
+            self.next_puddle_at =
+                self.elapsed + self.rng.range(t.puddle_min_gap, t.puddle_max_gap) as f64;
             ExcursionKind::Puddle {
                 mud_secs: self.rng.range(t.puddle_mud_min, t.puddle_mud_max),
             }
@@ -968,10 +1077,21 @@ impl World {
         // Entry: puddle hops come back near where they left (it went to *that* puddle);
         // errands may reappear anywhere along a horizontal edge.
         let entry = match kind {
-            ExcursionKind::Puddle { .. } => Vec2::new(
-                exit.x,
-                (exit.y + self.rng.range(-60.0, 60.0)).clamp(b.min.y + 40.0, b.max.y - 40.0),
-            ),
+            ExcursionKind::Puddle { .. } => {
+                if exit.x < b.min.x || exit.x > b.max.x {
+                    Vec2::new(
+                        exit.x,
+                        (exit.y + self.rng.range(-60.0, 60.0))
+                            .clamp(b.min.y + 40.0, b.max.y - 40.0),
+                    )
+                } else {
+                    Vec2::new(
+                        (exit.x + self.rng.range(-60.0, 60.0))
+                            .clamp(b.min.x + 40.0, b.max.x - 40.0),
+                        exit.y,
+                    )
+                }
+            }
             ExcursionKind::Errand => {
                 let left = self.rng.next_f64() < 0.5;
                 let x = if left {
@@ -996,12 +1116,12 @@ impl World {
         } else {
             0.0
         };
-        let return_target = Vec2::new(
+        let return_target = self.layout.clamp_point(Vec2::new(
             (entry.x + inward_x * self.rng.range(160.0, 380.0))
                 .clamp(b.min.x + 60.0, b.max.x - 60.0),
             (entry.y + inward_y * self.rng.range(160.0, 380.0))
                 .clamp(b.min.y + 60.0, b.max.y - 60.0),
-        );
+        ));
 
         let task = Box::new(ExcursionTask::new(kind, exit, entry, return_target, away));
         self.interrupted = Some(std::mem::replace(&mut self.current, task as Box<dyn Task>));
@@ -1013,10 +1133,10 @@ impl World {
         if id != "wander" && id != "excursion" {
             return Vec2::ZERO;
         }
-        self.meander_phase += DT * 2.2;
+        self.meander_phase = (self.meander_phase + DT * 2.2).rem_euclid(std::f32::consts::TAU);
         if self.elapsed >= self.next_meander_shift {
             self.meander_amp_target = (self.rng.next_f64() as f32) * 2.0 - 1.0;
-            self.next_meander_shift = self.elapsed + 0.8 + (self.rng.next_f64() as f32) * 1.4;
+            self.next_meander_shift = self.elapsed + 0.8 + self.rng.next_f64() * 1.4;
         }
         let k = 1.0 - (-3.0 * DT).exp();
         self.meander_amp += (self.meander_amp_target - self.meander_amp) * k;
@@ -1110,6 +1230,7 @@ mod tests {
     use crate::entity::ParametersTable;
     use crate::footmarks::FootMarkTiming;
     use crate::foreign_window::{ForeignWindowId, ForeignWindowOptions};
+    use crate::layout::DesktopLayout;
     use crate::mood::{HourlyHonkOptions, MoodIntensity, MoodOptions};
     use crate::schedule::{LocalMinute, PresenceSnapshot, ScheduleOptions};
 
@@ -1364,7 +1485,7 @@ mod tests {
     }
 
     #[test]
-    fn render_bounds_include_previous_frame_and_clip_to_world() {
+    fn damage_bounds_include_previous_visual_and_current_clipped_visuals() {
         let mut w = World::new(bounds(), 500);
         w.goose.position = Vec2::new(5.0, 6.0);
         w.goose.anim = RigAnim::new(w.goose.position, w.goose.direction);
@@ -1376,8 +1497,9 @@ mod tests {
         w.goose.rig = w.goose.pose.primary;
         w.goose.foot_marks.add(Vec2::new(900.0, 700.0), w.now());
 
-        let previous = Rect::new(Vec2::new(990.0, 790.0), Vec2::new(1040.0, 850.0));
-        let dirty = w.render_bounds(Some(previous));
+        let previous = Rect::new(Vec2::new(990.0, 790.0), Vec2::new(1000.0, 800.0));
+        let current = w.visual_bounds().expect("current pixels");
+        let dirty = World::damage_bounds(Some(previous), Some(current)).expect("damage");
 
         assert_eq!(dirty.min, Vec2::new(0.0, 0.0));
         assert_eq!(dirty.max, Vec2::new(1000.0, 800.0));
@@ -1401,6 +1523,361 @@ mod tests {
                 left_down: false,
             });
         }
+    }
+
+    #[test]
+    fn simulation_clock_advances_after_fourteen_days() {
+        let mut w = World::new(bounds(), 420);
+        w.elapsed = 14.0 * 24.0 * 60.0 * 60.0;
+        let before = w.now();
+
+        w.tick();
+
+        assert!(
+            w.now() > before,
+            "fixed ticks must remain representable after two weeks"
+        );
+    }
+
+    #[test]
+    fn task_deadlines_expire_after_fourteen_days() {
+        let mut w = World::new(bounds(), 421);
+        w.elapsed = 14.0 * 24.0 * 60.0 * 60.0;
+        w.current = Box::new(HyperTask::new());
+        w.interrupted = Some(Box::new(WanderTask::new()));
+
+        for _ in 0..400 {
+            w.tick();
+        }
+
+        assert_eq!(
+            w.current_task(),
+            "wander",
+            "hyper deadline should still elapse"
+        );
+    }
+
+    #[test]
+    fn world_visual_phases_wrap_in_long_running_sessions() {
+        let mut w = World::new(bounds(), 431);
+        w.current = Box::new(WanderTask::new());
+        w.goose.position = Vec2::new(100.0, 100.0);
+        w.goose.target_pos = Vec2::new(900.0, 700.0);
+        w.meander_phase = std::f32::consts::TAU * 100_000.0;
+        w.goose.gait_phase = std::f32::consts::TAU * 100_000.0;
+
+        w.tick();
+
+        assert!(w.meander_phase < std::f32::consts::TAU);
+        assert!(w.goose.gait_phase < std::f32::consts::TAU);
+    }
+
+    #[test]
+    fn region_layout_never_samples_targets_in_monitor_gaps() {
+        let left = Rect::new(Vec2::new(0.0, 0.0), Vec2::new(100.0, 100.0));
+        let right = Rect::new(Vec2::new(200.0, 0.0), Vec2::new(300.0, 100.0));
+        let layout = DesktopLayout::new(vec![left, right]).expect("valid layout");
+        let mut w = World::with_layout(layout.clone(), 422);
+
+        for _ in 0..512 {
+            w.current = Box::new(WanderTask::new());
+            w.tick();
+            assert!(
+                layout.contains(w.goose.target_pos),
+                "sampled target {:?} landed in the monitor gap",
+                w.goose.target_pos
+            );
+        }
+    }
+
+    #[test]
+    fn apply_layout_reconciles_an_active_excursion_after_hotplug() {
+        let left = Rect::new(Vec2::new(0.0, 0.0), Vec2::new(100.0, 100.0));
+        let right = Rect::new(Vec2::new(200.0, 0.0), Vec2::new(300.0, 100.0));
+        let mut w = World::with_layout(
+            DesktopLayout::new(vec![left, right]).expect("valid layout"),
+            423,
+        );
+        w.goose.position = Vec2::new(250.0, 50.0);
+        w.goose.target_pos = Vec2::new(390.0, 50.0);
+        w.goose.velocity = Vec2::new(80.0, 0.0);
+        w.current = Box::new(ExcursionTask::new(
+            ExcursionKind::Errand,
+            Vec2::new(390.0, 50.0),
+            Vec2::new(390.0, 60.0),
+            Vec2::new(250.0, 60.0),
+            90.0,
+        ));
+        w.interrupted = Some(Box::new(WanderTask::new()));
+        w.excursion_prank = true;
+
+        let replacement = DesktopLayout::new(vec![left]).expect("valid layout");
+        w.apply_layout(replacement.clone());
+
+        assert!(replacement.contains(w.goose.position));
+        assert!(replacement.contains(w.goose.target_pos));
+        assert_eq!(w.goose.velocity, Vec2::ZERO);
+        assert_eq!(w.current_task(), "wander");
+        assert!(!w.excursion_prank);
+    }
+
+    #[test]
+    fn autumn_targets_also_avoid_monitor_gaps() {
+        let left = Rect::new(Vec2::new(0.0, 0.0), Vec2::new(100.0, 100.0));
+        let right = Rect::new(Vec2::new(900.0, 0.0), Vec2::new(1000.0, 100.0));
+        let layout = DesktopLayout::new(vec![left, right]).expect("valid layout");
+        let mut w = World::with_layout(layout.clone(), 424);
+        w.set_local_time(LocalTime {
+            day: 20260901,
+            hour: 12,
+            minute: 0,
+            second: 0,
+        });
+
+        for _ in 0..1300 {
+            w.tick();
+        }
+
+        assert!(!w.autumn().piles().is_empty());
+        assert!(
+            w.autumn()
+                .piles()
+                .iter()
+                .all(|pile| layout.contains(pile.position)),
+            "Autumn pile targets must be sampled from real regions"
+        );
+    }
+
+    fn place_static_goose(w: &mut World, position: Vec2) {
+        w.goose.position = position;
+        w.goose.anim = RigAnim::new(position, 0.0);
+        w.goose.pose = w
+            .goose
+            .anim
+            .update(&RigInput::static_pose(position, 0.0, 0.45));
+        w.goose.rig = w.goose.pose.primary;
+    }
+
+    #[test]
+    fn current_visual_bounds_never_absorb_prior_damage() {
+        let mut w = World::new(bounds(), 425);
+        place_static_goose(&mut w, Vec2::new(120.0, 120.0));
+        let first = w.visual_bounds().expect("first visible frame");
+
+        place_static_goose(&mut w, Vec2::new(500.0, 120.0));
+        let second = w.visual_bounds().expect("second visible frame");
+        let damage = World::damage_bounds(Some(first), Some(second)).expect("move damage");
+        assert!(damage.contains(first.min) && damage.contains(second.max));
+
+        place_static_goose(&mut w, Vec2::new(800.0, 120.0));
+        let third = w.visual_bounds().expect("third visible frame");
+        let next_damage =
+            World::damage_bounds(Some(second), Some(third)).expect("next move damage");
+        assert!(
+            !next_damage.contains(first.min),
+            "feeding prior damage back would make the rectangle grow forever"
+        );
+    }
+
+    #[test]
+    fn four_k_frame_damage_stays_local_and_does_not_accumulate() {
+        let desktop = Rect::new(Vec2::ZERO, Vec2::new(3840.0, 2160.0));
+        let mut world = World::new(desktop, 4_000);
+        let mut previous = None;
+        let mut largest_area = 0.0_f32;
+
+        for frame in 0..1_000 {
+            let position = Vec2::new(160.0 + frame as f32 * 3.4, 1080.0);
+            place_static_goose(&mut world, position);
+            let current = world.visual_bounds().expect("visible 4K frame");
+            let damage = World::damage_bounds(previous, Some(current)).expect("frame damage");
+            assert!(desktop.contains(damage.min));
+            assert!(desktop.contains(damage.max));
+            largest_area = largest_area.max(damage.width() * damage.height());
+            previous = Some(current);
+        }
+
+        assert!(
+            largest_area < 512.0 * 512.0,
+            "one-frame 4K damage unexpectedly grew to {largest_area} pixels"
+        );
+    }
+
+    #[test]
+    fn fully_hidden_visuals_have_no_bounds_or_damage() {
+        let mut w = World::new(bounds(), 426);
+        place_static_goose(&mut w, Vec2::new(-10_000.0, -10_000.0));
+
+        let current = w.visual_bounds();
+
+        assert_eq!(current, None);
+        assert_eq!(World::damage_bounds(None, current), None);
+    }
+
+    #[test]
+    fn vertical_puddle_return_preserves_the_departure_edge() {
+        let mut found = None;
+        for seed in 0..512 {
+            let mut w = World::with_options(
+                bounds(),
+                seed,
+                WorldOptions {
+                    timing: TimingOptions {
+                        puddle_min_gap: 0.0,
+                        puddle_max_gap: 0.0,
+                        puddle_away_min: 0.0,
+                        puddle_away_max: 0.0,
+                        excursion_min_gap: 10_000.0,
+                        excursion_max_gap: 10_001.0,
+                        ..TimingOptions::default()
+                    },
+                    ..WorldOptions::default()
+                },
+            );
+            w.current = Box::new(WanderTask::new());
+            w.next_puddle_at = 0.0;
+            w.next_excursion_at = f64::INFINITY;
+            w.tick();
+            let exit = w.goose.target_pos;
+            if exit.x >= w.bounds.min.x
+                && exit.x <= w.bounds.max.x
+                && (exit.y < w.bounds.min.y || exit.y > w.bounds.max.y)
+            {
+                found = Some((w, exit));
+                break;
+            }
+        }
+        let (mut w, exit) = found.expect("a deterministic seed should choose a vertical edge");
+
+        w.goose.position = exit;
+        w.goose.velocity = Vec2::ZERO;
+        w.tick(); // Depart -> Away.
+        w.tick(); // Away -> Return, placing the goose at the staged entry.
+
+        assert!(
+            w.goose.position.y < w.bounds.min.y || w.goose.position.y > w.bounds.max.y,
+            "a vertical puddle return must reappear beyond the same top/bottom edge"
+        );
+        assert!((w.goose.position.x - exit.x).abs() <= 61.0);
+    }
+
+    #[test]
+    fn delayed_excursion_prank_is_cancelled_when_manners_activate() {
+        let mut w = World::new(bounds(), 427);
+        let at = w.goose.position;
+        w.current = Box::new(ExcursionTask::new(ExcursionKind::Errand, at, at, at, 0.0));
+        w.interrupted = Some(Box::new(WanderTask::new()));
+        w.excursion_prank = true;
+        w.tick(); // Depart -> Away.
+        w.tick(); // Away -> Return.
+        w.set_presence(PresenceSnapshot::do_not_disturb());
+
+        w.tick(); // Finish the return while manners are active.
+
+        assert_eq!(w.current_task(), "wander");
+        assert!(!w.excursion_prank);
+    }
+
+    #[test]
+    fn disabling_notes_cancels_an_active_note_even_when_memes_stay_enabled() {
+        let mut w = world_with_collect(428);
+        w.force_collect_window(CollectWindowKind::Note);
+        w.tick();
+        assert_eq!(w.current_task(), "collect_window");
+        w.take_collect_window_commands();
+        let mut options = w.options;
+        options.collect_window.notes_enabled = false;
+        assert!(options.collect_window.kind_active(CollectWindowKind::Meme));
+
+        w.apply_options(options);
+
+        assert_eq!(w.current_task(), "wander");
+    }
+
+    #[test]
+    fn runtime_capability_changes_refresh_the_pickable_deck() {
+        let mut w = World::with_options(
+            bounds(),
+            429,
+            WorldOptions {
+                collect_window: CollectWindowOptions {
+                    available_notes: 1,
+                    available_memes: 0,
+                    ..CollectWindowOptions::default()
+                },
+                ..WorldOptions::default()
+            },
+        );
+        assert_eq!(w.pickable.len(), 1);
+
+        w.set_collect_window_supported(true);
+
+        assert_eq!(w.pickable.len(), 2);
+    }
+
+    #[test]
+    fn entering_hyper_mood_emits_one_honk_not_two() {
+        let mut w = World::with_options(
+            bounds(),
+            430,
+            WorldOptions {
+                mood: MoodOptions {
+                    dynamic_moods: true,
+                    intensity: MoodIntensity::Spicy,
+                },
+                ..WorldOptions::default()
+            },
+        );
+        let mut prior = w.mood();
+        for _ in 0..240_000 {
+            w.tick();
+            let now = w.mood();
+            let sounds = w.take_sounds();
+            if prior != MoodKind::Hyper && now == MoodKind::Hyper {
+                let honks = sounds
+                    .iter()
+                    .filter(|sound| matches!(sound, Sound::Honk(_)))
+                    .count();
+                assert_eq!(honks, 1, "Hyper transition and task must share one honk");
+                return;
+            }
+            prior = now;
+        }
+        panic!("seed never entered Hyper mood");
+    }
+
+    #[test]
+    fn hourly_and_hyper_share_one_immediate_honk() {
+        let mut w = World::with_options(
+            bounds(),
+            432,
+            WorldOptions {
+                mood: MoodOptions {
+                    dynamic_moods: false,
+                    intensity: MoodIntensity::Normal,
+                },
+                hourly_honk: HourlyHonkOptions {
+                    on_hour_double_honk: true,
+                },
+                ..WorldOptions::default()
+            },
+        );
+        w.current = Box::new(WanderTask::new());
+        w.pending_hyper = true;
+        w.set_local_time(LocalTime {
+            day: 20260710,
+            hour: 10,
+            minute: 0,
+            second: 0,
+        });
+
+        w.tick();
+
+        assert_eq!(
+            w.take_sounds(),
+            vec![Sound::high_honk()],
+            "the top-of-hour and Hyper entry must not stack identical honks"
+        );
     }
 
     #[test]
@@ -1937,7 +2414,7 @@ mod tests {
         assert_eq!(w.goose.parameters.run_speed, 234.0);
         assert_eq!(w.footmark_timing(), footmarks);
         assert_eq!(w.poke(PokeAction::Mud), PokeOutcome::Applied);
-        assert!((w.goose.track_mud_end_time - (w.now() + 4.25)).abs() < f32::EPSILON);
+        assert!((w.goose.track_mud_end_time - (w.now() + 4.25)).abs() < f64::EPSILON);
     }
 
     #[test]

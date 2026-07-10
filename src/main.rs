@@ -14,10 +14,10 @@ mod assets;
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 mod audio;
 
-use cli::{Cli, Command};
+use cli::{Cli, Command, StartOptions};
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use honk_config::CliOverrides;
-use honk_config::Config;
+use honk_config::{reset_to_defaults, Config, ConfigError, ConfigLoadState};
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use honk_control::CommandServer;
 use honk_control::{send_command, ControlCommand, ControlResponse, RuntimeStatus, Singleton};
@@ -32,12 +32,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     match cli.command {
-        Some(Command::Config) => run_config(cli),
+        Some(Command::Config { config }) => run_config(config),
         Some(Command::Install { autostart }) => install::install(autostart),
         Some(Command::Uninstall { purge }) => install::uninstall(purge),
         Some(Command::Update) => update::run(),
-        Some(Command::Setup) => run_setup(cli),
-        Some(Command::Start) | None => run_start(cli),
+        Some(Command::Setup { config, reset }) => run_setup(config, reset),
+        Some(Command::Start { options }) => run_start(options),
+        None => run_start(StartOptions::default()),
         Some(Command::Stop | Command::Reload | Command::Status | Command::Do { .. }) => {
             unreachable!()
         }
@@ -51,12 +52,12 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::Status) => ControlCommand::Status,
         Some(Command::Do { action }) => ControlCommand::Do(action.into_engine()),
         Some(
-            Command::Start
-            | Command::Config
+            Command::Start { .. }
+            | Command::Config { .. }
             | Command::Install { .. }
             | Command::Uninstall { .. }
             | Command::Update
-            | Command::Setup,
+            | Command::Setup { .. },
         )
         | None => unreachable!("non-client commands are handled separately"),
     };
@@ -111,33 +112,70 @@ fn print_status(status: RuntimeStatus) {
     println!("assets: {} notes, {} memes", status.notes, status.memes);
 }
 
-fn run_config(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
-    let loaded = Config::load_or_default(cli.config)?;
-    if let Some(warning) = loaded.warning {
-        eprintln!("honk300 config: {warning}");
-    }
-    honk_config_tui::run(loaded.path)?;
+fn run_config(config: Option<std::path::PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+    let path = honk_config::resolve_path(config)?;
+    honk_config_tui::run(path)?;
     Ok(())
 }
 
-fn run_setup(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
-    let loaded = Config::load_or_default(cli.config)?;
-    loaded.config.save_atomic(&loaded.path)?;
-    println!("honk300: config ready at {}.", loaded.path.display());
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SetupResult {
+    Created,
+    AlreadyExists,
+    Reset { backup: Option<std::path::PathBuf> },
+}
+
+fn run_setup_at(path: &std::path::Path, reset: bool) -> Result<SetupResult, ConfigError> {
+    if reset {
+        return reset_to_defaults(path).map(|backup| SetupResult::Reset { backup });
+    }
+    match Config::load(Some(path.to_path_buf()))? {
+        ConfigLoadState::Missing { .. } => {
+            Config::default().save_atomic(path)?;
+            Ok(SetupResult::Created)
+        }
+        ConfigLoadState::Loaded(_) => Ok(SetupResult::AlreadyExists),
+        ConfigLoadState::Malformed { error, .. } => Err(ConfigError::MalformedDocument(error)),
+        ConfigLoadState::UnsupportedVersion { found, .. } => Err(ConfigError::WrongVersion(found)),
+    }
+}
+
+fn run_setup(
+    config: Option<std::path::PathBuf>,
+    reset: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = honk_config::resolve_path(config)?;
+    match run_setup_at(&path, reset)? {
+        SetupResult::Created => println!("honk300: config created at {}.", path.display()),
+        SetupResult::AlreadyExists => println!(
+            "honk300: config already exists at {}; left unchanged (use --reset to replace it).",
+            path.display()
+        ),
+        SetupResult::Reset {
+            backup: Some(backup),
+        } => println!(
+            "honk300: config reset at {}; backup saved to {}.",
+            path.display(),
+            backup.display()
+        ),
+        SetupResult::Reset { backup: None } => {
+            println!("honk300: config created at {}.", path.display())
+        }
+    }
     Ok(())
 }
 
 #[cfg(windows)]
-fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+fn run_start(options: StartOptions) -> Result<(), Box<dyn std::error::Error>> {
     let (_singleton, status) = Singleton::acquire()?;
     if status == honk_control::SingletonStatus::AlreadyRunning {
         println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
         return Ok(());
     }
 
-    let loaded = Config::load_or_default(cli.config.clone())?;
+    let loaded = Config::load_or_default(options.config.clone())?;
     if let Some(warning) = &loaded.warning {
-        eprintln!("honk300: ignoring config problem and using defaults ({warning})");
+        eprintln!("honk300 config: {warning}");
     }
 
     let server = CommandServer::start()?;
@@ -146,10 +184,10 @@ fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             config_path: loaded.path,
             config: loaded.config,
             cli_overrides: CliOverrides {
-                no_sound: cli.no_sound,
-                no_mouse_steal: cli.no_mouse_steal,
-                no_window_ride: cli.no_window_ride,
-                wayland: cli.wayland,
+                no_sound: options.no_sound,
+                no_mouse_steal: options.no_mouse_steal,
+                no_window_ride: options.no_window_ride,
+                wayland: options.wayland,
             },
         },
         &server,
@@ -157,16 +195,16 @@ fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(target_os = "macos")]
-fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+fn run_start(options: StartOptions) -> Result<(), Box<dyn std::error::Error>> {
     let (_singleton, status) = Singleton::acquire()?;
     if status == honk_control::SingletonStatus::AlreadyRunning {
         println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
         return Ok(());
     }
 
-    let loaded = Config::load_or_default(cli.config.clone())?;
+    let loaded = Config::load_or_default(options.config.clone())?;
     if let Some(warning) = &loaded.warning {
-        eprintln!("honk300: ignoring config problem and using defaults ({warning})");
+        eprintln!("honk300 config: {warning}");
     }
 
     let server = CommandServer::start()?;
@@ -175,10 +213,10 @@ fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             config_path: loaded.path,
             config: loaded.config,
             cli_overrides: CliOverrides {
-                no_sound: cli.no_sound,
-                no_mouse_steal: cli.no_mouse_steal,
-                no_window_ride: cli.no_window_ride,
-                wayland: cli.wayland,
+                no_sound: options.no_sound,
+                no_mouse_steal: options.no_mouse_steal,
+                no_window_ride: options.no_window_ride,
+                wayland: options.wayland,
             },
         },
         &server,
@@ -186,15 +224,15 @@ fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(target_os = "linux")]
-fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+fn run_start(options: StartOptions) -> Result<(), Box<dyn std::error::Error>> {
     let (_singleton, status) = Singleton::acquire()?;
     if status == honk_control::SingletonStatus::AlreadyRunning {
         println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
         return Ok(());
     }
-    let loaded = Config::load_or_default(cli.config.clone())?;
+    let loaded = Config::load_or_default(options.config.clone())?;
     if let Some(warning) = &loaded.warning {
-        eprintln!("honk300: ignoring config problem and using defaults ({warning})");
+        eprintln!("honk300 config: {warning}");
     }
 
     let server = CommandServer::start()?;
@@ -203,10 +241,10 @@ fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             config_path: loaded.path,
             config: loaded.config,
             cli_overrides: CliOverrides {
-                no_sound: cli.no_sound,
-                no_mouse_steal: cli.no_mouse_steal,
-                no_window_ride: cli.no_window_ride,
-                wayland: cli.wayland,
+                no_sound: options.no_sound,
+                no_mouse_steal: options.no_mouse_steal,
+                no_window_ride: options.no_window_ride,
+                wayland: options.wayland,
             },
         },
         &server,
@@ -214,16 +252,68 @@ fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
-fn run_start(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+fn run_start(options: StartOptions) -> Result<(), Box<dyn std::error::Error>> {
     let (_singleton, status) = Singleton::acquire()?;
     if status == honk_control::SingletonStatus::AlreadyRunning {
         println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
         return Ok(());
     }
-    let loaded = Config::load_or_default(cli.config)?;
+    let loaded = Config::load_or_default(options.config)?;
     if let Some(warning) = loaded.warning {
-        eprintln!("honk300: ignoring config problem and using defaults ({warning})");
+        eprintln!("honk300 config: {warning}");
     }
     eprintln!("honk300: this OS does not have a desktop backend yet.");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn setup_creates_a_valid_v2_config_only_when_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        assert_eq!(run_setup_at(&path, false).unwrap(), SetupResult::Created);
+        assert_eq!(Config::load_existing(&path).unwrap(), Config::default());
+
+        fs::write(
+            &path,
+            "goose_config_version = 2\nfuture_root = 'preserve me'\n",
+        )
+        .unwrap();
+        let original = fs::read(&path).unwrap();
+        assert_eq!(
+            run_setup_at(&path, false).unwrap(),
+            SetupResult::AlreadyExists
+        );
+        assert_eq!(fs::read(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn setup_refuses_malformed_existing_config_without_reset() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let original = b"[broken\nvalue = true\n";
+        fs::write(&path, original).unwrap();
+        assert!(run_setup_at(&path, false).is_err());
+        assert_eq!(fs::read(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn setup_reset_backs_up_then_replaces_existing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let original = b"goose_config_version = 99\nfuture = true\n";
+        fs::write(&path, original).unwrap();
+        let SetupResult::Reset {
+            backup: Some(backup),
+        } = run_setup_at(&path, true).unwrap()
+        else {
+            panic!("reset should report its backup");
+        };
+        assert_eq!(fs::read(backup).unwrap(), original);
+        assert_eq!(Config::load_existing(&path).unwrap(), Config::default());
+    }
 }

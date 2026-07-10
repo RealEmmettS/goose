@@ -4,6 +4,7 @@
 //! platform-free engine and renders leaves procedurally.
 
 use crate::entity::GooseEntity;
+use crate::layout::DesktopLayout;
 use crate::math::{clamp, Rect, Vec2};
 use crate::rng::{RandomSource, SplitMix64};
 use crate::time::DT;
@@ -60,8 +61,8 @@ pub struct AutumnPile {
     pub position: Vec2,
     pub radius: f32,
     pub height: f32,
-    pub created_at: f32,
-    pub kicked_at: Option<f32>,
+    pub created_at: f64,
+    pub kicked_at: Option<f64>,
     pub leaves: Vec<AutumnLeaf>,
 }
 
@@ -71,7 +72,7 @@ impl AutumnPile {
         position: Vec2,
         radius: f32,
         height: f32,
-        now: f32,
+        now: f64,
         rng: &mut SplitMix64,
     ) -> Self {
         let mut leaves = Vec::with_capacity(LEAVES_PER_PILE);
@@ -109,7 +110,7 @@ impl AutumnPile {
         &mut self,
         kick_velocity: Vec2,
         goose_speed_percentage: f32,
-        now: f32,
+        now: f64,
         rng: &mut SplitMix64,
     ) {
         self.kicked_at = Some(now);
@@ -144,22 +145,26 @@ impl AutumnPile {
         }
     }
 
-    pub fn spawn_scale(&self, now: f32) -> f32 {
-        ease_out_bounce(clamp((now - self.created_at) / SPAWN_ANIM_LENGTH, 0.0, 1.0))
+    pub fn spawn_scale(&self, now: f64) -> f32 {
+        ease_out_bounce(clamp(
+            ((now - self.created_at) / SPAWN_ANIM_LENGTH as f64) as f32,
+            0.0,
+            1.0,
+        ))
     }
 
-    pub fn fade_out(&self, now: f32) -> f32 {
+    pub fn fade_out(&self, now: f64) -> f32 {
         let Some(kicked_at) = self.kicked_at else {
             return 0.0;
         };
-        clamp(((now - kicked_at) - 8.0) / 2.0, 0.0, 1.0)
+        clamp((((now - kicked_at) - 8.0) / 2.0) as f32, 0.0, 1.0)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct AutumnState {
     piles: Vec<AutumnPile>,
-    next_pile_at: Option<f32>,
+    next_pile_at: Option<f64>,
     next_id: u64,
 }
 
@@ -205,9 +210,21 @@ impl AutumnState {
 
     pub fn tick(
         &mut self,
-        now: f32,
+        now: f64,
         active: bool,
         bounds: Rect,
+        goose: &GooseEntity,
+        rng: &mut SplitMix64,
+    ) {
+        self.tick_layout(now, active, &DesktopLayout::single(bounds), goose, rng);
+    }
+
+    /// Region-aware tick used by [`crate::world::World`].
+    pub fn tick_layout(
+        &mut self,
+        now: f64,
+        active: bool,
+        layout: &DesktopLayout,
         goose: &GooseEntity,
         rng: &mut SplitMix64,
     ) {
@@ -215,11 +232,13 @@ impl AutumnState {
             self.clear();
             return;
         }
-        let next = *self.next_pile_at.get_or_insert(now + FIRST_PILE_SECONDS);
+        let next = *self
+            .next_pile_at
+            .get_or_insert(now + FIRST_PILE_SECONDS as f64);
         if now >= next {
-            self.next_pile_at = Some(now + rng.range(PILE_INTERVAL_MIN, PILE_INTERVAL_MAX));
+            self.next_pile_at = Some(now + rng.range(PILE_INTERVAL_MIN, PILE_INTERVAL_MAX) as f64);
             if self.piles.len() < MAX_LEAF_PILES {
-                self.spawn_pile(now, bounds, rng);
+                self.spawn_pile(now, layout, rng);
             }
         }
 
@@ -237,17 +256,12 @@ impl AutumnState {
         }
         self.piles.retain(|pile| {
             pile.kicked_at
-                .is_none_or(|kicked_at| now - kicked_at <= LIFETIME_AFTER_KICKED)
+                .is_none_or(|kicked_at| now - kicked_at <= LIFETIME_AFTER_KICKED as f64)
         });
     }
 
-    fn spawn_pile(&mut self, now: f32, bounds: Rect, rng: &mut SplitMix64) {
-        let width = bounds.width().max(1.0);
-        let height = bounds.height().max(1.0);
-        let position = Vec2::new(
-            bounds.min.x + width * rng.range(0.2, 0.8),
-            bounds.min.y + height * rng.range(0.2, 0.8),
-        );
+    fn spawn_pile(&mut self, now: f64, layout: &DesktopLayout, rng: &mut SplitMix64) {
+        let position = layout.sample_point_inset(rng, 0.2);
         let radius = rng.range(30.0, 50.0);
         let pile_height = rng.range(30.0, 50.0);
         let pile = AutumnPile::new(
@@ -333,8 +347,8 @@ mod tests {
         let goose = GooseEntity::new();
         let mut rng = SplitMix64::seed(2);
         for i in 0..20 {
-            autumn.next_pile_at = Some(i as f32);
-            autumn.tick(i as f32, true, bounds(), &goose, &mut rng);
+            autumn.next_pile_at = Some(i as f64);
+            autumn.tick(i as f64, true, bounds(), &goose, &mut rng);
         }
         assert_eq!(autumn.piles().len(), MAX_LEAF_PILES);
     }

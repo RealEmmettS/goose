@@ -33,7 +33,8 @@ lipo -create \
   -output "$BIN"
 chmod 755 "$BIN"
 
-cp -R "$ROOT/Assets" "$RESOURCES_DIR/Assets"
+ditto "$ROOT/LICENSE" "$RESOURCES_DIR/LICENSE"
+ditto "$ROOT/THIRD_PARTY_ASSETS.md" "$RESOURCES_DIR/THIRD_PARTY_ASSETS.md"
 
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

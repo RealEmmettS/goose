@@ -1,96 +1,133 @@
-# goose
-Take the files in the Desktop Goose folder, analyze them thoroughly, and we're going to create an entirely new version of Desktop Goose. Same functionality, same features, but preferably built in Rust, works with both macOS, Linux, and Windows, and has native and CLI installers just like TR300, ND300, and WB300 (except we won't distribute with cargo, just via the builds and installers and scripts)
+# honk300
 
-FOR REFERENCE:
-"C:\Users\hey\git\qube-machine-report"
-"C:\Users\hey\git\qube-network-diagnostics"
-"C:\Users\hey\git\qube-workbranch-view"
+`honk300` is a clean-room, procedural desktop goose for Windows, macOS, and Linux. It walks
+across real monitor layouts, honks, leaves muddy footprints, reacts to the pointer, and performs
+bounded desktop pranks. Configuration and control stay local through a command-line interface
+and terminal settings screen.
 
----
+The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
+`honk300 start` and `goose plz` work.
 
-## Status
+## Install
 
-**Stage:** implementation in progress. Milestones **M0-M19** are implemented in-tree, and
-M16.1 macOS Accessibility readiness remains open for pre-granted host evidence. The current
-Windows build renders the procedural goose on the desktop,
-walks it, leaves mud, plays sounds, reacts to pat/click input, can perform bounded cursor
-nabbing when cursor warping is enabled, and can perch on a user-dragged foreign window until
-release. It can also drag in Notepad and meme windows through the M9 collect-window dispatcher,
-M10 adds a single-instance local control channel for `start`, `stop`, `reload`, and
-`do <action>` pokes, M11 adds the three-name goose-speak CLI grammar, and M12 adds durable TOML
-configuration plus the terminal config TUI. M13 adds deterministic dynamic moods and the local
-on-hour double honk; M14 adds quiet-hours/DND/fullscreen calm suppression and built-in procedural
-Autumn leaves. M15 adds Windows multi-monitor chase, per-monitor dirty-region presentation, live
-Calm Goose, and full RGB palette editing (six tones as of Renderer V2). M16 adds the macOS
-platform crate, AppKit/CoreGraphics runtime path, `honk300 status`, a TUI Status tab,
-bundle-aware asset/start handling, and `script/package_macos_app.sh`. M17 adds a Linux X11
-visible overlay path with input shaping, pointer sampling/warp, terminal-filtered
-foreign-window snapshots, and Unix IPC status/reload/stop/poke. M18 adds native Wayland reduced
-mode with layer-shell rendering, IPC control, and explicit unsupported reporting for mischief
-Wayland does not expose. Linux collect-window support remains unsupported and is reported that
-way. `docs/readiness/m16-m18-readiness.md` records the local gate, CI smoke gates, and pending
-macOS Accessibility evidence. M19 adds real `install`, `uninstall --purge`, and `update` command
-implementations plus cargo-dist shell/PowerShell installers, Linux archives, and Windows x64/ARM64
-Global/Corporate MSI and EXE installers with sha256 sidecars; the `v0.1.0` release and Windows
-installer workflow evidence close the M19 card. Post-M19 rounds R1/R2 (ADRs 0014–0016) fix the
-cross-platform reliability defects (Per-Monitor-V2 DPI, non-blocking window collection, crash-safe
-Unix single-instance, macOS event/present safety, honest Linux overlay failure, user-content-
-preserving uninstall), redraw the goose as the flat-illustration dual-view **Renderer V2** (planted
-feet, S-curve neck, six-tone palette, blink/breath/tail motion), and give it an idle life:
-meandering walks, mud that comes home from off-screen puddle hops, and periodic off-screen
-errands that sometimes return with a prank. `goose exit` / `goose quit` now stop it too.
+### Windows
 
-**Canonical plan → [`honk300_plan.md`](./honk300_plan.md). Start here.** It is a claim-tested
-*hybrid* that synthesizes the two earlier drafts — [`claude_plan.md`](./claude_plan.md) (the
-structural spine) and [`codex_plan.md`](./codex_plan.md) (grafts) — after verifying each draft's
-load-bearing claims against the original's shipped C# source and the `*300` sibling repos. Both
-drafts are now **superseded reference only**; where the three conflict, `honk300_plan.md` wins.
-(Why the hybrid is lopsided: `claude_plan.md`'s engine constants match `Exports.cs` verbatim,
-while `codex_plan.md`'s guessed speed values were wrong.)
+The machine-wide Global MSI is the recommended Windows install. It adds Honk300 to Program
+Files, the machine PATH, the all-users Start Menu, and Add/Remove Programs.
 
-**Architecture decisions → [`docs/adr/`](./docs/adr/README.md).** ADRs record durable decisions
-that should survive individual task-board updates. ADR 0010 records the M16 macOS agent-bundle,
-permission-degradation, status protocol, and TUI-only control decisions. ADR 0011 records the
-M17/M18 Linux control-runtime foundation and degraded Wayland contract. ADR 0012 records the
-CI-proven readiness contract for M16.1-M18.1. ADR 0013 records the M19 lifecycle/release
-contract and the deferred macOS distribution slice. ADR 0014 records Renderer V2 (supersedes
-ADR 0001's renderer direction), ADR 0015 the R1 reliability contract, ADR 0016 the
-idle-life behaviors, and ADR 0017 the R3 macOS packaging + lifecycle slice (supersedes ADR 0013's
-macOS deferral).
+- [Global MSI for x64 (most Windows PCs)](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc.msi)
+- [Global MSI for ARM64 (Windows on ARM)](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc.msi)
 
-**Decided direction (see `honk300_plan.md` for the full detail):**
+The MSI owns repair, upgrade, rollback, and uninstall. Corporate per-user packages, EXE
+installers, portable archives, checksums, and the PowerShell bootstrap remain under each
+[GitHub release](https://github.com/RealEmmettS/goose/releases/latest) for administrators and
+compatibility.
 
-- **Binary `honk300`**, installed under three names — `honk300` / `honk` / `goose` — with a
-  finite "goose-speak" CLI (`honk plz` / `goose plz` to start, `honk bad` /
-  `goose no honk` to stop, `goose do honk` to poke, `<name> config`, `<name> help`).
-- **Clean-room procedural goose** (no sprite extraction); engine ported 1:1 from the verified
-  constants. Sounds, screened original memes, and screened original notes are bundled 1:1 for
-  personal use; M9 adds one complete custom in-house counterpart per copied meme/note original.
-  Old donate pages and old developer references do not ship.
-- **TOML config** + a **ratatui terminal config TUI** at `<name> config`. Current M0-M15
-  settings hot-apply through reload where supported; M16 adds a live Status tab for platform,
-  bundle, permission, capability, asset, and running-state visibility. Future settings are
-  persisted and shown as planned or restart-required until their milestones land.
-- **New autonomous behaviors**, each an optional toggle, scoped to parameter-modulation of the
-  procedural rig (no new copied goose art): dynamic moods, on-the-hour double honk,
-  quiet-hours/DND/fullscreen manners, built-in Autumn leaves, multi-monitor chase, full
-  original-palette recolor, and the Calm Goose valve are implemented. Default = full original
-  prank, always-on.
-- **No external mods** (Autumn is built-in; extensibility via documented internal seams),
-  **no system tray**, and **no global quit key**. Starting, stopping, and configuration are
-  CLI/TUI-only over the single-instance IPC channel. The macOS `.app` is an agent/permission
-  identity, not a native settings surface.
-- **Terminal windows are protected:** the goose may visually pass over terminals, but it must
-  never move, focus, type into, drag, ride, collect, or otherwise manipulate terminal windows.
-- **Built for every OS + architecture:** Windows x64 **and ARM64**, macOS Intel **and Apple
-  Silicon** (universal2), Linux x64 **and ARM** (gnu + musl where packaging supports it).
-  Native + CLI installers like TR300/ND300/WB300; **no crates.io**.
-- M19 completed Windows and Linux packaging first; **R3 (ADR 0017) added the macOS slice** —
-  cargo-dist Apple targets, a universal2 `.app`/DMG CI job, and macOS `install`/`uninstall`/`update`.
-  macOS artifacts are **unsigned personal-use** (ad-hoc codesign only; first launch needs a
-  one-time right-click → Open); Developer ID signing/notarization stay out of scope, and the
-  Accessibility-granted hands-on evidence (`docs/readiness/macos-handson-checklist.md`) is still
-  pending a real Mac.
-- Linux is **X11-first** (runs under XWayland); native Wayland is an opt-in `--wayland` mode with
-  reduced mischief. The current Linux runtime has visible X11 and reduced Wayland presentation
-  paths plus CI smoke scripts; readiness cards close only after the host CI evidence is recorded.
+### macOS and Linux
+
+```sh
+curl --proto '=https' --tlsv1.2 -fsSL https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.sh | sh
+```
+
+The bootstrap is stamped for one exact release. It detects the OS, architecture, and Linux libc,
+downloads that exact-tag payload, verifies its embedded SHA-256, stages on the destination
+filesystem, and rolls back the payload and owned integrations if installation fails. It does not
+use `sudo`.
+
+- macOS: `~/Applications/Honk300.app`; receipt and user media under
+  `~/Library/Application Support/honk300`; aliases under `~/.local/bin`.
+- Linux: managed payload under `${XDG_DATA_HOME:-~/.local/share}/honk300/install`; receipt,
+  desktop entry, and user media stay in the corresponding XDG user directories; aliases under
+  `~/.local/bin`.
+
+The macOS app is universal (Intel and Apple Silicon), ad-hoc signed, and not notarized. macOS may
+require approval under **System Settings → Privacy & Security**, and desktop pranks require
+Accessibility permission. An update may require Accessibility reauthorization; the project does
+not promise that an ad-hoc signing identity preserves a prior grant.
+
+## Use
+
+```text
+honk300 start                 Start the goose
+honk300 status                Show runtime and platform capabilities
+honk300 config                Open the terminal settings editor
+honk300 reload                Apply reloadable saved settings
+honk300 do honk               Request an action
+honk300 stop                  Stop the running goose
+```
+
+Friendly aliases include `goose plz`, `honk bad`, `goose no honk`, `goose quit`, and
+`goose do mud`. Run `honk300 help` for the complete grammar.
+
+First run materializes schema-current configuration. Existing malformed files and files from a
+newer schema are never replaced automatically. To intentionally reset one, use
+`honk300 setup --reset`; the previous bytes are backed up first.
+
+Default config locations:
+
+- Windows: `%LOCALAPPDATA%\honk300\config.toml`
+- macOS: `~/Library/Application Support/honk300/config.toml`
+- Linux: `${XDG_DATA_HOME:-~/.local/share}/honk300/config.toml`
+
+Settings that affect backend selection, including native Wayland mode, require a restart and are
+reported as such. Native Wayland remains an explicit reduced mode (`honk300 start --wayland`):
+the overlay works, while cursor and foreign-window mischief report unsupported. X11/XWayland is
+the full-mischief Linux default. Terminal windows are always protected from focus, typing,
+dragging, riding, and collection.
+
+User notes and PNG memes can be added without modifying the program:
+
+- Windows: `%LOCALAPPDATA%\honk300\media\Notes` and `...\Memes`
+- macOS: `~/Library/Application Support/honk300/media/Notes` and `.../Memes`
+- Linux: `${XDG_DATA_HOME:-~/.local/share}/honk300/media/Notes` and `.../Memes`
+
+## Remove or update
+
+On Windows, use Add/Remove Programs or rerun the Global MSI. On macOS/Linux:
+
+```text
+honk300 update
+honk300 uninstall
+honk300 uninstall --purge
+```
+
+A normal uninstall preserves user media. `--purge` backs up user media before removing user
+state. Autostart is opt-in and off by default.
+
+## Platform support
+
+| Platform | Architectures | Desktop path |
+| --- | --- | --- |
+| Windows | x64, ARM64 | PMv2 layered overlays, one per monitor |
+| macOS 11+ | Intel, Apple Silicon | Universal LSUIElement app bundle |
+| Linux X11/XWayland | x64/ARM64, GNU/musl | Full overlay and supported mischief |
+| Linux native Wayland | x64/ARM64, GNU/musl | Opt-in reduced overlay mode |
+
+Linux collect-window behavior is unsupported and reported honestly. Hands-on pre-granted macOS
+Accessibility upgrade evidence remains tracked in the readiness docs; hosted bundle and
+permission-adapter tests are release gates.
+
+## Build and verify
+
+This is a Rust 1.95 workspace (edition 2021):
+
+```text
+cargo fmt --all -- --check
+cargo clippy --all-targets --workspace -- -D warnings
+cargo test --workspace
+cargo build --release
+dist plan --tag=v0.3.0
+cargo audit
+```
+
+Architecture decisions are under [`docs/adr`](docs/adr/README.md). ADR 0018 defines distribution
+and atomic publication; ADR 0019 defines the v0.3.0 configuration, runtime, renderer, and platform
+stabilization contracts. [`docs/readiness/v0.3.0-readiness.md`](docs/readiness/v0.3.0-readiness.md)
+is the release checklist.
+
+## License and assets
+
+The code is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). Bundled media has
+separate provenance and redistribution terms in [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md).
+This repository does not contain the original developers' source/reference tree, donation pages,
+or old developer branding.

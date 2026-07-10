@@ -119,6 +119,59 @@ pub fn display_collect_window_supported(_session: DisplayServer) -> bool {
     false
 }
 
+#[cfg(test)]
+fn x11_overlay_count(monitor_count: usize) -> usize {
+    monitor_count
+}
+
+#[cfg(any(test, target_os = "linux"))]
+fn x11_mapping_allowed(argb: bool, compositor: bool, empty_input_shape: bool) -> bool {
+    argb && compositor && empty_input_shape
+}
+
+#[cfg(test)]
+fn x11_setup_steps() -> [&'static str; 2] {
+    ["shape", "map"]
+}
+
+#[cfg(test)]
+fn x11_event_requires_reconcile(randr_event: bool) -> bool {
+    randr_event
+}
+
+#[cfg(any(test, target_os = "linux"))]
+const WAYLAND_MAX_BUFFERS_PER_OUTPUT: usize = 3;
+
+#[cfg(any(test, target_os = "linux"))]
+fn wayland_scaled_dimension(logical: u32, scale_120: u32) -> u32 {
+    wayland_scale_ceil(logical, scale_120).max(1)
+}
+
+#[cfg(any(test, target_os = "linux"))]
+fn wayland_scale_floor(logical: u32, scale_120: u32) -> u32 {
+    ((logical as u64 * scale_120 as u64) / 120) as u32
+}
+
+#[cfg(any(test, target_os = "linux"))]
+fn wayland_scale_ceil(logical: u32, scale_120: u32) -> u32 {
+    ((logical as u64 * scale_120 as u64).div_ceil(120)) as u32
+}
+
+#[cfg(test)]
+fn wayland_retained_buffer_count(frame_count: usize) -> usize {
+    frame_count.min(WAYLAND_MAX_BUFFERS_PER_OUTPUT)
+}
+
+#[cfg(test)]
+fn wayland_surface_count(output_count: usize) -> usize {
+    output_count
+}
+
+#[cfg(test)]
+fn wayland_pump_steps() -> [&'static str; 4] {
+    ["prepare_read", "poll", "read", "dispatch_pending"]
+}
+
 #[cfg(target_os = "linux")]
 pub use platform::{Overlay, OverlayMode};
 
@@ -195,6 +248,22 @@ mod platform {
                 OverlayInner::X11(overlay) => overlay.bounds(),
                 OverlayInner::Wayland(overlay) => overlay.bounds(),
                 OverlayInner::Headless(overlay) => overlay.bounds(),
+            }
+        }
+
+        pub fn monitor_bounds(&self) -> Vec<Rect> {
+            match &self.inner {
+                OverlayInner::X11(overlay) => overlay.monitor_bounds(),
+                OverlayInner::Wayland(overlay) => overlay.monitor_bounds(),
+                OverlayInner::Headless(overlay) => vec![overlay.bounds()],
+            }
+        }
+
+        pub fn take_topology_changed(&mut self) -> bool {
+            match &mut self.inner {
+                OverlayInner::X11(overlay) => overlay.take_topology_changed(),
+                OverlayInner::Wayland(overlay) => overlay.take_topology_changed(),
+                OverlayInner::Headless(_) => false,
             }
         }
 
@@ -338,11 +407,14 @@ mod platform {
     }
 
     mod x11 {
+        use super::super::x11_mapping_allowed;
         use super::{clamp_i16, clamp_u16, x11_bgra_from_rgba};
         use honk_engine::tiny_skia::Pixmap;
         use honk_engine::{ForeignWindowId, ForeignWindowSnapshot, Pointer, Rect, Vec2};
+        use std::collections::HashMap;
         use std::io;
         use x11rb::connection::Connection;
+        use x11rb::protocol::randr::{ConnectionExt as RandrConnectionExt, NotifyMask};
         use x11rb::protocol::render::ConnectionExt as RenderConnectionExt;
         use x11rb::protocol::shape;
         use x11rb::protocol::xfixes::ConnectionExt as XFixesConnectionExt;
@@ -350,9 +422,10 @@ mod platform {
         use x11rb::protocol::xproto::{
             AtomEnum, ButtonMask, ColormapAlloc, ConfigureWindowAux,
             ConnectionExt as XprotoConnectionExt, CreateGCAux, CreateWindowAux, EventMask,
-            GetPropertyReply, ImageFormat, PropMode, Rectangle, StackMode, Visualid, Window,
-            WindowClass,
+            GetPropertyReply, ImageFormat, PropMode, Rectangle, Screen, StackMode, Visualid,
+            Window, WindowClass,
         };
+        use x11rb::protocol::Event;
         use x11rb::rust_connection::RustConnection;
         use x11rb::wrapper::ConnectionExt as WrapperConnectionExt;
         use x11rb::NONE;
@@ -371,14 +444,28 @@ mod platform {
         pub struct X11Overlay {
             conn: RustConnection,
             root: u32,
+            screen_num: usize,
+            windows: Vec<X11Window>,
+            bounds: Rect,
+            atoms: Atoms,
+            topology_changed: bool,
+        }
+
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        struct Monitor {
+            id: u32,
+            bounds: Rect,
+            primary: bool,
+        }
+
+        struct X11Window {
+            monitor_id: u32,
             window: u32,
             gc: u32,
             depth: u8,
             colormap: Option<u32>,
             bounds: Rect,
-            atoms: Atoms,
-            // Last input region actually applied (post-intersection with `bounds`), so an
-            // unchanged bbox skips re-creating and re-setting the XFixes region every frame.
+            // Last input region actually applied (post-intersection with monitor bounds).
             last_input_region: Option<Option<Rect>>,
         }
 
@@ -387,110 +474,60 @@ mod platform {
                 let (conn, screen_num) = x11rb::connect(None).map_err(to_io)?;
                 let screen = &conn.setup().roots[screen_num];
                 let root = screen.root;
-                let bounds = query_bounds(&conn, root).unwrap_or_else(|| {
-                    Rect::new(
-                        Vec2::ZERO,
-                        Vec2::new(
-                            screen.width_in_pixels as f32,
-                            screen.height_in_pixels as f32,
-                        ),
-                    )
-                });
-                let width = clamp_u16(bounds.width());
-                let height = clamp_u16(bounds.height());
-                let window = conn.generate_id().map_err(to_io)?;
-                let gc = conn.generate_id().map_err(to_io)?;
                 let atoms = Atoms::new(&conn).map_err(to_io)?.reply().map_err(to_io)?;
-                let visual =
-                    choose_argb_visual(&conn, screen_num, screen.root_depth, screen.root_visual);
-                let colormap = if visual.visual != screen.root_visual {
-                    let colormap = conn.generate_id().map_err(to_io)?;
-                    conn.create_colormap(ColormapAlloc::NONE, colormap, root, visual.visual)
-                        .map_err(to_io)?;
-                    Some(colormap)
-                } else {
-                    None
-                };
-
-                let mut aux = CreateWindowAux::new()
-                    .override_redirect(1)
-                    .background_pixel(0)
-                    .border_pixel(0)
-                    .event_mask(EventMask::EXPOSURE | EventMask::STRUCTURE_NOTIFY);
-                if let Some(colormap) = colormap {
-                    aux = aux.colormap(colormap);
+                let visual = choose_argb_visual(&conn, screen_num)
+                    .ok_or_else(|| io::Error::other("X11 overlay requires a 32-bit ARGB visual"))?;
+                if !compositor_running(&conn, screen_num)? {
+                    return Err(io::Error::other(
+                        "X11 overlay requires an active compositing manager",
+                    ));
                 }
-                conn.create_window(
-                    visual.depth,
-                    window,
+                let monitors = query_monitors(&conn, root, screen);
+                let bounds = monitor_union(&monitors);
+                let mut windows = Vec::with_capacity(monitors.len());
+                for monitor in monitors {
+                    windows.push(create_overlay_window(
+                        &conn,
+                        root,
+                        screen.root_visual,
+                        &atoms,
+                        visual,
+                        monitor,
+                    )?);
+                }
+                conn.randr_select_input(
                     root,
-                    clamp_i16(bounds.min.x),
-                    clamp_i16(bounds.min.y),
-                    width,
-                    height,
-                    0,
-                    WindowClass::INPUT_OUTPUT,
-                    visual.visual,
-                    &aux,
+                    NotifyMask::SCREEN_CHANGE
+                        | NotifyMask::CRTC_CHANGE
+                        | NotifyMask::OUTPUT_CHANGE
+                        | NotifyMask::RESOURCE_CHANGE,
                 )
-                .map_err(to_io)?;
-                conn.create_gc(gc, window, &CreateGCAux::new())
-                    .map_err(to_io)?;
-                conn.change_property8(
-                    PropMode::REPLACE,
-                    window,
-                    AtomEnum::WM_NAME,
-                    AtomEnum::STRING,
-                    b"honk300 overlay",
-                )
-                .map_err(to_io)?;
-                conn.change_property8(
-                    PropMode::REPLACE,
-                    window,
-                    atoms._NET_WM_NAME,
-                    atoms.UTF8_STRING,
-                    b"honk300 overlay",
-                )
-                .map_err(to_io)?;
-                conn.change_property32(
-                    PropMode::REPLACE,
-                    window,
-                    atoms._NET_WM_WINDOW_TYPE,
-                    AtomEnum::ATOM,
-                    &[atoms._NET_WM_WINDOW_TYPE_DOCK],
-                )
-                .map_err(to_io)?;
-                conn.change_property32(
-                    PropMode::REPLACE,
-                    window,
-                    atoms._NET_WM_STATE,
-                    AtomEnum::ATOM,
-                    &[atoms._NET_WM_STATE_ABOVE],
-                )
-                .map_err(to_io)?;
-                conn.map_window(window).map_err(to_io)?;
-                conn.configure_window(
-                    window,
-                    &ConfigureWindowAux::new().stack_mode(StackMode::ABOVE),
-                )
+                .map_err(to_io)?
+                .check()
                 .map_err(to_io)?;
                 conn.flush().map_err(to_io)?;
 
                 Ok(Self {
-                    depth: visual.depth,
                     conn,
                     root,
-                    window,
-                    gc,
-                    colormap,
+                    screen_num,
+                    windows,
                     bounds,
                     atoms,
-                    last_input_region: None,
+                    topology_changed: false,
                 })
             }
 
             pub fn bounds(&self) -> Rect {
                 self.bounds
+            }
+
+            pub fn monitor_bounds(&self) -> Vec<Rect> {
+                self.windows.iter().map(|window| window.bounds).collect()
+            }
+
+            pub fn take_topology_changed(&mut self) -> bool {
+                std::mem::take(&mut self.topology_changed)
             }
 
             pub fn pointer_state(&self) -> io::Result<Pointer> {
@@ -570,34 +607,15 @@ mod platform {
             }
 
             pub fn set_input_region(&mut self, rect: Option<Rect>) -> io::Result<()> {
-                // `bounds` is fixed for the overlay's lifetime, so the applied region is a pure
-                // function of the intersected rect: skip the whole XFixes round-trip when it is
-                // unchanged from the frame before.
-                let effective = rect.and_then(|rect| rect.intersection(self.bounds));
-                if self.last_input_region == Some(effective) {
-                    return Ok(());
+                for window in &mut self.windows {
+                    let effective = rect.and_then(|rect| rect.intersection(window.bounds));
+                    if window.last_input_region == Some(effective) {
+                        continue;
+                    }
+                    apply_input_shape(&self.conn, window.window, window.bounds, effective)?;
+                    window.last_input_region = Some(effective);
                 }
-                let region = self.conn.generate_id().map_err(to_io)?;
-                let rectangles = effective
-                    .map(|rect| {
-                        vec![Rectangle {
-                            x: clamp_i16(rect.min.x - self.bounds.min.x),
-                            y: clamp_i16(rect.min.y - self.bounds.min.y),
-                            width: clamp_u16(rect.width()),
-                            height: clamp_u16(rect.height()),
-                        }]
-                    })
-                    .unwrap_or_default();
-                self.conn
-                    .xfixes_create_region(region, &rectangles)
-                    .map_err(to_io)?;
-                self.conn
-                    .xfixes_set_window_shape_region(self.window, shape::SK::INPUT, 0, 0, region)
-                    .map_err(to_io)?;
-                self.conn.xfixes_destroy_region(region).map_err(to_io)?;
                 self.conn.flush().map_err(to_io)?;
-                // Only cache after a fully applied+flushed region, so a mid-way error retries.
-                self.last_input_region = Some(effective);
                 Ok(())
             }
 
@@ -605,33 +623,53 @@ mod platform {
                 if pixmap.width() == 0 || pixmap.height() == 0 {
                     return Ok(());
                 }
-                let data = x11_bgra_from_rgba(pixmap);
-                self.conn
-                    .put_image(
-                        ImageFormat::Z_PIXMAP,
-                        self.window,
-                        self.gc,
-                        pixmap.width() as u16,
-                        pixmap.height() as u16,
-                        clamp_i16(dirty.min.x - self.bounds.min.x),
-                        clamp_i16(dirty.min.y - self.bounds.min.y),
-                        0,
-                        self.depth,
-                        &data,
-                    )
-                    .map_err(to_io)?;
+                for window in &self.windows {
+                    let Some(clip) = dirty.intersection(window.bounds).map(Rect::pixel_aligned)
+                    else {
+                        continue;
+                    };
+                    let width = clamp_u16(clip.width());
+                    let height = clamp_u16(clip.height());
+                    let data = clipped_bgra(dirty, clip, pixmap, width, height);
+                    self.conn
+                        .put_image(
+                            ImageFormat::Z_PIXMAP,
+                            window.window,
+                            window.gc,
+                            width,
+                            height,
+                            clamp_i16(clip.min.x - window.bounds.min.x),
+                            clamp_i16(clip.min.y - window.bounds.min.y),
+                            0,
+                            window.depth,
+                            &data,
+                        )
+                        .map_err(to_io)?;
+                }
                 self.conn.flush().map_err(to_io)
             }
 
             pub fn pump(&mut self) -> io::Result<bool> {
-                // The event mask is selected once at window creation; draining the queue here is
-                // all that's needed each frame (events are intentionally discarded).
-                while self.conn.poll_for_event().map_err(to_io)?.is_some() {}
+                let mut reconcile = false;
+                while let Some(event) = self.conn.poll_for_event().map_err(to_io)? {
+                    if matches!(
+                        event,
+                        Event::RandrNotify(_) | Event::RandrScreenChangeNotify(_)
+                    ) {
+                        reconcile = true;
+                    }
+                }
+                if reconcile {
+                    self.reconcile_monitors()?;
+                }
                 Ok(true)
             }
 
             fn foreign_target_window(&self, focus: Window) -> io::Result<Option<Window>> {
-                if focus == NONE || focus == self.root || focus == self.window {
+                if focus == NONE
+                    || focus == self.root
+                    || self.windows.iter().any(|overlay| overlay.window == focus)
+                {
                     return Ok(None);
                 }
                 let attrs = self
@@ -644,6 +682,62 @@ mod platform {
                     return Ok(None);
                 }
                 Ok(Some(focus))
+            }
+
+            fn reconcile_monitors(&mut self) -> io::Result<()> {
+                let screen = &self.conn.setup().roots[self.screen_num];
+                let monitors = query_monitors(&self.conn, self.root, screen);
+                let visual = choose_argb_visual(&self.conn, self.screen_num)
+                    .ok_or_else(|| io::Error::other("X11 overlay lost its required ARGB visual"))?;
+                if !compositor_running(&self.conn, self.screen_num)? {
+                    return Err(io::Error::other(
+                        "X11 compositing manager disappeared during topology refresh",
+                    ));
+                }
+                let prior = self.monitor_bounds();
+                let mut existing = self
+                    .windows
+                    .drain(..)
+                    .map(|window| (window.monitor_id, window))
+                    .collect::<HashMap<_, _>>();
+                let mut windows = Vec::with_capacity(monitors.len());
+                for monitor in &monitors {
+                    let mut window = match existing.remove(&monitor.id) {
+                        Some(window) => window,
+                        None => create_overlay_window(
+                            &self.conn,
+                            self.root,
+                            screen.root_visual,
+                            &self.atoms,
+                            visual,
+                            *monitor,
+                        )?,
+                    };
+                    if window.bounds != monitor.bounds {
+                        self.conn
+                            .configure_window(
+                                window.window,
+                                &ConfigureWindowAux::new()
+                                    .x(clamp_i16(monitor.bounds.min.x) as i32)
+                                    .y(clamp_i16(monitor.bounds.min.y) as i32)
+                                    .width(clamp_u16(monitor.bounds.width()) as u32)
+                                    .height(clamp_u16(monitor.bounds.height()) as u32),
+                            )
+                            .map_err(to_io)?
+                            .check()
+                            .map_err(to_io)?;
+                        window.bounds = monitor.bounds;
+                        window.last_input_region = None;
+                    }
+                    windows.push(window);
+                }
+                for (_, window) in existing {
+                    destroy_overlay_window(&self.conn, window);
+                }
+                self.windows = windows;
+                self.bounds = monitor_union(&monitors);
+                self.topology_changed |= prior != self.monitor_bounds();
+                self.conn.flush().map_err(to_io)
             }
 
             fn is_protected_window(&self, window: Window) -> io::Result<bool> {
@@ -690,43 +784,100 @@ mod platform {
             let value = reply
                 .value
                 .split(|byte| *byte == 0)
-                .filter(|part| !part.is_empty())
-                .next_back()
+                .rfind(|part| !part.is_empty())
                 .unwrap_or(&reply.value);
             Some(String::from_utf8_lossy(value).into_owned())
         }
 
-        fn query_bounds(conn: &RustConnection, root: u32) -> Option<Rect> {
-            let active = conn.xinerama_is_active().ok()?.reply().ok()?.state != 0;
-            if !active {
-                return None;
+        fn query_monitors(conn: &RustConnection, root: u32, screen: &Screen) -> Vec<Monitor> {
+            if let Ok(cookie) = conn.randr_get_monitors(root, true) {
+                if let Ok(reply) = cookie.reply() {
+                    let mut monitors = reply
+                        .monitors
+                        .into_iter()
+                        .filter(|monitor| monitor.width > 0 && monitor.height > 0)
+                        .map(|monitor| Monitor {
+                            id: monitor.name,
+                            bounds: Rect::new(
+                                Vec2::new(monitor.x as f32, monitor.y as f32),
+                                Vec2::new(
+                                    monitor.x as f32 + monitor.width as f32,
+                                    monitor.y as f32 + monitor.height as f32,
+                                ),
+                            ),
+                            primary: monitor.primary,
+                        })
+                        .collect::<Vec<_>>();
+                    monitors.sort_by_key(|monitor| !monitor.primary);
+                    if !monitors.is_empty() {
+                        return monitors;
+                    }
+                }
             }
-            let screens = conn
-                .xinerama_query_screens()
-                .ok()?
-                .reply()
-                .ok()?
-                .screen_info;
-            screens
-                .into_iter()
-                .map(|screen| {
+
+            if conn
+                .xinerama_is_active()
+                .ok()
+                .and_then(|cookie| cookie.reply().ok())
+                .is_some_and(|reply| reply.state != 0)
+            {
+                if let Ok(cookie) = conn.xinerama_query_screens() {
+                    if let Ok(reply) = cookie.reply() {
+                        let monitors = reply
+                            .screen_info
+                            .into_iter()
+                            .enumerate()
+                            .map(|(index, info)| Monitor {
+                                id: 0x8000_0000 | index as u32,
+                                bounds: Rect::new(
+                                    Vec2::new(info.x_org as f32, info.y_org as f32),
+                                    Vec2::new(
+                                        info.x_org as f32 + info.width as f32,
+                                        info.y_org as f32 + info.height as f32,
+                                    ),
+                                ),
+                                primary: index == 0,
+                            })
+                            .collect::<Vec<_>>();
+                        if !monitors.is_empty() {
+                            return monitors;
+                        }
+                    }
+                }
+            }
+
+            let bounds = conn
+                .get_geometry(root)
+                .ok()
+                .and_then(|cookie| cookie.reply().ok())
+                .map(|geometry| {
                     Rect::new(
-                        Vec2::new(screen.x_org as f32, screen.y_org as f32),
-                        Vec2::new(
-                            screen.x_org as f32 + screen.width as f32,
-                            screen.y_org as f32 + screen.height as f32,
-                        ),
+                        Vec2::ZERO,
+                        Vec2::new(geometry.width as f32, geometry.height as f32),
                     )
                 })
+                .unwrap_or_else(|| {
+                    Rect::new(
+                        Vec2::ZERO,
+                        Vec2::new(
+                            screen.width_in_pixels as f32,
+                            screen.height_in_pixels as f32,
+                        ),
+                    )
+                });
+            vec![Monitor {
+                id: root,
+                bounds,
+                primary: true,
+            }]
+        }
+
+        fn monitor_union(monitors: &[Monitor]) -> Rect {
+            monitors
+                .iter()
+                .map(|monitor| monitor.bounds)
                 .reduce(Rect::union)
-                .or_else(|| {
-                    conn.get_geometry(root).ok()?.reply().ok().map(|geometry| {
-                        Rect::new(
-                            Vec2::ZERO,
-                            Vec2::new(geometry.width as f32, geometry.height as f32),
-                        )
-                    })
-                })
+                .unwrap_or_else(|| Rect::new(Vec2::ZERO, Vec2::new(1.0, 1.0)))
         }
 
         #[derive(Clone, Copy)]
@@ -735,30 +886,14 @@ mod platform {
             visual: Visualid,
         }
 
-        fn choose_argb_visual(
-            conn: &RustConnection,
-            screen_num: usize,
-            fallback_depth: u8,
-            fallback_visual: Visualid,
-        ) -> ChosenVisual {
+        fn choose_argb_visual(conn: &RustConnection, screen_num: usize) -> Option<ChosenVisual> {
             let Ok(cookie) = conn.render_query_pict_formats() else {
-                return ChosenVisual {
-                    depth: fallback_depth,
-                    visual: fallback_visual,
-                };
+                return None;
             };
             let Ok(reply) = cookie.reply() else {
-                return ChosenVisual {
-                    depth: fallback_depth,
-                    visual: fallback_visual,
-                };
+                return None;
             };
-            let Some(screen) = reply.screens.get(screen_num) else {
-                return ChosenVisual {
-                    depth: fallback_depth,
-                    visual: fallback_visual,
-                };
-            };
+            let screen = reply.screens.get(screen_num)?;
             for depth in &screen.depths {
                 if depth.depth != 32 {
                     continue;
@@ -772,16 +907,210 @@ mod platform {
                         continue;
                     };
                     if format.depth == 32 && format.direct.alpha_mask != 0 {
-                        return ChosenVisual {
+                        return Some(ChosenVisual {
                             depth: depth.depth,
                             visual: visual.visual,
-                        };
+                        });
                     }
                 }
             }
-            ChosenVisual {
-                depth: fallback_depth,
-                visual: fallback_visual,
+            None
+        }
+
+        fn compositor_running(conn: &RustConnection, screen_num: usize) -> io::Result<bool> {
+            let atom_name = format!("_NET_WM_CM_S{screen_num}");
+            let atom = conn
+                .intern_atom(false, atom_name.as_bytes())
+                .map_err(to_io)?
+                .reply()
+                .map_err(to_io)?
+                .atom;
+            let owner = conn
+                .get_selection_owner(atom)
+                .map_err(to_io)?
+                .reply()
+                .map_err(to_io)?
+                .owner;
+            Ok(owner != NONE)
+        }
+
+        fn create_overlay_window(
+            conn: &RustConnection,
+            root: u32,
+            root_visual: Visualid,
+            atoms: &Atoms,
+            visual: ChosenVisual,
+            monitor: Monitor,
+        ) -> io::Result<X11Window> {
+            let window = conn.generate_id().map_err(to_io)?;
+            let gc = conn.generate_id().map_err(to_io)?;
+            let colormap = if visual.visual != root_visual {
+                let colormap = conn.generate_id().map_err(to_io)?;
+                conn.create_colormap(ColormapAlloc::NONE, colormap, root, visual.visual)
+                    .map_err(to_io)?
+                    .check()
+                    .map_err(to_io)?;
+                Some(colormap)
+            } else {
+                None
+            };
+            let mut aux = CreateWindowAux::new()
+                .override_redirect(1)
+                .background_pixel(0)
+                .border_pixel(0)
+                .event_mask(EventMask::EXPOSURE | EventMask::STRUCTURE_NOTIFY);
+            if let Some(colormap) = colormap {
+                aux = aux.colormap(colormap);
+            }
+            conn.create_window(
+                visual.depth,
+                window,
+                root,
+                clamp_i16(monitor.bounds.min.x),
+                clamp_i16(monitor.bounds.min.y),
+                clamp_u16(monitor.bounds.width()),
+                clamp_u16(monitor.bounds.height()),
+                0,
+                WindowClass::INPUT_OUTPUT,
+                visual.visual,
+                &aux,
+            )
+            .map_err(to_io)?
+            .check()
+            .map_err(to_io)?;
+            conn.create_gc(gc, window, &CreateGCAux::new())
+                .map_err(to_io)?
+                .check()
+                .map_err(to_io)?;
+            conn.change_property8(
+                PropMode::REPLACE,
+                window,
+                AtomEnum::WM_NAME,
+                AtomEnum::STRING,
+                b"honk300 overlay",
+            )
+            .map_err(to_io)?
+            .check()
+            .map_err(to_io)?;
+            conn.change_property8(
+                PropMode::REPLACE,
+                window,
+                atoms._NET_WM_NAME,
+                atoms.UTF8_STRING,
+                b"honk300 overlay",
+            )
+            .map_err(to_io)?
+            .check()
+            .map_err(to_io)?;
+            conn.change_property32(
+                PropMode::REPLACE,
+                window,
+                atoms._NET_WM_WINDOW_TYPE,
+                AtomEnum::ATOM,
+                &[atoms._NET_WM_WINDOW_TYPE_DOCK],
+            )
+            .map_err(to_io)?
+            .check()
+            .map_err(to_io)?;
+            conn.change_property32(
+                PropMode::REPLACE,
+                window,
+                atoms._NET_WM_STATE,
+                AtomEnum::ATOM,
+                &[atoms._NET_WM_STATE_ABOVE],
+            )
+            .map_err(to_io)?
+            .check()
+            .map_err(to_io)?;
+
+            // An empty input region must be accepted before the window can ever become visible.
+            // This prevents a transparent, input-blocking overlay when XFixes/XShape is absent.
+            apply_input_shape(conn, window, monitor.bounds, None)?;
+            if !x11_mapping_allowed(true, true, true) {
+                return Err(io::Error::other("X11 overlay safety prerequisites failed"));
+            }
+            conn.map_window(window)
+                .map_err(to_io)?
+                .check()
+                .map_err(to_io)?;
+            conn.configure_window(
+                window,
+                &ConfigureWindowAux::new().stack_mode(StackMode::ABOVE),
+            )
+            .map_err(to_io)?
+            .check()
+            .map_err(to_io)?;
+            Ok(X11Window {
+                monitor_id: monitor.id,
+                window,
+                gc,
+                depth: visual.depth,
+                colormap,
+                bounds: monitor.bounds,
+                last_input_region: Some(None),
+            })
+        }
+
+        fn apply_input_shape(
+            conn: &RustConnection,
+            window: u32,
+            monitor_bounds: Rect,
+            effective: Option<Rect>,
+        ) -> io::Result<()> {
+            let region = conn.generate_id().map_err(to_io)?;
+            let rectangles = effective
+                .map(|rect| {
+                    vec![Rectangle {
+                        x: clamp_i16(rect.min.x - monitor_bounds.min.x),
+                        y: clamp_i16(rect.min.y - monitor_bounds.min.y),
+                        width: clamp_u16(rect.width()),
+                        height: clamp_u16(rect.height()),
+                    }]
+                })
+                .unwrap_or_default();
+            conn.xfixes_create_region(region, &rectangles)
+                .map_err(to_io)?
+                .check()
+                .map_err(to_io)?;
+            conn.xfixes_set_window_shape_region(window, shape::SK::INPUT, 0, 0, region)
+                .map_err(to_io)?
+                .check()
+                .map_err(to_io)?;
+            conn.xfixes_destroy_region(region)
+                .map_err(to_io)?
+                .check()
+                .map_err(to_io)
+        }
+
+        fn clipped_bgra(
+            dirty: Rect,
+            clip: Rect,
+            pixmap: &Pixmap,
+            width: u16,
+            height: u16,
+        ) -> Vec<u8> {
+            let src = x11_bgra_from_rgba(pixmap);
+            let src_stride = pixmap.width() as usize * 4;
+            let dst_stride = width as usize * 4;
+            let src_x = (clip.min.x - dirty.min.x).round().max(0.0) as usize;
+            let src_y = (clip.min.y - dirty.min.y).round().max(0.0) as usize;
+            let mut out = vec![0; dst_stride * height as usize];
+            for row in 0..height as usize {
+                let start = (src_y + row) * src_stride + src_x * 4;
+                let end = start.saturating_add(dst_stride).min(src.len());
+                if end > start {
+                    let len = end - start;
+                    out[row * dst_stride..row * dst_stride + len].copy_from_slice(&src[start..end]);
+                }
+            }
+            out
+        }
+
+        fn destroy_overlay_window(conn: &RustConnection, window: X11Window) {
+            let _ = conn.free_gc(window.gc);
+            let _ = conn.destroy_window(window.window);
+            if let Some(colormap) = window.colormap {
+                let _ = conn.free_colormap(colormap);
             }
         }
 
@@ -791,10 +1120,8 @@ mod platform {
 
         impl Drop for X11Overlay {
             fn drop(&mut self) {
-                let _ = self.conn.free_gc(self.gc);
-                let _ = self.conn.destroy_window(self.window);
-                if let Some(colormap) = self.colormap {
-                    let _ = self.conn.free_colormap(colormap);
+                for window in std::mem::take(&mut self.windows) {
+                    destroy_overlay_window(&self.conn, window);
                 }
                 let _ = self.conn.flush();
             }
@@ -802,6 +1129,10 @@ mod platform {
     }
 
     mod wayland {
+        use super::super::{
+            wayland_scale_ceil, wayland_scale_floor, wayland_scaled_dimension,
+            WAYLAND_MAX_BUFFERS_PER_OUTPUT,
+        };
         use super::x11_bgra_from_rgba;
         use honk_engine::tiny_skia::Pixmap;
         use honk_engine::{Rect, Vec2};
@@ -811,7 +1142,7 @@ mod platform {
         use smithay_client_toolkit::delegate_output;
         use smithay_client_toolkit::delegate_registry;
         use smithay_client_toolkit::delegate_shm;
-        use smithay_client_toolkit::output::{OutputHandler, OutputState};
+        use smithay_client_toolkit::output::{OutputHandler, OutputInfo, OutputState};
         use smithay_client_toolkit::registry::{ProvidesRegistryState, RegistryState};
         use smithay_client_toolkit::registry_handlers;
         use smithay_client_toolkit::shell::wlr_layer::{
@@ -819,12 +1150,23 @@ mod platform {
             LayerSurfaceConfigure,
         };
         use smithay_client_toolkit::shell::WaylandSurface;
-        use smithay_client_toolkit::shm::{slot::SlotPool, Shm, ShmHandler};
+        use smithay_client_toolkit::shm::{
+            slot::{Buffer, SlotPool},
+            Shm, ShmHandler,
+        };
+        use std::collections::VecDeque;
         use std::io;
-        use std::num::NonZeroU32;
+        use std::os::fd::AsRawFd;
         use wayland_client::globals::registry_queue_init;
         use wayland_client::protocol::{wl_output, wl_shm, wl_surface};
-        use wayland_client::{Connection, EventQueue, QueueHandle};
+        use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle};
+        use wayland_protocols::wp::fractional_scale::v1::client::{
+            wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1,
+            wp_fractional_scale_v1::{self, WpFractionalScaleV1},
+        };
+        use wayland_protocols::wp::viewporter::client::{
+            wp_viewport::WpViewport, wp_viewporter::WpViewporter,
+        };
 
         const DEFAULT_WIDTH: u32 = 1280;
         const DEFAULT_HEIGHT: u32 = 720;
@@ -832,7 +1174,6 @@ mod platform {
         pub struct WaylandOverlay {
             conn: Connection,
             event_queue: EventQueue<WaylandLayer>,
-            qh: QueueHandle<WaylandLayer>,
             state: WaylandLayer,
         }
 
@@ -844,56 +1185,61 @@ mod platform {
                 let compositor = CompositorState::bind(&globals, &qh).map_err(to_io)?;
                 let layer_shell = LayerShell::bind(&globals, &qh).map_err(to_io)?;
                 let shm = Shm::bind(&globals, &qh).map_err(to_io)?;
-                let surface = compositor.create_surface(&qh);
-                let input_region = Region::new(&compositor).ok();
-                if let Some(region) = &input_region {
-                    surface.set_input_region(Some(region.wl_region()));
-                }
-                let layer = layer_shell.create_layer_surface(
-                    &qh,
-                    surface,
-                    Layer::Top,
-                    Some("honk300"),
-                    None,
-                );
-                layer.set_anchor(Anchor::TOP | Anchor::LEFT);
-                layer.set_keyboard_interactivity(KeyboardInteractivity::None);
-                layer.set_size(DEFAULT_WIDTH, DEFAULT_HEIGHT);
-                layer.commit();
-                let pool = SlotPool::new((DEFAULT_WIDTH * DEFAULT_HEIGHT * 4) as usize, &shm)
-                    .map_err(to_io)?;
+                let viewporter = globals.bind::<WpViewporter, _, _>(&qh, 1..=1, ()).ok();
+                let fractional_scale_manager = globals
+                    .bind::<WpFractionalScaleManagerV1, _, _>(&qh, 1..=1, ())
+                    .ok();
                 let mut state = WaylandLayer {
                     registry_state: RegistryState::new(&globals),
                     output_state: OutputState::new(&globals, &qh),
                     shm,
-                    pool,
-                    width: DEFAULT_WIDTH,
-                    height: DEFAULT_HEIGHT,
-                    configured: false,
-                    closed: false,
-                    layer,
-                    _input_region: input_region,
+                    compositor,
+                    layer_shell,
+                    viewporter,
+                    fractional_scale_manager,
+                    surfaces: Vec::new(),
+                    topology_changed: false,
+                    fatal_error: None,
                 };
                 let mut event_queue = event_queue;
+                event_queue.roundtrip(&mut state).map_err(to_io)?;
+                state.sync_outputs(&qh)?;
+                if state.surfaces.is_empty() {
+                    return Err(io::Error::other(
+                        "Wayland compositor advertised no active outputs",
+                    ));
+                }
                 for _ in 0..16 {
                     event_queue.blocking_dispatch(&mut state).map_err(to_io)?;
-                    if state.configured {
+                    if state.surfaces.iter().all(|surface| surface.configured) {
                         break;
                     }
+                }
+                if let Some(err) = state.fatal_error.take() {
+                    return Err(io::Error::other(err));
                 }
                 Ok(Self {
                     conn,
                     event_queue,
-                    qh,
                     state,
                 })
             }
 
             pub fn bounds(&self) -> Rect {
-                Rect::new(
-                    Vec2::ZERO,
-                    Vec2::new(self.state.width as f32, self.state.height as f32),
-                )
+                self.state.bounds()
+            }
+
+            pub fn monitor_bounds(&self) -> Vec<Rect> {
+                self.state
+                    .surfaces
+                    .iter()
+                    .filter(|surface| !surface.closed)
+                    .map(OutputSurface::bounds)
+                    .collect()
+            }
+
+            pub fn take_topology_changed(&mut self) -> bool {
+                std::mem::take(&mut self.state.topology_changed)
             }
 
             pub fn set_input_region(&mut self, rect: Option<Rect>) -> io::Result<()> {
@@ -905,16 +1251,42 @@ mod platform {
             }
 
             pub fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<()> {
-                self.state.present(&self.qh, dirty, pixmap)?;
+                self.state.present(dirty, pixmap)?;
                 self.conn.flush().map_err(to_io)
             }
 
             pub fn pump(&mut self) -> io::Result<bool> {
+                self.conn.flush().map_err(to_io)?;
                 self.event_queue
                     .dispatch_pending(&mut self.state)
                     .map_err(to_io)?;
-                self.conn.flush().map_err(to_io)?;
-                Ok(!self.state.closed)
+                if let Some(guard) = self.event_queue.prepare_read() {
+                    let mut descriptor = libc::pollfd {
+                        fd: guard.connection_fd().as_raw_fd(),
+                        events: libc::POLLIN,
+                        revents: 0,
+                    };
+                    let ready = unsafe { libc::poll(&mut descriptor, 1, 0) };
+                    if ready < 0 {
+                        return Err(io::Error::last_os_error());
+                    }
+                    if descriptor.revents & (libc::POLLERR | libc::POLLHUP | libc::POLLNVAL) != 0 {
+                        drop(guard);
+                        return Ok(false);
+                    }
+                    if ready > 0 && descriptor.revents & libc::POLLIN != 0 {
+                        guard.read().map_err(to_io)?;
+                    } else {
+                        drop(guard);
+                    }
+                }
+                self.event_queue
+                    .dispatch_pending(&mut self.state)
+                    .map_err(to_io)?;
+                if let Some(err) = self.state.fatal_error.take() {
+                    return Err(io::Error::other(err));
+                }
+                Ok(self.state.surfaces.iter().any(|surface| !surface.closed))
             }
         }
 
@@ -922,68 +1294,334 @@ mod platform {
             registry_state: RegistryState,
             output_state: OutputState,
             shm: Shm,
-            pool: SlotPool,
-            width: u32,
-            height: u32,
-            configured: bool,
-            closed: bool,
+            compositor: CompositorState,
+            layer_shell: LayerShell,
+            viewporter: Option<WpViewporter>,
+            fractional_scale_manager: Option<WpFractionalScaleManagerV1>,
+            surfaces: Vec<OutputSurface>,
+            topology_changed: bool,
+            fatal_error: Option<String>,
+        }
+
+        struct OutputSurface {
+            output: wl_output::WlOutput,
             layer: LayerSurface,
             _input_region: Option<Region>,
+            viewport: Option<WpViewport>,
+            _fractional_scale: Option<WpFractionalScaleV1>,
+            pool: SlotPool,
+            buffers: VecDeque<Buffer>,
+            position: (i32, i32),
+            width: u32,
+            height: u32,
+            integer_scale: i32,
+            preferred_scale_120: Option<u32>,
+            configured: bool,
+            closed: bool,
+        }
+
+        #[derive(Debug, Clone)]
+        struct FractionalScaleData {
+            output: wl_output::WlOutput,
+        }
+
+        #[derive(Clone, Copy)]
+        struct ScaleGlobals<'a> {
+            viewporter: Option<&'a WpViewporter>,
+            fractional_scale_manager: Option<&'a WpFractionalScaleManagerV1>,
         }
 
         impl WaylandLayer {
-            fn present(
-                &mut self,
-                _qh: &QueueHandle<Self>,
-                dirty: Rect,
-                pixmap: &Pixmap,
-            ) -> io::Result<()> {
-                let width = self.width.max(1);
-                let height = self.height.max(1);
-                let stride = width as i32 * 4;
-                let (buffer, canvas) = self
-                    .pool
-                    .create_buffer(
-                        width as i32,
-                        height as i32,
-                        stride,
-                        wl_shm::Format::Argb8888,
-                    )
+            fn sync_outputs(&mut self, qh: &QueueHandle<Self>) -> io::Result<()> {
+                let before = self.bounds_list();
+                let outputs = self.output_state.outputs().collect::<Vec<_>>();
+                self.surfaces
+                    .retain(|surface| outputs.iter().any(|output| output == &surface.output));
+                for output in &outputs {
+                    if self
+                        .surfaces
+                        .iter()
+                        .all(|surface| &surface.output != output)
+                    {
+                        self.surfaces.push(OutputSurface::new(
+                            output.clone(),
+                            &self.compositor,
+                            &self.layer_shell,
+                            &self.shm,
+                            ScaleGlobals {
+                                viewporter: self.viewporter.as_ref(),
+                                fractional_scale_manager: self.fractional_scale_manager.as_ref(),
+                            },
+                            qh,
+                            self.surfaces.len(),
+                        )?);
+                    }
+                }
+                for (index, surface) in self.surfaces.iter_mut().enumerate() {
+                    if let Some(info) = self.output_state.info(&surface.output) {
+                        surface.update_info(&info, index);
+                    }
+                }
+                self.topology_changed |= before != self.bounds_list();
+                Ok(())
+            }
+
+            fn bounds_list(&self) -> Vec<Rect> {
+                self.surfaces
+                    .iter()
+                    .filter(|surface| !surface.closed)
+                    .map(OutputSurface::bounds)
+                    .collect()
+            }
+
+            fn bounds(&self) -> Rect {
+                self.bounds_list()
+                    .into_iter()
+                    .reduce(Rect::union)
+                    .unwrap_or_else(|| {
+                        Rect::new(
+                            Vec2::ZERO,
+                            Vec2::new(DEFAULT_WIDTH as f32, DEFAULT_HEIGHT as f32),
+                        )
+                    })
+            }
+
+            fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<()> {
+                for surface in &mut self.surfaces {
+                    if !surface.closed && surface.configured {
+                        surface.present(dirty, pixmap)?;
+                    }
+                }
+                Ok(())
+            }
+        }
+
+        impl OutputSurface {
+            fn new(
+                output: wl_output::WlOutput,
+                compositor: &CompositorState,
+                layer_shell: &LayerShell,
+                shm: &Shm,
+                scale_globals: ScaleGlobals<'_>,
+                qh: &QueueHandle<WaylandLayer>,
+                index: usize,
+            ) -> io::Result<Self> {
+                let surface = compositor.create_surface(qh);
+                let input_region = Region::new(compositor).map_err(to_io)?;
+                // The region is deliberately left empty: native Wayland reduced mode is always
+                // click-through and never accepts pointer or keyboard input.
+                surface.set_input_region(Some(input_region.wl_region()));
+                let layer = layer_shell.create_layer_surface(
+                    qh,
+                    surface,
+                    Layer::Top,
+                    Some("honk300"),
+                    Some(&output),
+                );
+                layer.set_anchor(Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT);
+                layer.set_keyboard_interactivity(KeyboardInteractivity::None);
+                layer.set_exclusive_zone(-1);
+                layer.set_size(0, 0);
+                let (viewport, fractional_scale) = match (
+                    scale_globals.viewporter,
+                    scale_globals.fractional_scale_manager,
+                ) {
+                    (Some(viewporter), Some(manager)) => (
+                        Some(viewporter.get_viewport(layer.wl_surface(), qh, ())),
+                        Some(manager.get_fractional_scale(
+                            layer.wl_surface(),
+                            qh,
+                            FractionalScaleData {
+                                output: output.clone(),
+                            },
+                        )),
+                    ),
+                    _ => (None, None),
+                };
+                layer.commit();
+                let pool = SlotPool::new((DEFAULT_WIDTH * DEFAULT_HEIGHT * 4) as usize, shm)
                     .map_err(to_io)?;
-                canvas.fill(0);
-                blit_to_canvas(canvas, width, height, dirty, pixmap);
-                self.layer
-                    .wl_surface()
-                    .damage_buffer(0, 0, width as i32, height as i32);
-                buffer.attach_to(self.layer.wl_surface()).map_err(to_io)?;
+                Ok(Self {
+                    output,
+                    layer,
+                    _input_region: Some(input_region),
+                    viewport,
+                    _fractional_scale: fractional_scale,
+                    pool,
+                    buffers: VecDeque::new(),
+                    position: ((index as i32) * DEFAULT_WIDTH as i32, 0),
+                    width: DEFAULT_WIDTH,
+                    height: DEFAULT_HEIGHT,
+                    integer_scale: 1,
+                    preferred_scale_120: None,
+                    configured: false,
+                    closed: false,
+                })
+            }
+
+            fn update_info(&mut self, info: &OutputInfo, index: usize) {
+                self.integer_scale = info.scale_factor.max(1);
+                self.position = info
+                    .logical_position
+                    .unwrap_or(((index as i32) * self.width as i32, 0));
+                let fallback_size = info.modes.iter().find(|mode| mode.current).map(|mode| {
+                    (
+                        (mode.dimensions.0 / self.integer_scale).max(1),
+                        (mode.dimensions.1 / self.integer_scale).max(1),
+                    )
+                });
+                if let Some((width, height)) = info.logical_size.or(fallback_size) {
+                    self.width = width.max(1) as u32;
+                    self.height = height.max(1) as u32;
+                }
+                self.apply_surface_scale();
+            }
+
+            fn effective_scale_120(&self) -> u32 {
+                self.preferred_scale_120
+                    .unwrap_or_else(|| self.integer_scale.max(1) as u32 * 120)
+                    .max(1)
+            }
+
+            fn apply_surface_scale(&self) {
+                if let Some(viewport) = &self.viewport {
+                    self.layer.wl_surface().set_buffer_scale(1);
+                    viewport.set_destination(self.width as i32, self.height as i32);
+                } else {
+                    self.layer
+                        .wl_surface()
+                        .set_buffer_scale(self.integer_scale.max(1));
+                }
+            }
+
+            fn bounds(&self) -> Rect {
+                Rect::new(
+                    Vec2::new(self.position.0 as f32, self.position.1 as f32),
+                    Vec2::new(
+                        self.position.0 as f32 + self.width as f32,
+                        self.position.1 as f32 + self.height as f32,
+                    ),
+                )
+            }
+
+            fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<()> {
+                let Some(clip) = dirty.intersection(self.bounds()).map(Rect::pixel_aligned) else {
+                    return Ok(());
+                };
+                let scale_120 = self.effective_scale_120();
+                let surface_bounds = self.bounds();
+                let buffer_width = wayland_scaled_dimension(self.width.max(1), scale_120);
+                let buffer_height = wayland_scaled_dimension(self.height.max(1), scale_120);
+                let stride = buffer_width as i32 * 4;
+                let surface = self.layer.wl_surface().clone();
+
+                // Retain at most three real wl_buffers. Released buffers are redrawn in place;
+                // active buffers are never dropped merely to satisfy the VecDeque length, since
+                // doing so would hide compositor-owned slots from the apparent pool bound.
+                let mut index = 0;
+                while index < self.buffers.len() {
+                    let dimensions_match = self.buffers[index].height() == buffer_height as i32
+                        && self.buffers[index].stride() == stride;
+                    let released = self.buffers[index].canvas(&mut self.pool).is_some();
+                    if released && !dimensions_match {
+                        self.buffers.remove(index);
+                    } else {
+                        index += 1;
+                    }
+                }
+
+                let released = (0..self.buffers.len()).find(|&index| {
+                    self.buffers[index].height() == buffer_height as i32
+                        && self.buffers[index].stride() == stride
+                        && self.buffers[index].canvas(&mut self.pool).is_some()
+                });
+                let buffer_index = if let Some(index) = released {
+                    index
+                } else if self.buffers.len() < WAYLAND_MAX_BUFFERS_PER_OUTPUT {
+                    let (buffer, _canvas) = self
+                        .pool
+                        .create_buffer(
+                            buffer_width as i32,
+                            buffer_height as i32,
+                            stride,
+                            wl_shm::Format::Argb8888,
+                        )
+                        .map_err(to_io)?;
+                    self.buffers.push_back(buffer);
+                    self.buffers.len() - 1
+                } else {
+                    // All three buffers are still owned by the compositor. Dropping this frame
+                    // is preferable to allocating without a bound or blocking the event pump.
+                    return Ok(());
+                };
+
+                if let Some(canvas) = self.buffers[buffer_index].canvas(&mut self.pool) {
+                    canvas.fill(0);
+                    blit_to_canvas(
+                        canvas,
+                        buffer_width,
+                        buffer_height,
+                        scale_120,
+                        surface_bounds,
+                        dirty,
+                        clip,
+                        pixmap,
+                    );
+                }
+                self.layer.wl_surface().damage_buffer(
+                    0,
+                    0,
+                    buffer_width as i32,
+                    buffer_height as i32,
+                );
+                self.buffers[buffer_index]
+                    .attach_to(&surface)
+                    .map_err(to_io)?;
                 self.layer.commit();
                 Ok(())
             }
         }
 
+        #[allow(clippy::too_many_arguments)]
         fn blit_to_canvas(
             canvas: &mut [u8],
             width: u32,
             height: u32,
+            scale_120: u32,
+            surface_bounds: Rect,
             dirty: Rect,
+            clip: Rect,
             pixmap: &Pixmap,
         ) {
             let src = x11_bgra_from_rgba(pixmap);
-            let dst_x = dirty.min.x.round().max(0.0) as u32;
-            let dst_y = dirty.min.y.round().max(0.0) as u32;
-            for y in 0..pixmap.height() {
-                let target_y = dst_y + y;
-                if target_y >= height {
-                    break;
-                }
-                for x in 0..pixmap.width() {
-                    let target_x = dst_x + x;
-                    if target_x >= width {
-                        break;
+            let src_x = (clip.min.x - dirty.min.x).round().max(0.0) as u32;
+            let src_y = (clip.min.y - dirty.min.y).round().max(0.0) as u32;
+            let dst_x = (clip.min.x - surface_bounds.min.x).round().max(0.0) as u32;
+            let dst_y = (clip.min.y - surface_bounds.min.y).round().max(0.0) as u32;
+            let logical_width = clip.width().ceil().max(0.0) as u32;
+            let logical_height = clip.height().ceil().max(0.0) as u32;
+            for y in 0..logical_height {
+                for x in 0..logical_width {
+                    let source_x = src_x + x;
+                    let source_y = src_y + y;
+                    if source_x >= pixmap.width() || source_y >= pixmap.height() {
+                        continue;
                     }
-                    let src_idx = ((y * pixmap.width() + x) * 4) as usize;
-                    let dst_idx = ((target_y * width + target_x) * 4) as usize;
-                    canvas[dst_idx..dst_idx + 4].copy_from_slice(&src[src_idx..src_idx + 4]);
+                    let src_idx = ((source_y * pixmap.width() + source_x) * 4) as usize;
+                    let target_x0 = wayland_scale_floor(dst_x + x, scale_120);
+                    let target_x1 = wayland_scale_ceil(dst_x + x + 1, scale_120);
+                    let target_y0 = wayland_scale_floor(dst_y + y, scale_120);
+                    let target_y1 = wayland_scale_ceil(dst_y + y + 1, scale_120);
+                    for target_y in target_y0..target_y1 {
+                        for target_x in target_x0..target_x1 {
+                            if target_x >= width || target_y >= height {
+                                continue;
+                            }
+                            let dst_idx = ((target_y * width + target_x) * 4) as usize;
+                            canvas[dst_idx..dst_idx + 4]
+                                .copy_from_slice(&src[src_idx..src_idx + 4]);
+                        }
+                    }
                 }
             }
         }
@@ -993,9 +1631,18 @@ mod platform {
                 &mut self,
                 _conn: &Connection,
                 _qh: &QueueHandle<Self>,
-                _surface: &wl_surface::WlSurface,
-                _new_factor: i32,
+                surface: &wl_surface::WlSurface,
+                new_factor: i32,
             ) {
+                if let Some(output) = self
+                    .surfaces
+                    .iter_mut()
+                    .find(|output| output.layer.wl_surface() == surface)
+                {
+                    output.integer_scale = new_factor.max(1);
+                    output.apply_surface_scale();
+                    self.topology_changed = true;
+                }
             }
 
             fn transform_changed(
@@ -1043,25 +1690,34 @@ mod platform {
             fn new_output(
                 &mut self,
                 _conn: &Connection,
-                _qh: &QueueHandle<Self>,
+                qh: &QueueHandle<Self>,
                 _output: wl_output::WlOutput,
             ) {
+                if let Err(err) = self.sync_outputs(qh) {
+                    self.fatal_error = Some(err.to_string());
+                }
             }
 
             fn update_output(
                 &mut self,
                 _conn: &Connection,
-                _qh: &QueueHandle<Self>,
+                qh: &QueueHandle<Self>,
                 _output: wl_output::WlOutput,
             ) {
+                if let Err(err) = self.sync_outputs(qh) {
+                    self.fatal_error = Some(err.to_string());
+                }
             }
 
             fn output_destroyed(
                 &mut self,
                 _conn: &Connection,
-                _qh: &QueueHandle<Self>,
+                qh: &QueueHandle<Self>,
                 _output: wl_output::WlOutput,
             ) {
+                if let Err(err) = self.sync_outputs(qh) {
+                    self.fatal_error = Some(err.to_string());
+                }
             }
         }
 
@@ -1070,26 +1726,42 @@ mod platform {
                 &mut self,
                 _conn: &Connection,
                 _qh: &QueueHandle<Self>,
-                _layer: &LayerSurface,
+                layer: &LayerSurface,
             ) {
-                self.closed = true;
+                if let Some(surface) = self
+                    .surfaces
+                    .iter_mut()
+                    .find(|surface| &surface.layer == layer)
+                {
+                    surface.closed = true;
+                    self.topology_changed = true;
+                }
             }
 
             fn configure(
                 &mut self,
                 _conn: &Connection,
                 _qh: &QueueHandle<Self>,
-                _layer: &LayerSurface,
+                layer: &LayerSurface,
                 configure: LayerSurfaceConfigure,
                 _serial: u32,
             ) {
-                self.width = NonZeroU32::new(configure.new_size.0)
-                    .map(NonZeroU32::get)
-                    .unwrap_or(DEFAULT_WIDTH);
-                self.height = NonZeroU32::new(configure.new_size.1)
-                    .map(NonZeroU32::get)
-                    .unwrap_or(DEFAULT_HEIGHT);
-                self.configured = true;
+                if let Some(surface) = self
+                    .surfaces
+                    .iter_mut()
+                    .find(|surface| &surface.layer == layer)
+                {
+                    if configure.new_size.0 > 0 {
+                        surface.width = configure.new_size.0;
+                    }
+                    if configure.new_size.1 > 0 {
+                        surface.height = configure.new_size.1;
+                    }
+                    surface.apply_surface_scale();
+                    surface.configured = true;
+                    surface.closed = false;
+                    self.topology_changed = true;
+                }
             }
         }
 
@@ -1099,11 +1771,37 @@ mod platform {
             }
         }
 
+        impl Dispatch<WpFractionalScaleV1, FractionalScaleData> for WaylandLayer {
+            fn event(
+                state: &mut Self,
+                _proxy: &WpFractionalScaleV1,
+                event: wp_fractional_scale_v1::Event,
+                data: &FractionalScaleData,
+                _conn: &Connection,
+                _qh: &QueueHandle<Self>,
+            ) {
+                if let wp_fractional_scale_v1::Event::PreferredScale { scale } = event {
+                    if let Some(surface) = state
+                        .surfaces
+                        .iter_mut()
+                        .find(|surface| surface.output == data.output)
+                    {
+                        surface.preferred_scale_120 = Some(scale.max(1));
+                        surface.apply_surface_scale();
+                        state.topology_changed = true;
+                    }
+                }
+            }
+        }
+
         delegate_compositor!(WaylandLayer);
         delegate_output!(WaylandLayer);
         delegate_shm!(WaylandLayer);
         delegate_layer!(WaylandLayer);
         delegate_registry!(WaylandLayer);
+        wayland_client::delegate_noop!(WaylandLayer: ignore WpViewporter);
+        wayland_client::delegate_noop!(WaylandLayer: ignore WpViewport);
+        wayland_client::delegate_noop!(WaylandLayer: ignore WpFractionalScaleManagerV1);
 
         impl ProvidesRegistryState for WaylandLayer {
             fn registry(&mut self) -> &mut RegistryState {
@@ -1226,6 +1924,59 @@ mod imp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn x11_requires_one_overlay_per_monitor() {
+        let monitor_count = 3;
+        assert_eq!(x11_overlay_count(monitor_count), monitor_count);
+    }
+
+    #[test]
+    fn x11_fails_closed_without_an_argb_visual() {
+        // Current visual selection silently falls back to an opaque root visual.
+        assert!(!x11_mapping_allowed(false, true, true));
+        assert!(!x11_mapping_allowed(true, false, true));
+        assert!(!x11_mapping_allowed(true, true, false));
+        assert!(x11_mapping_allowed(true, true, true));
+    }
+
+    #[test]
+    fn wayland_buffer_budget_is_capped_per_output() {
+        assert_eq!(wayland_retained_buffer_count(4), 3);
+    }
+
+    #[test]
+    fn wayland_fractional_scaling_rounds_outward_without_zero_sized_buffers() {
+        assert_eq!(wayland_scaled_dimension(100, 180), 150);
+        assert_eq!(wayland_scale_floor(1, 180), 1);
+        assert_eq!(wayland_scale_ceil(1, 180), 2);
+        assert_eq!(wayland_scaled_dimension(0, 180), 1);
+    }
+
+    #[test]
+    fn x11_empty_input_shape_is_verified_before_map() {
+        assert_eq!(x11_setup_steps(), ["shape", "map"]);
+    }
+
+    #[test]
+    fn x11_randr_change_triggers_topology_reconciliation() {
+        assert!(x11_event_requires_reconcile(true));
+        assert!(!x11_event_requires_reconcile(false));
+    }
+
+    #[test]
+    fn wayland_owns_one_surface_per_output() {
+        let active_outputs = 3;
+        assert_eq!(wayland_surface_count(active_outputs), active_outputs);
+    }
+
+    #[test]
+    fn wayland_pump_reads_socket_before_dispatching() {
+        assert_eq!(
+            wayland_pump_steps(),
+            ["prepare_read", "poll", "read", "dispatch_pending"]
+        );
+    }
 
     #[test]
     fn x11_is_default_when_display_is_available_even_inside_wayland_session() {

@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
 use toml_edit::{value, DocumentMut, Item, Table};
 
-pub const CONFIG_VERSION: u32 = 1;
+pub const CONFIG_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -100,7 +100,6 @@ fn hex_string(rgb: (u8, u8, u8)) -> String {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct BehaviorConfig {
-    pub silence_sounds: bool,
     pub can_attack_mouse: bool,
     pub attack_randomly: bool,
     pub use_custom_colors: bool,
@@ -112,7 +111,6 @@ pub struct BehaviorConfig {
 impl Default for BehaviorConfig {
     fn default() -> Self {
         Self {
-            silence_sounds: false,
             can_attack_mouse: true,
             attack_randomly: false,
             use_custom_colors: false,
@@ -160,7 +158,6 @@ pub struct SpeedConfig {
     pub acceleration_charged: f32,
     pub step_time_normal: f32,
     pub step_time_charged: f32,
-    pub stop_radius: f32,
 }
 
 impl Default for SpeedConfig {
@@ -173,7 +170,6 @@ impl Default for SpeedConfig {
             acceleration_charged: 2300.0,
             step_time_normal: 0.2,
             step_time_charged: 0.1,
-            stop_radius: -10.0,
         }
     }
 }
@@ -412,6 +408,15 @@ pub struct LoadedConfig {
     pub path: PathBuf,
     pub config: Config,
     pub warning: Option<String>,
+    pub migrated_from: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub enum ConfigLoadState {
+    Missing { path: PathBuf },
+    Loaded(Box<LoadedConfig>),
+    Malformed { path: PathBuf, error: String },
+    UnsupportedVersion { path: PathBuf, found: u32 },
 }
 
 #[derive(Debug)]
@@ -419,8 +424,10 @@ pub enum ConfigError {
     NoDefaultPath,
     Io(io::Error),
     Parse(toml::de::Error),
+    MalformedDocument(String),
     WrongVersion(u32),
     Validation(Vec<String>),
+    InvalidTarget(String),
 }
 
 impl fmt::Display for ConfigError {
@@ -429,10 +436,12 @@ impl fmt::Display for ConfigError {
             Self::NoDefaultPath => f.write_str("could not determine a honk300 config path"),
             Self::Io(err) => write!(f, "config I/O error: {err}"),
             Self::Parse(err) => write!(f, "malformed config.toml: {err}"),
+            Self::MalformedDocument(err) => write!(f, "malformed config.toml: {err}"),
             Self::WrongVersion(version) => {
                 write!(f, "unsupported goose_config_version {version}")
             }
             Self::Validation(errors) => write!(f, "invalid config: {}", errors.join("; ")),
+            Self::InvalidTarget(message) => write!(f, "invalid config target: {message}"),
         }
     }
 }
@@ -452,25 +461,95 @@ impl From<toml::de::Error> for ConfigError {
 }
 
 impl Config {
-    pub fn load_or_default(path: Option<PathBuf>) -> Result<LoadedConfig, ConfigError> {
+    pub fn load(path: Option<PathBuf>) -> Result<ConfigLoadState, ConfigError> {
         let path = resolve_path(path)?;
-        match Self::load_existing_with_warning(&path) {
-            Ok(mut loaded) => {
-                loaded.path = path;
-                Ok(loaded)
+        let path_is_symlink = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata.file_type().is_symlink(),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                return Ok(ConfigLoadState::Missing { path });
             }
-            Err(ConfigError::Io(err)) if err.kind() == io::ErrorKind::NotFound => {
-                Ok(LoadedConfig {
+            Err(err) => return Err(ConfigError::Io(err)),
+        };
+        let text = match fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(err) if err.kind() == io::ErrorKind::NotFound && path_is_symlink => {
+                return Ok(ConfigLoadState::Malformed {
                     path,
-                    config: Self::default(),
-                    warning: None,
-                })
+                    error: "config path is a dangling symlink".into(),
+                });
             }
-            Err(err) => Ok(LoadedConfig {
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                return Ok(ConfigLoadState::Missing { path });
+            }
+            Err(err) => return Err(ConfigError::Io(err)),
+        };
+        let mut doc = match text.parse::<DocumentMut>() {
+            Ok(doc) => doc,
+            Err(err) => {
+                return Ok(ConfigLoadState::Malformed {
+                    path,
+                    error: err.to_string(),
+                });
+            }
+        };
+
+        let found_version = match document_version(&doc) {
+            Ok(version) => version.unwrap_or(CONFIG_VERSION),
+            Err(error) => return Ok(ConfigLoadState::Malformed { path, error }),
+        };
+        if found_version != 1 && found_version != CONFIG_VERSION {
+            return Ok(ConfigLoadState::UnsupportedVersion {
+                path,
+                found: found_version,
+            });
+        }
+
+        let migrated_from = if found_version == 1 {
+            if let Err(error) = migrate_v1_document(&mut doc) {
+                return Ok(ConfigLoadState::Malformed { path, error });
+            }
+            Some(1)
+        } else {
+            None
+        };
+        let normalized = doc.to_string();
+        let warning = unknown_key_warning(&normalized);
+        let config: Self = match toml::from_str(&normalized) {
+            Ok(config) => config,
+            Err(err) => {
+                return Ok(ConfigLoadState::Malformed {
+                    path,
+                    error: err.to_string(),
+                });
+            }
+        };
+        if let Err(err) = config.validate() {
+            return Ok(ConfigLoadState::Malformed {
+                path,
+                error: err.to_string(),
+            });
+        }
+        Ok(ConfigLoadState::Loaded(Box::new(LoadedConfig {
+            path,
+            config,
+            warning,
+            migrated_from,
+        })))
+    }
+
+    pub fn load_or_default(path: Option<PathBuf>) -> Result<LoadedConfig, ConfigError> {
+        match Self::load(path)? {
+            ConfigLoadState::Missing { path } => Ok(LoadedConfig {
                 path,
                 config: Self::default(),
-                warning: Some(err.to_string()),
+                warning: None,
+                migrated_from: None,
             }),
+            ConfigLoadState::Loaded(loaded) => Ok(*loaded),
+            ConfigLoadState::Malformed { error, .. } => Err(ConfigError::MalformedDocument(error)),
+            ConfigLoadState::UnsupportedVersion { found, .. } => {
+                Err(ConfigError::WrongVersion(found))
+            }
         }
     }
 
@@ -479,15 +558,17 @@ impl Config {
     }
 
     pub fn load_existing_with_warning(path: &Path) -> Result<LoadedConfig, ConfigError> {
-        let text = fs::read_to_string(path)?;
-        let warning = unknown_key_warning(&text);
-        let config: Self = toml::from_str(&text)?;
-        config.validate()?;
-        Ok(LoadedConfig {
-            path: path.to_path_buf(),
-            config,
-            warning,
-        })
+        match Self::load(Some(path.to_path_buf()))? {
+            ConfigLoadState::Loaded(loaded) => Ok(*loaded),
+            ConfigLoadState::Missing { .. } => Err(ConfigError::Io(io::Error::new(
+                io::ErrorKind::NotFound,
+                "config file does not exist",
+            ))),
+            ConfigLoadState::Malformed { error, .. } => Err(ConfigError::MalformedDocument(error)),
+            ConfigLoadState::UnsupportedVersion { found, .. } => {
+                Err(ConfigError::WrongVersion(found))
+            }
+        }
     }
 
     pub fn validate(&self) -> Result<(), ConfigError> {
@@ -541,7 +622,6 @@ impl Config {
             self.speeds.step_time_charged,
             &mut errors,
         );
-        finite("speeds.stop_radius", self.speeds.stop_radius, &mut errors);
         positive(
             "mud.duration_to_track_seconds",
             self.mud.duration_to_track_seconds,
@@ -601,26 +681,42 @@ impl Config {
 
     pub fn save_atomic(&self, path: &Path) -> Result<(), ConfigError> {
         self.validate()?;
-        if let Some(parent) = path.parent() {
+        let target = save_target(path)?;
+        if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
         }
-        let mut doc = match fs::read_to_string(path) {
-            Ok(text) => text.parse::<DocumentMut>().unwrap_or_default(),
+        let mut doc = match fs::read_to_string(&target) {
+            Ok(text) => text
+                .parse::<DocumentMut>()
+                .map_err(|err| ConfigError::MalformedDocument(err.to_string()))?,
             Err(err) if err.kind() == io::ErrorKind::NotFound => DocumentMut::new(),
             Err(err) => return Err(ConfigError::Io(err)),
         };
+        if let Some(found) = document_version(&doc).map_err(ConfigError::MalformedDocument)? {
+            if found != 1 && found != CONFIG_VERSION {
+                return Err(ConfigError::WrongVersion(found));
+            }
+            if found == 1 {
+                migrate_v1_document(&mut doc).map_err(ConfigError::MalformedDocument)?;
+            }
+        }
         self.write_to_document(&mut doc);
-        let parent = path.parent().unwrap_or_else(|| Path::new("."));
-        let mut tmp = NamedTempFile::new_in(parent)?;
-        tmp.write_all(doc.to_string().as_bytes())?;
-        tmp.flush()?;
-        tmp.persist(path)
-            .map_err(|err| ConfigError::Io(err.error))?;
-        Ok(())
+        persist_document(&target, &doc)
+    }
+
+    pub fn restart_required_changes(&self, next: &Self) -> Vec<&'static str> {
+        let mut changes = Vec::new();
+        if self.behaviors.multi_monitor_chase != next.behaviors.multi_monitor_chase {
+            changes.push("behaviors.multi_monitor_chase");
+        }
+        if self.platform.wayland != next.platform.wayland {
+            changes.push("platform.wayland");
+        }
+        changes
     }
 
     pub fn effective_options(&self, backend: BackendState, cli: CliOverrides) -> EffectiveOptions {
-        let no_sound = cli.no_sound || self.behavior.silence_sounds || !self.audio.enabled;
+        let no_sound = cli.no_sound || !self.audio.enabled;
         let no_mouse_steal = cli.no_mouse_steal || self.safety.no_mouse_steal;
         let no_window_ride = cli.no_window_ride || self.safety.no_window_ride;
         let default_schedule = ScheduleOptions::default();
@@ -683,7 +779,7 @@ impl Config {
                 charge_speed: self.speeds.charge_speed,
                 acceleration_normal: self.speeds.acceleration_normal,
                 acceleration_charged: self.speeds.acceleration_charged,
-                stop_radius: self.speeds.stop_radius,
+                stop_radius: ParametersTable::default().stop_radius,
                 step_time_normal: self.speeds.step_time_normal,
                 step_time_charged: self.speeds.step_time_charged,
                 duration_to_track_mud: self.mud.duration_to_track_seconds,
@@ -746,7 +842,7 @@ impl Config {
     fn write_to_document(&self, doc: &mut DocumentMut) {
         doc["goose_config_version"] = value(self.goose_config_version as i64);
         let behavior = table_mut(doc, "behavior");
-        set_bool(behavior, "silence_sounds", self.behavior.silence_sounds);
+        behavior.remove("silence_sounds");
         set_bool(behavior, "can_attack_mouse", self.behavior.can_attack_mouse);
         set_bool(behavior, "attack_randomly", self.behavior.attack_randomly);
         set_bool(
@@ -800,7 +896,7 @@ impl Config {
         );
         set_float(speeds, "step_time_normal", self.speeds.step_time_normal);
         set_float(speeds, "step_time_charged", self.speeds.step_time_charged);
-        set_float(speeds, "stop_radius", self.speeds.stop_radius);
+        speeds.remove("stop_radius");
 
         let mud = table_mut(doc, "mud");
         set_float(
@@ -917,15 +1013,150 @@ pub fn resolve_path(path: Option<PathBuf>) -> Result<PathBuf, ConfigError> {
     }
 }
 
-fn positive(name: &str, value: f32, errors: &mut Vec<String>) {
-    if !value.is_finite() || value <= 0.0 {
-        errors.push(format!("{name} must be a positive finite number"));
+/// Explicitly replace a config with schema-current defaults. Existing bytes are copied to a
+/// timestamped sibling first, including malformed and future-version configs.
+pub fn reset_to_defaults(path: &Path) -> Result<Option<PathBuf>, ConfigError> {
+    let existed = match fs::symlink_metadata(path) {
+        Ok(_) => true,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => false,
+        Err(err) => return Err(ConfigError::Io(err)),
+    };
+    let target = save_target(path)?;
+    let backup = if existed {
+        let backup = next_backup_path(path)?;
+        fs::copy(path, &backup)?;
+        Some(backup)
+    } else {
+        None
+    };
+
+    let config = Config::default();
+    config.validate()?;
+    let mut doc = DocumentMut::new();
+    config.write_to_document(&mut doc);
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    persist_document(&target, &doc)?;
+    Ok(backup)
+}
+
+fn next_backup_path(path: &Path) -> Result<PathBuf, ConfigError> {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|err| ConfigError::InvalidTarget(format!("system clock is before epoch: {err}")))?
+        .as_millis();
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("config.toml");
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    for suffix in 0u16..=u16::MAX {
+        let suffix = if suffix == 0 {
+            String::new()
+        } else {
+            format!("-{suffix}")
+        };
+        let candidate = parent.join(format!("{file_name}.backup-{timestamp}{suffix}"));
+        match fs::symlink_metadata(&candidate) {
+            Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(candidate),
+            Ok(_) => {}
+            Err(err) => return Err(ConfigError::Io(err)),
+        }
+    }
+    Err(ConfigError::InvalidTarget(
+        "could not choose an unused config backup name".into(),
+    ))
+}
+
+fn persist_document(target: &Path, doc: &DocumentMut) -> Result<(), ConfigError> {
+    let parent = target.parent().unwrap_or_else(|| Path::new("."));
+    let mut tmp = NamedTempFile::new_in(parent)?;
+    tmp.write_all(doc.to_string().as_bytes())?;
+    tmp.flush()?;
+    tmp.as_file().sync_all()?;
+    tmp.persist(target)
+        .map_err(|err| ConfigError::Io(err.error))?;
+    Ok(())
+}
+
+fn document_version(doc: &DocumentMut) -> Result<Option<u32>, String> {
+    let Some(item) = doc.as_table().get("goose_config_version") else {
+        return Ok(None);
+    };
+    let Some(version) = item.as_integer() else {
+        return Err("goose_config_version must be a non-negative integer".into());
+    };
+    u32::try_from(version)
+        .map(Some)
+        .map_err(|_| "goose_config_version is outside the supported integer range".into())
+}
+
+fn migrate_v1_document(doc: &mut DocumentMut) -> Result<(), String> {
+    let silence_sounds = doc
+        .get("behavior")
+        .and_then(Item::as_table)
+        .and_then(|table| table.get("silence_sounds"))
+        .map(|item| {
+            item.as_bool()
+                .ok_or_else(|| "behavior.silence_sounds must be a boolean".to_string())
+        })
+        .transpose()?
+        .unwrap_or(false);
+    let audio_enabled = doc
+        .get("audio")
+        .and_then(Item::as_table)
+        .and_then(|table| table.get("enabled"))
+        .map(|item| {
+            item.as_bool()
+                .ok_or_else(|| "audio.enabled must be a boolean".to_string())
+        })
+        .transpose()?
+        .unwrap_or(true);
+
+    doc["goose_config_version"] = value(CONFIG_VERSION as i64);
+    table_mut(doc, "behavior").remove("silence_sounds");
+    table_mut(doc, "speeds").remove("stop_radius");
+    table_mut(doc, "audio")["enabled"] = value(audio_enabled && !silence_sounds);
+    Ok(())
+}
+
+fn save_target(path: &Path) -> Result<PathBuf, ConfigError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            let linked = fs::read_link(path)?;
+            let target = if linked.is_absolute() {
+                linked
+            } else {
+                path.parent().unwrap_or_else(|| Path::new(".")).join(linked)
+            };
+            let metadata = fs::symlink_metadata(&target).map_err(|err| {
+                ConfigError::InvalidTarget(format!(
+                    "{} points to an unavailable target ({err})",
+                    path.display()
+                ))
+            })?;
+            if !metadata.file_type().is_file() {
+                return Err(ConfigError::InvalidTarget(format!(
+                    "{} must point directly to a regular file",
+                    path.display()
+                )));
+            }
+            Ok(target)
+        }
+        Ok(metadata) if metadata.file_type().is_file() => Ok(path.to_path_buf()),
+        Ok(_) => Err(ConfigError::InvalidTarget(format!(
+            "{} is not a regular file",
+            path.display()
+        ))),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(path.to_path_buf()),
+        Err(err) => Err(ConfigError::Io(err)),
     }
 }
 
-fn finite(name: &str, value: f32, errors: &mut Vec<String>) {
-    if !value.is_finite() {
-        errors.push(format!("{name} must be finite"));
+fn positive(name: &str, value: f32, errors: &mut Vec<String>) {
+    if !value.is_finite() || value <= 0.0 {
+        errors.push(format!("{name} must be a positive finite number"));
     }
 }
 
@@ -1030,7 +1261,6 @@ fn unknown_key_warning(text: &str) -> Option<String> {
 fn known_section_keys(section: &str) -> &'static [&'static str] {
     match section {
         "behavior" => &[
-            "silence_sounds",
             "can_attack_mouse",
             "attack_randomly",
             "use_custom_colors",
@@ -1054,7 +1284,6 @@ fn known_section_keys(section: &str) -> &'static [&'static str] {
             "acceleration_charged",
             "step_time_normal",
             "step_time_charged",
-            "stop_radius",
         ],
         "mud" => &[
             "duration_to_track_seconds",
@@ -1099,7 +1328,13 @@ fn set_bool(table: &mut Table, key: &str, v: bool) {
 }
 
 fn set_float(table: &mut Table, key: &str, v: f32) {
-    table[key] = value(v as f64);
+    // Parsing the shortest round-trippable f32 string back to f64 avoids exposing the
+    // binary-tail digits produced by a direct `f32 as f64` conversion.
+    let stable = v
+        .to_string()
+        .parse::<f64>()
+        .expect("a finite f32 always has a finite decimal representation");
+    table[key] = value(stable);
 }
 
 fn set_str(table: &mut Table, key: &str, v: &str) {
@@ -1177,8 +1412,10 @@ mod tests {
 
     #[test]
     fn validation_catches_bad_ranges() {
-        let c: Config =
-            toml::from_str("goose_config_version = 1\n[mouse]\ngrab_distance = -1.0\n").unwrap();
+        let c: Config = toml::from_str(&format!(
+            "goose_config_version = {CONFIG_VERSION}\n[mouse]\ngrab_distance = -1.0\n"
+        ))
+        .unwrap();
         assert!(matches!(c.validate(), Err(ConfigError::Validation(_))));
     }
 
@@ -1288,5 +1525,217 @@ mod tests {
         assert!(text.contains("custom = 7"));
         assert!(text.contains("unknown = true"));
         assert!(text.contains("enabled = false"));
+    }
+
+    #[test]
+    fn typed_load_states_distinguish_missing_malformed_and_newer_configs() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("missing.toml");
+        assert!(matches!(
+            Config::load(Some(missing.clone())).unwrap(),
+            ConfigLoadState::Missing { path } if path == missing
+        ));
+
+        let malformed = dir.path().join("malformed.toml");
+        fs::write(&malformed, "[audio\nenabled = true\n").unwrap();
+        assert!(matches!(
+            Config::load(Some(malformed.clone())).unwrap(),
+            ConfigLoadState::Malformed { path, .. } if path == malformed
+        ));
+
+        let newer = dir.path().join("newer.toml");
+        fs::write(&newer, "goose_config_version = 99\n").unwrap();
+        assert!(matches!(
+            Config::load(Some(newer.clone())).unwrap(),
+            ConfigLoadState::UnsupportedVersion {
+                path,
+                found: 99,
+            } if path == newer
+        ));
+    }
+
+    #[test]
+    fn v1_migration_combines_legacy_mute_controls_and_removes_retired_keys() {
+        for (silence_sounds, audio_enabled) in [(true, true), (false, false)] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("config.toml");
+            fs::write(
+                &path,
+                format!(
+                    "goose_config_version = 1\nfuture_root = 'keep'\n\
+                     [behavior]\nsilence_sounds = {silence_sounds}\n\
+                     [audio]\nenabled = {audio_enabled}\nfuture_audio = true\n\
+                     [speeds]\nstop_radius = 42.0\n"
+                ),
+            )
+            .unwrap();
+
+            let ConfigLoadState::Loaded(loaded) = Config::load(Some(path.clone())).unwrap() else {
+                panic!("v1 config should migrate in memory");
+            };
+            assert_eq!(loaded.config.goose_config_version, CONFIG_VERSION);
+            assert!(!loaded.config.audio.enabled);
+            assert_eq!(loaded.migrated_from, Some(1));
+
+            loaded.config.save_atomic(&path).unwrap();
+            let saved = fs::read_to_string(&path).unwrap();
+            assert!(!saved.contains("silence_sounds"));
+            assert!(!saved.contains("stop_radius"));
+            assert!(saved.contains("future_root = 'keep'"));
+            assert!(saved.contains("future_audio = true"));
+        }
+    }
+
+    #[test]
+    fn save_refuses_to_replace_malformed_or_newer_existing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        for (name, original) in [
+            ("malformed.toml", "[audio\nenabled = true\n"),
+            ("newer.toml", "goose_config_version = 99\nfuture = true\n"),
+        ] {
+            let path = dir.path().join(name);
+            fs::write(&path, original).unwrap();
+            assert!(Config::default().save_atomic(&path).is_err());
+            assert_eq!(fs::read_to_string(&path).unwrap(), original);
+        }
+    }
+
+    #[test]
+    fn explicit_reset_backs_up_existing_bytes_before_writing_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let original = "[broken\nvalue = true\n";
+        fs::write(&path, original).unwrap();
+
+        let backup = reset_to_defaults(&path)
+            .unwrap()
+            .expect("an existing config must be backed up");
+        assert_ne!(backup, path);
+        assert!(backup.parent() == path.parent());
+        assert_eq!(fs::read_to_string(backup).unwrap(), original);
+        assert_eq!(Config::load_existing(&path).unwrap(), Config::default());
+    }
+
+    #[test]
+    fn explicit_reset_of_missing_path_materializes_valid_defaults_without_backup() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nested").join("config.toml");
+        assert_eq!(reset_to_defaults(&path).unwrap(), None);
+        assert_eq!(Config::load_existing(&path).unwrap(), Config::default());
+    }
+
+    #[test]
+    fn save_uses_stable_human_readable_float_values() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let mut config = Config::default();
+        config.speeds.step_time_normal = 0.2;
+        config.save_atomic(&path).unwrap();
+        let saved = fs::read_to_string(path).unwrap();
+        assert!(saved.contains("step_time_normal = 0.2\n"), "{saved}");
+        assert!(!saved.contains("0.200000002"), "{saved}");
+        assert!(!saved.contains("stop_radius"), "{saved}");
+    }
+
+    #[test]
+    fn restart_required_changes_include_display_topology_and_backend_selection() {
+        let current = Config::default();
+        let mut next = current.clone();
+        assert!(current.restart_required_changes(&next).is_empty());
+
+        next.behaviors.multi_monitor_chase = !next.behaviors.multi_monitor_chase;
+        next.platform.wayland = !next.platform.wayland;
+        assert_eq!(
+            current.restart_required_changes(&next),
+            vec!["behaviors.multi_monitor_chase", "platform.wayland"]
+        );
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn save_preserves_config_symlink_and_replaces_regular_file_target() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target.toml");
+        let link = dir.path().join("config.toml");
+        fs::write(
+            &target,
+            "goose_config_version = 2\n[audio]\nenabled = true\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        #[cfg(windows)]
+        if !try_symlink_file(&target, &link) {
+            return;
+        }
+
+        let mut config = Config::default();
+        config.audio.enabled = false;
+        config.save_atomic(&link).unwrap();
+
+        assert!(fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+        assert!(!Config::load_existing(&target).unwrap().audio.enabled);
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn save_rejects_dangling_and_non_file_symlink_targets() {
+        let dir = tempfile::tempdir().unwrap();
+        let dangling = dir.path().join("dangling.toml");
+        let missing_target = dir.path().join("missing.toml");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&missing_target, &dangling).unwrap();
+        #[cfg(windows)]
+        if !try_symlink_file(&missing_target, &dangling) {
+            return;
+        }
+        assert!(Config::default().save_atomic(&dangling).is_err());
+        assert!(fs::symlink_metadata(&dangling)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+
+        let directory_target = dir.path().join("directory-target");
+        fs::create_dir(&directory_target).unwrap();
+        let directory_link = dir.path().join("directory.toml");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&directory_target, &directory_link).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(&directory_target, &directory_link).unwrap();
+        assert!(Config::default().save_atomic(&directory_link).is_err());
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn dangling_symlink_is_not_reported_as_a_missing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let dangling = dir.path().join("config.toml");
+        let missing_target = dir.path().join("missing.toml");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&missing_target, &dangling).unwrap();
+        #[cfg(windows)]
+        if !try_symlink_file(&missing_target, &dangling) {
+            return;
+        }
+
+        assert!(matches!(
+            Config::load(Some(dangling)).unwrap(),
+            ConfigLoadState::Malformed { .. }
+        ));
+    }
+
+    #[cfg(windows)]
+    fn try_symlink_file(target: &Path, link: &Path) -> bool {
+        match std::os::windows::fs::symlink_file(target, link) {
+            Ok(()) => true,
+            Err(err) if err.raw_os_error() == Some(1314) => {
+                eprintln!("skipping symlink assertion: Windows symlink privilege unavailable");
+                false
+            }
+            Err(err) => panic!("could not create test symlink: {err}"),
+        }
     }
 }

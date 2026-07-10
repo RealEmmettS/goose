@@ -12,8 +12,8 @@ Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of 
 Accessibility readiness remains gated on pre-granted host evidence rather than Windows-host
 claims. The repo now has a Cargo workspace, a platform-free
 `honk-engine`, shared `honk-control`, versioned TOML `honk-config`, the `honk-config-tui`
-terminal UI, Windows, macOS, and Linux platform crates, the `honk300` binary, the original app's files as
-reference, the canonical planning docs, and ADRs under `docs/adr/`. M13's dynamic moods and
+terminal UI, Windows, macOS, and Linux platform crates, the `honk300` binary, the approved
+built-in media catalog, canonical planning docs, and ADRs under `docs/adr/`. M13's dynamic moods and
 on-hour double honk use runtime-injected local time; M14's quiet-hours/DND/fullscreen manners and
 built-in Autumn leaves use platform-neutral schedule/presence state; M15's multi-monitor chase
 uses signed virtual-desktop bounds and one Windows overlay HWND per monitor while appearance
@@ -33,6 +33,11 @@ loud-failure + `overlay` status, user-content-preserving uninstall), replace the
 the flat-illustration dual-view Procedural Vector V2 goose (six-tone palette, reference art in
 `docs/art-reference/`), and add idle-life behaviors (meandering walks, puddle-hop mud,
 off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
+R5/v0.3.0 (ADRs 0018–0019) is the distribution-readiness stabilization: config schema v2,
+region-aware desktop layouts, bounded damage and shared runtime ordering, Concept C renderer,
+platform/IPC hardening, Global MSI as the Windows default, an exact-tag transactional shell
+installer for macOS/Linux, and one atomic immutable release workflow. The current release gate is
+`docs/readiness/v0.3.0-readiness.md` and task `#r5s`.
 
 ## Read these first (source-of-truth pointers)
 
@@ -44,12 +49,11 @@ off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
 - `claude_plan.md` — **superseded draft** (the structural spine of the hybrid). Reference only;
   its exact engine constants and Windows-overlay analysis were verified correct.
 - `codex_plan.md` — **superseded draft** (grafts: richer task inventory, FirstUX, TOML, tests,
-  `--purge`). Reference only; its Appendix-B speed *values* are wrong — use `honk300_plan.md`/`Exports.cs`.
-- `DESKTOP-GOOSE/` — the **original closed-source app**, kept as reference (Windows
-  `DesktopGoose v0.31/`, macOS `Desktop Goose for Mac v0.22/`).
-- `DESKTOP-GOOSE/DesktopGoose v0.31/FOR MOD-MAKERS/GooseMod_DefaultSolution/GooseModdingAPI/{SamEngine.cs, Exports.cs}`
-  — the shipped C# modding API. This is the **engine-port source-of-truth**: exact rig
-  geometry, physics constants, the `Deck` RNG, and the Task/`InjectionPoints` model.
+  `--purge`). Reference only; its Appendix-B speed *values* are wrong — use the constants and
+  invariant tests in `crates/honk-engine/src/{entity,rig,task}.rs`.
+- `crates/honk-engine/src/` and `crates/honk-engine/tests/` — the active engine source of truth.
+  The original research inputs were removed after the full custom rebuild; constants, rig
+  geometry, shuffle behavior, and task ordering must now be changed only with their in-tree tests.
 - Sibling repos `C:\Users\hey\git\qube-{machine-report,network-diagnostics,workbranch-view}`
   — the conventions to mirror: Cargo layout, `src/install/*`, `src/update.rs`, `build.rs`,
   `.github/workflows/windows-installers.yml`, and the dual-changelog discipline.
@@ -67,15 +71,15 @@ off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
   and deferred macOS distribution slice; ADR 0014 records Renderer V2 (flat-illustration
   dual-view procedural vector — supersedes ADR 0001's sprite/atlas direction); ADR 0015 records
   the R1 reliability/platform-safety contract; ADR 0016 records the idle-life behaviors; ADR 0017
-  records the R3 macOS packaging + lifecycle slice (supersedes ADR 0013's macOS deferral).
+  records the historical R3 macOS packaging slice; ADR 0018 supersedes its advertised-DMG and
+  release-mutation decisions; ADR 0019 records the v0.3.0 stabilization contracts.
 
 ## Big-picture architecture (original → planned port)
 
 - **The goose is procedurally rendered, not a sprite** — there is no sprite art anywhere.
   Renderer V2 (ADR 0014) draws it in the flat-illustration style of the project's own reference
-  art (`docs/art-reference/`, design-time only; nothing loads at runtime), on a rig whose
-  verified constants live in `Exports.cs`. The port reimplements this renderer clean-room (no asset
-  extraction).
+  art (`docs/art-reference/`, design-time only; nothing loads at runtime), on the test-pinned rig
+  in `crates/honk-engine/src/rig.rs`. The renderer is clean-room procedural (no asset extraction).
 - **Engine = fixed 120 Hz tick + a Task state machine.** A default "roaming" state picks
   random tasks via a shuffle-bag (`Deck`); a task only sets `targetPos`/acceleration and the
   engine auto-locomotes toward it. Mod hooks fire Pre/Post Tick / UpdateRig / Render.
@@ -95,11 +99,13 @@ off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
   ship.
 - Linux: **X11-first** (runs under XWayland); native Wayland behind an opt-in `--wayland`
   flag (reduced mischief).
-- Packaging: Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) + shell/PowerShell
-  installers + macOS `.app`/`.dmg` + Linux `.desktop`. **No crates.io.**
-- M19 advanced Windows/Linux packaging first. macOS DMG/signing/notarization and
-  Accessibility-granted evidence remain deferred; later macOS packaging defaults to unsigned
-  personal-use artifacts unless signing credentials are intentionally added.
+- Packaging: Windows recommends the x64/ARM64 machine-wide Global MSI. macOS/Linux recommend the
+  exact-tag, hash-verifying shell bootstrap; macOS receives a universal2 app in
+  `~/Applications`. Corporate/EXE/portable artifacts and the v0.2.1 compatibility DMG remain
+  secondary. **No crates.io.**
+- macOS artifacts are ad-hoc signed and not notarized. Documentation must not imply that terminal
+  installation replaces Gatekeeper approval, Developer ID/notarization, or durable Accessibility
+  grant identity.
 - Starting, stopping, and configuration are **CLI/TUI-only over local IPC**. There is no system
   tray and no global quit key.
 - Terminal windows are protected: the goose may visually overlay them, but must never move,
@@ -130,6 +136,8 @@ off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
 - R1's reliability/platform-safety contract lives in `docs/adr/0015-reliability-and-platform-safety-fixes.md`.
 - R2's idle-life behaviors live in `docs/adr/0016-idle-life-behaviors-meander-mud-excursions.md`.
 - R3's macOS packaging + lifecycle slice (universal2 `.app`/DMG, macOS `install`/`uninstall`/`update`, unsigned personal-use; supersedes ADR 0013's macOS deferral) lives in `docs/adr/0017-macos-packaging-and-lifecycle.md`.
+- v0.3.0 distribution/atomic publication lives in `docs/adr/0018-distribution-and-atomic-release.md`.
+- v0.3.0 config/runtime/renderer/platform contracts live in `docs/adr/0019-stabilization-contracts.md`.
 
 ## Task management system
 
@@ -176,17 +184,20 @@ family's local gate:
 - `cargo clippy --all-targets --workspace -- -D warnings`
 - `cargo test --workspace`  ·  single test: `cargo test -p honk-engine <name>`
 - `cargo build --release`
+- `dist plan --tag=v0.3.0`
+- `cargo audit`
 
-Release packaging uses **cargo-dist** plus the hand-authored `windows-installers.yml` (adapt
-from a sibling repo); **`crates-publish.yml` is intentionally dropped** (no crates.io).
+Release packaging uses **cargo-dist** for portable archives plus project-owned atomic release,
+Windows installer, macOS bundle, and bootstrap workflows; **`crates-publish.yml` is intentionally
+dropped** (no crates.io).
 
 ## Asset & IP rule
 
-`DESKTOP-GOOSE/` contains Samperson's / third-party copyrighted assets (memes, notes, sounds)
-and old developer donation material. This is a personal-use repo, so M9 copies screened original
-memes/notes into `Assets/` and adds one complete custom counterpart per original; do not
-redistribute those assets publicly. The goose visual remains clean-room procedural. Do not ship
-old donate pages or old developer references.
+`Assets/` contains the approved built-in media catalog. Treat entries identified in
+`THIRD_PARTY_ASSETS.md` as personal-use compatibility media: do not assert redistribution rights
+or publish them separately. Mutable user media belongs in platform user-data directories, never
+inside binaries, MSI-owned directories, or the sealed macOS bundle. The goose visual remains
+clean-room procedural; old donation pages and developer branding do not ship.
 
 ## Changelog rule
 

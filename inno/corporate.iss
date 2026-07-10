@@ -55,7 +55,8 @@ Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "honk
 Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "honk.exe"; Flags: ignoreversion
 Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "goose.exe"; Flags: ignoreversion
 Source: "install-source-exe-corporate.txt"; DestDir: "{app}"; DestName: "install-source.txt"; Flags: ignoreversion
-Source: "..\Assets\*"; DestDir: "{app}\bin\Assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\THIRD_PARTY_ASSETS.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Honk300"; Filename: "{app}\bin\honk300.exe"; Parameters: "start"; WorkingDir: "{app}\bin"

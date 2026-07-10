@@ -39,6 +39,7 @@ pub enum BundleStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CapabilityStatus {
+    Unprobed,
     Supported,
     Unsupported,
     Denied,
@@ -195,13 +196,13 @@ impl RuntimeStatus {
             running: false,
             platform: PlatformStatus::current(),
             bundle: BundleStatus::Unknown,
-            overlay: CapabilityStatus::Unsupported,
-            accessibility: CapabilityStatus::Unsupported,
-            cursor: CapabilityStatus::Unsupported,
-            window: CapabilityStatus::Unsupported,
-            collect: CapabilityStatus::Unsupported,
-            presence: CapabilityStatus::Unsupported,
-            audio: CapabilityStatus::Unsupported,
+            overlay: CapabilityStatus::Unprobed,
+            accessibility: CapabilityStatus::Unprobed,
+            cursor: CapabilityStatus::Unprobed,
+            window: CapabilityStatus::Unprobed,
+            collect: CapabilityStatus::Unprobed,
+            presence: CapabilityStatus::Unprobed,
+            audio: CapabilityStatus::Unprobed,
             notes: 0,
             memes: 0,
         }
@@ -376,6 +377,7 @@ impl CapabilityStatus {
 
     pub fn label(self) -> &'static str {
         match self {
+            Self::Unprobed => "unprobed",
             Self::Supported => "supported",
             Self::Unsupported => "unsupported",
             Self::Denied => "denied",
@@ -385,6 +387,7 @@ impl CapabilityStatus {
 
     fn encode(self) -> &'static str {
         match self {
+            Self::Unprobed => "N",
             Self::Supported => "S",
             Self::Unsupported => "U",
             Self::Denied => "D",
@@ -394,6 +397,7 @@ impl CapabilityStatus {
 
     fn decode(value: &str) -> Result<Self, ProtocolError> {
         match value {
+            "N" => Ok(Self::Unprobed),
             "S" => Ok(Self::Supported),
             "U" => Ok(Self::Unsupported),
             "D" => Ok(Self::Denied),
@@ -553,6 +557,28 @@ mod tests {
         assert_eq!(
             ControlResponse::decode(b"STATUS G=1 P=MAC B=APP A=S C=S W=S K=S R=S O=S N=1 M=2\n"),
             Err(ProtocolError::MalformedResponse)
+        );
+    }
+
+    #[test]
+    fn stopped_status_reports_capabilities_as_unprobed() {
+        let status = RuntimeStatus::not_running();
+        for capability in [
+            status.overlay,
+            status.accessibility,
+            status.cursor,
+            status.window,
+            status.collect,
+            status.presence,
+            status.audio,
+        ] {
+            assert_eq!(capability, CapabilityStatus::Unprobed);
+            assert_eq!(capability.label(), "unprobed");
+        }
+        let frame = ControlResponse::Status(status).encode();
+        assert_eq!(
+            ControlResponse::decode(frame.as_bytes()).unwrap(),
+            ControlResponse::Status(status)
         );
     }
 }

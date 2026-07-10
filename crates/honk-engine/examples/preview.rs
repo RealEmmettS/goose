@@ -16,7 +16,7 @@ const ROWS: u32 = 3;
 struct Sim {
     anim: RigAnim,
     center: Vec2,
-    now: f32,
+    now: f64,
 }
 
 impl Sim {
@@ -34,7 +34,7 @@ impl Sim {
         let ticks = (secs / DT).round().max(1.0) as usize;
         let mut pose = None;
         for _ in 0..ticks {
-            self.now += DT;
+            self.now += DT as f64;
             self.center = self.center + velocity * DT;
             pose = Some(self.anim.update(&RigInput {
                 center: self.center,
@@ -84,7 +84,7 @@ fn main() {
     {
         let mut s = Sim::new(0.0);
         s.run(0.5, 0.0, 0.0, 0.45, 0.2);
-        s.anim.start_blink(s.now + DT * 2.0);
+        s.anim.start_blink(s.now + DT as f64 * 2.0);
         cells.push(("blink", s.run(0.055, 0.0, 0.0, 0.45, 0.2)));
     }
     cells.push(("rest L", Sim::new(180.0).run(1.0, 180.0, 0.0, 0.45, 0.2)));

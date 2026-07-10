@@ -147,45 +147,6 @@ pub fn ellipse(pixmap: &mut Pixmap, center: Vec2, rx: f32, ry: f32, p: &Paint) {
     }
 }
 
-/// A variable-width ribbon along a cubic bezier spine — the animated neck. Sampled and
-/// offset by per-sample normals; `w0`/`w1` are the full widths (pixels) at the base and
-/// the head end, blended with a smoothstep so the taper reads organic.
-pub fn ribbon(a: Vec2, c1: Vec2, c2: Vec2, b: Vec2, w0: f32, w1: f32) -> Option<Path> {
-    const N: usize = 14;
-    let mut left = [Vec2::ZERO; N + 1];
-    let mut right = [Vec2::ZERO; N + 1];
-    for (i, (l, r)) in left.iter_mut().zip(right.iter_mut()).enumerate() {
-        let t = i as f32 / N as f32;
-        let p = cubic_point(a, c1, c2, b, t);
-        let tangent = cubic_tangent(a, c1, c2, b, t).normalize();
-        let n = tangent.perpendicular();
-        let tt = t * t * (3.0 - 2.0 * t);
-        let hw = (w0 + (w1 - w0) * tt) * 0.5;
-        *l = p + n * hw;
-        *r = p - n * hw;
-    }
-    let mut pb = PathBuilder::new();
-    pb.move_to(left[0].x, left[0].y);
-    for p in &left[1..] {
-        pb.line_to(p.x, p.y);
-    }
-    for p in right.iter().rev() {
-        pb.line_to(p.x, p.y);
-    }
-    pb.close();
-    pb.finish()
-}
-
-fn cubic_point(a: Vec2, c1: Vec2, c2: Vec2, b: Vec2, t: f32) -> Vec2 {
-    let u = 1.0 - t;
-    a * (u * u * u) + c1 * (3.0 * u * u * t) + c2 * (3.0 * u * t * t) + b * (t * t * t)
-}
-
-fn cubic_tangent(a: Vec2, c1: Vec2, c2: Vec2, b: Vec2, t: f32) -> Vec2 {
-    let u = 1.0 - t;
-    (c1 - a) * (3.0 * u * u) + (c2 - c1) * (6.0 * u * t) + (b - c2) * (3.0 * t * t)
-}
-
 /// Dotted elliptical ground shadow (the original's dithered look), supersample-aware.
 pub fn stipple_shadow(pixmap: &mut Pixmap, center: Vec2, rx: f32, ry: f32, ss: f32) {
     let dot = paint((0x20, 0x20, 0x20), 42);

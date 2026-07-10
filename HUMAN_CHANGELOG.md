@@ -24,6 +24,63 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Added
+- **One dependable install story.** Windows now leads with the all-users installer, while Mac and
+  Linux share one verified terminal command that chooses the right download without asking for
+  administrator access. Each managed install leaves a receipt so updates and removal know exactly
+  what they own.
+- **Safer settings recovery.** The app can now tell the difference between a missing settings
+  file, a healthy one, a broken one, and one written by a newer app. Resetting is always explicit
+  and backs up the previous file first, so recovery never silently destroys a user's choices.
+- **Clear licensing and media provenance.** Releases now say which terms cover the app, which
+  bundled media still belongs to other creators, and where the temporary Wayland build fix came
+  from. This makes downstream use less ambiguous.
+
+### Improved
+- **A more natural long-necked goose.** The side view is now one coherent silhouette, with a broad
+  neck base, separate back and throat curves, and a simpler oval head. It keeps the familiar wing,
+  beak, legs, colors, directions, and poses while looking less pinched or assembled from parts.
+- **Steadier long-running and multi-monitor behavior.** The goose's clock keeps its precision over
+  long sessions, monitor gaps are no longer treated as places it can walk, hot-plugging screens
+  safely rebases what it is doing, and drawing work stays limited to the small area that changed.
+  Shared runtime ordering also makes the different operating-system versions behave alike.
+- **Fewer install choices to second-guess.** Windows recommends the machine-wide installer. Mac
+  and Linux recommend the same no-sudo terminal flow. The old Mac disk image remains only for
+  older updater compatibility, and the site/docs are candid that the Mac build is not Apple
+  notarized.
+
+### Fixed
+- **Broken settings are no longer replaced with defaults.** Saves are safer, linked settings
+  files are handled deliberately, display-backend changes clearly ask for a restart, and a
+  stopped goose no longer claims every capability is unsupported. The settings screen stays
+  responsive during slow commands, saves before starting, reports the real launch error, and
+  remains usable in small terminals.
+- **Animations and delayed behavior now finish cleanly.** View transitions no longer briefly
+  over-brighten, puddle hops return smoothly, quiet-time manners cancel queued pranks, note and
+  meme switches act independently, scheduled honks do not duplicate, and missing reference
+  images fail tests instead of quietly changing the expected picture.
+- **Desktop backends recover instead of surprising the user.** Windows adapts when one monitor is
+  removed and never types through global keyboard focus. Mac screen coordinates, real window
+  drags, display changes, and temporary audio failures are handled correctly. Linux refuses an
+  unsafe opaque/click-catching overlay, while reduced Wayland mode now handles multiple scaled
+  outputs, unplugging, and compositor buffers without growing memory forever.
+- **Install, update, and release changes are transactional.** Unsafe archives are refused, files
+  owned by somebody else are left alone, interrupted replacements restore the prior install, and
+  privileged Windows updates wait until the running app exits. A release becomes public only
+  after every required download has been assembled and verified together.
+
+### Security
+- **Local controls and downloaded installers are more tightly contained.** Only the signed-in
+  user and the operating system can reach the Windows command channel; Mac and Linux verify the
+  identity and permissions of local peers. Network reads have deadlines, dependency auditing is
+  mandatory, and the Wayland build uses the upstream parser security correction without pulling
+  in incompatible unfinished changes.
+
+### Removed
+- **Old reference/source baggage and dead settings are gone.** The original developer reference
+  folder, duplicate mute switch, setting that never did anything, and old donation/developer
+  material are no longer in the active project. Historical planning notes remain for context.
+
 ### Improved
 - **A better goose neck.** Seen from the side, the goose's neck used to curve slightly backward
   into its body and showed a faint line where the neck met the shoulders. It now rises in a clean,

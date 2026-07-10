@@ -54,16 +54,17 @@ Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "honk
 Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "honk.exe"; Flags: ignoreversion
 Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "goose.exe"; Flags: ignoreversion
 Source: "install-source-exe-global.txt"; DestDir: "{app}"; DestName: "install-source.txt"; Flags: ignoreversion
-Source: "..\Assets\*"; DestDir: "{app}\bin\Assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\THIRD_PARTY_ASSETS.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Honk300"; Filename: "{app}\bin\honk300.exe"; Parameters: "start"; WorkingDir: "{app}\bin"
 Name: "{commondesktop}\Honk300"; Filename: "{app}\bin\honk300.exe"; Parameters: "start"; WorkingDir: "{app}\bin"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Honk300"; ValueType: string; ValueName: "InstallSource"; ValueData: "exe-global"; Flags: uninsdeletevalue
-Root: HKCU; Subkey: "Software\Honk300"; Flags: uninsdeletekeyifempty
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Honk300"; ValueData: """{app}\bin\honk300.exe"" start"; Tasks: autostart; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Honk300"; ValueType: string; ValueName: "InstallSource"; ValueData: "exe-global"; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Honk300"; Flags: uninsdeletekeyifempty
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Honk300"; ValueData: """{app}\bin\honk300.exe"" start"; Tasks: autostart; Flags: uninsdeletevalue
 
 [Code]
 const

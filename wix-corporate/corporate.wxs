@@ -31,8 +31,11 @@
             <Directory Id='LocalAppDataFolder'>
                 <Directory Id='ProgramsFolder' Name='Programs'>
                     <Directory Id='APPLICATIONFOLDER' Name='honk300'>
+                        <Component Id='LegalNotices' Guid='*'>
+                            <File Id='LicenseFile' Name='LICENSE' DiskId='1' Source='$(var.SourceRoot)\LICENSE' KeyPath='yes'/>
+                            <File Id='ThirdPartyAssetsFile' Name='THIRD_PARTY_ASSETS.md' DiskId='1' Source='$(var.SourceRoot)\THIRD_PARTY_ASSETS.md'/>
+                        </Component>
                         <Directory Id='Bin' Name='bin'>
-                            <Directory Id='AssetsDir' Name='Assets'/>
                             <Component Id='Path' Guid='103257E6-F862-4C5B-A921-104C5ACFA761' KeyPath='yes'>
                                 <Environment
                                     Id='PATH'
@@ -114,11 +117,9 @@
             <ComponentRef Id='HonkAliasExe'/>
             <ComponentRef Id='GooseAliasExe'/>
             <ComponentRef Id='InstallSourceMarkerFile'/>
+            <ComponentRef Id='LegalNotices'/>
             <ComponentRef Id='InstallSourceMarker'/>
             <ComponentRef Id='StartMenuShortcut'/>
-            <?ifdef IncludeHarvestedAssets ?>
-            <ComponentGroupRef Id='AssetsComponents'/>
-            <?endif ?>
             <Feature Id='Environment' Title='PATH Environment Variable' Description='Add honk300 to the user PATH.' Level='1' Absent='allow'>
                 <ComponentRef Id='Path'/>
             </Feature>

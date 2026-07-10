@@ -7,7 +7,30 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+  security-and-release-contracts:
+    name: Dependency audit and release contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install pinned cargo-audit
+        run: cargo install cargo-audit --version 0.22.2 --locked
+      - name: Required dependency audit
+        run: cargo audit
+      - name: Release metadata tests
+        run: python3 -m unittest discover -s script/tests -p 'test_release_metadata.py' -v
+      - name: Installer template tests
+        run: python3 -m unittest discover -s script/tests -p 'test_installer_templates.py' -v
+      - name: macOS packaging contract tests
+        run: python3 -m unittest discover -s script/tests -p 'test_macos_packaging.py' -v
+      - name: Windows packaging contract tests
+        run: python3 -m unittest discover -s script/tests -p 'test_windows_packaging.py' -v
+      - name: Atomic workflow contract tests
+        run: python3 -m unittest discover -s script/tests -p 'test_release_workflows.py' -v
+
   windows:
     name: Windows host gate
     runs-on: windows-latest
@@ -69,26 +92,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner:
-          - ubuntu-latest
-          - ubuntu-24.04-arm
+        include:
+          - runner: ubuntu-latest
+            gnu_target: x86_64-unknown-linux-gnu
+            musl_target: x86_64-unknown-linux-musl
+          - runner: ubuntu-24.04-arm
+            gnu_target: aarch64-unknown-linux-gnu
+            musl_target: aarch64-unknown-linux-musl
     steps:
       - uses: actions/checkout@v6
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway
+          sudo apt-get install -y libasound2-dev xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway
       - name: Install Rust targets
-        run: |
-          rustup target add x86_64-unknown-linux-gnu x86_64-unknown-linux-musl
-          rustup target add aarch64-unknown-linux-gnu aarch64-unknown-linux-musl
+        run: rustup target add ${{ matrix.gnu_target }} ${{ matrix.musl_target }}
       - name: Test
         run: cargo test --workspace
       - name: Linux X11 and Wayland smoke
         run: bash script/smoke_m17_m18_linux.sh
       - name: Linux target checks
+        env:
+          PKG_CONFIG_ALLOW_CROSS: "1"
         run: |
-          cargo check --workspace --target x86_64-unknown-linux-gnu
-          cargo check --workspace --target aarch64-unknown-linux-gnu
-          cargo check --workspace --target x86_64-unknown-linux-musl
-          cargo check --workspace --target aarch64-unknown-linux-musl
+          cargo check --workspace --target ${{ matrix.gnu_target }}
+          cargo check --workspace --target ${{ matrix.musl_target }}

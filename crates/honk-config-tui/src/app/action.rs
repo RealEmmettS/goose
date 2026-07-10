@@ -1,7 +1,7 @@
 use super::state::{Category, CommandResult};
 use honk_engine::PokeAction;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     None,
     Quit,
@@ -10,6 +10,7 @@ pub enum Action {
     SelectCategory(Category),
     MoveDown,
     MoveUp,
+    ScrollStatus(i8),
     Toggle,
     Adjust(i8),
     Save,
@@ -18,5 +19,5 @@ pub enum Action {
     Stop,
     Start,
     Poke(PokeAction),
-    CommandResult(CommandResult),
+    CommandResult(Box<CommandResult>),
 }

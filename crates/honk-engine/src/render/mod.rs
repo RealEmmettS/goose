@@ -18,6 +18,7 @@ use crate::footmarks::{FootMarkTiming, FootMarks};
 use crate::math::Vec2;
 use crate::rig::{GoosePose, Rig, RigView};
 use geom::{disc, ellipse, paint};
+use std::cell::RefCell;
 use tiny_skia::{Color, FilterQuality, Pixmap, PixmapPaint, Transform};
 
 /// Goose raster supersample factor (rendered at 2x, composited down at 0.5x).
@@ -28,6 +29,45 @@ const LEAF_GOLD: (u8, u8, u8) = (0xe2, 0xb8, 0x35);
 const LEAF_ORANGE: (u8, u8, u8) = (0xd9, 0x6a, 0x21);
 const LEAF_RED: (u8, u8, u8) = (0xa9, 0x3b, 0x2a);
 const LEAF_BROWN: (u8, u8, u8) = (0x7a, 0x4a, 0x24);
+
+thread_local! {
+    /// Render calls on a platform thread reuse one supersampled layer. The two views are
+    /// painted/composited sequentially, so a second per-frame allocation is unnecessary.
+    static LAYER_SCRATCH: RefCell<LayerScratch> = RefCell::new(LayerScratch::default());
+}
+
+#[derive(Default)]
+struct LayerScratch {
+    pixmap: Option<Pixmap>,
+    #[cfg(test)]
+    allocations: usize,
+}
+
+impl LayerScratch {
+    fn prepare(&mut self, width: u32, height: u32) -> &mut Pixmap {
+        let width = width.max(1);
+        let height = height.max(1);
+        let needs_growth = self
+            .pixmap
+            .as_ref()
+            .is_none_or(|pixmap| pixmap.width() < width || pixmap.height() < height);
+        if needs_growth {
+            let width = width.next_power_of_two();
+            let height = height.next_power_of_two();
+            self.pixmap = Pixmap::new(width, height);
+            #[cfg(test)]
+            {
+                self.allocations += 1;
+            }
+        }
+        let pixmap = self
+            .pixmap
+            .as_mut()
+            .expect("small renderer scratch allocation");
+        pixmap.fill(Color::TRANSPARENT);
+        pixmap
+    }
+}
 
 /// User-customizable goose palette — six tones, defaults from the reference art.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,7 +152,7 @@ fn leaf_rgb(color: AutumnLeafColor) -> (u8, u8, u8) {
 pub fn render_autumn_leaves(
     pixmap: &mut Pixmap,
     autumn: &AutumnState,
-    now: f32,
+    now: f64,
     origin: Vec2,
     goose_pos: Vec2,
     layer: AutumnRenderLayer,
@@ -151,7 +191,7 @@ pub fn render_autumn_leaves(
 }
 
 /// Render the muddy footprints into `pixmap` (call before the goose so it sits on top).
-pub fn render_footmarks(pixmap: &mut Pixmap, marks: &FootMarks, now: f32, origin: Vec2) {
+pub fn render_footmarks(pixmap: &mut Pixmap, marks: &FootMarks, now: f64, origin: Vec2) {
     render_footmarks_with_timing(pixmap, marks, now, origin, FootMarkTiming::default());
 }
 
@@ -159,7 +199,7 @@ pub fn render_footmarks(pixmap: &mut Pixmap, marks: &FootMarks, now: f32, origin
 pub fn render_footmarks_with_timing(
     pixmap: &mut Pixmap,
     marks: &FootMarks,
-    now: f32,
+    now: f64,
     origin: Vec2,
     timing: FootMarkTiming,
 ) {
@@ -172,7 +212,7 @@ pub fn render_footmarks_with_timing(
 
 /// Render the rising/fading heart particles (M6 pat-streak; call after the goose so
 /// hearts float on top).
-pub fn render_hearts(pixmap: &mut Pixmap, hearts: &crate::hearts::Hearts, now: f32, origin: Vec2) {
+pub fn render_hearts(pixmap: &mut Pixmap, hearts: &crate::hearts::Hearts, now: f64, origin: Vec2) {
     const HEART: (u8, u8, u8) = (0xff, 0x5a, 0x7a);
     const LOBE: f32 = 3.4;
     for (pos, alpha) in hearts.active(now) {
@@ -202,7 +242,7 @@ pub fn render_hearts(pixmap: &mut Pixmap, hearts: &crate::hearts::Hearts, now: f
 pub fn render_sleepies(
     pixmap: &mut Pixmap,
     sleepies: &crate::mood::ZParticles,
-    now: f32,
+    now: f64,
     origin: Vec2,
 ) {
     for (pos, alpha) in sleepies.active(now) {
@@ -236,29 +276,29 @@ fn render_rig_layer(
     let bb = rig.bounding_box();
     let w = (bb.width() * ss).ceil() as u32;
     let h = (bb.height() * ss).ceil() as u32;
-    let Some(mut layer) = Pixmap::new(w.max(1), h.max(1)) else {
-        return;
-    };
-    layer.fill(Color::TRANSPARENT);
-    match rig.view {
-        RigView::Side { .. } => side::paint_side(&mut layer, rig, bb.min, ss, &palette),
-        RigView::TopDown { .. } => top::paint_top(&mut layer, rig, bb.min, ss, &palette),
-    }
-    let inv = 1.0 / ss;
-    let transform =
-        Transform::from_scale(inv, inv).post_translate(bb.min.x - origin.x, bb.min.y - origin.y);
-    pixmap.draw_pixmap(
-        0,
-        0,
-        layer.as_ref(),
-        &PixmapPaint {
-            opacity: opacity.clamp(0.0, 1.0),
-            quality: FilterQuality::Bilinear,
-            ..PixmapPaint::default()
-        },
-        transform,
-        None,
-    );
+    LAYER_SCRATCH.with(|scratch| {
+        let mut scratch = scratch.borrow_mut();
+        let layer = scratch.prepare(w, h);
+        match rig.view {
+            RigView::Side { .. } => side::paint_side(layer, rig, bb.min, ss, &palette),
+            RigView::TopDown { .. } => top::paint_top(layer, rig, bb.min, ss, &palette),
+        }
+        let inv = 1.0 / ss;
+        let transform = Transform::from_scale(inv, inv)
+            .post_translate(bb.min.x - origin.x, bb.min.y - origin.y);
+        pixmap.draw_pixmap(
+            0,
+            0,
+            layer.as_ref(),
+            &PixmapPaint {
+                opacity: opacity.clamp(0.0, 1.0),
+                quality: FilterQuality::Bilinear,
+                ..PixmapPaint::default()
+            },
+            transform,
+            None,
+        );
+    });
 }
 
 /// Render the full drawable pose — the active view plus, mid-crossfade, the outgoing
@@ -269,10 +309,12 @@ pub fn render_pose_with_palette(
     origin: Vec2,
     palette: RenderPalette,
 ) {
+    let mut incoming_opacity = 1.0;
     if let Some((rig, alpha)) = &pose.fading {
         render_rig_layer(pixmap, rig, origin, palette, *alpha);
+        incoming_opacity = 1.0 - alpha.clamp(0.0, 1.0);
     }
-    render_rig_layer(pixmap, &pose.primary, origin, palette, 1.0);
+    render_rig_layer(pixmap, &pose.primary, origin, palette, incoming_opacity);
 }
 
 /// Render one goose view with the default palette (tests/tools).
@@ -393,7 +435,7 @@ mod tests {
             speed: 80.0,
             velocity: Vec2::new(0.0, 80.0),
             step_time: 0.2,
-            now: DT,
+            now: DT as f64,
             dt: DT,
         });
         assert!(pose.fading.is_some(), "expected an active crossfade");
@@ -414,6 +456,108 @@ mod tests {
             .filter(|px| px[3] > 60)
             .count();
         assert!(opaque > 800, "expected both views visible, got {opaque}");
+    }
+
+    #[test]
+    fn crossfade_uses_complementary_layer_opacity() {
+        let primary = Rig::update(Vec2::new(90.0, 130.0), 0.0, 0.45, 0.0);
+        let outgoing = Rig::update(Vec2::new(270.0, 130.0), 180.0, 0.45, 0.0);
+        let pose = GoosePose {
+            primary,
+            fading: Some((outgoing, 0.25)),
+        };
+        let mut pixmap = Pixmap::new(360, 240).expect("alloc");
+        pixmap.fill(Color::TRANSPARENT);
+
+        render_pose_with_palette(&mut pixmap, &pose, Vec2::ZERO, RenderPalette::default());
+
+        let max_alpha = |x0: usize, x1: usize| {
+            let width = pixmap.width() as usize;
+            pixmap
+                .data()
+                .chunks_exact(4)
+                .enumerate()
+                .filter(|(index, _)| {
+                    let x = index % width;
+                    x >= x0 && x < x1
+                })
+                .map(|(_, pixel)| pixel[3])
+                .max()
+                .unwrap_or(0)
+        };
+        let incoming_alpha = max_alpha(0, 180);
+        let outgoing_alpha = max_alpha(180, 360);
+        assert!(
+            (185..=200).contains(&incoming_alpha),
+            "incoming view should be 1-t opaque, got {incoming_alpha}"
+        );
+        assert!(
+            (58..=70).contains(&outgoing_alpha),
+            "outgoing view should be t opaque, got {outgoing_alpha}"
+        );
+    }
+
+    #[test]
+    fn layer_scratch_reuses_its_allocation_for_smaller_frames() {
+        let mut scratch = LayerScratch::default();
+        let first = scratch.prepare(240, 220).data().as_ptr() as usize;
+        let second = scratch.prepare(180, 160).data().as_ptr() as usize;
+
+        assert_eq!(first, second);
+        assert_eq!(scratch.allocations, 1);
+    }
+
+    #[test]
+    fn layer_scratch_allocation_count_plateaus_during_long_render_runs() {
+        let mut scratch = LayerScratch::default();
+        scratch.prepare(512, 512);
+
+        for frame in 0..2_000_u32 {
+            let width = 160 + frame % 353;
+            let height = 150 + (frame * 7) % 363;
+            scratch.prepare(width, height);
+        }
+
+        assert_eq!(
+            scratch.allocations, 1,
+            "steady-state rendering must reuse the maximum scratch allocation"
+        );
+    }
+
+    #[test]
+    fn side_neck_has_distinct_back_and_throat_contours() {
+        let rig = Rig::update(Vec2::new(128.0, 190.0), 0.0, 1.0, 0.0);
+        let mut pixmap = Pixmap::new(256, 256).expect("alloc");
+        pixmap.fill(Color::TRANSPARENT);
+        render_rig(&mut pixmap, &rig, Vec2::ZERO);
+        let t = 0.48;
+        let u = 1.0 - t;
+        let spine = rig.neck_base * (u * u * u)
+            + rig.neck_c1 * (3.0 * u * u * t)
+            + rig.neck_c2 * (3.0 * u * t * t)
+            + rig.neck_head * (t * t * t);
+        let row = spine.y.round() as usize;
+        let center = spine.x.round() as usize;
+        let width = pixmap.width() as usize;
+        let visible = |x: usize| {
+            let pixel = &pixmap.data()[(row * width + x) * 4..][..4];
+            pixel[3] > 128 && pixel[0] > 150 && pixel[1] > 150 && pixel[2] > 150
+        };
+        let mut left = center;
+        while left > 0 && visible(left - 1) {
+            left -= 1;
+        }
+        let mut right = center;
+        while right + 1 < width && visible(right + 1) {
+            right += 1;
+        }
+        let back = center - left;
+        let throat = right - center;
+
+        assert!(
+            back.abs_diff(throat) >= 5,
+            "Concept C needs visibly different contours (back={back}, throat={throat})"
+        );
     }
 
     #[test]

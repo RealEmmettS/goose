@@ -29,8 +29,8 @@ impl Clock {
     }
 
     /// Seconds elapsed since [`Clock::start`].
-    pub fn elapsed_secs(&self) -> f32 {
-        self.start.elapsed().as_secs_f32()
+    pub fn elapsed_secs(&self) -> f64 {
+        self.start.elapsed().as_secs_f64()
     }
 }
 
@@ -39,7 +39,7 @@ impl Clock {
 /// clamped so a long stall (debugger pause, sleep) can't trigger a "spiral of death".
 #[derive(Debug)]
 pub struct Accumulator {
-    acc: f32,
+    acc: f64,
     max_catchup_ticks: u32,
 }
 
@@ -65,15 +65,15 @@ impl Accumulator {
     /// leftover carries to the next pump (smooth timing); a backlog beyond the catch-up
     /// clamp is discarded so the sim never falls permanently behind. Negative input is
     /// ignored.
-    pub fn pump(&mut self, elapsed: f32) -> u32 {
+    pub fn pump(&mut self, elapsed: f64) -> u32 {
         self.acc += elapsed.max(0.0);
         let mut ticks = 0;
-        while self.acc >= DT && ticks < self.max_catchup_ticks {
-            self.acc -= DT;
+        while self.acc >= DT as f64 && ticks < self.max_catchup_ticks {
+            self.acc -= DT as f64;
             ticks += 1;
         }
         // Hit the clamp with ticks still owed ⇒ drop the backlog rather than spiral.
-        if self.acc >= DT {
+        if self.acc >= DT as f64 {
             self.acc = 0.0;
         }
         ticks
@@ -100,10 +100,10 @@ mod tests {
     #[test]
     fn accumulator_yields_whole_ticks() {
         let mut acc = Accumulator::new();
-        assert_eq!(acc.pump(DT * 3.0), 3);
+        assert_eq!(acc.pump(DT as f64 * 3.0), 3);
         // Fractional input accumulates across pumps.
-        assert_eq!(acc.pump(DT * 0.5), 0);
-        assert_eq!(acc.pump(DT * 0.5), 1);
+        assert_eq!(acc.pump(DT as f64 * 0.5), 0);
+        assert_eq!(acc.pump(DT as f64 * 0.5), 1);
     }
 
     #[test]
@@ -112,13 +112,13 @@ mod tests {
         // One full second (~120 ticks) is clamped to the catch-up max, backlog dropped.
         assert_eq!(acc.pump(1.0), Accumulator::DEFAULT_MAX_CATCHUP);
         // Backlog was discarded, so the next small pump starts fresh.
-        assert_eq!(acc.pump(DT * 0.4), 0);
+        assert_eq!(acc.pump(DT as f64 * 0.4), 0);
     }
 
     #[test]
     fn accumulator_ignores_negative() {
         let mut acc = Accumulator::new();
         assert_eq!(acc.pump(-5.0), 0);
-        assert_eq!(acc.pump(DT), 1);
+        assert_eq!(acc.pump(DT as f64), 1);
     }
 }

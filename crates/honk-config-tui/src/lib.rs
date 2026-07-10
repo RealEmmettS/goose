@@ -7,11 +7,12 @@ pub mod ui;
 use app::{Action, AppState, CommandResult, TuiCommand};
 use color_eyre::eyre::Result;
 use crossterm::event::{self, Event, KeyEvent, KeyEventKind};
-use honk_config::Config;
+use honk_config::{Config, ConfigError, ConfigLoadState, LoadedConfig};
 use honk_control::{send_command, ControlCommand, ControlResponse, RuntimeStatus};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::Duration;
+use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 pub fn run(config_path: PathBuf) -> Result<()> {
@@ -23,10 +24,10 @@ pub fn run(config_path: PathBuf) -> Result<()> {
 
 async fn run_async(config_path: PathBuf) -> Result<()> {
     terminal::install_panic_hook()?;
-    let loaded = Config::load_or_default(Some(config_path))?;
+    let loaded = load_tui_config(config_path)?;
     let mut app = AppState::new(loaded.config, loaded.path);
     if let Some(warning) = loaded.warning {
-        app.set_status(format!("using defaults: {warning}"), true);
+        app.set_status(format!("config warning: {warning}"), false);
     }
     app.apply(Action::Status);
 
@@ -37,6 +38,8 @@ async fn run_async(config_path: PathBuf) -> Result<()> {
 
     let mut keys = spawn_key_reader();
     let mut tick = tokio::time::interval(Duration::from_millis(100));
+    let (command_result_tx, mut command_results) = mpsc::unbounded_channel();
+    let mut command_busy = false;
 
     loop {
         terminal.draw(|frame| ui::render(frame, &app))?;
@@ -52,15 +55,52 @@ async fn run_async(config_path: PathBuf) -> Result<()> {
                     app.apply(action);
                 }
             }
+            maybe_result = command_results.recv(), if command_busy => {
+                if let Some(command_result) = maybe_result {
+                    app.apply(Action::CommandResult(Box::new(command_result)));
+                }
+                command_busy = false;
+            }
         }
 
-        while let Some(command) = app.take_pending_command() {
-            let result = handle_command(&app, command);
-            app.apply(Action::CommandResult(result));
+        if !command_busy {
+            if let Some(command) = app.take_pending_command() {
+                let snapshot = app.clone();
+                let tx = command_result_tx.clone();
+                app.set_status("working...".into(), false);
+                spawn_blocking_operation(tx, move || handle_command(&snapshot, command));
+                command_busy = true;
+            }
         }
     }
 
     Ok(())
+}
+
+fn spawn_blocking_operation<F>(
+    tx: mpsc::UnboundedSender<CommandResult>,
+    operation: F,
+) -> std::thread::JoinHandle<()>
+where
+    F: FnOnce() -> CommandResult + Send + 'static,
+{
+    std::thread::spawn(move || {
+        let _ = tx.send(operation());
+    })
+}
+
+fn load_tui_config(path: PathBuf) -> Result<LoadedConfig, ConfigError> {
+    match Config::load(Some(path))? {
+        ConfigLoadState::Missing { path } => Ok(LoadedConfig {
+            path,
+            config: Config::default(),
+            warning: None,
+            migrated_from: None,
+        }),
+        ConfigLoadState::Loaded(loaded) => Ok(*loaded),
+        ConfigLoadState::Malformed { error, .. } => Err(ConfigError::MalformedDocument(error)),
+        ConfigLoadState::UnsupportedVersion { found, .. } => Err(ConfigError::WrongVersion(found)),
+    }
 }
 
 fn spawn_key_reader() -> mpsc::UnboundedReceiver<KeyEvent> {
@@ -81,23 +121,29 @@ fn spawn_key_reader() -> mpsc::UnboundedReceiver<KeyEvent> {
 
 fn handle_command(app: &AppState, command: TuiCommand) -> CommandResult {
     match command {
-        TuiCommand::Save => match app
-            .config
-            .validate()
-            .and_then(|_| app.config.save_atomic(&app.path))
-        {
-            Ok(()) => match send_command(ControlCommand::Reload) {
-                Ok(ControlResponse::Ok) => result("saved; reload sent", false, true),
-                Ok(ControlResponse::Err(code)) => {
-                    result(format!("saved; reload rejected: {code}"), true, true)
-                }
-                Ok(ControlResponse::Status(_)) => {
-                    result("saved; unexpected status response", true, true)
-                }
-                Err(_) => result("saved; no running goose to reload", false, true),
-            },
-            Err(err) => result(format!("save failed: {err}"), true, false),
-        },
+        TuiCommand::Save => {
+            let mut command_result = match app
+                .config
+                .validate()
+                .and_then(|_| app.config.save_atomic(&app.path))
+            {
+                Ok(()) => match send_command(ControlCommand::Reload) {
+                    Ok(ControlResponse::Ok) => result("saved; reload sent", false, true),
+                    Ok(ControlResponse::Err(code)) => {
+                        result(format!("saved; reload rejected: {code}"), true, true)
+                    }
+                    Ok(ControlResponse::Status(_)) => {
+                        result("saved; unexpected status response", true, true)
+                    }
+                    Err(_) => result("saved; no running goose to reload", false, true),
+                },
+                Err(err) => result(format!("save failed: {err}"), true, false),
+            };
+            if command_result.mark_saved {
+                command_result.saved_config = Some(app.config.clone());
+            }
+            command_result
+        }
         TuiCommand::Reload => match send_command(ControlCommand::Reload) {
             Ok(ControlResponse::Ok) => result("reload sent", false, false),
             Ok(ControlResponse::Err(code)) => {
@@ -136,11 +182,99 @@ fn handle_command(app: &AppState, command: TuiCommand) -> CommandResult {
             Ok(ControlResponse::Status(_)) => result("poke got unexpected status", true, false),
             Err(err) => result(format!("poke failed: {err}"), true, false),
         },
-        TuiCommand::Start => match spawn_start(&app.path) {
-            Ok(()) => result("start launched", false, false),
-            Err(err) => result(format!("start failed: {err}"), true, false),
-        },
+        TuiCommand::Start => handle_start_with(app, launch_and_wait),
     }
+}
+
+fn handle_start_with<F>(app: &AppState, launch: F) -> CommandResult
+where
+    F: FnOnce(&Path) -> Result<String, String>,
+{
+    let saved = app.dirty();
+    if saved {
+        if let Err(err) = app
+            .config
+            .validate()
+            .and_then(|_| app.config.save_atomic(&app.path))
+        {
+            return result(format!("start blocked; save failed: {err}"), true, false);
+        }
+    }
+    let mut command_result = match launch(&app.path) {
+        Ok(message) => result(message, false, saved),
+        Err(error) => result(format!("start failed: {error}"), true, saved),
+    };
+    if saved {
+        command_result.saved_config = Some(app.config.clone());
+    }
+    command_result
+}
+
+fn wait_for_readiness<F>(
+    timeout: Duration,
+    poll_interval: Duration,
+    mut probe: F,
+) -> Result<RuntimeStatus, String>
+where
+    F: FnMut() -> std::io::Result<ControlResponse>,
+{
+    let started = Instant::now();
+    loop {
+        let last_error = match probe() {
+            Ok(ControlResponse::Status(status)) if status.running => return Ok(status),
+            Ok(ControlResponse::Status(_)) => "runtime reported not running".into(),
+            Ok(ControlResponse::Err(code)) => format!("status rejected: {code}"),
+            Ok(ControlResponse::Ok) => "status returned an unexpected OK".into(),
+            Err(err) => {
+                let message = err.to_string();
+                if !matches!(
+                    err.kind(),
+                    std::io::ErrorKind::NotFound
+                        | std::io::ErrorKind::ConnectionRefused
+                        | std::io::ErrorKind::WouldBlock
+                        | std::io::ErrorKind::TimedOut
+                ) {
+                    return Err(message);
+                }
+                message
+            }
+        };
+        if started.elapsed() >= timeout {
+            return Err(format!(
+                "runtime did not become ready within {:.1}s: {last_error}",
+                timeout.as_secs_f32()
+            ));
+        }
+        if !poll_interval.is_zero() {
+            std::thread::sleep(poll_interval);
+        }
+    }
+}
+
+fn launch_and_wait(config_path: &Path) -> Result<String, String> {
+    let (mut child, launcher_may_exit) = spawn_start(config_path).map_err(|err| err.to_string())?;
+    let mut child_exited = false;
+    wait_for_readiness(Duration::from_secs(10), Duration::from_millis(100), || {
+        if !child_exited {
+            if let Some(status) = child.try_wait()? {
+                child_exited = true;
+                if !status.success() || !launcher_may_exit {
+                    let mut stderr = String::new();
+                    if let Some(mut stream) = child.stderr.take() {
+                        let _ = stream.read_to_string(&mut stderr);
+                    }
+                    let detail = if stderr.trim().is_empty() {
+                        format!("start process exited with {status}")
+                    } else {
+                        stderr.trim().to_string()
+                    };
+                    return Err(std::io::Error::other(detail));
+                }
+            }
+        }
+        send_command(ControlCommand::Status)
+    })
+    .map(|_| "start ready".into())
 }
 
 fn result(status: impl Into<String>, is_error: bool, mark_saved: bool) -> CommandResult {
@@ -148,6 +282,7 @@ fn result(status: impl Into<String>, is_error: bool, mark_saved: bool) -> Comman
         status: status.into(),
         is_error,
         mark_saved,
+        saved_config: None,
         runtime_status: None,
     }
 }
@@ -161,14 +296,19 @@ fn status_result(status: RuntimeStatus) -> CommandResult {
         },
         is_error: false,
         mark_saved: false,
+        saved_config: None,
         runtime_status: Some(status),
     }
 }
 
-fn spawn_start(config_path: &Path) -> std::io::Result<()> {
+fn spawn_start(config_path: &Path) -> std::io::Result<(Child, bool)> {
     let exe = std::env::current_exe()?;
+    #[cfg(target_os = "macos")]
+    let launcher_may_exit = macos_bundle_root_from_exe(&exe).is_some();
+    #[cfg(not(target_os = "macos"))]
+    let launcher_may_exit = false;
     let mut command = build_start_command(exe, config_path);
-    command.spawn().map(|_| ())
+    command.spawn().map(|child| (child, launcher_may_exit))
 }
 
 fn build_start_command(exe: PathBuf, config_path: &Path) -> Command {
@@ -190,7 +330,7 @@ fn build_direct_start_command(exe: PathBuf, config_path: &Path) -> Command {
         .arg(config_path)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stderr(Stdio::piped());
     apply_detached_flags(&mut command);
     command
 }
@@ -208,7 +348,7 @@ fn build_macos_start_command(exe: PathBuf, config_path: &Path) -> Command {
             .arg(config_path)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stderr(Stdio::piped());
         return command;
     }
     build_direct_start_command(exe, config_path)
@@ -288,5 +428,110 @@ mod tests {
         assert!(r.mark_saved);
         assert!(!r.is_error);
         assert!(r.runtime_status.is_none());
+    }
+
+    #[test]
+    fn tui_loader_rejects_malformed_and_newer_configs_without_rewriting_them() {
+        let dir = tempfile::tempdir().unwrap();
+        for (name, original) in [
+            ("malformed.toml", "[audio\nenabled = true\n"),
+            ("newer.toml", "goose_config_version = 99\nfuture = true\n"),
+        ] {
+            let path = dir.path().join(name);
+            std::fs::write(&path, original).unwrap();
+            assert!(load_tui_config(path.clone()).is_err());
+            assert_eq!(std::fs::read_to_string(path).unwrap(), original);
+        }
+    }
+
+    #[test]
+    fn tui_loader_uses_defaults_only_for_a_missing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let loaded = load_tui_config(path.clone()).unwrap();
+        assert_eq!(loaded.path, path);
+        assert_eq!(loaded.config, Config::default());
+        assert!(!loaded.path.exists());
+    }
+
+    #[test]
+    fn dirty_config_is_saved_before_start_is_launched() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        Config::default().save_atomic(&path).unwrap();
+        let mut app = AppState::new(Config::default(), path.clone());
+        app.config.audio.enabled = false;
+        let launched = std::cell::Cell::new(false);
+
+        let command_result = handle_start_with(&app, |launch_path| {
+            assert!(!Config::load_existing(launch_path).unwrap().audio.enabled);
+            launched.set(true);
+            Ok("running and ready".into())
+        });
+
+        assert!(launched.get());
+        assert!(command_result.mark_saved);
+        assert!(!command_result.is_error);
+    }
+
+    #[test]
+    fn invalid_dirty_config_prevents_start_launch() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        Config::default().save_atomic(&path).unwrap();
+        let mut app = AppState::new(Config::default(), path);
+        app.config.speeds.walk_speed = 0.0;
+
+        let command_result = handle_start_with(&app, |_| -> Result<String, String> {
+            panic!("launch must not run when the dirty config cannot be saved")
+        });
+        assert!(command_result.is_error);
+        assert!(!command_result.mark_saved);
+    }
+
+    #[test]
+    fn readiness_poll_returns_running_status_after_transient_error() {
+        let mut attempts = 0;
+        let status = wait_for_readiness(Duration::from_millis(100), Duration::ZERO, || {
+            attempts += 1;
+            if attempts == 1 {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "not ready yet",
+                ))
+            } else {
+                let mut status = RuntimeStatus::not_running();
+                status.running = true;
+                Ok(ControlResponse::Status(status))
+            }
+        })
+        .unwrap();
+        assert!(status.running);
+        assert_eq!(attempts, 2);
+    }
+
+    #[test]
+    fn readiness_timeout_reports_the_actual_last_error() {
+        let error = wait_for_readiness(Duration::from_millis(15), Duration::from_millis(1), || {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "socket access denied",
+            ))
+        })
+        .unwrap_err();
+        assert!(error.contains("socket access denied"), "{error}");
+    }
+
+    #[test]
+    fn blocking_command_work_is_dispatched_off_the_caller_path() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let started = std::time::Instant::now();
+        let worker = spawn_blocking_operation(tx, || {
+            std::thread::sleep(Duration::from_millis(100));
+            result("finished", false, false)
+        });
+        assert!(started.elapsed() < Duration::from_millis(50));
+        assert_eq!(rx.blocking_recv().unwrap().status, "finished");
+        worker.join().unwrap();
     }
 }

@@ -1,27 +1,32 @@
 name: Windows Installers
 
 on:
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      commit:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to attach installers to, for example v0.1.0"
+        description: "Immutable stable release tag, for example v0.3.0"
+        required: true
+        type: string
+      commit:
+        description: "Full 40-character commit SHA named by the tag"
         required: true
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-windows-installers:
     name: ${{ matrix.triple }} extra installers
     runs-on: windows-2022
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       startsWith(github.event.workflow_run.head_branch, 'v'))
     strategy:
       fail-fast: false
       matrix:
@@ -44,49 +49,39 @@ jobs:
         id: tag
         shell: pwsh
         run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $tag = "${{ inputs.tag }}"
-          } else {
-            $tag = "${{ github.event.workflow_run.head_branch }}"
+          $tag = "${{ inputs.tag }}"
+          $commit = "${{ inputs.commit }}"
+          if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+            throw "Expected a stable vMAJOR.MINOR.PATCH tag, got '$tag'"
           }
-          if (-not $tag.StartsWith("v")) {
-            throw "Expected tag to start with v, got '$tag'"
+          if ($commit -notmatch '^[0-9a-fA-F]{40}$') {
+            throw "Expected a full commit SHA, got '$commit'"
           }
           $version = $tag -replace '^v', ''
           Add-Content -Path $env:GITHUB_OUTPUT -Value "tag=$tag"
           Add-Content -Path $env:GITHUB_OUTPUT -Value "version=$version"
 
-      - name: Verify upstream cargo-dist release is complete
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
-        run: |
-          $tag = "${{ steps.tag.outputs.tag }}"
-          $repo = "${{ github.repository }}"
-          $assets = (gh release view $tag --repo $repo --json assets --jq '.assets[].name') -split "`n"
-          $required = @(
-            "dist-manifest.json",
-            "honk300-${{ matrix.triple }}.zip"
-          )
-          $missing = @()
-          foreach ($asset in $required) {
-            if ($assets -notcontains $asset) { $missing += $asset }
-          }
-          if ($missing.Count -gt 0) {
-            Write-Host "Upstream release is incomplete. Missing assets:"
-            $missing | ForEach-Object { Write-Host "  $_" }
-            exit 1
-          }
-
-      - name: Checkout tag
+      - name: Checkout exact release commit
         uses: actions/checkout@v6
         with:
-          ref: ${{ steps.tag.outputs.tag }}
+          ref: ${{ inputs.commit }}
+          fetch-depth: 0
           persist-credentials: false
 
+      - name: Prove tag and checkout identify the same commit
+        shell: pwsh
+        run: |
+          git fetch --force --tags origin
+          $head = (git rev-parse HEAD).Trim()
+          $tagCommit = (git rev-parse "${{ inputs.tag }}^{commit}").Trim()
+          if ($head -ne "${{ inputs.commit }}" -or $tagCommit -ne $head) {
+            throw "Tag, requested commit, and checkout do not match"
+          }
+
       - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
+          toolchain: 1.95.0
           targets: ${{ matrix.triple }}
 
       - name: Install target for pinned toolchain
@@ -136,17 +131,6 @@ jobs:
           cmd.exe /c $cmd
           if ($LASTEXITCODE -ne 0) { throw "cargo build failed with exit $LASTEXITCODE" }
 
-      - name: Harvest Assets for WiX
-        shell: pwsh
-        run: |
-          $heat = "$env:WIX\bin\heat.exe"
-          if (-not (Test-Path $heat)) { throw "heat.exe not found at $heat" }
-          $sourceRoot = (Get-Location).Path
-          $assetsRoot = Join-Path $sourceRoot "Assets"
-          New-Item -ItemType Directory -Force -Path target\wix | Out-Null
-          & $heat dir $assetsRoot -cg AssetsComponents -dr AssetsDir -srd -sreg -gg -var var.SourceRoot -out target\wix\assets.wxs
-          if ($LASTEXITCODE -ne 0) { throw "heat failed with exit $LASTEXITCODE" }
-
       - name: Build Global and Corporate MSI
         shell: pwsh
         run: |
@@ -156,36 +140,30 @@ jobs:
           if (-not (Test-Path $light))  { throw "light.exe not found at $light" }
           $binDir = "target\${{ matrix.triple }}\release"
           $sourceRoot = (Get-Location).Path
+          New-Item -ItemType Directory -Force -Path target\wix | Out-Null
           & $candle -arch ${{ matrix.wix_arch }} `
             "-dVersion=${{ steps.tag.outputs.version }}" `
             "-dCargoTargetBinDir=$binDir" `
             "-dSourceRoot=$sourceRoot" `
-            "-dIncludeHarvestedAssets=1" `
             -out target\wix\corporate.wixobj `
             wix-corporate\corporate.wxs
           if ($LASTEXITCODE -ne 0) { throw "corporate candle failed with exit $LASTEXITCODE" }
           & $candle -arch ${{ matrix.wix_arch }} `
-            "-dSourceRoot=$sourceRoot\Assets" `
-            -out target\wix\assets.wixobj `
-            target\wix\assets.wxs
-          if ($LASTEXITCODE -ne 0) { throw "assets candle failed with exit $LASTEXITCODE" }
-          & $candle -arch ${{ matrix.wix_arch }} `
             "-dVersion=${{ steps.tag.outputs.version }}" `
             "-dCargoTargetBinDir=$binDir" `
             "-dSourceRoot=$sourceRoot" `
-            "-dIncludeHarvestedAssets=1" `
             -out target\wix\global.wixobj `
             wix\main.wxs
           if ($LASTEXITCODE -ne 0) { throw "global candle failed with exit $LASTEXITCODE" }
           & $light -sice:ICE38 -sice:ICE64 -sice:ICE91 `
             -ext WixUIExtension `
             -out target\wix\honk300-${{ matrix.triple }}.msi `
-            target\wix\global.wixobj target\wix\assets.wixobj
+            target\wix\global.wixobj
           if ($LASTEXITCODE -ne 0) { throw "global light failed with exit $LASTEXITCODE" }
           & $light -sice:ICE38 -sice:ICE64 -sice:ICE91 `
             -ext WixUIExtension `
             -out target\wix\honk300-${{ matrix.triple }}-corporate.msi `
-            target\wix\corporate.wixobj target\wix\assets.wixobj
+            target\wix\corporate.wixobj
           if ($LASTEXITCODE -ne 0) { throw "light failed with exit $LASTEXITCODE" }
 
       - name: Install Inno Setup 6
@@ -222,33 +200,48 @@ jobs:
             throw "Corporate EXE installer output missing"
           }
 
-      - name: Compute SHA256 sidecars
+      - name: Smoke Global MSI install, repair, and uninstall
+        if: ${{ matrix.triple == 'x86_64-pc-windows-msvc' }}
         shell: pwsh
         run: |
-          $files = @(
-            "target\wix\honk300-${{ matrix.triple }}.msi",
-            "target\wix\honk300-${{ matrix.triple }}-corporate.msi",
-            "inno\Output\honk300-${{ matrix.triple }}-setup.exe",
-            "inno\Output\honk300-${{ matrix.triple }}-corporate-setup.exe"
-          )
-          foreach ($file in $files) {
-            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
-            $name = Split-Path $file -Leaf
-            [System.IO.File]::WriteAllText("$file.sha256", "$hash *$name")
+          $msi = (Resolve-Path "target\wix\honk300-${{ matrix.triple }}.msi").Path
+          $msiexec = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) 'msiexec.exe'
+          foreach ($mode in @('/i', '/fa')) {
+            $process = Start-Process $msiexec -ArgumentList @($mode, "`"$msi`"", '/qn', '/norestart') -Wait -PassThru
+            if ($process.ExitCode -notin @(0, 3010)) { throw "MSI $mode failed with $($process.ExitCode)" }
           }
+          $binary = Join-Path $env:ProgramFiles "honk300\bin\honk300.exe"
+          if (-not (Test-Path $binary -PathType Leaf)) { throw "MSI did not install $binary" }
+          $reported = (& $binary --version | Select-Object -Last 1).Trim()
+          if ($reported -notmatch "${{ steps.tag.outputs.version }}$") { throw "Installed version mismatch: $reported" }
+          $process = Start-Process $msiexec -ArgumentList @('/x', "`"$msi`"", '/qn', '/norestart') -Wait -PassThru
+          if ($process.ExitCode -notin @(0, 3010)) { throw "MSI uninstall failed with $($process.ExitCode)" }
+          if (Test-Path $binary -PathType Leaf) { throw "MSI uninstall left the executable behind" }
 
-      - name: Upload artifacts to GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Smoke ARM64 MSI administrative extraction
+        if: ${{ matrix.triple == 'aarch64-pc-windows-msvc' }}
         shell: pwsh
         run: |
-          gh release upload "${{ steps.tag.outputs.tag }}" `
-            "target\wix\honk300-${{ matrix.triple }}.msi" `
-            "target\wix\honk300-${{ matrix.triple }}.msi.sha256" `
-            "target\wix\honk300-${{ matrix.triple }}-corporate.msi" `
-            "target\wix\honk300-${{ matrix.triple }}-corporate.msi.sha256" `
-            "inno\Output\honk300-${{ matrix.triple }}-setup.exe" `
-            "inno\Output\honk300-${{ matrix.triple }}-setup.exe.sha256" `
-            "inno\Output\honk300-${{ matrix.triple }}-corporate-setup.exe" `
-            "inno\Output\honk300-${{ matrix.triple }}-corporate-setup.exe.sha256" `
-            --clobber
+          $msi = (Resolve-Path "target\wix\honk300-${{ matrix.triple }}.msi").Path
+          $stage = Join-Path $env:RUNNER_TEMP 'arm64-msi-layout'
+          $msiexec = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) 'msiexec.exe'
+          $process = Start-Process $msiexec -ArgumentList @('/a', "`"$msi`"", '/qn', "TARGETDIR=`"$stage`"") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "ARM64 MSI administrative extraction failed with $($process.ExitCode)" }
+          if (-not (Get-ChildItem $stage -Recurse -Filter honk300.exe)) { throw "ARM64 MSI does not contain honk300.exe" }
+
+      - name: Collect release artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force target\release-artifacts | Out-Null
+          Copy-Item "target\wix\honk300-${{ matrix.triple }}.msi" target\release-artifacts\
+          Copy-Item "target\wix\honk300-${{ matrix.triple }}-corporate.msi" target\release-artifacts\
+          Copy-Item "inno\Output\honk300-${{ matrix.triple }}-setup.exe" target\release-artifacts\
+          Copy-Item "inno\Output\honk300-${{ matrix.triple }}-corporate-setup.exe" target\release-artifacts\
+
+      - name: Upload platform artifacts to the release orchestrator
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-windows-${{ matrix.triple }}
+          path: target/release-artifacts/*
+          if-no-files-found: error
+          retention-days: 7

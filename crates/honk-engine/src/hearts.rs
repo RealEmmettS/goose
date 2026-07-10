@@ -20,27 +20,27 @@ pub struct Heart {
     /// World position the heart was spawned at.
     pub origin: Vec2,
     /// Wall-clock time the heart was created.
-    pub created: f32,
+    pub created: f64,
 }
 
 impl Heart {
     /// Seconds since the heart was spawned.
-    fn age(&self, now: f32) -> f32 {
-        now - self.created
+    fn age(&self, now: f64) -> f32 {
+        (now - self.created) as f32
     }
 
     /// Whether the heart is still within its lifetime at `now`.
-    pub fn is_alive(&self, now: f32) -> bool {
+    pub fn is_alive(&self, now: f64) -> bool {
         self.age(now) <= LIFETIME
     }
 
     /// Opacity scale in `[0, 1]`: `1.0` fresh, fading linearly to `0.0` at end of life.
-    pub fn alpha(&self, now: f32) -> f32 {
+    pub fn alpha(&self, now: f64) -> f32 {
         crate::math::clamp(1.0 - self.age(now) / LIFETIME, 0.0, 1.0)
     }
 
     /// Current world position at `now` (origin, drifted upward by elapsed-life fraction).
-    pub fn position(&self, now: f32) -> Vec2 {
+    pub fn position(&self, now: f64) -> Vec2 {
         let frac = crate::math::clamp(self.age(now) / LIFETIME, 0.0, 1.0);
         self.origin + UP * (RISE * frac)
     }
@@ -59,7 +59,7 @@ impl Hearts {
     }
 
     /// Spawn a heart at `origin`, created at `now`. Prunes hearts already dead at `now` first.
-    pub fn add(&mut self, origin: Vec2, now: f32) {
+    pub fn add(&mut self, origin: Vec2, now: f64) {
         self.items.retain(|h| h.is_alive(now));
         self.items.push(Heart {
             origin,
@@ -68,7 +68,7 @@ impl Hearts {
     }
 
     /// All hearts alive at `now`, with their drifted position and current alpha.
-    pub fn active(&self, now: f32) -> impl Iterator<Item = (Vec2, f32)> + '_ {
+    pub fn active(&self, now: f64) -> impl Iterator<Item = (Vec2, f32)> + '_ {
         self.items
             .iter()
             .filter(move |h| h.is_alive(now))
@@ -76,7 +76,7 @@ impl Hearts {
     }
 
     /// Count of hearts alive at `now`.
-    pub fn alive_count(&self, now: f32) -> usize {
+    pub fn alive_count(&self, now: f64) -> usize {
         self.active(now).count()
     }
 }

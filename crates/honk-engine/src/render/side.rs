@@ -80,62 +80,116 @@ pub fn paint_side(layer: &mut Pixmap, rig: &Rig, layer_origin: Vec2, ss: f32, pa
         }
     }
 
-    // The white mass — body + neck + head drawn as ONE form: every outline is stroked
-    // first, then every fill lands on top, so no outline seam crosses the neck where
-    // it meets the body or the head (ADR 0014 §4, tuned per Emmett's review).
+    // Concept C white mass: one continuous body → throat → oval head → back-neck
+    // silhouette. The two neck contours deliberately differ: the throat is restrained
+    // and forward-curving, while the back-neck stays fuller and drops into a broad
+    // shoulder base. One path means there is no circular-head/lollipop join to hide.
     {
         let breath = 1.0 + rig.breath * 0.012;
         let mut bf = body;
         bf.fy = bf.fy * breath;
-        let mut p = P::new(&bf);
-        p.m(62.0, 71.9);
-        p.c(62.0, 81.4, 64.2, 87.5, 73.0, 88.2);
-        p.c(85.1, 89.2, 93.8, 94.4, 101.1, 99.1);
-        p.c(107.0, 102.8, 112.8, 107.7, 122.3, 112.5);
-        p.c(126.5, 114.5, 132.2, 116.5, 136.8, 117.0);
-        p.l(122.4, 131.5);
-        p.c(115.7, 143.3, 105.7, 147.2, 96.3, 148.1);
-        p.c(93.2, 154.0, 90.0, 159.5, 82.2, 159.4);
-        p.c(79.6, 159.4, 77.0, 158.3, 75.0, 156.4);
-        p.c(70.3, 152.4, 67.0, 144.9, 63.0, 143.2);
-        p.c(51.0, 139.4, 32.0, 126.0, 31.4, 106.0);
-        p.c(31.3, 98.9, 33.0, 92.4, 35.8, 85.0);
-        p.c(44.0, 76.5, 53.0, 72.3, 62.0, 71.9);
-        p.z();
-        let body_path = p.finish();
+        let point = |x: f32, y: f32| bf.pt(x, y);
+        let fwd = Vec2::new(mirror, 0.0);
+        let base = to_layer(rig.neck_base);
+        let c1 = to_layer(rig.neck_c1);
+        let c2 = to_layer(rig.neck_c2);
+        let base_throat = base + fwd * (9.0 * k);
+        let base_back = base - fwd * (20.0 * k);
+        let throat_c1 = c1 + fwd * (7.0 * k);
+        let throat_c2 = c2 + fwd * (5.0 * k);
+        let back_c2 = c2 - fwd * (12.0 * k);
+        let back_c1 = c1 - fwd * (17.0 * k);
+        let head_bottom_front = head.pt(36.0, 26.5);
+        let head_bottom_back = head.pt(51.0, 27.0);
 
-        let neck_path = geom::ribbon(
-            to_layer(rig.neck_base),
-            to_layer(rig.neck_c1),
-            to_layer(rig.neck_c2),
-            to_layer(rig.neck_head),
-            32.0 * k,
-            16.0 * k,
+        let mut pb = tiny_skia::PathBuilder::new();
+        let p = point(62.0, 71.9);
+        pb.move_to(p.x, p.y);
+        let (a, b, p) = (point(62.0, 81.4), point(64.2, 87.5), point(73.0, 88.2));
+        pb.cubic_to(a.x, a.y, b.x, b.y, p.x, p.y);
+        let (a, b, p) = (point(85.1, 89.2), point(93.8, 94.4), point(101.1, 99.1));
+        pb.cubic_to(a.x, a.y, b.x, b.y, p.x, p.y);
+        let (a, b, p) = (
+            point(107.0, 102.8),
+            point(112.8, 107.7),
+            point(122.3, 112.5),
         );
-        let skull_c = head.pt(44.0, 19.5);
-        let cheek_c = head.pt(36.5, 21.5);
-        let r_skull = 11.4 * k;
-        let r_cheek = 8.6 * k;
+        pb.cubic_to(a.x, a.y, b.x, b.y, p.x, p.y);
+        let (a, b, p) = (
+            point(126.5, 114.5),
+            point(132.2, 116.5),
+            point(136.8, 117.0),
+        );
+        pb.cubic_to(a.x, a.y, b.x, b.y, p.x, p.y);
+        let p = point(122.4, 131.5);
+        pb.line_to(p.x, p.y);
+        let (a, b, p) = (point(115.7, 143.3), point(105.7, 147.2), point(96.3, 148.1));
+        pb.cubic_to(a.x, a.y, b.x, b.y, p.x, p.y);
+        let (a, b, p) = (point(93.2, 154.0), point(90.0, 159.5), point(82.2, 159.4));
+        pb.cubic_to(a.x, a.y, b.x, b.y, p.x, p.y);
+        let (a, b, p) = (point(79.6, 159.4), point(77.0, 158.3), point(75.0, 156.4));
+        pb.cubic_to(a.x, a.y, b.x, b.y, p.x, p.y);
+        let (a, b, p) = (point(70.3, 152.4), point(67.0, 144.9), point(63.0, 143.2));
+        pb.cubic_to(a.x, a.y, b.x, b.y, p.x, p.y);
+        let (a, b, body_front) = (point(51.0, 139.4), point(32.0, 126.0), point(31.4, 106.0));
+        pb.cubic_to(a.x, a.y, b.x, b.y, body_front.x, body_front.y);
 
-        let out = paint(pal.goose_outline, 255);
-        if let Some(path) = &body_path {
-            geom::stroke(layer, path, &out, ow * 2.0);
-        }
-        if let Some(path) = &neck_path {
-            geom::stroke(layer, path, &out, ow * 2.0);
-        }
-        disc(layer, skull_c, r_skull + ow, &out);
-        disc(layer, cheek_c, r_cheek + ow, &out);
+        // Throat: a concave, narrower climb into the underside of the oval head.
+        let throat_join = Vec2::lerp(body_front, base_throat, 0.55) + fwd * (2.0 * k);
+        pb.cubic_to(
+            body_front.x,
+            body_front.y - 10.0 * k,
+            throat_join.x,
+            throat_join.y,
+            base_throat.x,
+            base_throat.y,
+        );
+        pb.cubic_to(
+            throat_c1.x,
+            throat_c1.y,
+            throat_c2.x,
+            throat_c2.y,
+            head_bottom_front.x,
+            head_bottom_front.y,
+        );
 
-        let white = paint(pal.goose_white, 255);
-        if let Some(path) = &body_path {
-            geom::fill(layer, path, &white);
+        // Restrained oval head, continuous with both neck contours.
+        let a = head.pt(31.0, 25.0);
+        let b = head.pt(29.5, 15.0);
+        let p = head.pt(40.0, 12.0);
+        pb.cubic_to(a.x, a.y, b.x, b.y, p.x, p.y);
+        let a = head.pt(46.0, 9.5);
+        let b = head.pt(56.0, 12.0);
+        let p = head.pt(57.0, 19.0);
+        pb.cubic_to(a.x, a.y, b.x, b.y, p.x, p.y);
+        let a = head.pt(57.0, 23.5);
+        let b = head.pt(54.0, 26.5);
+        pb.cubic_to(a.x, a.y, b.x, b.y, head_bottom_back.x, head_bottom_back.y);
+
+        // Back-neck: straighter and fuller than the throat, widening into the shoulder.
+        pb.cubic_to(
+            back_c2.x,
+            back_c2.y,
+            back_c1.x,
+            back_c1.y,
+            base_back.x,
+            base_back.y,
+        );
+        let body_back = point(62.0, 71.9);
+        let shoulder = Vec2::lerp(base_back, body_back, 0.5) - fwd * (4.0 * k);
+        pb.cubic_to(
+            base_back.x - fwd.x * 4.0 * k,
+            base_back.y + 8.0 * k,
+            shoulder.x,
+            shoulder.y,
+            body_back.x,
+            body_back.y,
+        );
+        pb.close();
+        if let Some(path) = pb.finish() {
+            geom::stroke(layer, &path, &paint(pal.goose_outline, 255), ow * 2.0);
+            geom::fill(layer, &path, &paint(pal.goose_white, 255));
         }
-        if let Some(path) = &neck_path {
-            geom::fill(layer, path, &white);
-        }
-        disc(layer, skull_c, r_skull, &white);
-        disc(layer, cheek_c, r_cheek, &white);
     }
 
     // Belly shade (path6).
@@ -240,24 +294,33 @@ pub fn paint_side(layer: &mut Pixmap, rig: &Rig, layer_origin: Vec2, ss: f32, pa
         }
     }
 
-    // Throat shade under the head (path 5), head-anchored so it rides the tilt; it is
-    // drawn for the raised stance, so it fades out as the neck tucks.
+    // A longitudinal throat shade follows the narrower contour; it reinforces the
+    // front/back asymmetry without drawing a cross-neck join line.
     {
         let eased = {
             let p = rig.neck_lerp_percent;
             p * p * (3.0 - 2.0 * p)
         };
-        let alpha = (60.0 + 175.0 * eased) as u8;
-        let mut p = P::new(&head);
-        p.m(31.50, 29.70);
-        p.c(33.80, 31.10, 36.90, 32.50, 41.90, 33.10);
-        p.c(44.60, 33.50, 46.20, 36.80, 46.40, 42.30);
-        p.c(48.00, 41.40, 52.60, 36.80, 52.90, 26.40);
-        p.c(49.90, 29.60, 46.50, 30.80, 41.00, 29.80);
-        p.c(38.60, 29.30, 35.00, 27.70, 34.20, 27.30);
-        p.l(31.50, 29.70);
-        p.z();
-        if let Some(path) = p.finish() {
+        let alpha = (55.0 + 105.0 * eased) as u8;
+        let fwd = Vec2::new(mirror, 0.0);
+        let base = to_layer(rig.neck_base);
+        let c1 = to_layer(rig.neck_c1);
+        let c2 = to_layer(rig.neck_c2);
+        let under_head = head.pt(39.0, 26.0);
+        let mut pb = tiny_skia::PathBuilder::new();
+        let start = base + fwd * (3.0 * k);
+        pb.move_to(start.x, start.y);
+        let a = c1 + fwd * (5.0 * k);
+        let b = c2 + fwd * (3.5 * k);
+        pb.cubic_to(a.x, a.y, b.x, b.y, under_head.x, under_head.y);
+        let inner_head = head.pt(43.0, 27.0);
+        pb.line_to(inner_head.x, inner_head.y);
+        let b = c2 - fwd * (0.5 * k);
+        let end = base - fwd * (1.5 * k);
+        let a = c1 - fwd * (1.0 * k);
+        pb.cubic_to(b.x, b.y, a.x, a.y, end.x, end.y);
+        pb.close();
+        if let Some(path) = pb.finish() {
             geom::fill(layer, &path, &paint(pal.goose_shade, alpha));
         }
     }

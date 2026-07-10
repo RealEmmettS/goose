@@ -15,6 +15,14 @@
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
 
 ## Active
+- [ ] **R5 — v0.3.0 distribution-readiness stabilization** - fix audited config, renderer, platform, lifecycle, release, and site defects; publish only after the complete gate #r5s
+  - [x] Remove the obsolete `DESKTOP-GOOSE/` tree and refresh active licensing/provenance/docs.
+  - [x] Land config v2, safe setup/save/reload behavior, scoped CLI flags, and responsive nonblocking TUI control.
+  - [x] Fix long-runtime timekeeping, monitor-region layout, damage tracking, renderer concept C, behavior regressions, and built-in asset loading.
+  - [x] Harden Windows, macOS, X11, native Wayland reduced mode, audio, and local IPC behavior.
+  - [x] Replace lifecycle/install/update paths and make release publication atomic with compatibility artifacts.
+  - [x] Refresh `desktop-goose-site` install hierarchy, renderer assets, motion, responsiveness, accessibility, and release-data handling.
+  - [ ] Run the complete Rust, platform, lifecycle, site, artifact, and live-release verification gates.
 - [x] **Name interchangeability + site usage clarity** - verified `honk300`/`honk`/`goose` are fully interchangeable across every command (install aliases all three → same binary; `normalize_args` never branches on arg0; only internal `honk300 --version` self-call in update.rs). Locked in with `all_three_names_are_fully_interchangeable` test (13 CLI tests green). Site usage section reworked: consistent `honk300` display (no more honk300↔goose switching), natural order (start/stop → configure → install/autostart → pokes → flags), goose-speak kept as "Also:" notes, interchangeability banner (done 2026-07-08) #names
 - [x] **v0.2.1 release — side-view neck refinement** - version bump + changelog cut (commit eb40260); tag `v0.2.1` drove cargo-dist Release → chained macOS Packaging + Windows Installers; wrap-up email sent (done 2026-07-08) #v021
   - [x] Release + macOS Packaging + Windows Installers workflows green; full 40-asset set verified (universal2 DMG + darwin tarballs + Windows MSI/EXE ×2 arch); v0.2.1 is latest, latest/download serves real bytes.

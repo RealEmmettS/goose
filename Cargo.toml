@@ -42,7 +42,7 @@ tiny-skia = { version = "0.11", features = ["png-format"] }
 # and M12 owns the full config TUI.
 [package]
 name = "honk300"
-version = "0.2.1"
+version = "0.3.0"
 description = "Cross-platform Desktop Goose — a procedural goose that roams your screen"
 edition.workspace = true
 rust-version.workspace = true
@@ -53,7 +53,9 @@ default-run = "honk300"
 include = [
     "/Cargo.lock",
     "/Cargo.toml",
+    "/LICENSE",
     "/README.md",
+    "/THIRD_PARTY_ASSETS.md",
     "/Assets/**",
     "/crates/**",
     "/src/**",
@@ -87,13 +89,29 @@ honk-platform-windows = { path = "crates/honk-platform-windows" }
 # Audio playback (honks/bite/mud/pat). Pure-Rust decode via symphonia; cpal backend.
 # Windows-scoped for now; the macOS/Linux backends wire audio in M16/M17.
 rodio = "0.20"
+windows = { version = "0.58", features = ["Win32_System_SystemInformation"] }
 winreg = "0.52"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 honk-platform-macos = { path = "crates/honk-platform-macos" }
+rodio = "0.20"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 honk-platform-linux = { path = "crates/honk-platform-linux" }
+
+[target.'cfg(all(target_os = "linux", target_env = "gnu"))'.dependencies]
+rodio = "0.20"
+
+[dev-dependencies]
+tempfile = "3"
+
+# Temporary security backport of upstream revision d07c4f91f28b42e5a485823ffd9d8d5a210b1053:
+# crates.io wayland-scanner 0.31.10 is vendored with only that revision's quick-xml 0.41 fix.
+# The full upstream revision also contains unreleased breaking Wayland API work, so pinning the
+# whole git snapshot is incompatible with released smithay-client-toolkit 0.20. Remove this path
+# patch when a crates.io wayland-scanner release contains the d07 fix.
+[patch.crates-io]
+wayland-scanner = { path = "vendor/wayland-scanner" }
 
 # The profile cargo-dist will build with in the later packaging round.
 [profile.dist]
@@ -104,7 +122,8 @@ lto = "thin"
 cargo-dist-version = "0.31.0"
 ci = "github"
 allow-dirty = ["ci"]
-installers = ["shell", "powershell"]
+installers = []
+include = ["THIRD_PARTY_ASSETS.md"]
 targets = [
     "aarch64-pc-windows-msvc",
     "x86_64-pc-windows-msvc",

@@ -1,6 +1,7 @@
 use crate::assets;
 use crate::audio;
-use crate::runtime::RuntimeOptions;
+use crate::runtime::core::RuntimeCore;
+use crate::runtime::{audio_probe_capability, RuntimeOptions};
 use honk_config::{BackendCapability, BackendState, Config, EffectiveOptions};
 use honk_control::{
     BundleStatus, CapabilityStatus, CommandServer, ControlCommand, ControlResponse, PlatformStatus,
@@ -12,8 +13,8 @@ use honk_engine::render::{
 };
 use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
-    Accumulator, Clock, CollectWindowCommand, CollectWindowPayload, CursorCommand, LocalTime,
-    Pointer, PresenceSnapshot, Rect, Sound, Vec2, World,
+    CollectWindowCommand, CollectWindowPayload, CursorCommand, DesktopLayout, LocalTime, Pointer,
+    PresenceSnapshot, Rect, Sound, Vec2, World,
 };
 use honk_platform_windows::{
     init_dpi_awareness, local_time, pointer_state, presence_state, warp_cursor,
@@ -34,7 +35,6 @@ pub fn run(
 
     let mut overlay = Overlay::new()?;
     let primary_bounds = overlay.primary_monitor_bounds();
-    let virtual_bounds = overlay.virtual_desktop_bounds();
 
     // Backend capability only: Windows can always warp the cursor. The user's mouse-steal
     // preference is applied separately via MouseStealOptions::enabled in effective_options, so
@@ -66,8 +66,8 @@ pub fn run(
     } else {
         audio::Audio::new()
     };
-    if !initial_effective.no_sound && audio.is_none() {
-        audio_capability = BackendCapability::Failed;
+    if !initial_effective.no_sound {
+        audio_capability = audio_probe_capability(audio.is_some());
     }
 
     let mut warned_window_ride = false;
@@ -98,27 +98,24 @@ pub fn run(
         ),
     );
 
-    let world_bounds = world_bounds_for(
+    let layout = desktop_layout_for(
         effective.world.multi_monitor_chase,
         primary_bounds,
-        virtual_bounds,
-    );
-    let mut world = World::with_options(world_bounds, seed_from_clock(), effective.world);
+        overlay.monitor_bounds(),
+    )?;
+    let mut world = World::with_layout_and_options(layout, seed_from_clock(), effective.world);
     if let Some(kind) = smoke_collect_kind() {
         world.force_collect_window(kind);
     }
     let mut collect_controller = CollectWindowController::new(primary_bounds);
-    let mut accumulator = Accumulator::new();
-    let clock = Clock::start();
-    let mut last = clock.elapsed_secs();
-    let mut last_present = f32::NEG_INFINITY;
-    let mut last_render_bounds: Option<Rect> = None;
-    const PRESENT_INTERVAL: f32 = 1.0 / 60.0;
-    const PRESENCE_POLL_INTERVAL: f32 = 0.5;
+    let mut core = RuntimeCore::new();
+    const PRESENCE_POLL_INTERVAL: f64 = 0.5;
+    const AUDIO_RETRY_INTERVAL: f64 = 5.0;
     let mut warned_cursor_warp = false;
     let mut warned_collect_window = false;
     let mut warned_presence = false;
-    let mut last_presence_poll = f32::NEG_INFINITY;
+    let mut last_presence_poll = f64::NEG_INFINITY;
+    let mut next_audio_probe = 0.0;
 
     println!("honk300: a goose is loose on your desktop. Use `honk300 stop` to send it home.");
 
@@ -135,12 +132,12 @@ pub fn run(
         if overlay.take_monitors_changed() {
             match overlay.rebuild_monitors() {
                 Ok(_) => {
-                    let new_bounds = world_bounds_for(
+                    let new_layout = desktop_layout_for(
                         effective.world.multi_monitor_chase,
                         overlay.primary_monitor_bounds(),
-                        overlay.virtual_desktop_bounds(),
-                    );
-                    world.bounds = new_bounds;
+                        overlay.monitor_bounds(),
+                    )?;
+                    world.apply_layout(new_layout);
                     // Overlay HWNDs may have been added/removed; rebuild the foreign-window
                     // watcher so its own-overlay filter matches the new window set.
                     if window_watcher.is_some() {
@@ -160,7 +157,6 @@ pub fn run(
                         }
                     }
                     // Force a full repaint on the next present against the rebuilt windows.
-                    last_render_bounds = None;
                     eprintln!(
                         "honk300: monitor topology changed; rebuilt overlay and world bounds."
                     );
@@ -171,6 +167,8 @@ pub fn run(
             }
         }
 
+        let frame = core.begin_frame();
+
         while let Some(request) = server.try_recv() {
             match request.command() {
                 ControlCommand::Stop => {
@@ -180,8 +178,17 @@ pub fn run(
                 }
                 ControlCommand::Reload => {
                     let response = match Config::load_existing(&options.config_path) {
+                        Ok(next_config)
+                            if RuntimeCore::restart_required_reason(&config, &next_config)
+                                .is_some() =>
+                        {
+                            let reason =
+                                RuntimeCore::restart_required_reason(&config, &next_config)
+                                    .expect("guard established restart-required changes");
+                            eprintln!("honk300: reload rejected; restart required for {reason}");
+                            ControlResponse::Err("RESTART_REQUIRED".into())
+                        }
                         Ok(next_config) => {
-                            let prior_multi_monitor_chase = effective.world.multi_monitor_chase;
                             config = next_config;
                             effective = effective_options(
                                 &config,
@@ -229,14 +236,7 @@ pub fn run(
                                 audio = None;
                             } else if audio.is_none() {
                                 audio = audio::Audio::new();
-                                if audio.is_none() {
-                                    audio_capability = BackendCapability::Failed;
-                                }
-                            }
-                            if effective.world.multi_monitor_chase != prior_multi_monitor_chase {
-                                eprintln!(
-                                    "honk300: multi-monitor chase changed; restart required for bounds/window rebuild"
-                                );
+                                audio_capability = audio_probe_capability(audio.is_some());
                             }
                             world.apply_options(effective.world);
                             println!("honk300: reload command applied.");
@@ -268,7 +268,7 @@ pub fn run(
             }
         }
 
-        let now = clock.elapsed_secs();
+        let now = frame.now();
         world.set_local_time(runtime_local_time());
         if now - last_presence_poll >= PRESENCE_POLL_INTERVAL {
             last_presence_poll = now;
@@ -286,9 +286,6 @@ pub fn run(
                 }
             }
         }
-
-        let dt = now - last;
-        last = now;
 
         // Feed the cursor before ticking: tasks such as nab_mouse chase the newest pointer
         // sample, then emit platform-free cursor commands for the backend to apply below.
@@ -324,9 +321,7 @@ pub fn run(
         world.set_foreign_window_drag(dragged_window);
         world.set_collect_window_snapshot(collect_controller.snapshot());
 
-        for _ in 0..accumulator.pump(dt) {
-            world.tick();
-        }
+        core.tick(&mut world, frame);
 
         for command in world.take_collect_window_commands() {
             let result = match command {
@@ -388,19 +383,33 @@ pub fn run(
             }
         }
 
+        if let Some(audio) = audio.as_mut() {
+            audio.poll();
+        }
+        if !effective.no_sound && audio.is_none() && now >= next_audio_probe {
+            audio = audio::Audio::new();
+            audio_capability = audio_probe_capability(audio.is_some());
+            next_audio_probe = now + AUDIO_RETRY_INTERVAL;
+        }
+
         // Drain and play any sounds the sim requested this frame (silently dropped if muted).
         let sounds = world.take_sounds();
+        let mut audio_failed = false;
         if let Some(a) = audio.as_mut() {
             for s in sounds {
-                if sound_enabled(effective.audio, s) {
-                    a.play(s);
+                if sound_enabled(effective.audio, s) && a.play(s) == audio::PlayOutcome::Failed {
+                    audio_failed = true;
+                    break;
                 }
             }
         }
+        if audio_failed {
+            audio = None;
+            audio_capability = BackendCapability::Failed;
+            next_audio_probe = now + AUDIO_RETRY_INTERVAL;
+        }
 
-        if now - last_present >= PRESENT_INTERVAL {
-            last_present = now;
-            let dirty = world.render_bounds(last_render_bounds);
+        if let Some(dirty) = core.damage(&world, frame) {
             let width = dirty.width().ceil().max(1.0) as u32;
             let height = dirty.height().ceil().max(1.0) as u32;
             let origin = dirty.min;
@@ -434,7 +443,6 @@ pub fn run(
             render_hearts(&mut canvas, world.hearts(), world.now(), origin);
             render_sleepies(&mut canvas, world.sleepies(), world.now(), origin);
             overlay.present(dirty, &canvas)?;
-            last_render_bounds = Some(dirty);
         }
 
         // Yield so the loop doesn't busy-spin; the accumulator keeps the sim at 120 Hz.
@@ -484,11 +492,24 @@ fn sound_enabled(config: honk_config::AudioConfig, sound: Sound) -> bool {
     }
 }
 
+#[cfg(test)]
 fn world_bounds_for(multi_monitor_chase: bool, primary_bounds: Rect, virtual_bounds: Rect) -> Rect {
     if multi_monitor_chase {
         virtual_bounds
     } else {
         primary_bounds
+    }
+}
+
+fn desktop_layout_for(
+    multi_monitor_chase: bool,
+    primary_bounds: Rect,
+    monitor_bounds: Vec<Rect>,
+) -> Result<DesktopLayout, honk_engine::DesktopLayoutError> {
+    if multi_monitor_chase {
+        DesktopLayout::new(monitor_bounds)
+    } else {
+        Ok(DesktopLayout::single(primary_bounds))
     }
 }
 

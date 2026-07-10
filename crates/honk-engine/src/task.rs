@@ -1,7 +1,7 @@
 //! The goose's task state machine — the AI.
 //!
-//! Mirrors the original's model (`GooseTaskInfo` + `TaskDatabase`, `Exports.cs`): a default
-//! roaming state picks a random *pickable* task via the biased [`Deck`](crate::rng::Deck);
+//! The in-tree task model uses a default roaming state that picks a random *pickable* task
+//! via the biased [`Deck`](crate::rng::Deck);
 //! a task only sets `target_pos` / speed / acceleration and the engine auto-locomotes
 //! (see [`crate::locomotion`]). A scripted **FirstUX** intro runs once before roaming.
 //!
@@ -19,7 +19,8 @@ use crate::cursor::{CursorCommand, MouseStealOptions, TimingOptions};
 use crate::entity::GooseEntity;
 use crate::foreign_window::{ForeignWindowOptions, ForeignWindowSnapshot};
 use crate::interaction::Pointer;
-use crate::math::{clamp, Rect, Vec2};
+use crate::layout::DesktopLayout;
+use crate::math::{Rect, Vec2};
 use crate::rng::{RandomSource, SplitMix64};
 use crate::sound::Sound;
 
@@ -30,20 +31,22 @@ pub const MIN_WANDERING_TIME: f32 = 20.0;
 pub const MAX_WANDERING_TIME: f32 = 40.0;
 
 /// How long the click→charge "hyper" burst lasts, in seconds (M6, plan §5.6 hyper).
-pub const HYPER_DURATION: f32 = 2.5;
-const COLLECT_SPAWN_TIMEOUT: f32 = 3.0;
-const COLLECT_VISIBLE_DWELL: f32 = 4.0;
+pub const HYPER_DURATION: f64 = 2.5;
+const COLLECT_SPAWN_TIMEOUT: f64 = 3.0;
+const COLLECT_VISIBLE_DWELL: f64 = 4.0;
 const COLLECT_PICKUP_DISTANCE: f32 = 42.0;
 const COLLECT_RELEASE_DISTANCE: f32 = 5.0;
 
 /// Per-tick context handed to a running task.
 pub struct TaskCtx<'a> {
     /// World clock (seconds).
-    pub now: f32,
+    pub now: f64,
     /// Fixed tick duration.
     pub dt: f32,
     /// Roaming bounds (the virtual-desktop space).
     pub bounds: Rect,
+    /// Actual visible monitor regions; ordinary targets must stay inside one of them.
+    pub layout: &'a DesktopLayout,
     /// Shared RNG for target/dwell choices.
     pub rng: &'a mut SplitMix64,
     /// Sound requests a task wants played this frame.
@@ -76,6 +79,11 @@ pub struct TaskCtx<'a> {
 pub trait Task {
     /// Stable identifier (for `do <id>` pokes and debugging).
     fn id(&self) -> &'static str;
+    /// Selected collect-window content, when this task controls one. Used to cancel one
+    /// disabled media class without disabling the still-valid sibling class.
+    fn collect_kind(&self) -> Option<CollectWindowKind> {
+        None
+    }
     /// Advance one tick; return `true` when finished (the engine then picks the next task).
     fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool;
 }
@@ -85,24 +93,14 @@ fn arrived(goose: &GooseEntity, tol: f32) -> bool {
 }
 
 fn random_point(ctx: &mut TaskCtx) -> Vec2 {
-    Vec2::new(
-        ctx.rng.range(ctx.bounds.min.x, ctx.bounds.max.x),
-        ctx.rng.range(ctx.bounds.min.y, ctx.bounds.max.y),
-    )
-}
-
-fn clamp_point(p: Vec2, bounds: Rect) -> Vec2 {
-    Vec2::new(
-        clamp(p.x, bounds.min.x, bounds.max.x),
-        clamp(p.y, bounds.min.y, bounds.max.y),
-    )
+    ctx.layout.sample_point(ctx.rng)
 }
 
 /// Roam to random points for a random dwell, occasionally tracking mud. The default
 /// pickable task (the original `Task_Wander`, with mud folded in for now).
 #[derive(Default)]
 pub struct WanderTask {
-    end_time: Option<f32>,
+    end_time: Option<f64>,
 }
 
 impl WanderTask {
@@ -159,7 +157,7 @@ impl Task for AutumnLeafPileTask {
 
         goose.current_speed = goose.parameters.run_speed;
         goose.current_acceleration = goose.parameters.acceleration_normal;
-        goose.target_pos = clamp_point(target_pos, ctx.bounds);
+        goose.target_pos = ctx.layout.clamp_point(target_pos);
         arrived(goose, 20.0)
     }
 }
@@ -181,7 +179,8 @@ impl Task for WanderTask {
                 ctx.now
                     + ctx
                         .rng
-                        .range(ctx.timing.min_wandering_time, ctx.timing.max_wandering_time),
+                        .range(ctx.timing.min_wandering_time, ctx.timing.max_wandering_time)
+                        as f64,
             );
         }
         if arrived(goose, 1.5) {
@@ -212,7 +211,7 @@ pub enum ExcursionKind {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ExcursionState {
     Depart,
-    Away { until: f32 },
+    Away { until: f64 },
     Return,
 }
 
@@ -265,7 +264,7 @@ impl Task for ExcursionTask {
                 goose.target_pos = self.exit;
                 if arrived(goose, 8.0) {
                     self.state = ExcursionState::Away {
-                        until: ctx.now + self.away_secs,
+                        until: ctx.now + self.away_secs as f64,
                     };
                 }
                 false
@@ -289,7 +288,7 @@ impl Task for ExcursionTask {
                 if arrived(goose, 6.0) {
                     if let ExcursionKind::Puddle { mud_secs } = self.kind {
                         // Came home through a puddle: track mud for a while.
-                        goose.track_mud_end_time = ctx.now + mud_secs;
+                        goose.track_mud_end_time = ctx.now + mud_secs as f64;
                     }
                     return true;
                 }
@@ -304,7 +303,7 @@ impl Task for ExcursionTask {
 /// restores whatever task was running before. The full self-triggered mood FSM is M13.
 #[derive(Default)]
 pub struct HyperTask {
-    end_time: Option<f32>,
+    end_time: Option<f64>,
 }
 
 impl HyperTask {
@@ -325,7 +324,15 @@ impl Task for HyperTask {
 
         if self.end_time.is_none() {
             goose.target_pos = random_point(ctx);
-            ctx.sounds.push(Sound::high_honk()); // an indignant honk at being clicked
+            // An on-hour or mood transition may already have queued a honk this tick.
+            // Hyper shares that immediate sound instead of stacking identical playback.
+            if !ctx
+                .sounds
+                .iter()
+                .any(|sound| matches!(sound, Sound::Honk(_)))
+            {
+                ctx.sounds.push(Sound::high_honk());
+            }
             self.end_time = Some(ctx.now + HYPER_DURATION);
         } else if arrived(goose, 3.0) {
             // Bolt to a fresh spot the instant it arrives — erratic, no dwell.
@@ -343,7 +350,7 @@ enum NabState {
     SeekingMouse,
     DraggingMouseAway {
         original_vector_to_mouse: Vec2,
-        grabbed_at: f32,
+        grabbed_at: f64,
         target: Vec2,
     },
 }
@@ -390,7 +397,7 @@ impl Task for NabMouseTask {
 
         match self.state {
             NabState::SeekingMouse => {
-                goose.target_pos = clamp_point(ctx.pointer.pos, ctx.bounds);
+                goose.target_pos = ctx.layout.clamp_point(ctx.pointer.pos);
 
                 if Vec2::distance(goose.rig.beak_tip, ctx.pointer.pos)
                     <= ctx.mouse_steal.grab_distance
@@ -430,8 +437,9 @@ impl Task for NabMouseTask {
                 }
 
                 goose.target_pos = target;
-                let desired_cursor =
-                    clamp_point(goose.rig.beak_tip + original_vector_to_mouse, ctx.bounds);
+                let desired_cursor = ctx
+                    .layout
+                    .clamp_point(goose.rig.beak_tip + original_vector_to_mouse);
 
                 if Vec2::distance(ctx.pointer.pos, desired_cursor) > ctx.mouse_steal.drop_distance {
                     return true;
@@ -439,7 +447,7 @@ impl Task for NabMouseTask {
 
                 ctx.cursor_commands
                     .push(CursorCommand::WarpTo(desired_cursor));
-                ctx.now - grabbed_at >= ctx.mouse_steal.succ_time
+                ctx.now - grabbed_at >= ctx.mouse_steal.succ_time as f64
             }
         }
     }
@@ -465,7 +473,7 @@ enum CollectState {
     WaitForSpawn {
         request: CollectWindowRequestId,
         payload: CollectWindowPayload,
-        deadline: f32,
+        deadline: f64,
     },
     RunToPickup {
         request: CollectWindowRequestId,
@@ -481,7 +489,7 @@ enum CollectState {
         request: CollectWindowRequestId,
         payload: CollectWindowPayload,
         typed: bool,
-        visible_until: f32,
+        visible_until: f64,
     },
 }
 
@@ -574,8 +582,22 @@ impl Task for CollectWindowTask {
         "collect_window"
     }
 
+    fn collect_kind(&self) -> Option<CollectWindowKind> {
+        self.forced.or(match self.state {
+            CollectState::Choose => None,
+            CollectState::WaitForSpawn { payload, .. }
+            | CollectState::RunToPickup { payload, .. }
+            | CollectState::DraggingBack { payload, .. }
+            | CollectState::Release { payload, .. } => Some(payload.kind()),
+        })
+    }
+
     fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
-        if !ctx.collect_window.active() {
+        if !ctx.collect_window.active()
+            || self
+                .collect_kind()
+                .is_some_and(|kind| !ctx.collect_window.kind_active(kind))
+        {
             return true;
         }
 
@@ -615,10 +637,12 @@ impl Task for CollectWindowTask {
                     return true;
                 };
                 let pickup = snapshot.center();
-                goose.target_pos = clamp_point(pickup, ctx.bounds);
+                goose.target_pos = ctx.layout.clamp_point(pickup);
                 if Vec2::distance(goose.rig.beak_tip, pickup) <= COLLECT_PICKUP_DISTANCE {
                     let offset = snapshot.rect.min - goose.rig.beak_tip;
-                    let release_at = (ctx.bounds.min + ctx.bounds.max) * 0.5;
+                    let release_at = ctx
+                        .layout
+                        .clamp_point((ctx.bounds.min + ctx.bounds.max) * 0.5);
                     ctx.collect_window_commands
                         .push(CollectWindowCommand::SetPassthrough {
                             id: snapshot.id,
@@ -642,7 +666,7 @@ impl Task for CollectWindowTask {
                 let Some(snapshot) = Self::live_snapshot(ctx, request, payload) else {
                     return true;
                 };
-                goose.target_pos = clamp_point(release_at, ctx.bounds);
+                goose.target_pos = ctx.layout.clamp_point(release_at);
                 ctx.collect_window_commands
                     .push(CollectWindowCommand::Move {
                         id: snapshot.id,
@@ -769,7 +793,7 @@ impl Task for PerchRideTask {
 /// `FirstUX_SecondTask` in the original; text/honk flourishes arrive with M5 audio + notes.)
 #[derive(Default)]
 pub struct FirstUxTask {
-    intro_until: Option<f32>,
+    intro_until: Option<f64>,
 }
 
 impl FirstUxTask {
@@ -789,9 +813,11 @@ impl Task for FirstUxTask {
                 // Walk in to centre stage.
                 goose.current_speed = goose.parameters.walk_speed;
                 goose.current_acceleration = goose.parameters.acceleration_normal;
-                goose.target_pos = (ctx.bounds.min + ctx.bounds.max) * 0.5;
+                goose.target_pos = ctx
+                    .layout
+                    .clamp_point((ctx.bounds.min + ctx.bounds.max) * 0.5);
                 if arrived(goose, 2.0) {
-                    self.intro_until = Some(ctx.now + ctx.timing.first_wander_time);
+                    self.intro_until = Some(ctx.now + ctx.timing.first_wander_time as f64);
                 }
                 false
             }
@@ -806,16 +832,18 @@ mod tests {
     use super::*;
 
     fn base_ctx<'a>(
-        now: f32,
+        now: f64,
         rng: &'a mut SplitMix64,
         sounds: &'a mut Vec<Sound>,
         cursor_commands: &'a mut Vec<CursorCommand>,
     ) -> TaskCtx<'a> {
         let collect_window_commands = Box::leak(Box::new(Vec::new()));
+        let layout = Box::leak(Box::new(DesktopLayout::single(ctx_bounds())));
         TaskCtx {
             now,
             dt: 1.0 / 120.0,
             bounds: ctx_bounds(),
+            layout,
             rng,
             sounds,
             cursor_commands,
@@ -893,7 +921,7 @@ mod tests {
         assert_eq!(goose.current_speed, goose.parameters.walk_speed);
         // Well past the max dwell it reports finished.
         let mut ctx = base_ctx(
-            MAX_WANDERING_TIME + 1.0,
+            (MAX_WANDERING_TIME + 1.0) as f64,
             &mut rng,
             &mut sounds,
             &mut cursor_commands,
@@ -1001,7 +1029,10 @@ mod tests {
 
     #[test]
     fn mouse_steal_default_drag_time_matches_hyper_burst() {
-        assert_eq!(MouseStealOptions::default().succ_time, HYPER_DURATION);
+        assert_eq!(
+            MouseStealOptions::default().succ_time as f64,
+            HYPER_DURATION
+        );
     }
 
     #[test]
@@ -1025,7 +1056,7 @@ mod tests {
         let mut ctx = base_ctx(1.0, &mut rng, &mut sounds, &mut cursor_commands);
         assert!(!task.run(&mut goose, &mut ctx));
         let mut ctx = base_ctx(
-            1.0 + FIRST_WANDER_TIME + 0.1,
+            (1.0 + FIRST_WANDER_TIME + 0.1) as f64,
             &mut rng,
             &mut sounds,
             &mut cursor_commands,
@@ -1142,7 +1173,7 @@ mod tests {
 
         ctx.cursor_commands.clear();
         ctx.pointer.pos = expected;
-        ctx.now = ctx.mouse_steal.succ_time + 0.01;
+        ctx.now = ctx.mouse_steal.succ_time as f64 + 0.01;
         assert!(task.run(&mut goose, &mut ctx), "nab ends after succ_time");
     }
 

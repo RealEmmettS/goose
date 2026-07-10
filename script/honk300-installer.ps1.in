@@ -1,0 +1,121 @@
+[CmdletBinding()]
+param([switch]$Update)
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
+$Version = '__VERSION__'
+$Tag = '__TAG__'
+$Commit = '__COMMIT__'
+$Repository = 'https://github.com/RealEmmettS/goose'
+$arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+
+switch -Regex ($arch) {
+    '^(AMD64|x86_64)$' {
+        $triple = 'x86_64-pc-windows-msvc'
+        $expectedHash = '__SHA_WINDOWS_X64_MSI__'
+    }
+    '^(ARM64|aarch64)$' {
+        $triple = 'aarch64-pc-windows-msvc'
+        $expectedHash = '__SHA_WINDOWS_ARM64_MSI__'
+    }
+    default { throw "Unsupported Windows architecture: $arch" }
+}
+
+$artifact = "honk300-$triple.msi"
+$base = if ($env:HONK300_DOWNLOAD_BASE) { $env:HONK300_DOWNLOAD_BASE.TrimEnd('/') } else { "$Repository/releases/download/$Tag" }
+$url = "$base/$artifact"
+$tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("honk300-" + [guid]::NewGuid().ToString('N'))
+$path = Join-Path $tempRoot $artifact
+
+try {
+    New-Item -ItemType Directory -Path $tempRoot | Out-Null
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $path -Headers @{ 'User-Agent' = 'honk300-installer' }
+    $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualHash -ne $expectedHash.ToLowerInvariant()) {
+        throw "SHA-256 mismatch for $artifact; refusing to run it"
+    }
+
+    $systemDirectory = [Environment]::GetFolderPath([Environment+SpecialFolder]::System)
+    if ([string]::IsNullOrWhiteSpace($systemDirectory)) {
+        throw 'Windows system directory could not be resolved'
+    }
+    $msiexec = Join-Path $systemDirectory 'msiexec.exe'
+    $msiexecItem = Get-Item -LiteralPath $msiexec -Force -ErrorAction Stop
+    if ($msiexecItem.PSIsContainer -or (($msiexecItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+        throw "Windows Installer is not a regular system executable: $msiexec"
+    }
+    $arguments = @('/i', ('"' + $path + '"'), '/passive', '/norestart')
+    $process = Start-Process -FilePath $msiexec -ArgumentList $arguments -Verb RunAs -Wait -PassThru
+    if ($process.ExitCode -notin @(0, 3010)) {
+        throw "msiexec.exe exited with code $($process.ExitCode)"
+    }
+
+    $installed = Join-Path $env:ProgramFiles 'honk300\bin\honk300.exe'
+    if (-not (Test-Path -LiteralPath $installed -PathType Leaf)) {
+        throw "Global MSI completed but the installed executable is missing: $installed"
+    }
+    $reported = (& $installed --version | Select-Object -Last 1).Trim().Split()[-1] -replace '[+-].*$', ''
+    if ($reported -ne $Version) {
+        throw "Global MSI completed but installed version is $reported, expected $Version"
+    }
+
+    $installRoot = Join-Path $env:ProgramFiles 'honk300'
+    $runKey = Get-ItemProperty -LiteralPath 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue
+    $autostartEnabled = $null -ne $runKey -and $runKey.PSObject.Properties.Name -contains 'Honk300'
+    $receipt = [ordered]@{
+        schema = 'honk300.install.v1'
+        version = $Version
+        tag = $Tag
+        commit = $Commit
+        channel = 'powershell-global-msi'
+        layout = 'windows-global-msi'
+        target = $triple
+        artifact = [ordered]@{ name = $artifact; sha256 = $expectedHash.ToLowerInvariant() }
+        install_root = $installRoot
+        aliases = @(
+            (Join-Path $installRoot 'bin\honk300.exe'),
+            (Join-Path $installRoot 'bin\honk.exe'),
+            (Join-Path $installRoot 'bin\goose.exe')
+        )
+        autostart = [ordered]@{ enabled = $autostartEnabled; owner = 'msi' }
+    }
+    $receiptDir = Join-Path $env:LOCALAPPDATA 'honk300'
+    $receiptPath = Join-Path $receiptDir 'install-receipt.json'
+    $receiptTemp = Join-Path $receiptDir ('.install-receipt.' + [guid]::NewGuid().ToString('N') + '.tmp')
+    if (Test-Path -LiteralPath $receiptDir) {
+        $receiptDirectoryItem = Get-Item -LiteralPath $receiptDir -Force
+        if (($receiptDirectoryItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "refusing to use a reparse-point install receipt directory: $receiptDir"
+        }
+        if (-not $receiptDirectoryItem.PSIsContainer) {
+            throw "install receipt directory is not a directory: $receiptDir"
+        }
+    } else {
+        New-Item -ItemType Directory -Path $receiptDir | Out-Null
+    }
+    if (Test-Path -LiteralPath $receiptPath) {
+        $receiptItem = Get-Item -LiteralPath $receiptPath -Force
+        if (($receiptItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "refusing to replace a reparse-point install receipt: $receiptPath"
+        }
+        if ($receiptItem.PSIsContainer) {
+            throw "install receipt is not a regular file: $receiptPath"
+        }
+        try {
+            $existingReceipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+        } catch {
+            throw "refusing to replace a foreign install receipt: $receiptPath"
+        }
+        if ($existingReceipt.schema -ne 'honk300.install.v1') {
+            throw "refusing to replace a foreign install receipt: $receiptPath"
+        }
+    }
+    [IO.File]::WriteAllText($receiptTemp, (($receipt | ConvertTo-Json -Depth 5) + [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $receiptTemp -Destination $receiptPath -Force
+
+    Write-Host "honk300 $Version installed for all Windows users."
+} finally {
+    Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+}

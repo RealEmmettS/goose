@@ -1,11 +1,9 @@
 //! Procedural feet — the stateful plant-and-swing walking gait.
 //!
-//! Verified constants (`Exports.cs`, `ProceduralFeets`): `feetDistanceApart = 6`,
-//! `wantStepAtDistance = 5`, `overshootFraction = 0.4`. The original keeps each foot
-//! **planted** in world space and swings it forward (with overshoot) only once it lags
-//! too far behind its home under the body; the exact update math lives in the closed
-//! binary, so [`FeetState`] is a clean-room stateful reconstruction guided by those
-//! constants. A planted foot never slides: that is the invariant the old stateless
+//! Frozen compatibility constants: `feetDistanceApart = 6`, `wantStepAtDistance = 5`,
+//! `overshootFraction = 0.4`. [`FeetState`] keeps each foot **planted** in world space
+//! and swings it forward (with overshoot) only once it lags too far behind its home
+//! under the body. A planted foot never slides: that is the invariant the old stateless
 //! sine gait broke (feet "moonwalked" along with the body) and the one pinned by test.
 //!
 //! `FeetState` lives on the entity across ticks (`GooseEntity::anim`). Each tick it is

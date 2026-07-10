@@ -1,7 +1,7 @@
 //! Muddy footprints: a fixed 64-slot ring buffer of fading marks.
 //!
-//! Verified constants (`Exports.cs`, `FootMark`): `Lifetime = 8.5 s`, `ShrinkTime = 1 s`,
-//! ring buffer length 64. A mark renders full-size for its first `Lifetime - ShrinkTime`
+//! Frozen in-tree constants: `Lifetime = 8.5 s`, `ShrinkTime = 1 s`, ring buffer length
+//! 64. A mark renders full-size for its first `Lifetime - ShrinkTime`
 //! seconds, then shrinks to nothing over the final `ShrinkTime`.
 
 use crate::math::Vec2;
@@ -35,21 +35,21 @@ pub struct FootMark {
     /// World position of the print.
     pub position: Vec2,
     /// Wall-clock time the print was created.
-    pub created: f32,
+    pub created: f64,
 }
 
 impl FootMark {
     /// Remaining-life scale in `[0, 1]` at time `now`: `1.0` while fresh, ramping to
     /// `0.0` across the final [`SHRINK_TIME`] seconds; `0.0` once dead.
-    pub fn scale(&self, now: f32) -> f32 {
+    pub fn scale(&self, now: f64) -> f32 {
         self.scale_with_timing(now, FootMarkTiming::default())
     }
 
     /// Remaining-life scale using explicit runtime timing.
-    pub fn scale_with_timing(&self, now: f32, timing: FootMarkTiming) -> f32 {
+    pub fn scale_with_timing(&self, now: f64, timing: FootMarkTiming) -> f32 {
         let lifetime = timing.lifetime.max(0.001);
         let shrink_time = timing.shrink_time.max(0.001).min(lifetime);
-        let remaining = lifetime - (now - self.created);
+        let remaining = lifetime - (now - self.created) as f32;
         if remaining <= 0.0 {
             0.0
         } else if remaining >= shrink_time {
@@ -60,13 +60,13 @@ impl FootMark {
     }
 
     /// Whether the print is still within its lifetime at `now`.
-    pub fn is_alive(&self, now: f32) -> bool {
+    pub fn is_alive(&self, now: f64) -> bool {
         self.is_alive_with_timing(now, FootMarkTiming::default())
     }
 
     /// Whether the print is still alive using explicit runtime timing.
-    pub fn is_alive_with_timing(&self, now: f32, timing: FootMarkTiming) -> bool {
-        now - self.created <= timing.lifetime.max(0.001)
+    pub fn is_alive_with_timing(&self, now: f64, timing: FootMarkTiming) -> bool {
+        now - self.created <= timing.lifetime.max(0.001) as f64
     }
 }
 
@@ -94,7 +94,7 @@ impl FootMarks {
 
     /// Drop a new print at `position`, created at `now`. Overwrites the oldest slot
     /// when the buffer is full.
-    pub fn add(&mut self, position: Vec2, now: f32) {
+    pub fn add(&mut self, position: Vec2, now: f64) {
         self.slots[self.next] = Some(FootMark {
             position,
             created: now,
@@ -103,14 +103,14 @@ impl FootMarks {
     }
 
     /// All prints still alive at `now`, with their current [`FootMark::scale`].
-    pub fn active(&self, now: f32) -> impl Iterator<Item = (FootMark, f32)> + '_ {
+    pub fn active(&self, now: f64) -> impl Iterator<Item = (FootMark, f32)> + '_ {
         self.active_with_timing(now, FootMarkTiming::default())
     }
 
     /// All prints still alive at `now`, using explicit runtime timing.
     pub fn active_with_timing(
         &self,
-        now: f32,
+        now: f64,
         timing: FootMarkTiming,
     ) -> impl Iterator<Item = (FootMark, f32)> + '_ {
         self.slots
@@ -121,12 +121,12 @@ impl FootMarks {
     }
 
     /// Count of prints alive at `now`.
-    pub fn alive_count(&self, now: f32) -> usize {
+    pub fn alive_count(&self, now: f64) -> usize {
         self.active(now).count()
     }
 
     /// Count of prints alive at `now`, using explicit runtime timing.
-    pub fn alive_count_with_timing(&self, now: f32, timing: FootMarkTiming) -> usize {
+    pub fn alive_count_with_timing(&self, now: f64, timing: FootMarkTiming) -> usize {
         self.active_with_timing(now, timing).count()
     }
 }

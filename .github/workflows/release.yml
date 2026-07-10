@@ -1,207 +1,437 @@
 name: Release
 
-permissions:
-  contents: write
-
 on:
-  pull_request:
   push:
     tags:
-      - '**[0-9]+.[0-9]+.[0-9]+*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing immutable stable tag, for example v0.3.0"
+        required: true
+        type: string
+      commit:
+        description: "Full 40-character commit SHA named by the tag"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   plan:
     runs-on: ubuntu-22.04
     outputs:
-      val: ${{ steps.plan.outputs.manifest }}
-      tag: ${{ !github.event.pull_request && github.ref_name || '' }}
-      tag-flag: ${{ !github.event.pull_request && format('--tag={0}', github.ref_name) || '' }}
-      publishing: ${{ !github.event.pull_request }}
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      manifest: ${{ steps.plan.outputs.manifest }}
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.release.outputs.commit }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Resolve immutable release identity
+        id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_COMMIT: ${{ inputs.commit }}
+          REF_TAG: ${{ github.ref_name }}
+          REF_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            tag="$INPUT_TAG"
+            commit="$INPUT_COMMIT"
+          else
+            tag="$REF_TAG"
+            commit="$REF_COMMIT"
+          fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "unstable tag: $tag" >&2; exit 1; }
+          [[ "$commit" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "invalid commit: $commit" >&2; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "commit=${commit,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact release commit
+        uses: actions/checkout@v6
         with:
+          ref: ${{ steps.release.outputs.commit }}
+          fetch-depth: 0
           persist-credentials: false
-          submodules: recursive
-      - name: Install cargo-dist
+
+      - name: Prove tag, commit, checkout, and package version agree
         shell: bash
         run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          test "$(git rev-parse HEAD)" = '${{ steps.release.outputs.commit }}'
+          test "$(git rev-parse '${{ steps.release.outputs.tag }}^{commit}')" = "$(git rev-parse HEAD)"
+          version="$(sed -n '/^\[package\]$/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)"
+          test "v$version" = '${{ steps.release.outputs.tag }}'
+
+      - name: Install pinned cargo-dist
+        shell: bash
+        run: |
+          set -euo pipefail
           mkdir -p "$HOME/.cargo/bin"
+          archive="$(mktemp)"
+          trap 'rm -f "$archive"' EXIT
           curl --proto '=https' --tlsv1.2 -fL --retry 6 --retry-all-errors --retry-delay 5 \
             https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-x86_64-unknown-linux-gnu.tar.xz \
-            | tar -xJ -C "$HOME/.cargo/bin" --strip-components=1 cargo-dist-x86_64-unknown-linux-gnu/dist
+            -o "$archive"
+          echo "cd355dab0b4c02fb59038fef87655550021d07f45f1d82f947a34ef98560abb8  $archive" \
+            | sha256sum -c -
+          tar -xJf "$archive" -C "$HOME/.cargo/bin" --strip-components=1 \
+            cargo-dist-x86_64-unknown-linux-gnu/dist
           chmod +x "$HOME/.cargo/bin/dist"
-          "$HOME/.cargo/bin/dist" --version
-      - name: Cache cargo-dist
-        uses: actions/upload-artifact@v6
-        with:
-          name: cargo-dist-cache
-          path: ~/.cargo/bin/dist
-      - id: plan
+          dist --version
+
+      - name: Plan portable artifacts
+        id: plan
         shell: bash
         run: |
-          dist ${{ (!github.event.pull_request && format('host --steps=create --tag={0}', github.ref_name)) || 'plan' }} --output-format=json > plan-dist-manifest.json
-          cat plan-dist-manifest.json
-          echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
-      - name: Upload dist plan
+          set -euo pipefail
+          dist plan --tag='${{ steps.release.outputs.tag }}' --output-format=json > plan-dist-manifest.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("plan-dist-manifest.json")
+          manifest = json.loads(path.read_text(encoding="utf-8"))
+          matrix = manifest["ci"]["github"]["artifacts_matrix"]["include"]
+          for job in matrix:
+              container = job.get("container")
+              if container:
+                  if container.get("image") != "messense/cargo-xwin":
+                      raise SystemExit(f"unexpected release container: {container!r}")
+                  container["image"] = "messense/cargo-xwin@sha256:62351ad39ca7f3bd60e8e6e186d8fd35732876dda6bef93d64ee368234a3c75c"
+              packages = job.get("packages_install", "")
+              packages = packages.replace("pip3 install --upgrade pip\n", "")
+              packages = packages.replace("pip3 install cargo-xwin", "pip3 install cargo-xwin==0.22.0")
+              job["packages_install"] = packages
+          path.write_text(json.dumps(manifest, separators=(",", ":")), encoding="utf-8")
+          PY
+          jq . plan-dist-manifest.json
+          echo "manifest=$(jq -c . plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve the build plan for diagnostics
         uses: actions/upload-artifact@v6
         with:
-          name: artifacts-plan-dist-manifest
+          name: internal-plan-dist-manifest
           path: plan-dist-manifest.json
+          retention-days: 7
 
-  build-local-artifacts:
-    name: build-local-artifacts (${{ join(matrix.targets, ', ') }})
+  build-portable-artifacts:
+    name: portable (${{ join(matrix.targets, ', ') }})
     needs: plan
-    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload') }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix }}
+      matrix: ${{ fromJson(needs.plan.outputs.manifest).ci.github.artifacts_matrix }}
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.container && matrix.container.image || null }}
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      BUILD_MANIFEST_NAME: target/distrib/${{ join(matrix.targets, '-') }}-dist-manifest.json
     steps:
       - name: Enable Windows long paths
         run: git config --global core.longpaths true
-      - uses: actions/checkout@v6
+
+      - name: Checkout exact release commit
+        uses: actions/checkout@v6
         with:
+          ref: ${{ needs.plan.outputs.commit }}
           persist-credentials: false
-          submodules: recursive
-      - name: Install Rust in container
+
+      - name: Install Rust in build container
         if: ${{ matrix.container }}
         shell: bash
         run: |
+          set -euo pipefail
           if ! command -v cargo >/dev/null 2>&1; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            echo "pinned cargo-xwin container is missing cargo" >&2
+            exit 1
           fi
-      - name: Install cargo-dist
-        run: ${{ matrix.install_dist.run }}
-      - name: Fetch prior dist artifacts
-        uses: actions/download-artifact@v7
-        with:
-          pattern: artifacts-*
-          path: target/distrib/
-          merge-multiple: true
+
+      - name: Install checksum-pinned cargo-dist (Unix)
+        if: ${{ runner.os != 'Windows' }}
+        shell: bash
+        env:
+          HOST: ${{ matrix.host }}
+        run: |
+          set -euo pipefail
+          case "$HOST" in
+            aarch64-apple-darwin) expected=decb01c64c12501931c3cac3111b368a7f48adf8d9e65455c08e5757b9a1fd6f ;;
+            x86_64-apple-darwin) expected=fd4d8f9f07802359cbcdc52bac3abd7d5201c4b73a7cbcdd6faca2232a389f0c ;;
+            aarch64-unknown-linux-gnu) expected=382cc29ff91ef12a5bf78ad8ee1804661d24e2fbe64b1bdedd6078723b677ae5 ;;
+            x86_64-unknown-linux-gnu) expected=cd355dab0b4c02fb59038fef87655550021d07f45f1d82f947a34ef98560abb8 ;;
+            x86_64-unknown-linux-musl) expected=1d46b93a785e8b666c0e7add581d747d53c3f29589cc3ef9aee60341ad899023 ;;
+            *) echo "unsupported cargo-dist host: $HOST" >&2; exit 1 ;;
+          esac
+          archive="$(mktemp)"
+          trap 'rm -f "$archive"' EXIT
+          curl --proto '=https' --tlsv1.2 -fL --retry 6 --retry-all-errors --retry-delay 5 \
+            "https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-$HOST.tar.xz" \
+            -o "$archive"
+          echo "$expected  $archive" | sha256sum -c -
+          mkdir -p "$HOME/.cargo/bin"
+          tar -xJf "$archive" -C "$HOME/.cargo/bin" --strip-components=1 "cargo-dist-$HOST/dist"
+          chmod +x "$HOME/.cargo/bin/dist"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Install checksum-pinned cargo-dist (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'cargo-dist.zip'
+          Invoke-WebRequest -UseBasicParsing 'https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-x86_64-pc-windows-msvc.zip' -OutFile $archive
+          $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne 'a14e17557b269b101405e0cc6b647581d56313c954a51c7fddd423bba21e17b2') {
+            throw "cargo-dist archive hash mismatch: $actual"
+          }
+          $destination = Join-Path $env:USERPROFILE '.cargo\bin'
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP -Force
+          Copy-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'cargo-dist-x86_64-pc-windows-msvc\dist.exe') -Destination (Join-Path $destination 'dist.exe') -Force
+          $destination | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Install native packages
         run: |
           ${{ matrix.packages_install }}
-      - name: Build artifacts
+
+      - name: Build exact-tag portable artifacts
         shell: bash
         run: |
-          dist build ${{ needs.plan.outputs.tag-flag }} --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
-          cp dist-manifest.json "$BUILD_MANIFEST_NAME"
-      - id: cargo-dist
-        name: Collect artifact paths
+          set -euo pipefail
+          dist build --tag='${{ needs.plan.outputs.tag }}' --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
+
+      - name: Collect upload paths
+        id: cargo-dist
         shell: bash
         run: |
           echo "paths<<EOF" >> "$GITHUB_OUTPUT"
           dist print-upload-files-from-manifest --manifest dist-manifest.json >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
-      - name: Upload artifacts
+
+      - name: Upload portable artifacts to the orchestrator
         uses: actions/upload-artifact@v6
         with:
-          name: artifacts-build-local-${{ join(matrix.targets, '_') }}
-          path: |
-            ${{ steps.cargo-dist.outputs.paths }}
-            ${{ env.BUILD_MANIFEST_NAME }}
+          name: release-portable-${{ join(matrix.targets, '_') }}
+          path: ${{ steps.cargo-dist.outputs.paths }}
+          if-no-files-found: error
+          retention-days: 7
 
-  build-global-artifacts:
+  windows-installers:
+    needs: plan
+    uses: ./.github/workflows/windows-installers.yml
+    with:
+      tag: ${{ needs.plan.outputs.tag }}
+      commit: ${{ needs.plan.outputs.commit }}
+
+  macos-app:
+    needs: plan
+    uses: ./.github/workflows/macos-packaging.yml
+    with:
+      tag: ${{ needs.plan.outputs.tag }}
+      commit: ${{ needs.plan.outputs.commit }}
+
+  assemble-and-publish:
+    name: Verify, upload once, and publish latest
     needs:
       - plan
-      - build-local-artifacts
+      - build-portable-artifacts
+      - windows-installers
+      - macos-app
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
+      TAG: ${{ needs.plan.outputs.tag }}
+      COMMIT: ${{ needs.plan.outputs.commit }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout exact release commit
+        uses: actions/checkout@v6
         with:
+          ref: ${{ needs.plan.outputs.commit }}
+          fetch-depth: 0
           persist-credentials: false
-          submodules: recursive
-      - name: Install cached cargo-dist
-        uses: actions/download-artifact@v7
-        with:
-          name: cargo-dist-cache
-          path: ~/.cargo/bin/
-      - run: chmod +x ~/.cargo/bin/dist
-      - name: Fetch local artifacts
-        uses: actions/download-artifact@v7
-        with:
-          pattern: artifacts-*
-          path: target/distrib/
-          merge-multiple: true
-      - id: cargo-dist
-        shell: bash
-        run: |
-          dist build ${{ needs.plan.outputs.tag-flag }} --output-format=json "--artifacts=global" > dist-manifest.json
-          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          jq --raw-output ".upload_files[]" dist-manifest.json >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-          cp dist-manifest.json "$BUILD_MANIFEST_NAME"
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: artifacts-build-global
-          path: |
-            ${{ steps.cargo-dist.outputs.paths }}
-            ${{ env.BUILD_MANIFEST_NAME }}
 
-  host:
-    needs:
-      - plan
-      - build-local-artifacts
-      - build-global-artifacts
-    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
-    runs-on: ubuntu-22.04
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    outputs:
-      val: ${{ steps.host.outputs.manifest }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - name: Install cached cargo-dist
+      - name: Download every producer artifact
         uses: actions/download-artifact@v7
         with:
-          name: cargo-dist-cache
-          path: ~/.cargo/bin/
-      - run: chmod +x ~/.cargo/bin/dist
-      - name: Fetch artifacts
-        uses: actions/download-artifact@v7
-        with:
-          pattern: artifacts-*
-          path: target/distrib/
-          merge-multiple: true
-      - id: host
+          pattern: release-*
+          path: incoming
+
+      - name: Flatten artifacts and reject duplicate filenames
         shell: bash
         run: |
-          dist host ${{ needs.plan.outputs.tag-flag }} --steps=upload --steps=release --output-format=json > dist-manifest.json
-          echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
-      - name: Upload final dist manifest
-        uses: actions/upload-artifact@v6
-        with:
-          name: artifacts-dist-manifest
-          path: dist-manifest.json
-      - name: Download GitHub artifacts
-        uses: actions/download-artifact@v7
-        with:
-          pattern: artifacts-*
-          path: artifacts
-          merge-multiple: true
-      - name: Cleanup internal manifests
-        run: rm -f artifacts/*-dist-manifest.json
-      - name: Create GitHub Release
-        env:
-          PRERELEASE_FLAG: "${{ fromJson(steps.host.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
-          ANNOUNCEMENT_TITLE: "${{ fromJson(steps.host.outputs.manifest).announcement_title }}"
-          ANNOUNCEMENT_BODY: "${{ fromJson(steps.host.outputs.manifest).announcement_github_body }}"
-          RELEASE_COMMIT: "${{ github.sha }}"
+          set -euo pipefail
+          mkdir release-assets
+          declare -A seen=()
+          while IFS= read -r -d '' source; do
+            name="$(basename "$source")"
+            case "$name" in
+              *.sha256|sha256.sum|dist-manifest.json|*-dist-manifest.json) continue ;;
+            esac
+            if [ -n "${seen[$name]:-}" ]; then
+              echo "duplicate release artifact name: $name" >&2
+              exit 1
+            fi
+            seen[$name]="$source"
+            cp "$source" "release-assets/$name"
+          done < <(find incoming -type f -print0)
+          find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Render immutable project-owned installers
         shell: bash
         run: |
-          echo "$ANNOUNCEMENT_BODY" > "$RUNNER_TEMP/notes.txt"
-          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+          set -euo pipefail
+          python3 script/release_metadata.py render-installers \
+            --directory release-assets \
+            --tag "$TAG" \
+            --commit "$COMMIT"
+          sh -n release-assets/honk300-installer.sh
+          pwsh -NoProfile -Command '$tokens=$null; $errors=$null; [void][System.Management.Automation.Language.Parser]::ParseFile("release-assets/honk300-installer.ps1", [ref]$tokens, [ref]$errors); if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }'
+
+      - name: Validate exact compatibility and primary artifact set
+        shell: bash
+        run: python3 script/release_metadata.py validate --directory release-assets
+
+      - name: Generate stable public manifest and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The stable manifest names only sidecars that already exist and match their payload.
+          python3 script/release_metadata.py sidecars --directory release-assets
+          python3 script/release_metadata.py manifest \
+            --directory release-assets \
+            --tag "$TAG" \
+            --commit "$COMMIT" \
+            --output release-assets/release-manifest.json
+          (
+            cd release-assets
+            find . -maxdepth 1 -type f ! -name '*.sha256' ! -name 'sha256.sum' -printf '%f\n' \
+              | LC_ALL=C sort \
+              | while IFS= read -r file; do sha256sum "$file"; done \
+              > sha256.sum
+          )
+          # Add the manifest's own sidecar after its bytes are sealed. Payload sidecars are
+          # deterministically rewritten with the same verified content.
+          python3 script/release_metadata.py sidecars --directory release-assets
+
+      - name: Verify every local checksum and manifest hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd release-assets
+            sha256sum -c sha256.sum
+            for sidecar in *.sha256; do sha256sum -c "$sidecar"; done
+          )
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          root = pathlib.Path('release-assets')
+          manifest = json.loads((root / 'release-manifest.json').read_text(encoding='utf-8'))
+          assert manifest['schema'] == 'honk300.release.v1'
+          assert manifest['tag'] == '${{ needs.plan.outputs.tag }}'
+          assert manifest['commit'] == '${{ needs.plan.outputs.commit }}'
+          for artifact in manifest['artifacts']:
+              path = root / artifact['name']
+              checksum = root / artifact['checksum']
+              assert path.is_file() and not path.is_symlink()
+              assert checksum.is_file() and not checksum.is_symlink()
+              assert artifact['checksum'] == artifact['name'] + '.sha256'
+              assert path.stat().st_size == artifact['size']
+              assert hashlib.sha256(path.read_bytes()).hexdigest() == artifact['sha256']
+              assert checksum.read_text(encoding='utf-8') == artifact['sha256'] + ' *' + artifact['name'] + '\n'
+          PY
+
+      - name: Smoke shell installer twice without sudo
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke="$(mktemp -d)"
+          mkdir -p "$smoke/home"
+          for pass in 1 2; do
+            HOME="$smoke/home" \
+            XDG_DATA_HOME="$smoke/data" \
+            XDG_CONFIG_HOME="$smoke/config" \
+            HONK300_TEST_LOCAL_DIR="$PWD/release-assets" \
+              sh release-assets/honk300-installer.sh
+          done
+          binary="$smoke/data/honk300/install/bin/honk300"
+          test -x "$binary"
+          test "$("$binary" --version | awk '{print $NF}' | sed 's/[+-].*$//')" = "${TAG#v}"
+          test "$(readlink "$smoke/home/.local/bin/honk300")" = "$binary"
+          python3 -m json.tool "$smoke/data/honk300/install-receipt.json" >/dev/null
+          before="$(sha256sum "$binary" | awk '{print $1}')"
+          set +e
+          HOME="$smoke/home" \
+          XDG_DATA_HOME="$smoke/data" \
+          XDG_CONFIG_HOME="$smoke/config" \
+          HONK300_TEST_LOCAL_DIR="$PWD/release-assets" \
+          HONK300_TEST_FAIL_AFTER_SWAP=1 \
+            sh release-assets/honk300-installer.sh
+          fault_status=$?
+          set -e
+          test "$fault_status" -ne 0
+          test "$(sha256sum "$binary" | awk '{print $1}')" = "$before"
+          test "$("$binary" --version | awk '{print $NF}' | sed 's/[+-].*$//')" = "${TAG#v}"
+
+      - name: Refuse mutable or pre-existing release state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          test "$(git rev-parse "$TAG^{commit}")" = "$COMMIT"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release $TAG already exists; published releases are immutable, use a new patch version" >&2
+            exit 1
+          fi
+
+      - name: Create unpublished draft
+        id: create_draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --target "$COMMIT" \
+            --draft \
+            --latest=false \
+            --title "honk300 ${TAG#v}" \
+            --generate-notes
+
+      - name: Upload complete asset set once
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" release-assets/* --repo "$GITHUB_REPOSITORY"
+
+      - name: Verify remote asset set and bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          find release-assets -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort > local-assets.txt
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
+            | LC_ALL=C sort > remote-assets.txt
+          diff -u local-assets.txt remote-assets.txt
+          mkdir remote-assets
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir remote-assets
+          while IFS= read -r name; do cmp "release-assets/$name" "remote-assets/$name"; done < local-assets.txt
+
+      - name: Publish stable latest release
+        id: publish
+        shell: bash
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft=false --latest
+
+      - name: Delete this run's unpublished draft after failure
+        if: ${{ failure() && steps.create_draft.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true ]; then
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes
+          else
+            echo "Release is already published; immutable release state was preserved."
+          fi

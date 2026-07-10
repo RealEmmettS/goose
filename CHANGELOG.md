@@ -18,6 +18,67 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-10
+
+### Added
+- **Stable release and install receipts** - `honk300.release.v1` and `honk300.install.v1`
+  record the exact version, tag, commit, target, artifact hash/size, managed layout, aliases, and
+  autostart ownership. Windows recommends the x64/ARM64 Global MSI; macOS and Linux use one
+  version-stamped, exact-tag, hash-verifying shell bootstrap. macOS installs a real universal
+  `~/Applications/Honk300.app`; Linux installs below the user's XDG data directory.
+- **Config schema v2 and explicit recovery states** - configuration loads now distinguish
+  missing, valid, malformed, and unsupported-newer files. `setup --reset` is the only reset path
+  and creates a timestamped backup first; v1 mute controls migrate without losing intent.
+- **Distribution notices** - the official PolyForm Noncommercial license, third-party media
+  notice, and vendored-code provenance now travel with release payloads.
+
+### Changed
+- **Concept-C side renderer** - the goose now uses a single integrated white silhouette with
+  distinct back-neck/throat curves, a broad neck base, restrained long-neck sweep, and oval head.
+  Both facings, tucked/raised poses, the existing rig, palette, wings, beak, and legs remain.
+- **Long-running and multi-display runtime core** - simulation clocks/deadlines use `f64`, visual
+  phases wrap independently, display geometry uses real monitor regions/adjacency instead of a
+  bounding rectangle, and shared `RuntimeCore` pins command/reload/tick/damage ordering across
+  native event pumps. Renderer/platform scratch storage is reused and frame damage is bounded to
+  the current and previous visual bounds.
+- **Simpler distribution defaults** - Windows is machine-wide MSI-first; macOS/Linux are
+  terminal-first and no-sudo. The DMG remains an unadvertised v0.2.1 updater compatibility asset,
+  and the ad-hoc-signed, unnotarized macOS limitations are documented honestly.
+
+### Fixed
+- **Non-destructive config and responsive control UI** - malformed/future config is never
+  overwritten, atomic saves preserve valid symlink targets and stable floats, reload rejects
+  restart-only backend changes, stopped runtimes report capabilities as unprobed, and TUI IPC no
+  longer blocks drawing/input. Start saves dirty settings first and surfaces actual readiness
+  failures while small/error-heavy terminal layouts remain reachable.
+- **Behavior and render continuity** - crossfades use complementary alpha, puddle returns stay
+  vertically continuous, manners cancel delayed pranks, note/meme toggles cancel independently,
+  on-hour/Hyper honks deduplicate, capability decks refresh, and missing renderer goldens fail
+  rather than being created silently.
+- **Cross-platform backend reliability** - Windows monitor removal no longer quits the process,
+  topology/DPI changes reconcile in place, and note typing is target-scoped UI Automation only.
+  macOS corrects display-coordinate conversion, drag classification, topology handling, and audio
+  recovery. X11 fails closed without ARGB/compositor/input shaping; native Wayland now has a real
+  event pump, per-output layer surfaces, hotplug, integer/fractional scale, empty input regions,
+  and a released-buffer pool capped at three buffers per output.
+- **Transactional lifecycle and publication** - archive traversal/absolute/duplicate/link entries
+  are rejected, foreign integrations are preserved, payload swaps and owned integrations roll
+  back together, Windows hands privileged replacement to hidden post-exit installer helpers, and
+  one draft-only release orchestration now publishes the complete immutable asset set at once.
+
+### Security
+- **Hardened local boundaries and supply chain** - Windows named pipes are limited to the current
+  user and SYSTEM, reject remote clients, and use bounded I/O; Unix IPC uses owner-only directories
+  and sockets with peer-credential validation. `cargo audit` is required, and the compatible
+  vendored `wayland-scanner` security backport carries upstream revision
+  `d07c4f91f28b42e5a485823ffd9d8d5a210b1053`'s `quick-xml` fix.
+
+### Removed
+- **Obsolete source/config material** - the current `DESKTOP-GOOSE/` reference tree, duplicate
+  `behavior.silence_sounds`, nonfunctional `stop_radius`, and old donation/developer material are
+  no longer part of the active repository or product surface. Historical transcripts and
+  superseded planning records remain untouched.
+
 ## [0.2.1] - 2026-07-08
 
 ### Changed
