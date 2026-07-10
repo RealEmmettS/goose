@@ -1313,8 +1313,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            global,
-            PathBuf::from(r"C:\Program Files\honk300\bin\honk300.exe")
+            global.to_string_lossy().replace('/', "\\"),
+            r"C:\Program Files\honk300\bin\honk300.exe"
         );
 
         let corporate = windows_strategy_executable(

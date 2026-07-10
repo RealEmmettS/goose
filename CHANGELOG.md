@@ -69,8 +69,10 @@ All notable changes to this project are documented here. Format based on
 ### Security
 - **Hardened local boundaries and supply chain** - Windows named pipes are limited to the current
   user and SYSTEM, reject remote clients, and use bounded I/O; Unix IPC uses owner-only directories
-  and sockets with peer-credential validation. `cargo audit` is required, and the compatible
-  vendored `wayland-scanner` security backport carries upstream revision
+  and sockets with peer-credential validation, including a short UID-scoped fallback when a macOS
+  temporary path exceeds the Unix-socket limit. Elevated Windows lifecycle helpers and note
+  pranks resolve only validated system executables rather than the caller's search path. `cargo
+  audit` is required, and the compatible vendored `wayland-scanner` security backport carries upstream revision
   `d07c4f91f28b42e5a485823ffd9d8d5a210b1053`'s `quick-xml` fix.
 
 ### Removed

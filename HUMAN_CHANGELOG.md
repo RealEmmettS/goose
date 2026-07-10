@@ -72,9 +72,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ### Security
 - **Local controls and downloaded installers are more tightly contained.** Only the signed-in
   user and the operating system can reach the Windows command channel; Mac and Linux verify the
-  identity and permissions of local peers. Network reads have deadlines, dependency auditing is
-  mandatory, and the Wayland build uses the upstream parser security correction without pulling
-  in incompatible unfinished changes.
+  identity and permissions of local peers, even when a managed Mac supplies an unusually long
+  temporary folder. Windows install/update helpers and note pranks launch only the operating
+  system's own tools, never a lookalike from the current folder. Network reads have deadlines,
+  dependency auditing is mandatory, and the Wayland build uses the upstream parser security
+  correction without pulling in incompatible unfinished changes.
 
 ### Removed
 - **Old reference/source baggage and dead settings are gone.** The original developer reference

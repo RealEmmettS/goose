@@ -2098,8 +2098,10 @@ mod tests {
     #[test]
     fn platform_media_roots_are_external_user_data_locations() {
         assert_eq!(
-            windows_media_root_from(Path::new(r"C:\Users\goose\AppData\Local")),
-            PathBuf::from(r"C:\Users\goose\AppData\Local\honk300\media")
+            windows_media_root_from(Path::new(r"C:\Users\goose\AppData\Local"))
+                .to_string_lossy()
+                .replace('/', "\\"),
+            r"C:\Users\goose\AppData\Local\honk300\media"
         );
         assert_eq!(
             macos_media_root_from(Path::new("/Users/goose")),

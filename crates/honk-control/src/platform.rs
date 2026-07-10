@@ -695,10 +695,24 @@ mod imp {
     }
 
     fn runtime_dir_path() -> PathBuf {
-        std::env::var_os("XDG_RUNTIME_DIR")
+        let uid = current_uid();
+        let preferred = std::env::var_os("XDG_RUNTIME_DIR")
             .map(PathBuf::from)
             .map(|dir| dir.join("honk300"))
-            .unwrap_or_else(|| std::env::temp_dir().join(format!("honk300-{}", current_uid())))
+            .unwrap_or_else(|| std::env::temp_dir().join(format!("honk300-{uid}")));
+        choose_runtime_dir(preferred, uid)
+    }
+
+    fn choose_runtime_dir(preferred: PathBuf, uid: u32) -> PathBuf {
+        if SockAddr::unix(preferred.join("control.sock")).is_ok() {
+            preferred
+        } else {
+            // macOS has a 104-byte sockaddr_un path limit and hosted/managed environments often
+            // provide a much longer TMPDIR. /tmp is the portable short fallback. The directory
+            // remains UID-namespaced and secure_runtime_dir still rejects symlinks, foreign
+            // owners, non-directories, and non-0700 permissions before either lock or socket use.
+            PathBuf::from("/tmp").join(format!("honk300-{uid}"))
+        }
     }
 
     fn secure_runtime_dir() -> io::Result<PathBuf> {
@@ -799,8 +813,8 @@ mod imp {
 
         #[test]
         fn secure_runtime_directory_and_socket_modes_are_owner_only() {
-            let dir = std::env::temp_dir().join(format!(
-                "honk300-ipc-mode-test-{}-{}",
+            let dir = PathBuf::from("/tmp").join(format!(
+                "h3-{}-{:x}",
                 std::process::id(),
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -826,6 +840,14 @@ mod imp {
 
             drop(listener);
             let _ = fs::remove_dir_all(dir);
+        }
+
+        #[test]
+        fn overlong_runtime_path_uses_short_uid_scoped_fallback() {
+            let preferred = PathBuf::from("/").join("x".repeat(256));
+            let selected = choose_runtime_dir(preferred, 4242);
+            assert_eq!(selected, PathBuf::from("/tmp/honk300-4242"));
+            assert!(SockAddr::unix(selected.join("control.sock")).is_ok());
         }
 
         #[test]
