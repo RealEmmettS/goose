@@ -136,10 +136,8 @@ fn marker_derived_windows_executable(
     expected_source: InstallSource,
     current_exe: &Path,
 ) -> Result<PathBuf, String> {
-    let normalized = current_exe
-        .to_string_lossy()
-        .replace('/', "\\")
-        .to_ascii_lowercase();
+    let windows_path = current_exe.to_string_lossy().replace('/', "\\");
+    let normalized = windows_path.to_ascii_lowercase();
     if source != expected_source
         || !is_absolute_windows_path(current_exe)
         || !["honk300.exe", "honk.exe", "goose.exe"]
@@ -151,10 +149,16 @@ fn marker_derived_windows_executable(
             expected_source.marker_value()
         ));
     }
-    Ok(current_exe
-        .parent()
-        .expect("validated executable has a bin parent")
-        .join("honk300.exe"))
+    let parent = windows_path
+        .rsplit_once('\\')
+        .map(|(parent, _)| parent)
+        .ok_or_else(|| {
+            format!(
+                "cannot derive the owned post-update executable for {}",
+                expected_source.marker_value()
+            )
+        })?;
+    Ok(PathBuf::from(format!("{parent}\\honk300.exe")))
 }
 
 #[cfg(any(test, windows))]
@@ -1353,6 +1357,18 @@ mod tests {
         .unwrap();
         assert_eq!(corporate, current);
         assert_ne!(corporate, PathBuf::from("honk300"));
+
+        let alias = Path::new(r"C:\Users\goose\AppData\Local\Programs\honk300\bin\goose.exe");
+        assert_eq!(
+            windows_strategy_executable(
+                UpdateStrategy::MsiCorporate,
+                InstallSource::MsiCorporate,
+                alias,
+                program_files,
+            )
+            .unwrap(),
+            current
+        );
     }
 
     #[test]
