@@ -33,11 +33,12 @@ loud-failure + `overlay` status, user-content-preserving uninstall), replace the
 the flat-illustration dual-view Procedural Vector V2 goose (six-tone palette, reference art in
 `docs/art-reference/`), and add idle-life behaviors (meandering walks, puddle-hop mud,
 off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
-R5/v0.3.0 (ADRs 0018–0019) is the distribution-readiness stabilization: config schema v2,
+R5/v0.3.1 (ADRs 0018–0019) is the distribution-readiness stabilization: config schema v2,
 region-aware desktop layouts, bounded damage and shared runtime ordering, Concept C renderer,
 platform/IPC hardening, Global MSI as the Windows default, an exact-tag transactional shell
 installer for macOS/Linux, and one atomic immutable release workflow. The current release gate is
-`docs/readiness/v0.3.0-readiness.md` and task `#r5s`.
+`docs/readiness/v0.3.1-readiness.md` and task `#r5s`. The immutable `v0.3.0` tag failed before
+draft creation; ADR 0018's fix-forward rule therefore moved the actual stable target to v0.3.1.
 
 ## Read these first (source-of-truth pointers)
 
@@ -72,7 +73,7 @@ installer for macOS/Linux, and one atomic immutable release workflow. The curren
   dual-view procedural vector — supersedes ADR 0001's sprite/atlas direction); ADR 0015 records
   the R1 reliability/platform-safety contract; ADR 0016 records the idle-life behaviors; ADR 0017
   records the historical R3 macOS packaging slice; ADR 0018 supersedes its advertised-DMG and
-  release-mutation decisions; ADR 0019 records the v0.3.0 stabilization contracts.
+  release-mutation decisions; ADR 0019 records the v0.3.x stabilization contracts.
 
 ## Big-picture architecture (original → planned port)
 
@@ -136,8 +137,8 @@ installer for macOS/Linux, and one atomic immutable release workflow. The curren
 - R1's reliability/platform-safety contract lives in `docs/adr/0015-reliability-and-platform-safety-fixes.md`.
 - R2's idle-life behaviors live in `docs/adr/0016-idle-life-behaviors-meander-mud-excursions.md`.
 - R3's macOS packaging + lifecycle slice (universal2 `.app`/DMG, macOS `install`/`uninstall`/`update`, unsigned personal-use; supersedes ADR 0013's macOS deferral) lives in `docs/adr/0017-macos-packaging-and-lifecycle.md`.
-- v0.3.0 distribution/atomic publication lives in `docs/adr/0018-distribution-and-atomic-release.md`.
-- v0.3.0 config/runtime/renderer/platform contracts live in `docs/adr/0019-stabilization-contracts.md`.
+- v0.3.x distribution/atomic publication lives in `docs/adr/0018-distribution-and-atomic-release.md`.
+- v0.3.x config/runtime/renderer/platform contracts live in `docs/adr/0019-stabilization-contracts.md`.
 
 ## Task management system
 
@@ -184,7 +185,7 @@ family's local gate:
 - `cargo clippy --all-targets --workspace -- -D warnings`
 - `cargo test --workspace`  ·  single test: `cargo test -p honk-engine <name>`
 - `cargo build --release`
-- `dist plan --tag=v0.3.0`
+- `dist plan --tag=v0.3.1`
 - `cargo audit`
 
 Release packaging uses **cargo-dist** for portable archives plus project-owned atomic release,

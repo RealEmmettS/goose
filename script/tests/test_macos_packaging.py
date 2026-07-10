@@ -33,6 +33,12 @@ class MacosPackagingTests(unittest.TestCase):
         self.assertIn("codesign --verify --deep --strict", WORKFLOW)
         self.assertNotIn("gh release upload", WORKFLOW)
 
+    def test_release_explicitly_installs_both_apple_targets(self) -> None:
+        self.assertIn(
+            "rustup target add x86_64-apple-darwin aarch64-apple-darwin",
+            WORKFLOW,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

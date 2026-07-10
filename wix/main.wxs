@@ -21,7 +21,7 @@
             Keywords='Installer'
             Description='Desktop goose for your screen'
             Manufacturer='Emmett S'
-            InstallerVersion='450'
+            InstallerVersion='500'
             Languages='1033'
             Compressed='yes'
             InstallScope='perMachine'
@@ -37,7 +37,7 @@
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
                 <Directory Id='APPLICATIONFOLDER' Name='honk300'>
-                    <Component Id='LegalNotices' Guid='*'>
+                    <Component Id='LegalNotices' Guid='2618A816-02FC-4651-8920-9255D16D1719'>
                         <File Id='LicenseFile' Name='LICENSE' DiskId='1' Source='$(var.SourceRoot)\LICENSE' KeyPath='yes'/>
                         <File Id='ThirdPartyAssetsFile' Name='THIRD_PARTY_ASSETS.md' DiskId='1' Source='$(var.SourceRoot)\THIRD_PARTY_ASSETS.md'/>
                     </Component>

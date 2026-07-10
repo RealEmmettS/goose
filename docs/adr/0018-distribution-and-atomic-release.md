@@ -16,8 +16,12 @@ only one path per platform is supportable as the default. macOS additionally tre
 both delivery and update machinery, which encouraged mutation or synthesis of an app bundle
 whose Accessibility identity depends on a stable, sealed bundle.
 
-v0.3.0 needs one distribution contract that is simple for users, verifiable by machines, and
+v0.3.x needs one distribution contract that is simple for users, verifiable by machines, and
 transactional when an existing installation is replaced.
+
+Implementation note (2026-07-10): the immutable `v0.3.0` tag failed during artifact production
+before a draft existed. Applying this ADR's fix-forward rule, the corrected stable target is
+`v0.3.1`; the failed tag is not moved or rebuilt.
 
 ## Decision
 
@@ -70,10 +74,15 @@ installer-owned binary trees, or `Honk300.app`. Legacy user content is migrated 
 
 ### Atomic publication
 
-One `release.yml` invocation builds every portable target and both platform packaging matrices
-from the tagged SHA. It flattens producer outputs while rejecting duplicate filenames, renders
-the bootstraps, validates the complete v0.3.0 plus v0.2.1-compatibility set, generates the public
-manifest and per-file checksums, runs installer smoke and rollback injection, and then:
+Before a tag is created, `release.yml` candidate mode builds every portable target and both
+platform packaging matrices from an explicit full commit SHA. It requires the proposed tag to be
+absent, assembles the complete artifact set, validates installers/checksums/rollback, and has no
+publication steps. This proves the producer graph without consuming an immutable release identity.
+
+After that gate passes, one release-mode invocation rebuilds the same graph from the tagged SHA.
+It flattens producer outputs while rejecting duplicate filenames, renders the bootstraps, validates
+the complete stable plus v0.2.1-compatibility set, generates the public manifest and per-file
+checksums, runs installer smoke and rollback injection, and then:
 
 1. refuses a pre-existing release;
 2. creates one unpublished draft;
@@ -100,11 +109,12 @@ releases are immutable; corrections use a new patch version.
 ## Verification
 
 - Python contract suites validate metadata classification, required assets, exact-tag template
-  rendering, archive defenses, installer ownership, and workflow atomicity.
+  rendering, archive defenses, installer ownership, producer prerequisites, and workflow atomicity.
 - The release workflow installs the Linux payload twice and injects a post-swap failure to prove
-  rollback before creating a draft.
-- Windows CI installs, repairs, and uninstalls the x64 Global MSI and administratively extracts
-  the ARM64 MSI.
+  rollback before any publication step. Candidate mode runs this complete gate before the tag
+  exists and refuses to publish.
+- Windows CI installs v0.2.1, upgrades to the candidate x64 Global MSI, repairs it, refuses a
+  downgrade, and uninstalls it; it also administratively extracts the ARM64 MSI.
 - macOS CI validates the sealed app's slices, bundle id, version, `ditto` archive, and
   `codesign --verify --deep --strict` result.
-- `dist plan --tag=v0.3.0`, checksum validation, and remote byte comparison are release gates.
+- `dist plan --tag=v0.3.1`, checksum validation, and remote byte comparison are release gates.

@@ -108,4 +108,4 @@ surface.
   protocol is not a Weston protocol; it creates multiple virtual outputs with integer and
   fractional scales. Hosted platform smoke remains the authority for APIs unavailable on Windows.
 - Hands-on pre-granted macOS Accessibility upgrade evidence remains tracked by `#m16r`; it is not
-  a v0.3.0 blocker and no release text promises grant persistence.
+  a v0.3.1 blocker and no release text promises grant persistence.

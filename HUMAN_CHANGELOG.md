@@ -76,6 +76,13 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   input-shape request if an app skips the extension handshake, even when support is installed.
   The goose now performs that handshake before creating any overlay, so it can remain safely
   click-through instead of refusing an otherwise healthy desktop.
+- **Every release builder now starts with the tools and package metadata it actually needs.** An
+  unpublished build caught missing Linux audio headers, platform-specific checksum and archive
+  assumptions, an incomplete Mac target setup, and invalid or auto-corrected Windows installer
+  metadata. The complete download set can now be assembled and tested before reserving a public
+  release name, and Windows proves that the all-users installer upgrades the prior release,
+  repairs cleanly, refuses a downgrade, and uninstalls fully. These checks keep a failed release
+  identity immutable while making the corrected one safer.
 
 ### Security
 - **Local controls and downloaded installers are more tightly contained.** Only the signed-in

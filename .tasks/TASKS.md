@@ -15,7 +15,7 @@
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
 
 ## Active
-- [ ] **R5 — v0.3.0 distribution-readiness stabilization** - fix audited config, renderer, platform, lifecycle, release, and site defects; publish only after the complete gate #r5s
+- [ ] **R5 — v0.3.1 distribution-readiness stabilization** - fix audited config, renderer, platform, lifecycle, release, and site defects; publish only after the complete gate #r5s
   - [x] Remove the obsolete `DESKTOP-GOOSE/` tree and refresh active licensing/provenance/docs.
   - [x] Land config v2, safe setup/save/reload behavior, scoped CLI flags, and responsive nonblocking TUI control.
   - [x] Fix long-runtime timekeeping, monitor-region layout, damage tracking, renderer concept C, behavior regressions, and built-in asset loading.

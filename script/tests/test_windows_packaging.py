@@ -32,6 +32,18 @@ class WindowsPackagingTests(unittest.TestCase):
         for definition in (GLOBAL_WIX, CORPORATE_WIX, GLOBAL_INNO, CORPORATE_INNO):
             self.assertIn("LICENSE", definition)
             self.assertIn("THIRD_PARTY_ASSETS.md", definition)
+        for definition in (GLOBAL_WIX, CORPORATE_WIX):
+            self.assertNotIn("<Component Id='LegalNotices' Guid='*'>", definition)
+            self.assertIn("InstallerVersion='500'", definition)
+            self.assertIn("Schedule='afterInstallInitialize'", definition)
+
+    def test_hosted_global_msi_smoke_covers_real_upgrade_and_downgrade(self) -> None:
+        self.assertIn("v0.2.1/honk300-x86_64-pc-windows-msvc.msi", WINDOWS_WORKFLOW)
+        self.assertIn(
+            "9566f3cc4c97fd16b087f72f16aedf0f80e1044868f2c0694329b4462929e022",
+            WINDOWS_WORKFLOW,
+        )
+        self.assertIn("Downgrade unexpectedly succeeded", WINDOWS_WORKFLOW)
 
     def test_embedded_runtime_assets_are_not_duplicated_in_installer_trees(self) -> None:
         self.assertNotIn('Source: "..\\Assets\\*"', GLOBAL_INNO)

@@ -18,7 +18,11 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-07-10
+## [0.3.1] - 2026-07-10
+
+> The immutable `v0.3.0` tag failed in artifact production before any draft or public release was
+> created. In accordance with the atomic-release contract, the corrected build ships as the next
+> patch version rather than moving or rebuilding that tag.
 
 ### Added
 - **Stable release and install receipts** - `honk300.release.v1` and `honk300.install.v1`
@@ -71,6 +75,13 @@ All notable changes to this project are documented here. Format based on
 - **X11 input-shape protocol negotiation** - the runtime now negotiates XFixes region support and
   the Shape extension before its required pre-map click-through check. Xorg otherwise rejects the
   first region request with `BadRequest` even when both extensions are installed.
+- **Cross-platform release producers** - GNU portable jobs install their ALSA build prerequisite,
+  macOS verifies cargo-dist with the native checksum tool and explicitly installs both Rust
+  targets, the flat Windows cargo-dist archive is extracted correctly, and WiX legal notices use
+  permanent component GUIDs plus an explicit ARM64-compatible installer schema version accepted
+  by both x64 and ARM64 MSI builds. A pre-tag candidate mode now builds and verifies the complete
+  artifact set without executing publication steps or consuming an immutable tag; hosted MSI
+  smoke also exercises an actual v0.2.1 upgrade, repair, downgrade refusal, and uninstall.
 
 ### Security
 - **Hardened local boundaries and supply chain** - Windows named pipes are limited to the current

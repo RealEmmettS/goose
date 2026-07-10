@@ -41,6 +41,13 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("Delete this run's unpublished draft after failure", RELEASE)
         self.assertIn('if: ${{ failure() && steps.create_draft.outcome == \'success\' }}', RELEASE)
 
+    def test_candidate_preflight_assembles_without_consuming_a_tag_or_release(self) -> None:
+        for workflow in (RELEASE, WINDOWS, MACOS):
+            self.assertIn("candidate:", workflow)
+        self.assertIn("Candidate artifact set verified without publication", RELEASE)
+        self.assertIn("if: ${{ !inputs.candidate }}", RELEASE)
+        self.assertIn("candidate: ${{ inputs.candidate || false }}", RELEASE)
+
     def test_ci_requires_audit_and_project_owned_installer_tests(self) -> None:
         self.assertIn("cargo audit", CI)
         self.assertIn("test_release_metadata.py", CI)
@@ -62,6 +69,16 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertNotIn("cargo-dist-installer.ps1", RELEASE)
         self.assertIn("contents: read", RELEASE)
         self.assertIn("contents: write", RELEASE)
+
+    def test_release_portable_jobs_cover_native_host_prerequisites(self) -> None:
+        self.assertIn("command -v sha256sum", RELEASE)
+        self.assertIn("shasum -a 256 -c -", RELEASE)
+        self.assertIn("sudo apt-get install --no-install-recommends -y libasound2-dev", RELEASE)
+        self.assertIn("Join-Path $env:RUNNER_TEMP 'dist.exe'", RELEASE)
+        self.assertNotIn(
+            "cargo-dist-x86_64-pc-windows-msvc\\dist.exe",
+            RELEASE,
+        )
 
 
 if __name__ == "__main__":

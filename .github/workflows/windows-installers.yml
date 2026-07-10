@@ -9,6 +9,10 @@ on:
       commit:
         required: true
         type: string
+      candidate:
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       tag:
@@ -19,6 +23,11 @@ on:
         description: "Full 40-character commit SHA named by the tag"
         required: true
         type: string
+      candidate:
+        description: "Build and verify before the tag exists"
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -70,12 +79,26 @@ jobs:
 
       - name: Prove tag and checkout identify the same commit
         shell: pwsh
+        env:
+          CANDIDATE: ${{ inputs.candidate }}
         run: |
           git fetch --force --tags origin
           $head = (git rev-parse HEAD).Trim()
-          $tagCommit = (git rev-parse "${{ inputs.tag }}^{commit}").Trim()
-          if ($head -ne "${{ inputs.commit }}" -or $tagCommit -ne $head) {
-            throw "Tag, requested commit, and checkout do not match"
+          if ($head -ne "${{ inputs.commit }}") {
+            throw "Requested commit and checkout do not match"
+          }
+          git show-ref --verify --quiet "refs/tags/${{ inputs.tag }}" *> $null
+          $tagExists = $LASTEXITCODE -eq 0
+          if ($env:CANDIDATE -eq 'true') {
+            if ($tagExists) {
+              throw "Candidate tag already exists; use release mode or a new patch version"
+            }
+          } else {
+            if (-not $tagExists) { throw "Release tag does not exist" }
+            $tagCommit = (git rev-parse "${{ inputs.tag }}^{commit}").Trim()
+            if ($tagCommit -ne $head) {
+              throw "Tag, requested commit, and checkout do not match"
+            }
           }
 
       - name: Set up Rust toolchain
@@ -200,22 +223,46 @@ jobs:
             throw "Corporate EXE installer output missing"
           }
 
-      - name: Smoke Global MSI install, repair, and uninstall
+      - name: Smoke Global MSI upgrade, repair, downgrade refusal, and uninstall
         if: ${{ matrix.triple == 'x86_64-pc-windows-msvc' }}
         shell: pwsh
         run: |
           $msi = (Resolve-Path "target\wix\honk300-${{ matrix.triple }}.msi").Path
-          $msiexec = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) 'msiexec.exe'
-          foreach ($mode in @('/i', '/fa')) {
-            $process = Start-Process $msiexec -ArgumentList @($mode, "`"$msi`"", '/qn', '/norestart') -Wait -PassThru
-            if ($process.ExitCode -notin @(0, 3010)) { throw "MSI $mode failed with $($process.ExitCode)" }
+          $oldMsi = Join-Path $env:RUNNER_TEMP 'honk300-v0.2.1-x86_64-global.msi'
+          Invoke-WebRequest -UseBasicParsing `
+            'https://github.com/RealEmmettS/goose/releases/download/v0.2.1/honk300-x86_64-pc-windows-msvc.msi' `
+            -OutFile $oldMsi
+          $oldHash = (Get-FileHash -LiteralPath $oldMsi -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($oldHash -ne '9566f3cc4c97fd16b087f72f16aedf0f80e1044868f2c0694329b4462929e022') {
+            throw "v0.2.1 MSI hash mismatch: $oldHash"
           }
+          $msiexec = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) 'msiexec.exe'
+          function Invoke-Msi([string] $mode, [string] $path) {
+            $process = Start-Process $msiexec -ArgumentList @($mode, "`"$path`"", '/qn', '/norestart') -Wait -PassThru
+            if ($process.ExitCode -notin @(0, 3010)) {
+              throw "MSI $mode $path failed with $($process.ExitCode)"
+            }
+          }
+
+          Invoke-Msi '/i' $oldMsi
           $binary = Join-Path $env:ProgramFiles "honk300\bin\honk300.exe"
-          if (-not (Test-Path $binary -PathType Leaf)) { throw "MSI did not install $binary" }
+          if (-not (Test-Path $binary -PathType Leaf)) { throw "v0.2.1 MSI did not install $binary" }
+          $oldReported = (& $binary --version | Select-Object -Last 1).Trim()
+          if ($oldReported -notmatch '0\.2\.1$') { throw "v0.2.1 install mismatch: $oldReported" }
+
+          Invoke-Msi '/i' $msi
           $reported = (& $binary --version | Select-Object -Last 1).Trim()
-          if ($reported -notmatch "${{ steps.tag.outputs.version }}$") { throw "Installed version mismatch: $reported" }
-          $process = Start-Process $msiexec -ArgumentList @('/x', "`"$msi`"", '/qn', '/norestart') -Wait -PassThru
-          if ($process.ExitCode -notin @(0, 3010)) { throw "MSI uninstall failed with $($process.ExitCode)" }
+          if ($reported -notmatch "${{ steps.tag.outputs.version }}$") { throw "Upgrade mismatch: $reported" }
+
+          Invoke-Msi '/fa' $msi
+          $downgrade = Start-Process $msiexec -ArgumentList @('/i', "`"$oldMsi`"", '/qn', '/norestart') -Wait -PassThru
+          if ($downgrade.ExitCode -in @(0, 3010)) { throw 'Downgrade unexpectedly succeeded' }
+          $afterDowngrade = (& $binary --version | Select-Object -Last 1).Trim()
+          if ($afterDowngrade -notmatch "${{ steps.tag.outputs.version }}$") {
+            throw "Rejected downgrade changed the installed version: $afterDowngrade"
+          }
+
+          Invoke-Msi '/x' $msi
           if (Test-Path $binary -PathType Leaf) { throw "MSI uninstall left the executable behind" }
 
       - name: Smoke ARM64 MSI administrative extraction
