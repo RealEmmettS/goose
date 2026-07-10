@@ -68,6 +68,9 @@ All notable changes to this project are documented here. Format based on
 - **Deterministic hosted X11 readiness** - the Linux visible-overlay smoke gate now waits for the
   compositing manager to own the same X11 selection required by the runtime before starting it,
   and prints the runtime log when readiness fails instead of hiding the actionable cause.
+- **X11 input-shape protocol negotiation** - the runtime now negotiates XFixes region support and
+  the Shape extension before its required pre-map click-through check. Xorg otherwise rejects the
+  first region request with `BadRequest` even when both extensions are installed.
 
 ### Security
 - **Hardened local boundaries and supply chain** - Windows named pipes are limited to the current

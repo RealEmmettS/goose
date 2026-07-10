@@ -129,6 +129,11 @@ fn x11_mapping_allowed(argb: bool, compositor: bool, empty_input_shape: bool) ->
     argb && compositor && empty_input_shape
 }
 
+#[cfg(any(test, target_os = "linux"))]
+fn xfixes_supports_regions(major_version: u32) -> bool {
+    major_version >= 2
+}
+
 #[cfg(test)]
 fn x11_setup_steps() -> [&'static str; 2] {
     ["shape", "map"]
@@ -407,7 +412,7 @@ mod platform {
     }
 
     mod x11 {
-        use super::super::x11_mapping_allowed;
+        use super::super::{x11_mapping_allowed, xfixes_supports_regions};
         use super::{clamp_i16, clamp_u16, x11_bgra_from_rgba};
         use honk_engine::tiny_skia::Pixmap;
         use honk_engine::{ForeignWindowId, ForeignWindowSnapshot, Pointer, Rect, Vec2};
@@ -416,7 +421,7 @@ mod platform {
         use x11rb::connection::Connection;
         use x11rb::protocol::randr::{ConnectionExt as RandrConnectionExt, NotifyMask};
         use x11rb::protocol::render::ConnectionExt as RenderConnectionExt;
-        use x11rb::protocol::shape;
+        use x11rb::protocol::shape::{self, ConnectionExt as ShapeConnectionExt};
         use x11rb::protocol::xfixes::ConnectionExt as XFixesConnectionExt;
         use x11rb::protocol::xinerama::ConnectionExt as XineramaConnectionExt;
         use x11rb::protocol::xproto::{
@@ -475,6 +480,7 @@ mod platform {
                 let screen = &conn.setup().roots[screen_num];
                 let root = screen.root;
                 let atoms = Atoms::new(&conn).map_err(to_io)?.reply().map_err(to_io)?;
+                initialize_input_shape_extensions(&conn)?;
                 let visual = choose_argb_visual(&conn, screen_num)
                     .ok_or_else(|| io::Error::other("X11 overlay requires a 32-bit ARGB visual"))?;
                 if !compositor_running(&conn, screen_num)? {
@@ -932,6 +938,29 @@ mod platform {
                 .map_err(to_io)?
                 .owner;
             Ok(owner != NONE)
+        }
+
+        fn initialize_input_shape_extensions(conn: &RustConnection) -> io::Result<()> {
+            // XFixes keeps a negotiated version per client. Region requests issued before
+            // QueryVersion are rejected with BadRequest by Xorg/Xvfb even when the extension is
+            // installed, which previously made the fail-closed pre-map input-shape check reject
+            // every otherwise-valid overlay.
+            let xfixes = conn
+                .xfixes_query_version(5, 0)
+                .map_err(to_io)?
+                .reply()
+                .map_err(to_io)?;
+            if !xfixes_supports_regions(xfixes.major_version) {
+                return Err(io::Error::other(format!(
+                    "X11 overlay requires XFixes region support (server reported {}.{})",
+                    xfixes.major_version, xfixes.minor_version
+                )));
+            }
+            conn.shape_query_version()
+                .map_err(to_io)?
+                .reply()
+                .map_err(to_io)?;
+            Ok(())
         }
 
         fn create_overlay_window(
@@ -1933,11 +1962,17 @@ mod tests {
 
     #[test]
     fn x11_fails_closed_without_an_argb_visual() {
-        // Current visual selection silently falls back to an opaque root visual.
         assert!(!x11_mapping_allowed(false, true, true));
         assert!(!x11_mapping_allowed(true, false, true));
         assert!(!x11_mapping_allowed(true, true, false));
         assert!(x11_mapping_allowed(true, true, true));
+    }
+
+    #[test]
+    fn x11_requires_negotiated_xfixes_region_support() {
+        assert!(!xfixes_supports_regions(1));
+        assert!(xfixes_supports_regions(2));
+        assert!(xfixes_supports_regions(6));
     }
 
     #[test]

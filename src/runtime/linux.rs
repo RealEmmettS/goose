@@ -174,13 +174,15 @@ pub fn run(
                 ControlCommand::Status => {
                     request.respond(ControlResponse::Status(runtime_status(
                         overlay_capability(overlay_mode, display_server),
-                        cursor_warp,
-                        window_watch,
-                        collect_window,
-                        presence_capability(display_server),
-                        audio_capability,
-                        assets.note_count(),
-                        assets.meme_count(),
+                        backend_state(
+                            cursor_warp,
+                            window_watch,
+                            collect_window,
+                            presence_capability(display_server),
+                            audio_capability,
+                            assets.note_count(),
+                            assets.meme_count(),
+                        ),
                     )));
                 }
             }
@@ -413,29 +415,20 @@ fn overlay_capability(mode: OverlayMode, session: DisplayServer) -> CapabilitySt
     }
 }
 
-fn runtime_status(
-    overlay: CapabilityStatus,
-    cursor: BackendCapability,
-    window: BackendCapability,
-    collect: BackendCapability,
-    presence: BackendCapability,
-    audio: BackendCapability,
-    notes: u32,
-    memes: u32,
-) -> RuntimeStatus {
+fn runtime_status(overlay: CapabilityStatus, backend: BackendState) -> RuntimeStatus {
     RuntimeStatus {
         running: true,
         platform: PlatformStatus::Linux,
         bundle: BundleStatus::Bare,
         overlay,
         accessibility: CapabilityStatus::Unsupported,
-        cursor: capability_status(cursor),
-        window: capability_status(window),
-        collect: capability_status(collect),
-        presence: capability_status(presence),
-        audio: capability_status(audio),
-        notes,
-        memes,
+        cursor: capability_status(backend.cursor_warp),
+        window: capability_status(backend.window_watch),
+        collect: capability_status(backend.collect_window),
+        presence: capability_status(backend.presence),
+        audio: capability_status(backend.audio),
+        notes: backend.note_count,
+        memes: backend.meme_count,
     }
 }
 
@@ -529,13 +522,15 @@ mod tests {
     fn linux_runtime_status_keeps_platform_and_bundle_stable() {
         let status = runtime_status(
             CapabilityStatus::Supported,
-            BackendCapability::Unsupported,
-            BackendCapability::Unsupported,
-            BackendCapability::Unsupported,
-            BackendCapability::Unsupported,
-            BackendCapability::Supported,
-            2,
-            3,
+            backend_state(
+                BackendCapability::Unsupported,
+                BackendCapability::Unsupported,
+                BackendCapability::Unsupported,
+                BackendCapability::Unsupported,
+                BackendCapability::Supported,
+                2,
+                3,
+            ),
         );
         assert_eq!(status.platform, PlatformStatus::Linux);
         assert_eq!(status.bundle, BundleStatus::Bare);

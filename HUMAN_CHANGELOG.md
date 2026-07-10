@@ -72,6 +72,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   waits until its compositor is genuinely ready before launching the goose, and shows the real
   startup error if readiness still fails. This makes Linux release evidence repeatable and easier
   to diagnose.
+- **Linux click-through setup now completes its required handshake.** X11 desktops can reject an
+  input-shape request if an app skips the extension handshake, even when support is installed.
+  The goose now performs that handshake before creating any overlay, so it can remain safely
+  click-through instead of refusing an otherwise healthy desktop.
 
 ### Security
 - **Local controls and downloaded installers are more tightly contained.** Only the signed-in
