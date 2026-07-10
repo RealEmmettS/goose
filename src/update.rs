@@ -141,7 +141,7 @@ fn marker_derived_windows_executable(
         .replace('/', "\\")
         .to_ascii_lowercase();
     if source != expected_source
-        || !current_exe.is_absolute()
+        || !is_absolute_windows_path(current_exe)
         || !["honk300.exe", "honk.exe", "goose.exe"]
             .iter()
             .any(|name| normalized.ends_with(&format!("\\bin\\{name}")))
@@ -155,6 +155,26 @@ fn marker_derived_windows_executable(
         .parent()
         .expect("validated executable has a bin parent")
         .join("honk300.exe"))
+}
+
+#[cfg(any(test, windows))]
+fn is_absolute_windows_path(path: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        path.is_absolute()
+    }
+    #[cfg(not(windows))]
+    {
+        // These helpers are intentionally unit-tested on macOS/Linux runners too, where the host
+        // Path implementation does not recognize a drive-letter or UNC path as absolute.
+        let normalized = path.to_string_lossy().replace('/', "\\");
+        let bytes = normalized.as_bytes();
+        (bytes.len() >= 3
+            && bytes[0].is_ascii_alphabetic()
+            && bytes[1] == b':'
+            && bytes[2] == b'\\')
+            || normalized.starts_with("\\\\")
+    }
 }
 
 #[cfg(any(test, not(windows)))]
@@ -1305,6 +1325,13 @@ mod tests {
     fn windows_post_install_verification_uses_strategy_owned_path_not_path_lookup() {
         let program_files = Path::new(r"C:\Program Files");
         let current = Path::new(r"C:\Users\goose\AppData\Local\Programs\honk300\bin\honk300.exe");
+        assert!(is_absolute_windows_path(current));
+        assert!(is_absolute_windows_path(Path::new(
+            r"\\server\share\honk300\bin\honk300.exe"
+        )));
+        assert!(!is_absolute_windows_path(Path::new(
+            r"honk300\bin\honk300.exe"
+        )));
         let global = windows_strategy_executable(
             UpdateStrategy::MsiGlobal,
             InstallSource::MsiGlobal,
