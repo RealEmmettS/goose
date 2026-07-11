@@ -24,6 +24,13 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Behind the scenes
+- **Published downloads now get a full cross-platform rehearsal.** A separate release check can
+  install the exact public downloads on both kinds of Mac, both Linux architectures, and Windows,
+  then deliberately interrupt replacement work to prove the previous install returns intact. It
+  also rehearses Windows upgrade, repair, downgrade protection, and removal, which helps catch
+  packaging failures that source tests cannot see.
+
 ### Added
 - **One dependable install story.** Windows now leads with the all-users installer, while Mac and
   Linux share one verified terminal command that chooses the right download without asking for

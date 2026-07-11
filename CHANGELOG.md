@@ -18,6 +18,13 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- **Published installer lifecycle smoke** - a manually dispatched, read-only GitHub Actions gate
+  now exercises the immutable stable release on x64/ARM64 Linux, Intel/Apple Silicon macOS, and
+  Windows. It installs twice, verifies managed integrations, forces and proves transactional
+  rollback, and covers Global MSI upgrade, repair, downgrade refusal, ARM64 extraction, and
+  uninstall behavior.
+
 ## [0.3.1] - 2026-07-10
 
 > The immutable `v0.3.0` tag failed in artifact production before any draft or public release was

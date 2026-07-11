@@ -1,0 +1,48 @@
+name: Post-release Installer Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published immutable stable tag to verify, for example v0.3.1"
+        required: true
+        default: v0.3.1
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  unix-managed-install:
+    name: live managed install (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-15
+          - macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install twice and prove complete rollback from live assets
+        env:
+          HONK300_SMOKE_TAG: ${{ inputs.tag }}
+        shell: bash
+        run: sh script/smoke_released_unix.sh "$HONK300_SMOKE_TAG"
+
+  windows-global-msi:
+    name: live Global MSI rollback and lifecycle
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Prove rollback, upgrade, repair, downgrade refusal, ARM extraction, and uninstall
+        env:
+          HONK300_SMOKE_TAG: ${{ inputs.tag }}
+        shell: pwsh
+        run: ./script/smoke_released_windows.ps1 -Tag $env:HONK300_SMOKE_TAG
