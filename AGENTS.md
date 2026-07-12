@@ -37,10 +37,10 @@ R5/v0.3.1 (ADRs 0018–0019) is the distribution-readiness stabilization: config
 region-aware desktop layouts, bounded damage and shared runtime ordering, Concept C renderer,
 platform/IPC hardening, Global MSI as the Windows default, an exact-tag transactional shell
 installer for macOS/Linux, and one atomic immutable release workflow. The current release gate is
-`docs/readiness/v0.3.2-readiness.md` and task `#gla`: v0.3.2 replaces the stock MSI agreement
-with the real PolyForm terms plus a non-binding Goose appendix. Until that gate completes,
-v0.3.1 remains the public stable release. The immutable `v0.3.0` tag failed before draft creation;
-ADR 0018's fix-forward rule therefore moved the prior stable target to v0.3.1.
+`docs/readiness/v0.3.2-readiness.md` and task `#gla`. Stable/latest v0.3.2 replaces the stock MSI
+agreement with the real PolyForm terms plus a non-binding Goose appendix. The immutable `v0.3.0`
+tag failed before draft creation; ADR 0018's fix-forward rule therefore moved the prior stable
+target to v0.3.1.
 
 ## Read these first (source-of-truth pointers)
 

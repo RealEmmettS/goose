@@ -46,6 +46,12 @@
   - [ ] Verify or waive every `#m16r` verification item before moving the card to Done.
 
 ## Done
+- [x] **Replace MSI placeholder with PolyForm + Great Honk Accord** - shipped the real license and non-binding goose appendix in every Windows MSI as stable/latest v0.3.2 (done 2026-07-11) #gla
+  - [x] Add the combined RTF and regression contract.
+  - [x] Wire Global and Corporate MSI manifests to the shared agreement.
+  - [x] Update paired changelogs and v0.3.2 release/readiness metadata.
+  - [x] Verify the repository gate plus x64/ARM64 MSI builds and UI rendering.
+  - [x] Merge and push main, publish and verify v0.3.2, then clean temporary branches.
 - [x] **R5 — v0.3.1 distribution-readiness stabilization** - fixed audited config, renderer, platform, lifecycle, release, and site defects; published only after the complete gate (done 2026-07-10) #r5s
   - [x] Remove the obsolete `DESKTOP-GOOSE/` tree and refresh active licensing/provenance/docs.
   - [x] Land config v2, safe setup/save/reload behavior, scoped CLI flags, and responsive nonblocking TUI control.
