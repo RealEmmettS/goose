@@ -18,12 +18,22 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-11
+
 ### Added
 - **Published installer lifecycle smoke** - a manually dispatched, read-only GitHub Actions gate
   now exercises the immutable stable release on x64/ARM64 Linux, Intel/Apple Silicon macOS, and
   Windows. It installs twice, verifies managed integrations, forces and proves transactional
   rollback, and covers Global MSI upgrade, repair, downgrade refusal, ARM64 extraction, and
   uninstall behavior.
+
+### Fixed
+- **Real MSI license plus the Great Honk Accord** - the x64/ARM64 Global and Corporate MSI
+  agreement page now displays the authoritative PolyForm Noncommercial License instead of WiX's
+  lorem-ipsum placeholder, followed by one shared, long-form, explicitly non-binding ceremonial
+  agreement between the installer operator and the Goose. Packaging tests prove the legal wording
+  stays aligned with `LICENSE`, the appendix stays within its copy contract, and every MSI variant
+  consumes the same simple RTF while the Inno installers remain unchanged.
 
 ## [0.3.1] - 2026-07-10
 

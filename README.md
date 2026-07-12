@@ -116,13 +116,13 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v0.3.1
+dist plan --tag=v0.3.2
 cargo audit
 ```
 
 Architecture decisions are under [`docs/adr`](docs/adr/README.md). ADR 0018 defines distribution
 and atomic publication; ADR 0019 defines the v0.3.x configuration, runtime, renderer, and platform
-stabilization contracts. [`docs/readiness/v0.3.1-readiness.md`](docs/readiness/v0.3.1-readiness.md)
+stabilization contracts. [`docs/readiness/v0.3.2-readiness.md`](docs/readiness/v0.3.2-readiness.md)
 is the release checklist.
 
 ## License and assets

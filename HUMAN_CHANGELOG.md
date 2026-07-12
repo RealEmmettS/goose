@@ -24,6 +24,13 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Fixed
+- **Windows setup replaced its filler agreement with something worth scrolling.** The installer
+  now shows the real noncommercial software terms first, then a long and deliberately ridiculous
+  personal pact with the Goose that is clearly just a joke. This keeps the important terms honest
+  while letting the Goose negotiate cursor custody, imaginary bread, pond arbitration, and the
+  serious allegation that it might be a duck.
+
 ### Behind the scenes
 - **Published downloads now get a full cross-platform rehearsal.** A separate release check can
   install the exact public downloads on both kinds of Mac, both Linux architectures, and Windows,

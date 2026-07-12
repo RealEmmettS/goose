@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,44 @@ INSTALL_RS = (ROOT / "src" / "install.rs").read_text(encoding="utf-8")
 WINDOWS_WORKFLOW = (
     ROOT / ".github" / "workflows" / "windows-installers.yml"
 ).read_text(encoding="utf-8")
+MSI_LICENSE = ROOT / "wix" / "honk300-license.rtf"
+MSI_LICENSE_REFERENCE = (
+    "<WixVariable Id='WixUILicenseRtf' "
+    "Value='$(var.SourceRoot)\\wix\\honk300-license.rtf'/>"
+)
+LICENSE_START = "BEGIN ACTUAL POLYFORM LICENSE TERMS"
+LICENSE_END = "END ACTUAL LICENSE TERMS"
+GOOSE_START = "THE GREAT HONK ACCORD"
+
+
+def rtf_to_plain_text(rtf: str) -> str:
+    """Extract text from the deliberately minimal installer RTF."""
+
+    def decode_hex(match: re.Match[str]) -> str:
+        return bytes.fromhex(match.group(1)).decode("windows-1252")
+
+    text = re.sub(r"\\'([0-9a-fA-F]{2})", decode_hex, rtf)
+    text = re.sub(r"\\(?:par|line)\b ?", "\n", text)
+    text = re.sub(r"\\tab\b ?", "\t", text)
+    text = re.sub(r"\\[a-zA-Z]+-?\d* ?", "", text)
+    text = text.replace(r"\{", "{").replace(r"\}", "}")
+    text = text.replace(r"\\", "\\")
+    text = text.replace("{", "").replace("}", "")
+    return "\n".join(line.rstrip() for line in text.splitlines()).strip()
+
+
+def normalize_license_markdown(markdown: str) -> str:
+    """Remove presentation-only Markdown while preserving every license word."""
+
+    lines = []
+    for raw_line in markdown.splitlines():
+        line = re.sub(r"^#{1,6}\s+", "", raw_line.strip())
+        line = re.sub(r"^>\s?", "", line)
+        line = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", line)
+        line = line.replace("***", "").replace("**", "").replace("`", "")
+        if line:
+            lines.append(re.sub(r"\s+", " ", line))
+    return "\n".join(lines)
 
 
 class WindowsPackagingTests(unittest.TestCase):
@@ -36,6 +75,40 @@ class WindowsPackagingTests(unittest.TestCase):
             self.assertNotIn("<Component Id='LegalNotices' Guid='*'>", definition)
             self.assertIn("InstallerVersion='500'", definition)
             self.assertIn("Schedule='afterInstallInitialize'", definition)
+
+    def test_every_msi_uses_the_same_custom_license_rtf(self) -> None:
+        self.assertTrue(MSI_LICENSE.is_file())
+        for definition in (GLOBAL_WIX, CORPORATE_WIX):
+            self.assertEqual(definition.count(MSI_LICENSE_REFERENCE), 1)
+
+    def test_custom_msi_license_preserves_the_authoritative_terms(self) -> None:
+        rtf = MSI_LICENSE.read_text(encoding="ascii")
+        self.assertTrue(rtf.startswith(r"{\rtf1\ansi\ansicpg1252"))
+        plain_text = rtf_to_plain_text(rtf)
+        legal_text = plain_text.split(LICENSE_START, 1)[1].split(LICENSE_END, 1)[0]
+        self.assertEqual(
+            "\n".join(
+                re.sub(r"\s+", " ", line.strip())
+                for line in legal_text.splitlines()
+                if line.strip()
+            ),
+            normalize_license_markdown((ROOT / "LICENSE").read_text(encoding="utf-8")),
+        )
+
+    def test_goose_accord_is_long_nonbinding_and_placeholder_free(self) -> None:
+        plain_text = rtf_to_plain_text(MSI_LICENSE.read_text(encoding="ascii"))
+        self.assertNotRegex(plain_text.lower(), r"\b(?:lorem|ipsum)\b")
+        goose_text = plain_text.split(GOOSE_START, 1)[1]
+        words = re.findall(r"[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)*", goose_text)
+        self.assertGreaterEqual(len(words), 1_800)
+        self.assertLessEqual(len(words), 2_200)
+        opening = " ".join(words[:250]).lower()
+        closing = " ".join(words[-250:]).lower()
+        self.assertIn("this ceremonial appendix is comedy not a contract", opening)
+        self.assertIn(
+            "nothing in this appendix changes the polyform noncommercial license",
+            closing,
+        )
 
     def test_hosted_global_msi_smoke_covers_real_upgrade_and_downgrade(self) -> None:
         self.assertIn("v0.2.1/honk300-x86_64-pc-windows-msvc.msi", WINDOWS_WORKFLOW)
