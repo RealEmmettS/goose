@@ -26,6 +26,15 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def test_release_orchestrator_builds_everything_before_one_draft_upload(self) -> None:
         self.assertIn("uses: ./.github/workflows/windows-installers.yml", RELEASE)
         self.assertIn("uses: ./.github/workflows/macos-packaging.yml", RELEASE)
+        for secret in (
+            "MACOS_CERTIFICATE_P12_BASE64",
+            "MACOS_CERTIFICATE_PASSWORD",
+            "MACOS_KEYCHAIN_PASSWORD",
+            "APPLE_NOTARY_KEY_P8_BASE64",
+            "APPLE_NOTARY_KEY_ID",
+            "APPLE_NOTARY_ISSUER_ID",
+        ):
+            self.assertIn(secret, RELEASE)
         self.assertIn("release_metadata.py render-installers", RELEASE)
         self.assertIn('--commit "$COMMIT"', RELEASE)
         self.assertIn("release_metadata.py validate", RELEASE)

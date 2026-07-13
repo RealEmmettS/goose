@@ -80,7 +80,7 @@ pub use schedule::{LocalMinute, PresenceSnapshot, PresenceState, ScheduleOptions
 pub use sound::{HonkTone, Sound};
 pub use task::{
     AutumnLeafPileTask, CollectWindowTask, FirstUxTask, HyperTask, NabMouseTask, PerchRideTask,
-    Task, WanderTask,
+    PermissionWaitTask, Task, WanderTask,
 };
 pub use time::{Accumulator, Clock, DT, FRAMERATE};
 pub use world::World;

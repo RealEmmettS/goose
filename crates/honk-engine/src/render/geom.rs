@@ -7,7 +7,24 @@
 //! coordinates themselves.
 
 use crate::math::Vec2;
-use tiny_skia::{FillRule, LineCap, Paint, Path, PathBuilder, Pixmap, Stroke, Transform};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use tiny_skia::{
+    FillRule, LineCap, Paint, Path, PathBuilder, Pixmap, PixmapPaint, Stroke, Transform,
+};
+
+thread_local! {
+    static STIPPLE_SHADOWS: RefCell<HashMap<ShadowKey, Pixmap>> = RefCell::new(HashMap::new());
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct ShadowKey {
+    rx: u32,
+    ry: u32,
+    ss: u32,
+    phase_x: u8,
+    phase_y: u8,
+}
 
 pub fn paint(rgb: (u8, u8, u8), alpha: u8) -> Paint<'static> {
     let mut p = Paint::default();
@@ -149,6 +166,62 @@ pub fn ellipse(pixmap: &mut Pixmap, center: Vec2, rx: f32, ry: f32, p: &Paint) {
 
 /// Dotted elliptical ground shadow (the original's dithered look), supersample-aware.
 pub fn stipple_shadow(pixmap: &mut Pixmap, center: Vec2, rx: f32, ry: f32, ss: f32) {
+    if (ss - 1.0).abs() > f32::EPSILON {
+        paint_stipple_shadow(pixmap, center, rx, ry, ss);
+        return;
+    }
+    let pad = (2.0 * ss).ceil().max(2.0);
+    let left = (center.x - rx - pad).floor() as i32;
+    let top = (center.y - ry - pad).floor() as i32;
+    let local = center - Vec2::new(left as f32, top as f32);
+    let base_x = (rx + pad).floor() as i32;
+    let base_y = (ry + pad).floor() as i32;
+    let quantized_x = (local.x * 4.0).round() as i32;
+    let quantized_y = (local.y * 4.0).round() as i32;
+    let anchor_x = quantized_x.div_euclid(4);
+    let anchor_y = quantized_y.div_euclid(4);
+    let phase_x = quantized_x.rem_euclid(4) as u8;
+    let phase_y = quantized_y.rem_euclid(4) as u8;
+    let key = ShadowKey {
+        rx: rx.to_bits(),
+        ry: ry.to_bits(),
+        ss: ss.to_bits(),
+        phase_x,
+        phase_y,
+    };
+    let width = (rx * 2.0 + pad * 2.0).ceil() as u32 + 2;
+    let height = (ry * 2.0 + pad * 2.0).ceil() as u32 + 2;
+    let cached_center = Vec2::new(
+        base_x as f32 + f32::from(phase_x) * 0.25,
+        base_y as f32 + f32::from(phase_y) * 0.25,
+    );
+    let draw_x = left + anchor_x - base_x;
+    let draw_y = top + anchor_y - base_y;
+
+    STIPPLE_SHADOWS.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let std::collections::hash_map::Entry::Vacant(entry) = cache.entry(key) {
+            if let Some(mut shadow) = Pixmap::new(width.max(1), height.max(1)) {
+                paint_stipple_shadow(&mut shadow, cached_center, rx, ry, ss);
+                entry.insert(shadow);
+            }
+        }
+        if let Some(shadow) = cache.get(&key) {
+            pixmap.draw_pixmap(
+                draw_x,
+                draw_y,
+                shadow.as_ref(),
+                &PixmapPaint::default(),
+                Transform::identity(),
+                None,
+            );
+        } else {
+            paint_stipple_shadow(pixmap, center, rx, ry, ss);
+        }
+    });
+}
+
+fn paint_stipple_shadow(pixmap: &mut Pixmap, center: Vec2, rx: f32, ry: f32, ss: f32) {
     let dot = paint((0x20, 0x20, 0x20), 42);
     let step = 3.0 * ss;
     let mut dy = -ry;
@@ -174,4 +247,14 @@ pub fn stipple_shadow(pixmap: &mut Pixmap, center: Vec2, rx: f32, ry: f32, ss: f
         }
         dy += step;
     }
+}
+
+#[cfg(test)]
+pub(super) fn clear_stipple_shadow_cache() {
+    STIPPLE_SHADOWS.with(|cache| cache.borrow_mut().clear());
+}
+
+#[cfg(test)]
+pub(super) fn stipple_shadow_cache_size() -> usize {
+    STIPPLE_SHADOWS.with(|cache| cache.borrow().len())
 }

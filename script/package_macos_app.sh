@@ -12,6 +12,22 @@ BUNDLE_ID="dev.emmetts.honk300"
 # Stamp the bundle version from HONK300_VERSION (the release workflow passes the resolved tag
 # without its leading `v`); default to 0.0.0 for local/unversioned staging.
 VERSION="${HONK300_VERSION:-0.0.0}"
+TAG="${HONK300_TAG:-v$VERSION}"
+COMMIT="${HONK300_COMMIT:-$(git -C "$ROOT" rev-parse HEAD)}"
+IDENTITY="${MACOS_SIGN_IDENTITY:--}"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+  echo "invalid bundle version: $VERSION" >&2
+  exit 1
+}
+[[ "$TAG" == "v$VERSION" ]] || {
+  echo "bundle tag $TAG does not match version $VERSION" >&2
+  exit 1
+}
+[[ "$COMMIT" =~ ^[0-9a-fA-F]{40}$ ]] || {
+  echo "bundle commit is not a full hexadecimal SHA" >&2
+  exit 1
+}
+COMMIT="$(printf '%s' "$COMMIT" | tr '[:upper:]' '[:lower:]')"
 STAGE_DIR="${1:-"$ROOT/target/dist/macos-universal2"}"
 APP_DIR="$STAGE_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
@@ -60,6 +76,10 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <string>$VERSION</string>
   <key>CFBundleVersion</key>
   <string>$VERSION</string>
+  <key>Honk300ReleaseTag</key>
+  <string>$TAG</string>
+  <key>Honk300ReleaseCommit</key>
+  <string>$COMMIT</string>
   <key>LSMinimumSystemVersion</key>
   <string>11.0</string>
   <key>LSUIElement</key>
@@ -72,7 +92,14 @@ PLIST
 
 plutil -lint "$CONTENTS_DIR/Info.plist"
 lipo "$BIN" -verify_arch x86_64 arm64
-codesign --force --deep --sign - "$APP_DIR"
-codesign --verify --deep --strict "$APP_DIR"
+if [[ "$IDENTITY" == "-" ]]; then
+  codesign --force --options runtime --sign - "$BIN"
+  codesign --force --options runtime --sign - "$APP_DIR"
+else
+  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$BIN"
+  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
+fi
+codesign --verify --strict "$BIN"
+codesign --verify --strict "$APP_DIR"
 
 echo "Staged $APP_DIR"

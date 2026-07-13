@@ -23,7 +23,7 @@ use crate::schedule::PresenceSnapshot;
 use crate::sound::Sound;
 use crate::task::{
     AutumnLeafPileTask, CollectWindowTask, ExcursionKind, ExcursionTask, FirstUxTask, HyperTask,
-    NabMouseTask, PerchRideTask, Task, TaskCtx, WanderTask,
+    NabMouseTask, PerchRideTask, PermissionWaitTask, Task, TaskCtx, WanderTask,
 };
 use crate::time::DT;
 
@@ -353,8 +353,57 @@ impl World {
         }
     }
 
+    /// Replace all active work with a platform-neutral safe wait at `anchor`.
+    pub fn enter_permission_wait(&mut self, anchor: Vec2) {
+        self.pending_cursor_commands.clear();
+        self.pending_collect_window_commands.clear();
+        if self.is_collect_window_active() {
+            self.abandon_collect_window();
+        } else {
+            self.collect_window_snapshot = None;
+        }
+
+        self.current = Box::new(PermissionWaitTask::new(anchor));
+        self.interrupted = None;
+        self.pending_sounds.clear();
+        self.pending_hyper = false;
+        self.pending_nab = false;
+        self.pending_collect = None;
+        self.dragged_window = None;
+        self.excursion_prank = false;
+        self.second_hourly_honk_at = None;
+        self.pat = PatTracker::new();
+        self.hearts = Hearts::new();
+        self.sleepies = ZParticles::new();
+        self.goose.track_mud_end_time = self.elapsed;
+        self.goose.foot_marks = Default::default();
+        self.autumn.clear();
+    }
+
+    /// Move the permission-wait anchor after a display-topology change.
+    pub fn update_permission_wait_anchor(&mut self, anchor: Vec2) {
+        self.current.set_permission_wait_anchor(anchor);
+    }
+
+    /// Leave the safe wait and restart the normal first-run introduction.
+    pub fn leave_permission_wait(&mut self) {
+        self.current = Box::new(FirstUxTask::new());
+        self.interrupted = None;
+        self.pending_hyper = false;
+        self.pending_nab = false;
+        self.pending_collect = None;
+    }
+
+    /// Whether the world is currently holding at a permission-wait anchor.
+    pub fn permission_waiting(&self) -> bool {
+        self.current.id() == "permission_wait"
+    }
+
     /// Apply a live CLI/TUI poke to the world without exposing OS details to the engine.
     pub fn poke(&mut self, action: PokeAction) -> PokeOutcome {
+        if self.permission_waiting() && action != PokeAction::Honk {
+            return PokeOutcome::Busy;
+        }
         match action {
             PokeAction::Honk => {
                 self.pending_sounds.push(Sound::honk());
@@ -464,7 +513,7 @@ impl World {
 
     /// Force a collect-window action for smoke tests before M10/M11 public pokes exist.
     pub fn force_collect_window(&mut self, kind: CollectWindowKind) {
-        if self.options.collect_window.kind_active(kind) {
+        if !self.permission_waiting() && self.options.collect_window.kind_active(kind) {
             self.pending_collect = Some(kind);
         }
     }
@@ -616,7 +665,8 @@ impl World {
     /// Feed one frame of pointer state (cursor + buttons, world space). Detects pats
     /// (hover sweeps → hearts + calm) and a click on the goose (→ a hyper burst next tick).
     pub fn set_pointer(&mut self, pointer: Pointer) {
-        if self.is_cursor_mischief_active()
+        if self.permission_waiting()
+            || self.is_cursor_mischief_active()
             || self.is_perch_ride_active()
             || self.is_collect_window_active()
         {
@@ -644,7 +694,7 @@ impl World {
         // Click = left-button rising edge while over the goose → a hyper burst on the next tick.
         // Independent of the pat streak so disabling pats never disables the click reaction.
         let clicked = on_goose && pointer.left_down && !self.prev_left_down;
-        if clicked {
+        if clicked && !self.permission_waiting() {
             if self.options.mouse_steal.active() {
                 self.pending_nab = true;
             } else {
@@ -658,7 +708,8 @@ impl World {
 
     /// Interrupt the current task with a hyper burst, saving the prior task to resume later.
     fn start_hyper(&mut self) {
-        if self.current.id() == "hyper"
+        if self.permission_waiting()
+            || self.current.id() == "hyper"
             || self.is_collect_window_active()
             || self.interrupted.is_some()
         {
@@ -670,7 +721,8 @@ impl World {
 
     /// Interrupt the current task with a cursor nab, saving the prior task to resume later.
     fn start_nab(&mut self) {
-        if self.current.id() == "nab_mouse"
+        if self.permission_waiting()
+            || self.current.id() == "nab_mouse"
             || self.is_collect_window_active()
             || self.interrupted.is_some()
         {
@@ -682,7 +734,10 @@ impl World {
 
     /// Interrupt the current task with a forced collect-window task.
     fn start_collect_window(&mut self, kind: CollectWindowKind) {
-        if self.current.id() == "collect_window" || self.interrupted.is_some() {
+        if self.permission_waiting()
+            || self.current.id() == "collect_window"
+            || self.interrupted.is_some()
+        {
             return; // do not stack long-running desktop-mischief tasks
         }
         let prev = std::mem::replace(&mut self.current, Box::new(CollectWindowTask::forced(kind)));
@@ -691,7 +746,10 @@ impl World {
 
     /// Interrupt the current task with a foreign-window perch/ride.
     fn start_perch_ride(&mut self) {
-        if self.current.id() == "perch_ride" || self.interrupted.is_some() {
+        if self.permission_waiting()
+            || self.current.id() == "perch_ride"
+            || self.interrupted.is_some()
+        {
             return; // do not stack transient interrupts
         }
         let prev = std::mem::replace(&mut self.current, Box::new(PerchRideTask::new()));
@@ -741,6 +799,7 @@ impl World {
         self.elapsed += DT as f64;
         self.refresh_schedule_state();
         let manners_active = self.manners_active();
+        let permission_waiting = self.permission_waiting();
         self.apply_hourly_honk();
 
         let mood_event = self.mood.tick(self.elapsed, &mut self.rng);
@@ -748,6 +807,7 @@ impl World {
             self.rebuild_pickable();
         }
         let start_mood_hyper = mood_event.trigger_hyper
+            && !permission_waiting
             && !manners_active
             && !self.is_cursor_mischief_active()
             && !self.is_perch_ride_active()
@@ -755,11 +815,11 @@ impl World {
             && self.interrupted.is_none();
         if let Some(sound) = mood_event
             .sound
-            .filter(|_| !manners_active && !start_mood_hyper)
+            .filter(|_| !permission_waiting && !manners_active && !start_mood_hyper)
         {
             self.pending_sounds.push(sound);
         }
-        if mood_event.spawn_sleepy_particle {
+        if mood_event.spawn_sleepy_particle && !permission_waiting {
             let jitter = Vec2::new(self.rng.range(-5.0, 5.0), self.rng.range(-4.0, 2.0));
             self.sleepies
                 .add(self.goose.rig.neck_head + jitter, self.elapsed);
@@ -934,7 +994,7 @@ impl World {
         self.goose.extending_neck = false;
 
         // Drop a fading muddy print exactly where a foot actually lands while tracking mud.
-        let tracking_mud = self.elapsed < self.goose.track_mud_end_time;
+        let tracking_mud = !permission_waiting && self.elapsed < self.goose.track_mud_end_time;
         let elapsed = self.elapsed;
         let mut planted = 0u32;
         {
@@ -955,7 +1015,7 @@ impl World {
         let had_autumn_pickable = self.autumn_pickable();
         self.autumn.tick_layout(
             self.elapsed,
-            self.autumn_active(),
+            !permission_waiting && self.autumn_active(),
             &self.layout,
             &self.goose,
             &mut self.rng,
@@ -977,7 +1037,7 @@ impl World {
     }
 
     fn apply_hourly_honk(&mut self) {
-        if self.manners_active() {
+        if self.permission_waiting() || self.manners_active() {
             self.second_hourly_honk_at = None;
             return;
         }
@@ -1152,7 +1212,7 @@ impl World {
     }
 
     fn apply_mood_locomotion_modulation(&mut self) {
-        if !self.mood.options().dynamic_moods {
+        if self.permission_waiting() || !self.mood.options().dynamic_moods {
             return;
         }
         match self.mood.current() {
@@ -2380,6 +2440,158 @@ mod tests {
         assert_eq!(w.poke(PokeAction::Honk), PokeOutcome::Applied);
         assert_eq!(w.take_sounds(), vec![Sound::honk()]);
         assert!(w.take_sounds().is_empty());
+    }
+
+    #[test]
+    fn permission_wait_walks_to_anchor_and_never_finishes() {
+        let anchor = Vec2::new(700.0, 500.0);
+        let mut world = World::new(bounds(), 31);
+        world
+            .pending_cursor_commands
+            .push(CursorCommand::WarpTo(Vec2::new(1.0, 2.0)));
+        world
+            .pending_collect_window_commands
+            .push(CollectWindowCommand::Close {
+                id: CollectWindowId(9),
+            });
+        world.pending_hyper = true;
+        world.pending_nab = true;
+        world.pending_collect = Some(CollectWindowKind::Meme);
+        world.interrupted = Some(Box::new(WanderTask::new()));
+
+        world.enter_permission_wait(Vec2::new(600.0, 400.0));
+        assert!(world.permission_waiting());
+        assert!(world.interrupted.is_none());
+        assert!(!world.pending_hyper);
+        assert!(!world.pending_nab);
+        assert!(world.pending_collect.is_none());
+        world.update_permission_wait_anchor(anchor);
+        for _ in 0..(120 * 12) {
+            world.tick();
+        }
+        assert_eq!(world.current_task(), "permission_wait");
+        assert!(Vec2::distance(world.goose.position, anchor) < 3.0);
+        assert!(world.take_cursor_commands().is_empty());
+        assert!(world.take_collect_window_commands().is_empty());
+    }
+
+    #[test]
+    fn permission_wait_allows_only_honk_and_grant_resumes_first_ux() {
+        let mut world = World::new(bounds(), 32);
+        world.enter_permission_wait(Vec2::new(700.0, 500.0));
+        assert_eq!(world.poke(PokeAction::Honk), PokeOutcome::Applied);
+        for action in [
+            PokeAction::Wander,
+            PokeAction::Mud,
+            PokeAction::Nab,
+            PokeAction::Meme,
+            PokeAction::Note,
+        ] {
+            assert_eq!(world.poke(action), PokeOutcome::Busy);
+        }
+        world.leave_permission_wait();
+        assert!(!world.permission_waiting());
+        assert_eq!(world.current_task(), "first_ux");
+    }
+
+    #[test]
+    fn permission_wait_blocks_pats_and_clears_pat_visuals_and_sound() {
+        let mut world = World::new(bounds(), 33);
+        pat_the_goose(&mut world, 12);
+        assert!(world.is_calm());
+        assert!(world.hearts().alive_count(world.now()) > 0);
+        assert!(world.take_sounds().contains(&Sound::Pat));
+
+        pat_the_goose(&mut world, 12);
+        world.sleepies.add(world.goose.rig.neck_head, world.now());
+        world.enter_permission_wait(Vec2::new(700.0, 500.0));
+
+        assert!(!world.is_calm());
+        assert_eq!(world.hearts().alive_count(world.now()), 0);
+        assert_eq!(world.sleepies().alive_count(world.now()), 0);
+        assert!(world.take_sounds().is_empty());
+
+        pat_the_goose(&mut world, 24);
+        assert!(!world.is_calm());
+        assert_eq!(world.hearts().alive_count(world.now()), 0);
+        assert!(world.take_sounds().is_empty());
+    }
+
+    #[test]
+    fn permission_wait_clears_and_suppresses_mud_autumn_and_queued_sound() {
+        let mut world = World::new(bounds(), 34);
+        world.set_local_time(LocalTime {
+            day: 20260915,
+            hour: 12,
+            minute: 0,
+            second: 0,
+        });
+        for _ in 0..1_300 {
+            world.tick();
+        }
+        assert!(!world.autumn().piles().is_empty());
+
+        let now = world.now();
+        world.goose.track_mud_end_time = now + 100.0;
+        world.goose.foot_marks.add(Vec2::new(10.0, 10.0), now);
+        world.pending_sounds.push(Sound::MudSquish);
+        world.enter_permission_wait(Vec2::new(700.0, 500.0));
+
+        assert!(world.goose.track_mud_end_time <= world.now());
+        assert_eq!(world.goose.foot_marks.alive_count(world.now()), 0);
+        assert!(world.autumn().piles().is_empty());
+        assert!(world.take_sounds().is_empty());
+
+        for _ in 0..1_300 {
+            world.tick();
+        }
+        assert_eq!(world.goose.foot_marks.alive_count(world.now()), 0);
+        assert!(world.autumn().piles().is_empty());
+        assert!(world.take_sounds().is_empty());
+        assert_eq!(world.poke(PokeAction::Honk), PokeOutcome::Applied);
+        assert_eq!(world.take_sounds(), vec![Sound::honk()]);
+    }
+
+    #[test]
+    fn permission_wait_cleans_up_an_active_collect_window() {
+        let mut world = world_with_collect(35);
+        world.force_collect_window(CollectWindowKind::Meme);
+        world.tick();
+        let request = match world.take_collect_window_commands().as_slice() {
+            [CollectWindowCommand::Spawn { request, .. }] => *request,
+            other => panic!("unexpected commands: {other:?}"),
+        };
+        let id = CollectWindowId(35);
+        world.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id,
+            request,
+            kind: CollectWindowKind::Meme,
+            rect: Rect {
+                min: Vec2::new(200.0, 100.0),
+                max: Vec2::new(500.0, 300.0),
+            },
+            alive: true,
+        }));
+        world
+            .pending_collect_window_commands
+            .push(CollectWindowCommand::Move {
+                id,
+                top_left: Vec2::new(300.0, 200.0),
+            });
+
+        world.enter_permission_wait(Vec2::new(700.0, 500.0));
+
+        assert_eq!(world.current_task(), "permission_wait");
+        assert_eq!(
+            world.take_collect_window_commands(),
+            vec![
+                CollectWindowCommand::SetPassthrough {
+                    id,
+                    passthrough: false,
+                },
+                CollectWindowCommand::Close { id },
+            ]
+        );
     }
 
     #[test]

@@ -964,13 +964,7 @@ fn present_layered(
         let src = pixmap.data();
         let count = (width * height) as usize;
         let dst = std::slice::from_raw_parts_mut(dib.bits, count * 4);
-        for i in 0..count {
-            let s = i * 4;
-            dst[s] = src[s + 2];
-            dst[s + 1] = src[s + 1];
-            dst[s + 2] = src[s];
-            dst[s + 3] = src[s + 3];
-        }
+        copy_premultiplied_rgba_to_bgra(src, dst);
 
         let screen = GetDC(None);
         let dest = POINT {
@@ -1001,6 +995,14 @@ fn present_layered(
         );
         ReleaseDC(None, screen);
         result
+    }
+}
+
+fn copy_premultiplied_rgba_to_bgra(src: &[u8], dst: &mut [u8]) {
+    assert_eq!(src.len(), dst.len());
+    assert_eq!(src.len() % 4, 0);
+    for (rgba, bgra) in src.chunks_exact(4).zip(dst.chunks_exact_mut(4)) {
+        bgra.copy_from_slice(&[rgba[2], rgba[1], rgba[0], rgba[3]]);
     }
 }
 
@@ -1502,6 +1504,16 @@ extern "system" fn image_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn layered_window_preserves_asymmetric_channels_and_alpha_when_swizzling_to_bgra() {
+        let rgba = [17_u8, 83, 149, 211, 7, 61, 203, 0];
+        let mut bgra = [0_u8; 8];
+
+        copy_premultiplied_rgba_to_bgra(&rgba, &mut bgra);
+
+        assert_eq!(bgra, [149, 83, 17, 211, 203, 61, 7, 0]);
+    }
 
     #[test]
     fn monitor_reconciliation_preserves_surviving_overlay_identity() {

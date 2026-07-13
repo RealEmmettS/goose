@@ -1,6 +1,9 @@
 use crate::assets;
 use crate::audio;
 use crate::runtime::core::RuntimeCore;
+use crate::runtime::macos_accessibility::{
+    safe_anchor, transition, AccessibilityOnboarding, PermissionTransition,
+};
 use crate::runtime::{audio_probe_capability, RuntimeOptions};
 use honk_config::{BackendCapability, BackendState, Config, EffectiveOptions};
 use honk_control::{
@@ -8,8 +11,8 @@ use honk_control::{
     RuntimeStatus,
 };
 use honk_engine::render::{
-    render_autumn_leaves, render_footmarks_with_timing, render_hearts, render_pose_with_palette,
-    render_sleepies, AutumnRenderLayer,
+    render_autumn_leaves, render_footmarks_with_timing, render_hearts,
+    render_pose_with_palette_at_scale, render_sleepies, AutumnRenderLayer,
 };
 use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
@@ -17,8 +20,9 @@ use honk_engine::{
     PresenceSnapshot, Rect, Sound, Vec2, World,
 };
 use honk_platform_macos::{
-    accessibility_state, local_time, pointer_state, presence_state, warp_cursor,
-    AccessibilityState, CollectWindowController, ForeignWindowWatcher, Overlay,
+    accessibility_state, local_time, main_bundle_release_metadata, open_accessibility_settings,
+    presence_state, request_accessibility_prompt, warp_cursor, AccessibilityState,
+    CollectWindowController, ForeignWindowWatcher, Overlay,
 };
 
 pub fn run(
@@ -32,8 +36,17 @@ pub fn run(
     let mut overlay = Overlay::new()?;
     let primary_bounds = overlay.primary_monitor_bounds();
 
-    let mut cursor_warp = accessibility_capability();
-    let mut window_watch = accessibility_capability();
+    let accessibility = accessibility_state();
+    let mut onboarding = detect_accessibility_onboarding();
+    let mut accessibility = run_accessibility_onboarding(
+        &mut onboarding,
+        accessibility,
+        request_accessibility_prompt,
+        open_accessibility_settings,
+    );
+
+    let mut cursor_warp = accessibility_capability_from_state(accessibility);
+    let mut window_watch = accessibility_capability_from_state(accessibility);
     let mut collect_window = BackendCapability::Supported;
     let presence = BackendCapability::Unsupported;
     let mut audio_capability = BackendCapability::Supported;
@@ -61,19 +74,14 @@ pub fn run(
     }
 
     let mut warned_window_ride = false;
-    let mut window_watcher = if !effective.world.foreign_window.enabled {
-        None
-    } else {
-        match ForeignWindowWatcher::new(&overlay) {
-            Ok(watcher) => Some(watcher),
-            Err(err) => {
-                window_watch = permission_or_failed(&err);
-                warned_window_ride = true;
-                eprintln!("honk300: macOS window ride unavailable; disabling it ({err})");
-                None
-            }
-        }
-    };
+    let (mut window_watcher, initial_window_watch) = attempt_window_watcher(
+        window_watcher_requested(effective.world.foreign_window),
+        window_watch,
+        &mut warned_window_ride,
+        "honk300: macOS window ride unavailable; disabling it",
+        || ForeignWindowWatcher::new(&overlay),
+    );
+    window_watch = initial_window_watch;
     effective = effective_options(
         &config,
         &options,
@@ -94,10 +102,19 @@ pub fn run(
         overlay.monitor_bounds(),
     )?;
     let mut world = World::with_layout_and_options(layout, seed_from_clock(), effective.world);
+    if onboarding.waiting_for(accessibility) {
+        world.enter_permission_wait(safe_anchor(primary_bounds));
+        println!(
+            "honk300: waiting calmly for macOS Accessibility permission; status, reload, honk, and stop remain available."
+        );
+    }
     let mut collect_controller = CollectWindowController::new(primary_bounds, primary_bounds);
     let mut core = RuntimeCore::new();
+    let mut canvas: Option<Pixmap> = None;
     const AUDIO_RETRY_INTERVAL: f64 = 5.0;
+    const ACCESSIBILITY_POLL_INTERVAL: f64 = 1.0;
     let mut next_audio_probe = 0.0;
+    let mut next_accessibility_probe = ACCESSIBILITY_POLL_INTERVAL;
     let mut warned_cursor_warp = false;
     let mut warned_collect_window = false;
 
@@ -116,6 +133,9 @@ pub fn run(
                 overlay.monitor_bounds(),
             )?;
             world.apply_layout(layout);
+            if world.permission_waiting() {
+                world.update_permission_wait_anchor(safe_anchor(primary));
+            }
             collect_controller.update_display_bounds(primary, primary);
         }
 
@@ -158,9 +178,9 @@ pub fn run(
                                     assets.meme_count(),
                                 ),
                             );
-                            if !effective.world.foreign_window.enabled {
+                            if !window_watcher_requested(effective.world.foreign_window) {
                                 window_watcher = None;
-                            } else if window_watcher.is_none() && window_watch.active() {
+                            } else if window_watcher.is_none() {
                                 match ForeignWindowWatcher::new(&overlay) {
                                     Ok(watcher) => window_watcher = Some(watcher),
                                     Err(err) => {
@@ -213,8 +233,85 @@ pub fn run(
         world.set_presence(presence_state().unwrap_or_else(|_| PresenceSnapshot::unsupported()));
 
         let now = frame.now();
+        if onboarding.managed() && now >= next_accessibility_probe {
+            let current_accessibility = accessibility_state();
+            match transition(accessibility, current_accessibility, true) {
+                PermissionTransition::ResumeFirstUx => {
+                    cursor_warp = BackendCapability::Supported;
+                    window_watch = BackendCapability::Supported;
+                    effective = effective_options(
+                        &config,
+                        &options,
+                        backend_state(
+                            cursor_warp,
+                            window_watch,
+                            collect_window,
+                            presence,
+                            audio_capability,
+                            assets.note_count(),
+                            assets.meme_count(),
+                        ),
+                    );
+                    let watcher_requested =
+                        window_watcher_requested(effective.world.foreign_window);
+                    let (next_watcher, next_window_watch) = complete_accessibility_grant(
+                        &mut world,
+                        watcher_requested,
+                        &mut warned_window_ride,
+                        || ForeignWindowWatcher::new(&overlay),
+                        |world, capability| {
+                            effective = effective_options(
+                                &config,
+                                &options,
+                                backend_state(
+                                    cursor_warp,
+                                    capability,
+                                    collect_window,
+                                    presence,
+                                    audio_capability,
+                                    assets.note_count(),
+                                    assets.meme_count(),
+                                ),
+                            );
+                            world.apply_options(effective.world);
+                        },
+                    );
+                    window_watcher = next_watcher;
+                    window_watch = next_window_watch;
+                    println!(
+                        "honk300: macOS Accessibility granted; resuming the FirstUX introduction."
+                    );
+                }
+                PermissionTransition::EnterWait => {
+                    window_watcher = None;
+                    cursor_warp = BackendCapability::Denied;
+                    window_watch = BackendCapability::Denied;
+                    effective = effective_options(
+                        &config,
+                        &options,
+                        backend_state(
+                            cursor_warp,
+                            window_watch,
+                            collect_window,
+                            presence,
+                            audio_capability,
+                            assets.note_count(),
+                            assets.meme_count(),
+                        ),
+                    );
+                    world.apply_options(effective.world);
+                    world.enter_permission_wait(safe_anchor(overlay.primary_monitor_bounds()));
+                    println!(
+                        "honk300: macOS Accessibility was revoked; returning to the calm permission wait."
+                    );
+                }
+                PermissionTransition::Stable => {}
+            }
+            accessibility = current_accessibility;
+            next_accessibility_probe = now + ACCESSIBILITY_POLL_INTERVAL;
+        }
 
-        let (mx, my, left_down) = pointer_state();
+        let (mx, my, left_down) = overlay.pointer_state();
         let pointer = Vec2::new(mx, my);
         world.set_pointer(Pointer {
             pos: pointer,
@@ -333,42 +430,71 @@ pub fn run(
             let width = dirty.width().ceil().max(1.0) as u32;
             let height = dirty.height().ceil().max(1.0) as u32;
             let origin = dirty.min;
-            let mut canvas =
-                Pixmap::new(width, height).ok_or("could not allocate dirty overlay canvas")?;
+            let canvas = prepare_dirty_canvas(&mut canvas, width, height)?;
             canvas.fill(Color::TRANSPARENT);
             render_footmarks_with_timing(
-                &mut canvas,
+                canvas,
                 &world.goose.foot_marks,
                 world.now(),
                 origin,
                 world.footmark_timing(),
             );
             render_autumn_leaves(
-                &mut canvas,
+                canvas,
                 world.autumn(),
                 world.now(),
                 origin,
                 world.goose.position,
                 AutumnRenderLayer::BelowGoose,
             );
-            render_pose_with_palette(&mut canvas, world.pose(), origin, world.render_palette());
+            render_pose_with_palette_at_scale(
+                canvas,
+                world.pose(),
+                origin,
+                world.render_palette(),
+                1.0,
+            );
             render_autumn_leaves(
-                &mut canvas,
+                canvas,
                 world.autumn(),
                 world.now(),
                 origin,
                 world.goose.position,
                 AutumnRenderLayer::AboveGoose,
             );
-            render_hearts(&mut canvas, world.hearts(), world.now(), origin);
-            render_sleepies(&mut canvas, world.sleepies(), world.now(), origin);
-            overlay.present(dirty, &canvas)?;
+            render_hearts(canvas, world.hearts(), world.now(), origin);
+            render_sleepies(canvas, world.sleepies(), world.now(), origin);
+            overlay.present(dirty, canvas)?;
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(2));
+        std::thread::sleep(core.next_tick_delay());
     }
 
     Ok(())
+}
+
+fn prepare_dirty_canvas(
+    canvas: &mut Option<Pixmap>,
+    width: u32,
+    height: u32,
+) -> Result<&mut Pixmap, &'static str> {
+    let width = width.max(1);
+    let height = height.max(1);
+    let needs_growth = canvas
+        .as_ref()
+        .is_none_or(|canvas| canvas.width() < width || canvas.height() < height);
+    if needs_growth {
+        let current_width = canvas.as_ref().map_or(0, Pixmap::width);
+        let current_height = canvas.as_ref().map_or(0, Pixmap::height);
+        let rounded = |extent: u32| extent.saturating_add(31) / 32 * 32;
+        *canvas = Pixmap::new(
+            rounded(width.max(current_width)),
+            rounded(height.max(current_height)),
+        );
+    }
+    canvas
+        .as_mut()
+        .ok_or("could not allocate dirty overlay canvas")
 }
 
 fn effective_options(
@@ -399,6 +525,10 @@ fn backend_state(
     }
 }
 
+fn window_watcher_requested(options: honk_engine::ForeignWindowOptions) -> bool {
+    options.watch_active()
+}
+
 fn sound_enabled(config: honk_config::AudioConfig, sound: Sound) -> bool {
     if !config.enabled {
         return false;
@@ -408,15 +538,6 @@ fn sound_enabled(config: honk_config::AudioConfig, sound: Sound) -> bool {
         Sound::Bite => config.bite,
         Sound::MudSquish => config.mud,
         Sound::Pat => config.pat,
-    }
-}
-
-#[cfg(test)]
-fn world_bounds_for(multi_monitor_chase: bool, primary_bounds: Rect, virtual_bounds: Rect) -> Rect {
-    if multi_monitor_chase {
-        virtual_bounds
-    } else {
-        primary_bounds
     }
 }
 
@@ -432,8 +553,111 @@ fn desktop_layout_for(
     }
 }
 
+fn run_accessibility_onboarding(
+    onboarding: &mut AccessibilityOnboarding,
+    mut accessibility: AccessibilityState,
+    request_prompt: impl FnOnce() -> std::io::Result<AccessibilityState>,
+    open_settings: impl FnOnce() -> std::io::Result<()>,
+) -> AccessibilityState {
+    if !onboarding.should_prompt(accessibility) {
+        return accessibility;
+    }
+    match onboarding.mark_prompted() {
+        Ok(()) => {
+            match request_prompt() {
+                Ok(state) => accessibility = state,
+                Err(err) => eprintln!(
+                    "honk300: macOS rejected the native Accessibility prompt request ({err})"
+                ),
+            }
+            if accessibility == AccessibilityState::Denied {
+                if let Err(err) = open_settings() {
+                    eprintln!(
+                        "honk300: could not open macOS Accessibility settings; open Privacy & Security > Accessibility manually ({err})"
+                    );
+                }
+            }
+        }
+        Err(err) => {
+            eprintln!(
+                "honk300: skipped the first-run Accessibility prompt because secure prompt state could not be recorded ({err})"
+            );
+        }
+    }
+    accessibility
+}
+
+fn attempt_window_watcher<T>(
+    requested: bool,
+    current_capability: BackendCapability,
+    warned: &mut bool,
+    failure_context: &str,
+    create: impl FnOnce() -> std::io::Result<T>,
+) -> (Option<T>, BackendCapability) {
+    if !requested {
+        return (None, current_capability);
+    }
+    match create() {
+        Ok(watcher) => (Some(watcher), BackendCapability::Supported),
+        Err(err) => {
+            if !*warned {
+                *warned = true;
+                eprintln!("{failure_context} ({err})");
+            }
+            (None, permission_or_failed(&err))
+        }
+    }
+}
+
+fn complete_accessibility_grant<T>(
+    world: &mut World,
+    watcher_requested: bool,
+    warned: &mut bool,
+    create_watcher: impl FnOnce() -> std::io::Result<T>,
+    apply_window_capability: impl FnOnce(&mut World, BackendCapability),
+) -> (Option<T>, BackendCapability) {
+    let (watcher, capability) = attempt_window_watcher(
+        watcher_requested,
+        BackendCapability::Supported,
+        warned,
+        "honk300: macOS window ride unavailable after Accessibility grant",
+        create_watcher,
+    );
+    apply_window_capability(world, capability);
+    world.leave_permission_wait();
+    (watcher, capability)
+}
+
 fn accessibility_capability() -> BackendCapability {
     accessibility_capability_with(|| Ok(accessibility_state()))
+}
+
+fn accessibility_capability_from_state(state: AccessibilityState) -> BackendCapability {
+    match state {
+        AccessibilityState::Trusted => BackendCapability::Supported,
+        AccessibilityState::Denied => BackendCapability::Denied,
+    }
+}
+
+fn detect_accessibility_onboarding() -> AccessibilityOnboarding {
+    let Some(home) = std::env::var_os("HOME").map(std::path::PathBuf::from) else {
+        return AccessibilityOnboarding::unmanaged();
+    };
+    let Ok(executable) = std::env::current_exe() else {
+        return AccessibilityOnboarding::unmanaged();
+    };
+    let Some(metadata) = main_bundle_release_metadata() else {
+        return AccessibilityOnboarding::unmanaged();
+    };
+    match AccessibilityOnboarding::detect(&home, &executable, &metadata) {
+        Ok(onboarding) => onboarding,
+        Err(err) => {
+            eprintln!(
+                "honk300: automatic Accessibility onboarding is unavailable; continuing without opening settings ({err})"
+            );
+            AccessibilityOnboarding::unmanaged()
+        }
+    }
 }
 
 fn accessibility_capability_with(
@@ -535,6 +759,128 @@ fn seed_from_clock() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use honk_platform_macos::MacBundleReleaseMetadata;
+    use serde_json::json;
+    use std::fs;
+    use std::path::PathBuf;
+
+    const TEST_SHA: &str = "0123456789abcdef0123456789abcdef01234567";
+
+    fn managed_onboarding_fixture() -> (tempfile::TempDir, AccessibilityOnboarding, PathBuf) {
+        let home = tempfile::tempdir().expect("temporary managed home");
+        let app = home.path().join("Applications/Honk300.app");
+        let executable = app.join("Contents/MacOS/honk300");
+        fs::create_dir_all(executable.parent().expect("MacOS directory")).expect("app tree");
+        fs::write(&executable, b"fixture").expect("fixture executable");
+        let state_root = home.path().join("Library/Application Support/honk300");
+        fs::create_dir_all(&state_root).expect("state root");
+        fs::write(
+            state_root.join("install-receipt.json"),
+            serde_json::to_vec(&json!({
+                "schema": "honk300.install.v1",
+                "version": "0.3.3",
+                "tag": "v0.3.3",
+                "commit": TEST_SHA,
+                "install_root": app.to_string_lossy(),
+            }))
+            .expect("receipt json"),
+        )
+        .expect("receipt");
+        let metadata = MacBundleReleaseMetadata {
+            bundle_id: "dev.emmetts.honk300".into(),
+            version: "0.3.3".into(),
+            tag: "v0.3.3".into(),
+            commit: TEST_SHA.into(),
+        };
+        let onboarding = AccessibilityOnboarding::detect(home.path(), &executable, &metadata)
+            .expect("managed onboarding");
+        let marker = home
+            .path()
+            .join("Library/Application Support/honk300/state/accessibility-prompt-v1/0.3.3");
+        (home, onboarding, marker)
+    }
+
+    #[test]
+    fn settings_open_failure_keeps_secure_marker_and_permission_wait_eligible() {
+        let (_home, mut onboarding, marker) = managed_onboarding_fixture();
+        let accessibility = run_accessibility_onboarding(
+            &mut onboarding,
+            AccessibilityState::Denied,
+            || Ok(AccessibilityState::Denied),
+            || Err(std::io::Error::other("settings fixture rejected URL")),
+        );
+
+        assert_eq!(accessibility, AccessibilityState::Denied);
+        assert!(
+            marker.is_file(),
+            "prompt marker must survive settings failure"
+        );
+        assert!(onboarding.waiting_for(accessibility));
+        assert!(!onboarding.should_prompt(accessibility));
+        let mut world = World::new(Rect::new(Vec2::ZERO, Vec2::new(1200.0, 800.0)), 7);
+        if onboarding.waiting_for(accessibility) {
+            world.enter_permission_wait(Vec2::new(1080.0, 690.0));
+        }
+        assert!(world.permission_waiting());
+    }
+
+    #[test]
+    fn grant_watcher_failure_reports_capability_and_still_resumes_first_ux() {
+        for (error, expected) in [
+            (
+                std::io::Error::other("watcher fixture failed"),
+                BackendCapability::Failed,
+            ),
+            (
+                std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "watcher permission fixture",
+                ),
+                BackendCapability::Denied,
+            ),
+        ] {
+            let mut world = World::new(Rect::new(Vec2::ZERO, Vec2::new(1200.0, 800.0)), 7);
+            world.enter_permission_wait(Vec2::new(1080.0, 690.0));
+            let mut warned = false;
+            let mut applied = None;
+
+            let (watcher, capability) = complete_accessibility_grant(
+                &mut world,
+                true,
+                &mut warned,
+                || Err::<(), _>(error),
+                |world, capability| {
+                    applied = Some(capability);
+                    world.set_foreign_window_watch_supported(
+                        capability == BackendCapability::Supported,
+                    );
+                },
+            );
+
+            assert!(watcher.is_none());
+            assert_eq!(capability, expected);
+            assert_eq!(applied, Some(expected));
+            assert!(warned);
+            assert!(!world.permission_waiting());
+            assert_eq!(world.current_task(), "first_ux");
+        }
+    }
+
+    #[test]
+    fn denied_startup_skips_watcher_without_consuming_future_warning() {
+        let mut warned = false;
+        let (watcher, capability) = attempt_window_watcher(
+            false,
+            BackendCapability::Denied,
+            &mut warned,
+            "denied startup fixture",
+            || -> std::io::Result<()> { panic!("denied startup must not create a watcher") },
+        );
+
+        assert!(watcher.is_none());
+        assert_eq!(capability, BackendCapability::Denied);
+        assert!(!warned);
+    }
 
     #[test]
     fn hosted_accessibility_adapter_maps_granted_without_querying_host_permission() {
@@ -587,5 +933,33 @@ mod tests {
             }),
             BackendCapability::Unsupported
         );
+    }
+
+    #[test]
+    fn window_watcher_creation_requires_enabled_live_capability() {
+        let denied = honk_engine::ForeignWindowOptions::with_backend_support(false, true);
+        assert!(!window_watcher_requested(denied));
+
+        let mut supported = honk_engine::ForeignWindowOptions::with_backend_support(true, true);
+        assert!(window_watcher_requested(supported));
+        supported.enabled = false;
+        assert!(!window_watcher_requested(supported));
+    }
+
+    #[test]
+    fn dirty_canvas_reuses_a_small_grow_only_allocation() {
+        let mut canvas = None;
+        let first = prepare_dirty_canvas(&mut canvas, 257, 129)
+            .expect("allocate canvas")
+            .data()
+            .as_ptr() as usize;
+        assert_eq!(canvas.as_ref().map(Pixmap::width), Some(288));
+        assert_eq!(canvas.as_ref().map(Pixmap::height), Some(160));
+
+        let second = prepare_dirty_canvas(&mut canvas, 250, 120)
+            .expect("reuse canvas")
+            .data()
+            .as_ptr() as usize;
+        assert_eq!(first, second);
     }
 }

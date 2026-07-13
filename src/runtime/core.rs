@@ -1,5 +1,9 @@
 use honk_config::Config;
+#[cfg(any(test, target_os = "macos"))]
+use honk_engine::DT;
 use honk_engine::{Accumulator, Clock, Rect, World};
+#[cfg(any(test, target_os = "macos"))]
+use std::time::Duration;
 
 const PRESENT_INTERVAL: f64 = 1.0 / 60.0;
 
@@ -57,6 +61,17 @@ impl RuntimeCore {
     /// this call and before [`Self::tick`].
     pub(crate) fn begin_frame(&mut self) -> RuntimeFrame {
         self.begin_at(self.clock.elapsed_secs())
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(crate) fn next_tick_delay(&self) -> Duration {
+        self.next_tick_delay_at(self.clock.elapsed_secs())
+    }
+
+    #[cfg(any(test, target_os = "macos"))]
+    fn next_tick_delay_at(&self, now: f64) -> Duration {
+        let elapsed = (now - self.last_frame_time).max(0.0);
+        Duration::from_secs_f64((DT as f64 - elapsed).clamp(0.0, DT as f64))
     }
 
     fn begin_at(&mut self, now: f64) -> RuntimeFrame {
@@ -145,5 +160,19 @@ mod tests {
             RuntimeCore::restart_required_reason(&current, &next).as_deref(),
             Some("platform.wayland")
         );
+    }
+
+    #[test]
+    fn next_tick_delay_paces_the_loop_to_one_hundred_twenty_hz() {
+        let core = RuntimeCore::new();
+        let tick = honk_engine::DT as f64;
+        let start = core.last_frame_time;
+
+        let initial = core.next_tick_delay_at(start).as_secs_f64();
+        assert!((initial - tick).abs() < 1e-6);
+
+        let partial = core.next_tick_delay_at(start + tick * 0.25).as_secs_f64();
+        assert!((partial - tick * 0.75).abs() < 1e-6);
+        assert_eq!(core.next_tick_delay_at(start + tick * 2.0), Duration::ZERO);
     }
 }

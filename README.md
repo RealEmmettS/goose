@@ -23,7 +23,40 @@ installers, portable archives, checksums, and the PowerShell bootstrap remain un
 [GitHub release](https://github.com/RealEmmettS/goose/releases/latest) for administrators and
 compatibility.
 
-### macOS and Linux
+### macOS
+
+The signed and notarized universal DMG is the recommended install for both Apple Silicon and
+Intel Macs:
+
+- [Download Honk300 for macOS](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-universal2.dmg)
+
+Open the disk image and run **Install Honk300**. The universal Intel/Apple Silicon helper verifies
+the adjacent app's Developer ID team and bundle identity, installs it without `sudo` into
+`~/Applications/Honk300.app`, and opens the installed app. Receipts and user media live under
+`~/Library/Application Support/honk300`; all three command aliases live under `~/.local/bin`.
+Desktop pranks require Accessibility permission.
+
+When the exact managed app starts without Accessibility permission, it records a secure
+per-update prompt marker before asking macOS for consent and opening Privacy & Security >
+Accessibility. The goose walks to a calm lower-right screen-edge perch while permission is
+denied. Status, reload, honk, and stop continue to work; other direct actions report busy. A
+second denied launch of the same update waits without reopening Settings. If permission is
+granted or revoked while Honk300 is running, the same process notices within about a second and
+either starts the normal introduction or returns to the safe wait. Development binaries, bare
+copies, source-tree bundles, and an app launched directly from a mounted DMG do not open
+permission UI automatically.
+
+The app and graphical helper use hardened Developer ID signatures. The app ZIP and DMG are
+Apple-notarized and stapled, and release checks publish SHA-256 values for every artifact. The
+exact-tag terminal bootstrap remains a supported secondary install:
+
+```sh
+curl --proto '=https' --tlsv1.2 -fsSL https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.sh | sh
+```
+
+### Linux
+
+Use the exact-tag terminal bootstrap:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -fsSL https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.sh | sh
@@ -34,16 +67,9 @@ downloads that exact-tag payload, verifies its embedded SHA-256, stages on the d
 filesystem, and rolls back the payload and owned integrations if installation fails. It does not
 use `sudo`.
 
-- macOS: `~/Applications/Honk300.app`; receipt and user media under
-  `~/Library/Application Support/honk300`; aliases under `~/.local/bin`.
 - Linux: managed payload under `${XDG_DATA_HOME:-~/.local/share}/honk300/install`; receipt,
   desktop entry, and user media stay in the corresponding XDG user directories; aliases under
   `~/.local/bin`.
-
-The macOS app is universal (Intel and Apple Silicon), ad-hoc signed, and not notarized. macOS may
-require approval under **System Settings → Privacy & Security**, and desktop pranks require
-Accessibility permission. An update may require Accessibility reauthorization; the project does
-not promise that an ad-hoc signing identity preserves a prior grant.
 
 ## Use
 
@@ -72,7 +98,9 @@ Default config locations:
 Settings that affect backend selection, including native Wayland mode, require a restart and are
 reported as such. Native Wayland remains an explicit reduced mode (`honk300 start --wayland`):
 the overlay works, while cursor and foreign-window mischief report unsupported. X11/XWayland is
-the full-mischief Linux default. Terminal windows are always protected from focus, typing,
+the full-mischief Linux default. ADR 0021 records why universal native parity is not a single
+portable protocol feature and defines future opt-in portal/KDE/GNOME/wlroots adapters as separate
+claims. Terminal windows are always protected from focus, typing,
 dragging, riding, and collection.
 
 User notes and PNG memes can be added without modifying the program:
@@ -103,9 +131,10 @@ state. Autostart is opt-in and off by default.
 | Linux X11/XWayland | x64/ARM64, GNU/musl | Full overlay and supported mischief |
 | Linux native Wayland | x64/ARM64, GNU/musl | Opt-in reduced overlay mode |
 
-Linux collect-window behavior is unsupported and reported honestly. Hands-on pre-granted macOS
-Accessibility upgrade evidence remains tracked in the readiness docs; hosted bundle and
-permission-adapter tests are release gates.
+Linux collect-window behavior is unsupported and reported honestly. Exact signed-app macOS
+Accessibility evidence for first denial, non-nagging relaunch, live grant, and live revocation
+remains tracked in the readiness docs; hosted bundle and permission-adapter tests are release
+gates.
 
 ## Build and verify
 
@@ -116,14 +145,16 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v0.3.2
-cargo audit
+dist plan --tag=v0.3.3
+cargo audit --version 0.22.2
 ```
 
 Architecture decisions are under [`docs/adr`](docs/adr/README.md). ADR 0018 defines distribution
 and atomic publication; ADR 0019 defines the v0.3.x configuration, runtime, renderer, and platform
-stabilization contracts. [`docs/readiness/v0.3.2-readiness.md`](docs/readiness/v0.3.2-readiness.md)
-is the release checklist.
+stabilization contracts; ADR 0020 defines Developer ID signing, notarization, and the per-user
+graphical DMG; ADR 0021 defines native Wayland capability strata; ADR 0022 defines the managed
+macOS Accessibility first-run, non-nagging wait, and live grant/revocation boundary.
+[`docs/readiness/v0.3.3-readiness.md`](docs/readiness/v0.3.3-readiness.md) is the release checklist.
 
 ## License and assets
 

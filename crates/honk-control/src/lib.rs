@@ -8,7 +8,7 @@ mod platform;
 mod protocol;
 
 pub use platform::CommandServer;
-pub use platform::{send_command, Singleton, SingletonStatus};
+pub use platform::{send_command, wait_for_shutdown, Singleton, SingletonStatus};
 pub use protocol::{
     BundleStatus, CapabilityStatus, ControlCommand, ControlResponse, PlatformStatus, ProtocolError,
     RuntimeStatus,

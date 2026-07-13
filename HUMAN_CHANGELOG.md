@@ -15,14 +15,104 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > honk at the top of each hour. It now also respects quiet times, fullscreen/DND manners, and
 > seasonal Autumn leaves. It now supports Windows multi-monitor chasing and fuller appearance
 > controls. Mac support and the Linux desktop paths are now in the codebase, with repeatable
-> CI smoke proof for hosted Mac bundle checks and Linux desktop behavior. Mac Accessibility-granted
-> desktop tricks still need a pre-approved Mac smoke run. The Windows/Linux installer and update
+> CI smoke proof for hosted Mac bundle checks and Linux desktop behavior. The installed Mac app
+> now has a calm, non-nagging permission handoff, while its denied, repeat-denied, granted, and
+> revoked behavior still needs one final unchanged signed-app run. The Windows/Linux installer
+> and update
 > work now has release artifact proof, including Windows installers for both regular x64 and ARM64
 > machines.
 
 ---
 
 ## Latest — July 2026
+
+### Added
+- **Mac permission setup is now a calm, one-time handoff.** The officially installed Goose asks
+  once for each installed update, opens the right Mac privacy page, and waits visibly near a safe
+  screen edge instead of wandering off or attempting pranks. Honk, status, reload, and stop still
+  work while it waits, and another denied launch does not reopen the page. Granting permission
+  lets the same running Goose begin its normal introduction; taking permission away sends it
+  safely back to the wait. Developer and test copies do not open permission pages on their own,
+  which avoids surprise prompts and repeated nagging. The behind-the-scenes checks pass, but the
+  release still needs one unchanged signed copy to prove denial, a second denial, permission
+  granted, and permission removed.
+- **Mac now has a real graphical installer path.** The disk image includes the Goose, a small
+  “Install Honk300” app, and short instructions. The helper confirms both apps came from the same
+  fixed Developer ID application certificate, installs only for the signed-in user without an administrator password,
+  explains failures in a normal Mac dialog, and opens the installed Goose. This makes the Mac
+  download approachable without creating a second, inconsistent install system.
+- **Mac release builds now require Apple's trust checks.** Automated release work signs the app
+  and installer with hardened settings, sends both the app and disk image to Apple, attaches the
+  approval tickets, and checks that Gatekeeper accepts them. Missing credentials stop the build
+  instead of quietly publishing a weaker download, which keeps the promised trust level honest.
+  The finished disk image is opened once more and both contained apps are checked exactly where
+  people will launch them, so a trusted container cannot hide an untrusted installer. Each app's
+  actual executable is sealed before its outer app bundle, making the trust chain explicit.
+- **Mac drawing now has native color and visibility checks.** Tests send deliberately different
+  red, green, blue, and transparency values through the real Mac drawing stack and check that all
+  recognizable goose parts remain visible on light and dark desktops. This catches the exact
+  class of bug that produced the washed-out blob.
+- **Every desktop now guards its final color handoff.** Windows and both Linux display paths now
+  test deliberately different color and transparency values too. That makes the same washed-out,
+  transparent, or color-swapped failure much harder to reintroduce anywhere.
+
+### Improved
+- **Walking looks less stretchy everywhere without becoming frantic.** Planted feet release a
+  little sooner, while only the fastest running and charging strides shorten further. Normal
+  walking keeps its weighted rhythm, and checks prevent rapid bicycle-like stepping. The same
+  shared animation runs on Windows, Mac, X11, and Wayland.
+- **Mac drawing does less repeated work.** The renderer reuses drawing space and shadows, while
+  the Mac app reuses native images, remembers screen geometry, and limits display updates without
+  slowing the simulation. The final repeated image copy is gone, and a full timed run now passes
+  both the processor and memory release limits with room to spare.
+- **A mounted disk image can use the normal safe installer.** The Goose can now copy its own
+  verified app bundle into the user's Applications folder while preserving aliases, autostart,
+  user media, updates, removal, and rollback. Automated release checks can interrupt the swap on
+  purpose and prove the previous app returns. A failure late in setup also puts command aliases,
+  login startup, install records, and newly copied starter media back exactly as they were
+  without touching existing personal media. This keeps graphical and terminal installs under
+  the same ownership rules.
+- **Mac permission tests can hold one identity still.** The smoke checks can reuse an exact built
+  app and no longer create the settings file prematurely. That lets denied and granted
+  Accessibility checks happen without rebuilding the app between them.
+
+### Fixed
+- **Goose notes stay readable in Mac dark mode.** Note lettering now follows the Mac's chosen
+  appearance and accessibility contrast instead of always being black. Windows notes already use
+  the system Notepad's colors, and Linux does not currently offer the note-window prank, so the
+  same hidden contrast problem is not present there.
+- **The Goose is no longer a transparent white-and-purple blur on Mac.** The Mac window now reads
+  the renderer's color and transparency bytes in the format they were actually produced, so the
+  body, wing, beak, legs, outline, and shadow appear as intended. The underlying shared Goose art
+  did not need to be replaced.
+- **Mac-only build warnings are cleared.** Old and unnecessary platform paths were removed or
+  corrected, which keeps strict build checks useful instead of hiding new mistakes among known
+  warnings.
+- **Stop now means fully stopped.** Starting again immediately after a stop could occasionally
+  catch the old Goose halfway out, refuse the new launch, and then leave no Goose running. Stop,
+  exit, and quit now wait briefly for shutdown to finish on every desktop, which makes quick
+  restarts dependable while still reporting a genuinely stuck exit.
+- **Two old performance follow-ups are now formally closed.** The three desktop versions already
+  share the same timing rules, and Windows redraws only the small changed area on each affected
+  monitor. Fresh checks confirmed both designs, which reduces release risk and keeps the board
+  honest about work that is truly finished.
+- **The Wayland roadmap now says exactly what can work where.** A normal Wayland app still cannot
+  safely control every other window or the system pointer, but future user-approved integrations
+  can add selected abilities on KDE, GNOME, and some other desktops. This keeps today's reduced
+  mode truthful while turning vague “full support” into clear, testable choices.
+
+### Security
+- **The graphical installer is tightly bound to the official app beside it.** It refuses a
+  different app, mismatched developer, unsafe link, foreign command alias, or unowned receipt
+  before changing anything. The install record also remembers the exact release and source
+  revision, which helps future updates replace only what Honk300 owns. Graphical and terminal
+  installs will not replace an existing app unless that app has Honk300's matching install record.
+  Even a broken link left by another tool is treated as somebody else's file and kept untouched,
+  which prevents a failed destination from becoming accidental permission to overwrite it.
+- **Mac editor terminals stay out of reach.** Codex and Visual Studio Code are now protected as
+  whole apps alongside Terminal, Ghostty, iTerm, Warp, and other terminals. This conservative
+  boundary matters because it guarantees the Goose cannot mistake an embedded terminal panel for
+  an ordinary draggable window.
 
 ### Fixed
 - **Windows setup replaced its filler agreement with something worth scrolling.** The installer

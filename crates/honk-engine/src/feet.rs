@@ -28,6 +28,17 @@ const MAX_LIFT: f32 = 3.5;
 const SNAP_DISTANCE: f32 = 60.0;
 /// Fallback swing duration when the entity has no step interval yet.
 const DEFAULT_STEP_TIME: f32 = 0.2;
+/// Visual refinement over the compatibility trigger: start the recovery step slightly sooner.
+const GAIT_STEP_TRIGGER_DISTANCE: f32 = WANT_STEP_AT_DISTANCE * 0.8;
+/// The configured step interval is the gait beat; the airborne recovery occupies only this share.
+/// This preserves planted feet while preventing the opposite leg from trailing into a long rubbery
+/// stretch before it is allowed to recover.
+const GAIT_SWING_DURATION_SCALE: f32 = 0.7;
+/// At run/charge speed, cap how far the body can travel during one foot's recovery.
+/// Normal/moderate motion (up through 120 px/s × 0.14 s = 16.8 px) stays exactly on the weighted
+/// existing cadence; only the Run and Charge tiers shorten their airborne recovery enough to
+/// avoid rubber-leg trailing without turning into twitchy bicycle steps.
+const MAX_BODY_TRAVEL_DURING_SWING: f32 = 18.0;
 
 const UP: Vec2 = Vec2 { x: 0.0, y: -1.0 };
 
@@ -120,10 +131,17 @@ impl FeetState {
     /// facing unit vector, `velocity` the current velocity (px/s), and `step_time` the
     /// entity's per-step interval (`<= 0` falls back to the walk default).
     pub fn tick(&mut self, dt: f32, center: Vec2, forward: Vec2, velocity: Vec2, step_time: f32) {
-        let duration = if step_time > 1e-3 {
+        let beat = if step_time > 1e-3 {
             step_time
         } else {
             DEFAULT_STEP_TIME
+        };
+        let weighted_duration = beat * GAIT_SWING_DURATION_SCALE;
+        let speed = velocity.magnitude();
+        let duration = if speed > 1e-3 {
+            weighted_duration.min(MAX_BODY_TRAVEL_DURING_SWING / speed)
+        } else {
+            weighted_duration
         };
         let (home_l, home_r) = homes(center, forward);
 
@@ -164,7 +182,7 @@ impl FeetState {
             } else {
                 (&mut self.right, home_r, lag_r)
             };
-            if lag > WANT_STEP_AT_DISTANCE {
+            if lag > GAIT_STEP_TRIGGER_DISTANCE {
                 // Aim past home (overshoot) and lead a moving body so the foot lands
                 // where the home will roughly be, not where it was.
                 let dir = (home - foot.pos).normalize();
@@ -229,13 +247,63 @@ fn smoothstep(t: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entity::{ParametersTable, SpeedTier};
     use crate::time::DT;
+
+    #[derive(Debug, Clone, Copy)]
+    struct GaitSample {
+        max_planted_lag: f32,
+        first_swing_ticks: usize,
+        plants: usize,
+    }
+
+    fn sample_straight_gait(speed: f32, step_time: f32) -> GaitSample {
+        let forward = Vec2::new(1.0, 0.0);
+        let velocity = forward * speed;
+        let mut center = Vec2::ZERO;
+        let mut state = FeetState::new(center, forward);
+        let mut max_planted_lag: f32 = 0.0;
+        let mut first_swing = None;
+        let mut first_swing_ticks = 0;
+        let mut plants = 0;
+
+        for _ in 0..(120 * 3) {
+            center = center + velocity * DT;
+            state.tick(DT, center, forward, velocity, step_time);
+            let poses = state.poses();
+            let (left_home, right_home) = homes(center, forward);
+            for (index, (pose, home)) in poses.into_iter().zip([left_home, right_home]).enumerate()
+            {
+                if !pose.swinging {
+                    max_planted_lag = max_planted_lag.max(Vec2::distance(pose.pos, home));
+                }
+                if first_swing.is_none() && first_swing_ticks == 0 && pose.swinging {
+                    first_swing = Some(index);
+                }
+            }
+            if let Some(index) = first_swing {
+                first_swing_ticks += 1;
+                if !state.poses()[index].swinging {
+                    first_swing = None;
+                }
+            }
+            state.drain_plants(|_| plants += 1);
+        }
+
+        GaitSample {
+            max_planted_lag,
+            first_swing_ticks,
+            plants,
+        }
+    }
 
     #[test]
     fn constants_match_verified_source() {
         assert_eq!(FEET_DISTANCE_APART, 6.0);
         assert_eq!(WANT_STEP_AT_DISTANCE, 5.0);
         assert_eq!(OVERSHOOT_FRACTION, 0.4);
+        assert_eq!(GAIT_STEP_TRIGGER_DISTANCE, 4.0);
+        assert_eq!(GAIT_SWING_DURATION_SCALE, 0.7);
     }
 
     #[test]
@@ -334,5 +402,76 @@ mod tests {
             }
         }
         assert!(max_lift > 1.0, "feet never lifted (max {max_lift})");
+    }
+
+    #[test]
+    fn walking_planted_foot_does_not_trail_far_enough_to_read_as_stretched() {
+        let forward = Vec2::new(1.0, 0.0);
+        let mut center = Vec2::ZERO;
+        let velocity = forward * 80.0;
+        let mut state = FeetState::new(center, forward);
+        let mut max_planted_lag: f32 = 0.0;
+
+        for _ in 0..(120 * 3) {
+            center = center + velocity * DT;
+            state.tick(DT, center, forward, velocity, 0.2);
+            let (left_home, right_home) = homes(center, forward);
+            for (pose, home) in state.poses().into_iter().zip([left_home, right_home]) {
+                if !pose.swinging {
+                    max_planted_lag = max_planted_lag.max(Vec2::distance(pose.pos, home));
+                }
+            }
+        }
+
+        assert!(
+            max_planted_lag <= 16.0,
+            "planted foot trailed {max_planted_lag:.2}px behind home"
+        );
+    }
+
+    #[test]
+    fn actual_speed_tiers_bound_planted_leg_trailing() {
+        let parameters = ParametersTable::default();
+        for (tier, max_lag) in [
+            (SpeedTier::Walk, 16.0_f32),
+            (SpeedTier::Run, 26.0),
+            (SpeedTier::Charge, 26.0),
+        ] {
+            let sample = sample_straight_gait(parameters.speed(tier), parameters.step_time(tier));
+            assert!(
+                sample.max_planted_lag <= max_lag,
+                "{tier:?} planted foot trailed {:.2}px (limit {max_lag:.2}px)",
+                sample.max_planted_lag
+            );
+        }
+    }
+
+    #[test]
+    fn actual_speed_tiers_keep_visible_but_bounded_swing_airtime() {
+        let parameters = ParametersTable::default();
+        for (tier, min_ticks, max_ticks, max_plants) in [
+            (SpeedTier::Walk, 15_usize, 18_usize, 24_usize),
+            (SpeedTier::Run, 10, 12, 36),
+            (SpeedTier::Charge, 6, 8, 65),
+        ] {
+            let sample = sample_straight_gait(parameters.speed(tier), parameters.step_time(tier));
+            assert!(
+                (min_ticks..=max_ticks).contains(&sample.first_swing_ticks),
+                "{tier:?} first swing took {} ticks (expected {min_ticks}..={max_ticks})",
+                sample.first_swing_ticks
+            );
+            assert!(
+                sample.plants <= max_plants,
+                "{tier:?} planted {} times in three seconds (limit {max_plants})",
+                sample.plants
+            );
+        }
+    }
+
+    #[test]
+    fn moderate_directional_motion_keeps_the_weighted_walk_airtime() {
+        let sample = sample_straight_gait(120.0, ParametersTable::default().step_time_normal);
+
+        assert_eq!(sample.first_swing_ticks, 18);
     }
 }

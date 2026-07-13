@@ -1,6 +1,9 @@
 # ADR 0018 — Distribution and Atomic Release
 
 - Status: Accepted (2026-07-10)
+- Superseded in part: ADR 0020 replaces only this ADR's macOS primary-install, ad-hoc-signing,
+  hidden-DMG, and macOS artifact-verification decisions. Atomic publication and all non-macOS
+  decisions below remain accepted.
 - Supersedes: ADR 0013's release mutation workflow and ADR 0017's advertised DMG,
   bundle-synthesis, and DMG-update decisions. ADR 0017 remains the historical record for the
   first macOS packaging slice.
@@ -24,6 +27,9 @@ before a draft existed. Applying this ADR's fix-forward rule, the corrected stab
 `v0.3.1`; the failed tag is not moved or rebuilt.
 
 ## Decision
+
+> Current macOS distribution policy lives in ADR 0020. The macOS bullets below are retained as
+> the v0.3.1 historical decision; the atomic release contract remains current.
 
 ### Primary install paths
 

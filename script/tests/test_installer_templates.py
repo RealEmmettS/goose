@@ -65,6 +65,10 @@ class InstallerTemplateTests(unittest.TestCase):
         ]:
             self.assertIn(token, SHELL)
 
+    def test_macos_success_copy_matches_developer_id_notarized_release(self) -> None:
+        self.assertIn("Developer ID-signed, notarized, and stapled", SHELL)
+        self.assertNotIn("This build is ad-hoc signed and not notarized", SHELL)
+
     def test_shell_bootstrap_is_user_scoped_transactional_and_rejects_bad_archives(self) -> None:
         self.assertIn("$HOME/Applications/Honk300.app", SHELL)
         self.assertIn("${XDG_DATA_HOME:-$HOME/.local/share}/honk300/install", SHELL)
@@ -84,6 +88,7 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertIn('"schema": "honk300.install.v1"', SHELL)
         self.assertIn('"commit": "$(json_escape "$COMMIT")"', SHELL)
         self.assertIn('"owner": "honk300-installer"', SHELL)
+        self.assertIn("refusing to replace an unreceipted macOS app bundle", SHELL)
         self.assertIn("codesign --verify --deep --strict", SHELL)
         self.assertIn("dev.emmetts.honk300", SHELL)
         self.assertIn("archive contains links; refusing extraction", SHELL)

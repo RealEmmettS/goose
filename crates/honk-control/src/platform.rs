@@ -102,6 +102,39 @@ pub fn send_command(command: ControlCommand) -> io::Result<ControlResponse> {
     imp::send_command(command)
 }
 
+const SHUTDOWN_PROBE_ATTEMPTS: usize = 80;
+const SHUTDOWN_PROBE_INTERVAL: Duration = Duration::from_millis(25);
+
+/// Wait until the runtime has actually released its singleton after acknowledging `Stop`.
+///
+/// A stop response is sent just before the runtime unwinds. Waiting on the same singleton used by
+/// startup closes the small interval where an immediate restart could see the old process and
+/// exit, only for that old process to finish a moment later and leave no instance running.
+pub fn wait_for_shutdown() -> io::Result<()> {
+    wait_for_shutdown_with(SHUTDOWN_PROBE_ATTEMPTS, SHUTDOWN_PROBE_INTERVAL, || {
+        Singleton::acquire().map(|(_guard, status)| status)
+    })
+}
+
+fn wait_for_shutdown_with(
+    attempts: usize,
+    interval: Duration,
+    mut probe: impl FnMut() -> io::Result<SingletonStatus>,
+) -> io::Result<()> {
+    for attempt in 0..attempts {
+        if probe()? == SingletonStatus::Acquired {
+            return Ok(());
+        }
+        if attempt + 1 < attempts {
+            std::thread::sleep(interval);
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::TimedOut,
+        "runtime accepted stop but did not release its singleton within two seconds",
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,6 +167,29 @@ mod tests {
         request.respond(ControlResponse::Err("BUSY".into()));
 
         assert_eq!(resp_rx.recv().unwrap(), ControlResponse::Err("BUSY".into()));
+    }
+
+    #[test]
+    fn stop_waits_until_the_singleton_is_released_before_returning() {
+        let mut probes = [
+            SingletonStatus::AlreadyRunning,
+            SingletonStatus::AlreadyRunning,
+            SingletonStatus::Acquired,
+        ]
+        .into_iter();
+
+        wait_for_shutdown_with(4, Duration::ZERO, || {
+            Ok(probes.next().expect("shutdown probe count"))
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn stop_reports_a_bounded_timeout_when_the_runtime_never_releases() {
+        let err = wait_for_shutdown_with(2, Duration::ZERO, || Ok(SingletonStatus::AlreadyRunning))
+            .unwrap_err();
+
+        assert_eq!(err.kind(), io::ErrorKind::TimedOut);
     }
 }
 

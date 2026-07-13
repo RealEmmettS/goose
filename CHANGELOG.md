@@ -4,8 +4,11 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); release versions follow
 [Semantic Versioning](https://semver.org/).
 
-> **Project stage: implementation in progress.** Milestones M0-M19 are implemented in-tree, and
-> M16.1 macOS Accessibility readiness remains gated on pre-granted host evidence rather than Windows-host claims. The goose now renders, walks, leaves mud, plays sounds, reacts to the cursor, can
+> **Project stage: implementation in progress.** Milestones M0-M19 are implemented in-tree. The
+> managed macOS Accessibility first run is implemented and automated tests are green; M16.1
+> readiness remains gated on exact signed-candidate denied, non-nagging relaunch, live-grant, and
+> live-revocation evidence. The goose now renders, walks, leaves mud, plays sounds, reacts to the
+> cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
 > Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
@@ -17,6 +20,106 @@ All notable changes to this project are documented here. Format based on
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
+
+### Added
+- **Managed macOS Accessibility first run (2026-07-13, ADR 0022)** - only the exact receipted app
+  at `~/Applications/Honk300.app` can open automatic permission UI. Before calling the native
+  consent request and opening Accessibility settings, the runtime atomically creates an
+  owner-only `accessibility-prompt-v1/<version>` marker; mismatched metadata/receipts, symlinks,
+  unsafe state, development binaries, and direct mounted-DMG launches fail closed without UI. A
+  denied managed app enters a platform-neutral safe-edge wait which blocks automatic and direct
+  pranks except honk while preserving status/reload/stop. One-second polling restores capability
+  state and starts FirstUX after a live grant, or abandons permission-bound work and returns to
+  the non-nagging wait after revocation. Focused engine, eligibility/marker, native bridge, and
+  smoke-contract tests pass; the exact signed-candidate denied/non-nag/grant/revoke smoke remains
+  a release gate.
+- **Developer ID macOS distribution (v0.3.3, ADR 0020)** - the universal app now carries exact
+  version/tag/commit metadata, and the DMG contains `Honk300.app`, a separately signed native
+  `Install Honk300.app`, and concise per-user instructions without an `/Applications` symlink.
+  The helper verifies the target bundle id, signature, and matching nonempty Developer ID team,
+  requires the fixed `M9D5379H93` Developer ID Application certificate identity on both apps,
+  delegates to the shared no-sudo install transaction, reports native failures, and opens the
+  installed app on success.
+- **Fail-closed signing and notarization pipeline** - candidate and release macOS jobs now import
+  a password-protected Developer ID P12 into an ephemeral keychain, sign nested code inside-out
+  with hardened runtime and secure timestamps, notarize/staple/validate the app and DMG, retain
+  notarization JSON as internal evidence, and delete temporary credentials. All six certificate
+  and App Store Connect secrets are mandatory; release mode has no ad-hoc fallback. The stapled
+  final DMG is remounted and Gatekeeper-assessed for both contained apps, proving the user launch
+  path rather than only the disk-image container; both the main app and graphical helper sign and
+  verify their executable before their outer bundle rather than relying on recursive signing.
+- **Native macOS pixel and screenshot contracts** - asymmetric RGBA round trips through AppKit
+  and CoreGraphics pin channel/alpha semantics, while semantic captures require a visible body,
+  outline, wing, beak, legs, and shadow on light and dark backgrounds.
+- **Cross-platform presenter byte-order contracts** - asymmetric color/alpha tests also pin the
+  intentional premultiplied RGBA-to-BGRA conversion used by Windows layered windows and both
+  Linux X11 and Wayland presenters. This extends the macOS regression audit to every native
+  pixel bridge without changing the platform-neutral renderer output.
+
+### Changed
+- **Quicker shared walk recovery** - the platform-neutral planted-foot trigger now releases at
+  four pixels and normal/moderate recovery keeps its weighted 70%-of-beat cadence. A speed-aware
+  body-travel cap shortens only Run/Charge recovery: tests bound Walk lag at 16 pixels and
+  Run/Charge at 26 pixels while guarding visible airtime and plant cadence against twitchy
+  overcorrection. The shared fix applies on Windows, macOS, X11, and Wayland; three gait-dependent
+  renderer goldens were deliberately refreshed before the tier cap, which requires no additional
+  golden changes.
+- **Lower-allocation renderer and macOS runtime** - renderer scratch surfaces grow in bounded
+  increments, stippled shadows are cached, and opaque 1x frames can paint directly. macOS reuses
+  bitmap/image/layer storage, avoids swizzle buffers and redundant window/display work, drains
+  native objects in autorelease pools, caches desktop geometry, retains 120 Hz simulation, and
+  caps presentation at 60 Hz. AppKit's reusable bitmap-to-CGImage bridge also removes the final
+  per-frame CFData copy; the 10-second-warm-up/60-second M2 profile passes at 8.30% median CPU,
+  54.48 MiB maximum RSS, and negative 5.12 MiB RSS growth.
+- **Mounted-bundle lifecycle transaction** - `honk300 install` can copy its enclosing mounted
+  source app into `~/Applications/Honk300.app` after validating bundle id, stamped release
+  identity, strict signature, and both architectures. It preserves the shared aliases/media/
+  autostart/receipt/update/uninstall contract and performs an atomic bundle swap with rollback;
+  a candidate-only fault hook proves the previous bundle and receipt return after activation.
+  Late failures also restore/remove aliases, the LaunchAgent, receipt, and only migration-created
+  media while preserving existing user content.
+- **Exact-artifact native smoke** - both macOS smoke scripts accept `HONK300_APP` plus
+  `HONK300_SKIP_BUILD=1`, reject missing bundles, and create their config only through `setup`,
+  allowing denied and granted Accessibility evidence on one unchanged signed identity.
+
+### Fixed
+- **Readable macOS notes in every appearance** - note text now uses AppKit's semantic label color
+  instead of absolute black, so it follows light, dark, and increased-contrast appearances. A
+  native regression pins the semantic-color contract. The equivalent platform paths were audited:
+  Windows delegates note colors to system Notepad, while Linux explicitly reports collect windows
+  unsupported rather than drawing a separate note surface.
+- **macOS transparent-white/purple goose** - the AppKit bridge now declares tiny-skia's direct
+  premultiplied RGBA bytes as alpha-last instead of interpreting them through the former
+  BGRA/alpha-first contract. Native captures show the articulated goose rather than a translucent
+  color blob; the seven shared engine goldens remain stable apart from the intentional gait poses.
+- **macOS lint debt** - removed the obsolete world-bounds path and corrected the three remaining
+  target-specific warning failures so workspace clippy can run with `-D warnings` on macOS.
+- **Stop/start singleton race** - a successful `stop`, including the `exit` and `quit` aliases,
+  now waits for the shared singleton to be released before returning. An immediate restart can no
+  longer lose the race between the old runtime acknowledging shutdown and actually exiting on
+  Windows, macOS, or Linux; the wait is bounded and reports a stalled shutdown explicitly.
+- **Release-board runtime debt** - re-audited the shared `RuntimeCore` and the Windows per-monitor
+  dirty-region presenter against their deferred cards. Focused sequencing, 4K bounded-damage, and
+  Windows x64/ARM64 cross-target checks confirm the old loop-duplication and fullscreen-redraw
+  follow-ups are resolved by the current architecture.
+- **Native Wayland capability decision (ADR 0021)** - completed the upstream protocol/compositor
+  audit and published a portable/wlroots/KDE/GNOME/portal/XWayland/privileged-helper matrix. The
+  portable layer-shell mode remains honestly reduced; future near-parity work is split into
+  explicit, permissioned compositor adapters rather than one false universal-support claim.
+
+### Security
+- **Bound graphical installation** - mounted-source installation preflights foreign aliases,
+  receipts, LaunchAgents, symlinks, bundle identity, release metadata, architecture, and code
+  signature before mutation. DMG receipts bind updates to the exact tag and full commit, and the
+  helper refuses adjacent apps signed by another team. Both graphical and terminal transactions
+  also refuse to replace an existing app that lacks a matching Honk300 ownership receipt.
+  Receipt checks use no-follow metadata so even a dangling foreign symlink is preserved rather
+  than misclassified as an absent path.
+- **Embedded-terminal protection on macOS** - the foreign-window classifier now excludes Codex
+  and Visual Studio Code by bundle identity in addition to Terminal, Ghostty, iTerm, Warp, and
+  other terminal apps. Because AppKit permission-safe filtering happens at application scope,
+  conservatively excluding the full editor prevents ride/collect behavior from ever targeting an
+  integrated terminal panel.
 
 ## [0.3.2] - 2026-07-11
 

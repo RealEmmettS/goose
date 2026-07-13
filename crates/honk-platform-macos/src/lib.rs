@@ -89,6 +89,8 @@ pub fn is_protected_terminal_app(bundle_id: Option<&str>, app_name: Option<&str>
                     | "dev.warp.warp"
                     | "com.mitchellh.ghostty"
                     | "co.zeit.hyper"
+                    | "com.openai.codex"
+                    | "com.microsoft.vscode"
             )
         });
     if bundle_match {
@@ -109,6 +111,8 @@ pub fn is_protected_terminal_app(bundle_id: Option<&str>, app_name: Option<&str>
                     | "warp"
                     | "ghostty"
                     | "hyper"
+                    | "codex"
+                    | "visual studio code"
             )
         })
 }
@@ -125,26 +129,31 @@ mod platform {
     use honk_engine::{
         ForeignWindowId, ForeignWindowSnapshot, LocalTime, PresenceSnapshot, Rect, Vec2,
     };
-    use objc2::rc::Retained;
+    use objc2::rc::{autoreleasepool, Retained};
+    use objc2::runtime::AnyObject;
     use objc2::MainThreadMarker;
     use objc2::{AnyThread, MainThreadOnly};
     use objc2_app_kit::{
         NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSBitmapFormat,
         NSBitmapImageRep, NSColor, NSDeviceRGBColorSpace, NSEvent, NSEventMask, NSImage,
-        NSImageRep, NSImageView, NSRunningApplication, NSScreenSaverWindowLevel, NSTextField,
-        NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
+        NSImageCacheMode, NSImageRep, NSImageView, NSRunningApplication, NSScreenSaverWindowLevel,
+        NSTextField, NSView, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
     };
     use objc2_application_services::{
-        AXError, AXIsProcessTrusted, AXUIElement, AXValue, AXValueType,
+        kAXTrustedCheckOptionPrompt, AXError, AXIsProcessTrusted, AXIsProcessTrustedWithOptions,
+        AXUIElement, AXValue, AXValueType,
     };
-    use objc2_core_foundation::{CFRetained, CFString, CFType, CGPoint, CGRect, CGSize};
+    use objc2_core_foundation::{
+        CFBoolean, CFDictionary, CFRetained, CFString, CFType, CGPoint, CGRect, CGSize,
+    };
     use objc2_core_graphics::{
-        CGDisplayBounds, CGError, CGEventSourceStateID, CGGetActiveDisplayList, CGMainDisplayID,
-        CGMouseButton, CGWarpMouseCursorPosition,
+        CGDisplayBounds, CGError, CGEventSourceStateID, CGGetActiveDisplayList, CGImage,
+        CGMainDisplayID, CGMouseButton, CGWarpMouseCursorPosition,
     };
     use objc2_foundation::{
-        NSDate, NSDefaultRunLoopMode, NSInteger, NSPoint, NSRect, NSSize, NSString,
+        NSBundle, NSDate, NSDefaultRunLoopMode, NSInteger, NSPoint, NSRect, NSSize, NSString, NSURL,
     };
+    use objc2_quartz_core::{CALayer, CATransaction};
     use std::collections::HashMap;
     use std::ffi::c_void;
     use std::io;
@@ -155,11 +164,51 @@ mod platform {
 
     const MAX_DISPLAYS: usize = 16;
     const DISPLAY_REFRESH_INTERVAL: Duration = Duration::from_millis(500);
+    const APPKIT_EVENT_PUMP_INTERVAL: Duration = Duration::from_nanos(16_666_667);
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum AccessibilityState {
         Trusted,
         Denied,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct MacBundleReleaseMetadata {
+        pub bundle_id: String,
+        pub version: String,
+        pub tag: String,
+        pub commit: String,
+    }
+
+    enum BundleInfoValue {
+        String(String),
+        NonString,
+    }
+
+    fn bundle_release_metadata_from_values(
+        mut value_for_key: impl FnMut(&str) -> Option<BundleInfoValue>,
+    ) -> Option<MacBundleReleaseMetadata> {
+        let mut string_for_key = |key| match value_for_key(key)? {
+            BundleInfoValue::String(value) => Some(value),
+            BundleInfoValue::NonString => None,
+        };
+        Some(MacBundleReleaseMetadata {
+            bundle_id: string_for_key("CFBundleIdentifier")?,
+            version: string_for_key("CFBundleShortVersionString")?,
+            tag: string_for_key("Honk300ReleaseTag")?,
+            commit: string_for_key("Honk300ReleaseCommit")?,
+        })
+    }
+
+    pub fn main_bundle_release_metadata() -> Option<MacBundleReleaseMetadata> {
+        let bundle = NSBundle::mainBundle();
+        bundle_release_metadata_from_values(|key| {
+            let value = bundle.objectForInfoDictionaryKey(&NSString::from_str(key))?;
+            Some(match value.downcast_ref::<NSString>() {
+                Some(value) => BundleInfoValue::String(value.to_string()),
+                None => BundleInfoValue::NonString,
+            })
+        })
     }
 
     pub fn accessibility_state() -> AccessibilityState {
@@ -170,26 +219,65 @@ mod platform {
         }
     }
 
-    pub fn pointer_state() -> (f32, f32, bool) {
-        let coordinate_space = display_list()
-            .map(|displays| {
-                appkit_coordinate_space(primary_bounds(&displays), union_bounds(&displays))
+    fn request_accessibility_prompt_with(
+        prompt: impl FnOnce() -> AccessibilityState,
+    ) -> io::Result<AccessibilityState> {
+        let _main_thread = MainThreadMarker::new().ok_or_else(|| {
+            io::Error::other("macOS Accessibility prompt must be requested on the main thread")
+        })?;
+        Ok(autoreleasepool(|_| prompt()))
+    }
+
+    pub fn request_accessibility_prompt() -> io::Result<AccessibilityState> {
+        request_accessibility_prompt_with(|| {
+            let options = CFDictionary::<CFType, CFType>::from_slices(
+                &[unsafe { kAXTrustedCheckOptionPrompt }.as_ref()],
+                &[CFBoolean::new(true).as_ref()],
+            );
+            if unsafe { AXIsProcessTrustedWithOptions(Some(options.as_opaque())) } {
+                AccessibilityState::Trusted
+            } else {
+                AccessibilityState::Denied
+            }
+        })
+    }
+
+    fn accessibility_settings_urls() -> [&'static str; 2] {
+        [
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension",
+        ]
+    }
+
+    fn try_accessibility_settings_urls(mut open: impl FnMut(&str) -> bool) -> io::Result<()> {
+        for url in accessibility_settings_urls() {
+            if open(url) {
+                return Ok(());
+            }
+        }
+        Err(io::Error::other(
+            "macOS rejected the Accessibility and Privacy & Security Settings URLs",
+        ))
+    }
+
+    pub fn open_accessibility_settings() -> io::Result<()> {
+        let _main_thread = MainThreadMarker::new().ok_or_else(|| {
+            io::Error::other("macOS Accessibility settings must be opened on the main thread")
+        })?;
+        autoreleasepool(|_| {
+            let workspace = NSWorkspace::sharedWorkspace();
+            try_accessibility_settings_urls(|url_string| {
+                NSURL::URLWithString(&NSString::from_str(url_string))
+                    .is_some_and(|url| workspace.openURL(&url))
             })
-            .unwrap_or_else(|_| default_desktop_bounds());
-        let point = NSEvent::mouseLocation();
-        let world = appkit_point_to_world((point.x, point.y), coordinate_space);
-        let left_down = objc2_core_graphics::CGEventSource::button_state(
-            CGEventSourceStateID::CombinedSessionState,
-            CGMouseButton::Left,
-        );
-        (world.x, world.y, left_down)
+        })
     }
 
     pub fn local_time() -> LocalTime {
         unsafe {
-            let mut now = libc::time(ptr::null_mut());
+            let now = libc::time(ptr::null_mut());
             let mut out = std::mem::zeroed::<libc::tm>();
-            let tm = if libc::localtime_r(&mut now, &mut out).is_null() {
+            let tm = if libc::localtime_r(&now, &mut out).is_null() {
                 None
             } else {
                 Some(out)
@@ -243,6 +331,8 @@ mod platform {
         primary_bounds: Rect,
         virtual_bounds: Rect,
         topology_changed: bool,
+        interactive: bool,
+        next_event_pump: Instant,
         next_display_refresh: Instant,
     }
 
@@ -261,7 +351,7 @@ mod platform {
             let coordinate_space = appkit_coordinate_space(primary_bounds, virtual_bounds);
             let mut displays = Vec::with_capacity(display_infos.len());
             for info in display_infos {
-                displays.push(DisplayWindow::new(mtm, info, coordinate_space)?);
+                displays.push(DisplayWindow::new(mtm, info, coordinate_space, false)?);
             }
             Ok(Self {
                 app,
@@ -269,27 +359,37 @@ mod platform {
                 primary_bounds,
                 virtual_bounds,
                 topology_changed: false,
+                interactive: false,
+                next_event_pump: Instant::now(),
                 next_display_refresh: Instant::now() + DISPLAY_REFRESH_INTERVAL,
             })
         }
 
         pub fn pump(&mut self) -> bool {
-            // Non-blocking drain of the AppKit event queue. Without this the queue is never
-            // serviced, so window-chrome events — including the Titled|Closable collect-window
-            // close button — are silently ignored. `distantPast` makes each poll return
-            // immediately, so we drain everything currently queued and stop as soon as it's empty.
-            let mode = unsafe { NSDefaultRunLoopMode };
-            while let Some(event) = self.app.nextEventMatchingMask_untilDate_inMode_dequeue(
-                NSEventMask::Any,
-                Some(&NSDate::distantPast()),
-                mode,
-                true,
-            ) {
-                self.app.sendEvent(&event);
+            autoreleasepool(|_| self.pump_inner())
+        }
+
+        fn pump_inner(&mut self) -> bool {
+            let now = Instant::now();
+            if now >= self.next_event_pump {
+                self.next_event_pump = now + APPKIT_EVENT_PUMP_INTERVAL;
+                // Non-blocking drain of the AppKit event queue. Without this the queue is never
+                // serviced, so window-chrome events — including the Titled|Closable
+                // collect-window close button — are silently ignored. Driving the AppKit run loop
+                // also commits Core Animation transactions, so cap it at the same 60 Hz maximum as
+                // presentation instead of doing that work on every 120 Hz simulation tick.
+                let mode = unsafe { NSDefaultRunLoopMode };
+                while let Some(event) = self.app.nextEventMatchingMask_untilDate_inMode_dequeue(
+                    NSEventMask::Any,
+                    Some(&NSDate::distantPast()),
+                    mode,
+                    true,
+                ) {
+                    self.app.sendEvent(&event);
+                }
             }
-            self.app.updateWindows();
-            if Instant::now() >= self.next_display_refresh {
-                self.next_display_refresh = Instant::now() + DISPLAY_REFRESH_INTERVAL;
+            if now >= self.next_display_refresh {
+                self.next_display_refresh = now + DISPLAY_REFRESH_INTERVAL;
                 if let Err(err) = self.refresh_display_topology() {
                     eprintln!(
                         "honk300: macOS display refresh failed; keeping prior topology ({err})"
@@ -297,6 +397,20 @@ mod platform {
                 }
             }
             true
+        }
+
+        pub fn pointer_state(&self) -> (f32, f32, bool) {
+            autoreleasepool(|_| {
+                let coordinate_space =
+                    appkit_coordinate_space(self.primary_bounds, self.virtual_bounds);
+                let point = NSEvent::mouseLocation();
+                let world = appkit_point_to_world((point.x, point.y), coordinate_space);
+                let left_down = objc2_core_graphics::CGEventSource::button_state(
+                    CGEventSourceStateID::CombinedSessionState,
+                    CGMouseButton::Left,
+                );
+                (world.x, world.y, left_down)
+            })
         }
 
         pub fn primary_monitor_bounds(&self) -> Rect {
@@ -319,11 +433,13 @@ mod platform {
         }
 
         pub fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<()> {
-            let coordinate_space =
-                appkit_coordinate_space(self.primary_bounds, self.virtual_bounds);
+            autoreleasepool(|_| self.present_inner(dirty, pixmap))
+        }
+
+        fn present_inner(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<()> {
             for display in &mut self.displays {
                 if let Some(clip) = dirty.intersection(display.info.bounds) {
-                    display.present(dirty, clip, pixmap, coordinate_space)?;
+                    display.present(dirty, clip, pixmap)?;
                 } else {
                     display.clear();
                 }
@@ -332,9 +448,13 @@ mod platform {
         }
 
         pub fn set_interactive(&mut self, over_goose: bool) {
+            if self.interactive == over_goose {
+                return;
+            }
             for display in &mut self.displays {
                 display.window.setIgnoresMouseEvents(!over_goose);
             }
+            self.interactive = over_goose;
         }
 
         fn refresh_display_topology(&mut self) -> io::Result<()> {
@@ -364,7 +484,7 @@ mod platform {
             for info in infos {
                 let mut display = match existing.remove(&info.id) {
                     Some(display) => display,
-                    None => DisplayWindow::new(mtm, info, coordinate_space)?,
+                    None => DisplayWindow::new(mtm, info, coordinate_space, self.interactive)?,
                 };
                 display.update_info(info, coordinate_space);
                 displays.push(display);
@@ -390,13 +510,24 @@ mod platform {
     struct DisplayWindow {
         info: DisplayInfo,
         window: Retained<NSWindow>,
-        image_view: Retained<NSImageView>,
-        image: Option<Retained<NSImage>>,
-        buffer: Vec<u8>,
+        image_view: Retained<NSView>,
+        image_layer: Retained<CALayer>,
+        surface: Option<BitmapSurface>,
+        view_frame: Option<AppKitFrame>,
+        visible: bool,
+    }
+
+    fn ignores_mouse_events_for_interactivity(interactive: bool) -> bool {
+        !interactive
     }
 
     impl DisplayWindow {
-        fn new(mtm: MainThreadMarker, info: DisplayInfo, desktop: Rect) -> io::Result<Self> {
+        fn new(
+            mtm: MainThreadMarker,
+            info: DisplayInfo,
+            desktop: Rect,
+            interactive: bool,
+        ) -> io::Result<Self> {
             let frame = appkit_frame_for_world_rect(info.bounds, desktop);
             let ns_frame = nsrect(frame);
             let style = NSWindowStyleMask::Borderless | NSWindowStyleMask::NonactivatingPanel;
@@ -416,7 +547,7 @@ mod platform {
                 window.setReleasedWhenClosed(false);
             }
             window.setCanHide(false);
-            window.setIgnoresMouseEvents(true);
+            window.setIgnoresMouseEvents(ignores_mouse_events_for_interactivity(interactive));
             window.setLevel(NSScreenSaverWindowLevel);
             window.setCollectionBehavior(
                 NSWindowCollectionBehavior::CanJoinAllSpaces
@@ -432,51 +563,89 @@ mod platform {
                 width: frame.width,
                 height: frame.height,
             });
-            let image_view = NSImageView::initWithFrame(NSImageView::alloc(mtm), view_frame);
-            window.setContentView(Some(&image_view));
+            let root_view = NSView::initWithFrame(NSView::alloc(mtm), view_frame);
+            let image_view = NSView::initWithFrame(NSView::alloc(mtm), view_frame);
+            let image_layer = CALayer::new();
+            image_layer.setOpaque(false);
+            image_layer.setGeometryFlipped(true);
+            image_view.setWantsLayer(true);
+            image_view.setLayer(Some(&image_layer));
+            root_view.addSubview(&image_view);
+            window.setContentView(Some(&root_view));
             window.orderFrontRegardless();
 
             Ok(Self {
                 info,
                 window,
                 image_view,
-                image: None,
-                buffer: Vec::new(),
+                image_layer,
+                surface: None,
+                view_frame: None,
+                visible: false,
             })
         }
 
-        fn present(
-            &mut self,
-            dirty: Rect,
-            clip: Rect,
-            pixmap: &Pixmap,
-            desktop: Rect,
-        ) -> io::Result<()> {
+        fn present(&mut self, dirty: Rect, clip: Rect, pixmap: &Pixmap) -> io::Result<()> {
             let clip = clip.pixel_aligned();
             let width = clip.width().ceil().max(1.0) as u32;
             let height = clip.height().ceil().max(1.0) as u32;
-            self.buffer = clipped_bgra(dirty, clip, pixmap, width, height);
-            let image = image_from_bgra(&self.buffer, width, height)?;
+            let resized = self
+                .surface
+                .as_ref()
+                .is_none_or(|surface| surface.width < width || surface.height < height);
+            if resized {
+                let capacity_width = rounded_surface_extent(width);
+                let capacity_height = rounded_surface_extent(height);
+                self.surface = Some(BitmapSurface::new(capacity_width, capacity_height)?);
+            }
+            let surface = self
+                .surface
+                .as_ref()
+                .expect("surface allocated for the requested dimensions");
+            surface.copy_clipped_rgba(dirty, clip, pixmap, width, height)?;
             let local_frame = AppKitFrame {
                 x: (clip.min.x - self.info.bounds.min.x) as f64,
-                y: (self.info.bounds.max.y - clip.max.y) as f64,
-                width: width as f64,
-                height: height as f64,
+                y: (self.info.bounds.max.y - clip.max.y) as f64
+                    - f64::from(surface.height - height),
+                width: surface.width as f64,
+                height: surface.height as f64,
             };
-            self.image_view.setFrame(nsrect(local_frame));
-            self.image_view.setImage(Some(&image));
-            self.image = Some(image);
+            if self.view_frame != Some(local_frame) {
+                if self.view_frame.is_some_and(|frame| {
+                    frame.width == local_frame.width && frame.height == local_frame.height
+                }) {
+                    self.image_view.setFrameOrigin(NSPoint {
+                        x: local_frame.x,
+                        y: local_frame.y,
+                    });
+                } else {
+                    self.image_view.setFrame(nsrect(local_frame));
+                }
+                self.view_frame = Some(local_frame);
+            }
+            let cg_image = surface.direct_cg_image()?;
+            let contents = <objc2_core_graphics::CGImage as AsRef<AnyObject>>::as_ref(&cg_image);
+            CATransaction::begin();
+            CATransaction::setDisableActions(true);
+            unsafe {
+                self.image_layer.setContents(Some(contents));
+            }
+            CATransaction::commit();
+            self.visible = true;
 
-            let window_frame = appkit_frame_for_world_rect(self.info.bounds, desktop);
-            self.window.setFrame_display(nsrect(window_frame), false);
-            self.window.orderFrontRegardless();
             Ok(())
         }
 
         fn clear(&mut self) {
-            self.image_view.setImage(None);
-            self.image = None;
-            self.buffer.clear();
+            if self.visible {
+                CATransaction::begin();
+                CATransaction::setDisableActions(true);
+                unsafe {
+                    self.image_layer.setContents(None);
+                }
+                CATransaction::commit();
+                self.visible = false;
+            }
         }
 
         fn update_info(&mut self, info: DisplayInfo, coordinate_space: Rect) {
@@ -569,13 +738,24 @@ mod platform {
         }
     }
 
-    fn image_from_bgra(buffer: &[u8], width: u32, height: u32) -> io::Result<Retained<NSImage>> {
-        // Pass NULL planes so AppKit allocates and owns the pixel storage for the rep's lifetime.
-        // The previous code handed AppKit a pointer into an external per-frame Vec that the caller
-        // reuses and reallocates, so the rep aliased memory that mutated or freed underneath it
-        // (tearing / use-after-free). With AppKit-owned storage we copy our rows in once.
-        let rep = unsafe {
-            NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bitmapFormat_bytesPerRow_bitsPerPixel(
+    struct BitmapSurface {
+        width: u32,
+        height: u32,
+        rep: Retained<NSBitmapImageRep>,
+        image: Retained<NSImage>,
+    }
+
+    fn rounded_surface_extent(extent: u32) -> u32 {
+        extent.saturating_add(31) / 32 * 32
+    }
+
+    impl BitmapSurface {
+        fn new(width: u32, height: u32) -> io::Result<Self> {
+            // Pass NULL planes so AppKit allocates and owns the pixel storage for the rep's
+            // lifetime. Alpha-last device RGB matches tiny-skia's premultiplied RGBA byte
+            // contract, so no channel swizzle is needed.
+            let rep = unsafe {
+                NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bitmapFormat_bytesPerRow_bitsPerPixel(
                     NSBitmapImageRep::alloc(),
                     ptr::null_mut(),
                     width as NSInteger,
@@ -585,63 +765,118 @@ mod platform {
                     true,
                     false,
                     NSDeviceRGBColorSpace,
-                    NSBitmapFormat::AlphaFirst | NSBitmapFormat::ThirtyTwoBitLittleEndian,
+                    NSBitmapFormat::empty(),
                     (width * 4) as NSInteger,
                     32,
                 )
-        }
-        .ok_or_else(|| io::Error::other("failed to create NSBitmapImageRep"))?;
-
-        // Copy each row into AppKit's buffer, honoring its (possibly padded) bytesPerRow rather
-        // than assuming a tight width*4 stride.
-        let dst = rep.bitmapData();
-        if dst.is_null() {
-            return Err(io::Error::other("NSBitmapImageRep provided no bitmap data"));
-        }
-        let dst_stride = rep.bytesPerRow() as usize;
-        let src_stride = width as usize * 4;
-        let row_bytes = src_stride.min(dst_stride);
-        for row in 0..height as usize {
-            unsafe {
-                ptr::copy_nonoverlapping(
-                    buffer.as_ptr().add(row * src_stride),
-                    dst.add(row * dst_stride),
-                    row_bytes,
-                );
             }
+            .ok_or_else(|| io::Error::other("failed to create NSBitmapImageRep"))?;
+
+            let image = NSImage::initWithSize(
+                NSImage::alloc(),
+                NSSize {
+                    width: width as f64,
+                    height: height as f64,
+                },
+            );
+            image.setCacheMode(NSImageCacheMode::Never);
+            let rep_ref: &NSImageRep = &rep;
+            image.addRepresentation(rep_ref);
+            Ok(Self {
+                width,
+                height,
+                rep,
+                image,
+            })
         }
 
-        let image = NSImage::initWithSize(
-            NSImage::alloc(),
-            NSSize {
-                width: width as f64,
-                height: height as f64,
-            },
-        );
-        let rep_ref: &NSImageRep = &rep;
-        image.addRepresentation(rep_ref);
-        Ok(image)
-    }
-
-    fn clipped_bgra(dirty: Rect, clip: Rect, pixmap: &Pixmap, width: u32, height: u32) -> Vec<u8> {
-        let src_width = pixmap.width() as usize;
-        let src_x = (clip.min.x - dirty.min.x).round().max(0.0) as usize;
-        let src_y = (clip.min.y - dirty.min.y).round().max(0.0) as usize;
-        let mut out = vec![0; width as usize * height as usize * 4];
-        let src = pixmap.data();
-        for y in 0..height as usize {
-            for x in 0..width as usize {
-                let src_idx = ((src_y + y) * src_width + src_x + x) * 4;
-                let dst_idx = (y * width as usize + x) * 4;
-                if src_idx + 3 < src.len() {
-                    out[dst_idx] = src[src_idx + 2];
-                    out[dst_idx + 1] = src[src_idx + 1];
-                    out[dst_idx + 2] = src[src_idx];
-                    out[dst_idx + 3] = src[src_idx + 3];
+        fn copy_tight_rgba(&self, rgba: &[u8]) -> io::Result<()> {
+            let expected = self.width as usize * self.height as usize * 4;
+            if rgba.len() != expected {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("expected {expected} RGBA bytes, got {}", rgba.len()),
+                ));
+            }
+            let dst = self.bitmap_data()?;
+            let dst_stride = self.rep.bytesPerRow() as usize;
+            let src_stride = self.width as usize * 4;
+            for row in 0..self.height as usize {
+                unsafe {
+                    ptr::copy_nonoverlapping(
+                        rgba.as_ptr().add(row * src_stride),
+                        dst.add(row * dst_stride),
+                        src_stride,
+                    );
                 }
             }
+            Ok(())
         }
-        out
+
+        fn copy_clipped_rgba(
+            &self,
+            dirty: Rect,
+            clip: Rect,
+            pixmap: &Pixmap,
+            active_width: u32,
+            active_height: u32,
+        ) -> io::Result<()> {
+            let dst = self.bitmap_data()?;
+            let dst_stride = self.rep.bytesPerRow() as usize;
+            let src_stride = pixmap.width() as usize * 4;
+            let src_x = (clip.min.x - dirty.min.x).round() as isize;
+            let src_y = (clip.min.y - dirty.min.y).round() as isize;
+            let src = pixmap.data();
+
+            for y in 0..self.height as usize {
+                let dst_row = unsafe { dst.add(y * dst_stride) };
+                unsafe { ptr::write_bytes(dst_row, 0, dst_stride) };
+                if y >= active_height as usize {
+                    continue;
+                }
+                let source_y = src_y + y as isize;
+                if source_y < 0 || source_y >= pixmap.height() as isize {
+                    continue;
+                }
+                let start_x = src_x.max(0) as usize;
+                let skipped = (start_x as isize - src_x).max(0) as usize;
+                if start_x >= pixmap.width() as usize || skipped >= active_width as usize {
+                    continue;
+                }
+                let copy_pixels =
+                    (active_width as usize - skipped).min(pixmap.width() as usize - start_x);
+                let src_offset = source_y as usize * src_stride + start_x * 4;
+                unsafe {
+                    ptr::copy_nonoverlapping(
+                        src.as_ptr().add(src_offset),
+                        dst_row.add(skipped * 4),
+                        copy_pixels * 4,
+                    );
+                }
+            }
+            Ok(())
+        }
+
+        fn bitmap_data(&self) -> io::Result<*mut u8> {
+            let data = self.rep.bitmapData();
+            if data.is_null() {
+                Err(io::Error::other("NSBitmapImageRep provided no bitmap data"))
+            } else {
+                Ok(data)
+            }
+        }
+
+        fn direct_cg_image(&self) -> io::Result<Retained<CGImage>> {
+            self.rep
+                .CGImage()
+                .ok_or_else(|| io::Error::other("AppKit did not expose the reusable RGBA bitmap"))
+        }
+    }
+
+    fn image_from_rgba(buffer: &[u8], width: u32, height: u32) -> io::Result<Retained<NSImage>> {
+        let surface = BitmapSurface::new(width, height)?;
+        surface.copy_tight_rgba(buffer)?;
+        Ok(surface.image)
     }
 
     pub struct ForeignWindowWatcher {
@@ -868,7 +1103,10 @@ mod platform {
         window: Retained<NSWindow>,
         _image_view: Retained<NSImageView>,
         _image: Retained<NSImage>,
-        _buffer: Vec<u8>,
+    }
+
+    fn note_text_color() -> Retained<NSColor> {
+        NSColor::labelColor()
     }
 
     pub struct CollectWindowController {
@@ -939,7 +1177,7 @@ mod platform {
             label.setSelectable(false);
             label.setDrawsBackground(false);
             label.setMaximumNumberOfLines(0);
-            label.setTextColor(Some(&NSColor::blackColor()));
+            label.setTextColor(Some(&note_text_color()));
             if let Some(content) = window.contentView() {
                 content.addSubview(&label);
             }
@@ -982,8 +1220,7 @@ mod platform {
                 height: size.y as f64,
             });
             let image_view = NSImageView::initWithFrame(NSImageView::alloc(mtm), view_frame);
-            let buffer = pixmap_bgra(pixmap);
-            let image = image_from_bgra(&buffer, pixmap.width(), pixmap.height())?;
+            let image = image_from_rgba(pixmap.data(), pixmap.width(), pixmap.height())?;
             image_view.setImage(Some(&image));
             window.setContentView(Some(&image_view));
             window.orderFrontRegardless();
@@ -994,7 +1231,6 @@ mod platform {
                     window,
                     _image_view: image_view,
                     _image: image,
-                    _buffer: buffer,
                 }),
             );
             Ok(id)
@@ -1101,22 +1337,212 @@ mod platform {
         Rect::new(min, max)
     }
 
-    fn pixmap_bgra(pixmap: &Pixmap) -> Vec<u8> {
-        let mut out = Vec::with_capacity(pixmap.data().len());
-        for pixel in pixmap.data().chunks_exact(4) {
-            out.push(pixel[2]);
-            out.push(pixel[1]);
-            out.push(pixel[0]);
-            out.push(pixel[3]);
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use objc2::runtime::NSObjectProtocol;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
+        #[test]
+        fn accessibility_prompt_rejects_off_main_thread_before_calling_ax() {
+            let ax_called = Arc::new(AtomicBool::new(false));
+            let worker_ax_called = Arc::clone(&ax_called);
+            let result = std::thread::spawn(move || {
+                request_accessibility_prompt_with(|| {
+                    worker_ax_called.store(true, Ordering::SeqCst);
+                    AccessibilityState::Denied
+                })
+            })
+            .join()
+            .expect("worker thread must finish normally");
+
+            let error = result.expect_err("off-main prompt requests must be rejected");
+            assert_eq!(error.kind(), io::ErrorKind::Other);
+            assert!(
+                !ax_called.load(Ordering::SeqCst),
+                "AX prompt closure must not run off the main thread"
+            );
         }
-        out
+
+        #[test]
+        fn accessibility_settings_urls_prefer_direct_then_privacy_fallback() {
+            assert_eq!(
+                accessibility_settings_urls(),
+                [
+                    "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+                    "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension",
+                ]
+            );
+        }
+
+        #[test]
+        fn accessibility_settings_rejects_off_main_thread() {
+            let result = std::thread::spawn(open_accessibility_settings)
+                .join()
+                .expect("worker thread must finish normally");
+            let error = result.expect_err("off-main settings requests must be rejected");
+            assert_eq!(error.kind(), io::ErrorKind::Other);
+        }
+
+        #[test]
+        fn accessibility_settings_failure_is_reported_only_after_both_urls_are_tried() {
+            let mut attempted = Vec::new();
+            let error = try_accessibility_settings_urls(|url| {
+                attempted.push(url.to_owned());
+                false
+            })
+            .expect_err("both rejected settings URLs must be actionable");
+
+            assert_eq!(attempted, accessibility_settings_urls());
+            assert_eq!(error.kind(), io::ErrorKind::Other);
+        }
+
+        #[test]
+        fn bundle_release_metadata_rejects_missing_or_non_string_values() {
+            let complete = bundle_release_metadata_from_values(|key| match key {
+                "CFBundleIdentifier" => Some(BundleInfoValue::String("dev.emmetts.honk300".into())),
+                "CFBundleShortVersionString" => Some(BundleInfoValue::String("0.3.3".into())),
+                "Honk300ReleaseTag" => Some(BundleInfoValue::String("v0.3.3".into())),
+                "Honk300ReleaseCommit" => Some(BundleInfoValue::String("abc123".into())),
+                _ => None,
+            });
+            assert_eq!(
+                complete,
+                Some(MacBundleReleaseMetadata {
+                    bundle_id: "dev.emmetts.honk300".into(),
+                    version: "0.3.3".into(),
+                    tag: "v0.3.3".into(),
+                    commit: "abc123".into(),
+                })
+            );
+
+            let missing = bundle_release_metadata_from_values(|key| match key {
+                "CFBundleIdentifier" => Some(BundleInfoValue::String("dev.emmetts.honk300".into())),
+                "CFBundleShortVersionString" => Some(BundleInfoValue::String("0.3.3".into())),
+                "Honk300ReleaseTag" => None,
+                "Honk300ReleaseCommit" => Some(BundleInfoValue::String("abc123".into())),
+                _ => None,
+            });
+            assert_eq!(missing, None);
+
+            let non_string = bundle_release_metadata_from_values(|key| match key {
+                "CFBundleIdentifier" => Some(BundleInfoValue::String("dev.emmetts.honk300".into())),
+                "CFBundleShortVersionString" => Some(BundleInfoValue::String("0.3.3".into())),
+                "Honk300ReleaseTag" => Some(BundleInfoValue::String("v0.3.3".into())),
+                "Honk300ReleaseCommit" => Some(BundleInfoValue::NonString),
+                _ => None,
+            });
+            assert_eq!(non_string, None);
+        }
+
+        fn assert_component(actual: f64, byte: u8) {
+            let expected = f64::from(byte) / 255.0;
+            assert!(
+                (actual - expected).abs() < 0.005,
+                "expected {expected:.4} from byte {byte}, got {actual:.4}"
+            );
+        }
+
+        fn assert_unpremultiplied_component(actual: f64, component: u8, alpha: u8) {
+            let expected = f64::from(component) / f64::from(alpha);
+            assert!(
+                (actual - expected).abs() < 0.005,
+                "expected {expected:.4} from premultiplied byte {component}/{alpha}, got {actual:.4}"
+            );
+        }
+
+        #[test]
+        fn note_text_uses_the_appearance_aware_system_label_color() {
+            let actual = note_text_color();
+            let expected = NSColor::labelColor();
+
+            assert!(
+                actual.isEqual(Some(&expected)),
+                "note text must follow the active light, dark, and high-contrast appearance"
+            );
+        }
+
+        #[test]
+        fn appkit_interprets_tiny_skia_rgba_without_channel_or_alpha_swaps() {
+            let rgba = [17_u8, 83, 149, 211];
+            let image = image_from_rgba(&rgba, 1, 1).expect("create one-pixel AppKit image");
+            let representations = image.representations();
+            let rep = representations
+                .firstObject()
+                .expect("image owns its bitmap representation");
+            let bitmap = rep
+                .downcast_ref::<NSBitmapImageRep>()
+                .expect("representation is an NSBitmapImageRep");
+            let color = bitmap.colorAtX_y(0, 0).expect("read AppKit pixel color");
+
+            assert_unpremultiplied_component(color.redComponent(), rgba[0], rgba[3]);
+            assert_unpremultiplied_component(color.greenComponent(), rgba[1], rgba[3]);
+            assert_unpremultiplied_component(color.blueComponent(), rgba[2], rgba[3]);
+            assert_component(color.alphaComponent(), rgba[3]);
+        }
+
+        #[test]
+        fn core_graphics_surface_declares_premultiplied_rgba_without_a_swizzle() {
+            let rgba = [17_u8, 83, 149, 211];
+            let surface = BitmapSurface::new(1, 1).expect("create one-pixel surface");
+            surface.copy_tight_rgba(&rgba).expect("copy RGBA pixel");
+            let image = surface.direct_cg_image().expect("create direct CGImage");
+
+            assert_eq!(
+                objc2_core_graphics::CGImage::alpha_info(Some(&image)),
+                objc2_core_graphics::CGImageAlphaInfo::PremultipliedLast
+            );
+            assert_eq!(
+                objc2_core_graphics::CGImage::bits_per_pixel(Some(&image)),
+                32
+            );
+        }
+
+        #[test]
+        fn appkit_cgimage_observes_reused_bitmap_mutations() {
+            let surface = BitmapSurface::new(1, 1).expect("create one-pixel surface");
+            surface
+                .copy_tight_rgba(&[17, 83, 149, 211])
+                .expect("copy first pixel");
+            let first = surface.direct_cg_image().expect("first image");
+            let first_provider = CGImage::data_provider(Some(&first)).expect("first provider");
+            let first_data = objc2_core_graphics::CGDataProvider::data(Some(&first_provider))
+                .expect("first bytes");
+            let first_bytes = unsafe { first_data.as_bytes_unchecked() };
+            assert_eq!(&first_bytes[..4], &[17, 83, 149, 211]);
+
+            surface
+                .copy_tight_rgba(&[201, 71, 13, 223])
+                .expect("mutate reused pixel");
+            let second = surface.direct_cg_image().expect("second image");
+            let second_provider = CGImage::data_provider(Some(&second)).expect("second provider");
+            let second_data = objc2_core_graphics::CGDataProvider::data(Some(&second_provider))
+                .expect("second bytes");
+            let second_bytes = unsafe { second_data.as_bytes_unchecked() };
+            assert_eq!(&second_bytes[..4], &[201, 71, 13, 223]);
+        }
+
+        #[test]
+        fn bitmap_surfaces_grow_in_small_stable_steps() {
+            assert_eq!(rounded_surface_extent(1), 32);
+            assert_eq!(rounded_surface_extent(244), 256);
+            assert_eq!(rounded_surface_extent(257), 288);
+        }
+
+        #[test]
+        fn newly_reconciled_window_inherits_cached_interactive_state() {
+            assert!(!ignores_mouse_events_for_interactivity(true));
+            assert!(ignores_mouse_events_for_interactivity(false));
+        }
     }
 }
 
 #[cfg(target_os = "macos")]
 pub use platform::{
-    accessibility_state, local_time, pointer_state, presence_state, warp_cursor,
-    AccessibilityState, CollectWindowController, ForeignWindowWatcher, Overlay,
+    accessibility_state, local_time, main_bundle_release_metadata, open_accessibility_settings,
+    presence_state, request_accessibility_prompt, warp_cursor, AccessibilityState,
+    CollectWindowController, ForeignWindowWatcher, MacBundleReleaseMetadata, Overlay,
 };
 
 #[cfg(test)]
@@ -1190,6 +1616,14 @@ mod tests {
             None
         ));
         assert!(is_protected_terminal_app(None, Some("Ghostty")));
+        assert!(is_protected_terminal_app(
+            Some("com.openai.codex"),
+            Some("Codex")
+        ));
+        assert!(is_protected_terminal_app(
+            Some("com.microsoft.VSCode"),
+            Some("Visual Studio Code")
+        ));
         assert!(!is_protected_terminal_app(
             Some("com.apple.TextEdit"),
             Some("TextEdit")

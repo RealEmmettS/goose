@@ -20,7 +20,9 @@ use honk_config::CliOverrides;
 use honk_config::{reset_to_defaults, Config, ConfigError, ConfigLoadState};
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use honk_control::CommandServer;
-use honk_control::{send_command, ControlCommand, ControlResponse, RuntimeStatus, Singleton};
+use honk_control::{
+    send_command, wait_for_shutdown, ControlCommand, ControlResponse, RuntimeStatus, Singleton,
+};
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use runtime::RuntimeOptions;
 
@@ -46,6 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+    let wait_for_stop = matches!(&cli.command, Some(Command::Stop));
     let command = match cli.command {
         Some(Command::Stop) => ControlCommand::Stop,
         Some(Command::Reload) => ControlCommand::Reload,
@@ -80,6 +83,9 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
 
     match response {
         ControlResponse::Ok => {
+            if wait_for_stop {
+                wait_for_shutdown()?;
+            }
             println!("honk300: command accepted.");
             Ok(())
         }

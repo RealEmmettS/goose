@@ -8,9 +8,10 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M19 are implemented in-tree, and M16.1 macOS
-Accessibility readiness remains gated on pre-granted host evidence rather than Windows-host
-claims. The repo now has a Cargo workspace, a platform-free
+**Current stage: implementation in progress.** M0-M19 are implemented in-tree. M16.1 macOS
+Accessibility onboarding is implemented and automated tests are green, while readiness remains
+gated on exact signed-candidate denied, non-nagging relaunch, live-grant, and live-revocation
+evidence. The repo now has a Cargo workspace, a platform-free
 `honk-engine`, shared `honk-control`, versioned TOML `honk-config`, the `honk-config-tui`
 terminal UI, Windows, macOS, and Linux platform crates, the `honk300` binary, the approved
 built-in media catalog, canonical planning docs, and ADRs under `docs/adr/`. M13's dynamic moods and
@@ -36,11 +37,12 @@ off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
 R5/v0.3.1 (ADRs 0018–0019) is the distribution-readiness stabilization: config schema v2,
 region-aware desktop layouts, bounded damage and shared runtime ordering, Concept C renderer,
 platform/IPC hardening, Global MSI as the Windows default, an exact-tag transactional shell
-installer for macOS/Linux, and one atomic immutable release workflow. The current release gate is
-`docs/readiness/v0.3.2-readiness.md` and task `#gla`. Stable/latest v0.3.2 replaces the stock MSI
-agreement with the real PolyForm terms plus a non-binding Goose appendix. The immutable `v0.3.0`
-tag failed before draft creation; ADR 0018's fix-forward rule therefore moved the prior stable
-target to v0.3.1.
+installer for macOS/Linux, and one atomic immutable release workflow. v0.3.3/ADR 0020 adds the
+first native macOS qualification, Developer ID signing/notarization, a per-user graphical DMG,
+and shared gait refinement. ADR 0022 adds managed one-prompt-per-update Accessibility onboarding,
+a calm safe-edge wait, and same-process grant/revocation transitions. The current release gate is
+`docs/readiness/v0.3.3-readiness.md` and task `#m20q`. Stable/latest remains v0.3.2 until that
+checklist is complete and the immutable v0.3.3 release is independently verified.
 
 ## Read these first (source-of-truth pointers)
 
@@ -74,8 +76,11 @@ target to v0.3.1.
   and deferred macOS distribution slice; ADR 0014 records Renderer V2 (flat-illustration
   dual-view procedural vector — supersedes ADR 0001's sprite/atlas direction); ADR 0015 records
   the R1 reliability/platform-safety contract; ADR 0016 records the idle-life behaviors; ADR 0017
-  records the historical R3 macOS packaging slice; ADR 0018 supersedes its advertised-DMG and
-  release-mutation decisions; ADR 0019 records the v0.3.x stabilization contracts.
+  records the historical R3 macOS packaging slice; ADR 0018 records atomic publication; ADR 0019
+  records the v0.3.x stabilization contracts; ADR 0020 replaces only ADR 0018's macOS
+  distribution decisions with Developer ID, notarization, and a DMG-first per-user install; ADR
+  0021 defines portable native Wayland reduced mode plus explicit compositor capability strata;
+  ADR 0022 records the managed macOS Accessibility first-run and live-transition boundary.
 
 ## Big-picture architecture (original → planned port)
 
@@ -102,13 +107,18 @@ target to v0.3.1.
   ship.
 - Linux: **X11-first** (runs under XWayland); native Wayland behind an opt-in `--wayland`
   flag (reduced mischief).
-- Packaging: Windows recommends the x64/ARM64 machine-wide Global MSI. macOS/Linux recommend the
-  exact-tag, hash-verifying shell bootstrap; macOS receives a universal2 app in
-  `~/Applications`. Corporate/EXE/portable artifacts and the v0.2.1 compatibility DMG remain
-  secondary. **No crates.io.**
-- macOS artifacts are ad-hoc signed and not notarized. Documentation must not imply that terminal
-  installation replaces Gatekeeper approval, Developer ID/notarization, or durable Accessibility
-  grant identity.
+- Packaging: Windows recommends the x64/ARM64 machine-wide Global MSI. macOS recommends the
+  Developer ID-signed, notarized, stapled universal DMG and installs per-user into
+  `~/Applications`; the exact-tag shell bootstrap remains a secondary terminal path. Linux
+  recommends that shell bootstrap. Corporate/EXE/portable artifacts remain secondary.
+  **No crates.io.**
+- Release-mode macOS artifacts must fail closed without Developer ID and App Store Connect API
+  credentials. No ad-hoc release fallback, `codesign --deep` signing, or DMG `/Applications`
+  symlink is permitted.
+- Automatic macOS Accessibility UI is limited to the exact receipted app at
+  `~/Applications/Honk300.app`. It prompts at most once per installed update, waits calmly at a
+  safe screen edge while denied, and handles grants/revocations in the same process. Development,
+  bare, source-tree, and mounted-DMG launches must not open permission UI automatically.
 - Starting, stopping, and configuration are **CLI/TUI-only over local IPC**. There is no system
   tray and no global quit key.
 - Terminal windows are protected: the goose may visually overlay them, but must never move,
@@ -141,6 +151,12 @@ target to v0.3.1.
 - R3's macOS packaging + lifecycle slice (universal2 `.app`/DMG, macOS `install`/`uninstall`/`update`, unsigned personal-use; supersedes ADR 0013's macOS deferral) lives in `docs/adr/0017-macos-packaging-and-lifecycle.md`.
 - v0.3.x distribution/atomic publication lives in `docs/adr/0018-distribution-and-atomic-release.md`.
 - v0.3.x config/runtime/renderer/platform contracts live in `docs/adr/0019-stabilization-contracts.md`.
+- Developer ID macOS distribution and the per-user graphical DMG live in
+  `docs/adr/0020-macos-developer-id-dmg-distribution.md`.
+- Native Wayland's portable base and portal/KDE/GNOME/wlroots adapter boundaries live in
+  `docs/adr/0021-native-wayland-capability-strata.md`.
+- Managed macOS Accessibility first-run onboarding lives in
+  `docs/adr/0022-macos-accessibility-first-run-onboarding.md`.
 
 ## Task management system
 
@@ -166,15 +182,19 @@ Relevant skills: `tasks-start`, `tasks-management`, `tasks-update`, `tasks-memor
   `UpdateLayeredWindow` directly; softbuffer is X11/Wayland-only.
 - **Click-through vs. clickable** — use per-pixel-alpha natural hit-testing (do *not* set
   `WS_EX_TRANSPARENT`); on X11 set the XShape input region to the goose bbox each frame.
-- **Native Wayland makes the core mischief impossible** (moving other windows, warping the
-  cursor, synthesizing keystrokes) — by design. These degrade to no-ops;
-  document, don't fight.
+- **A normal native Wayland client cannot provide the core mischief portably** (moving other
+  windows, global pointer warp, synthetic input). ADR 0021 permits explicit portal or
+  compositor-specific adapters, but the portable layer-shell path stays honestly reduced.
 - **Terminal windows are never mischief targets.** Backend filters must exclude terminal windows
   before foreign-window ride, collect-window, or future spicy behavior code can target them.
 - **macOS needs a real `.app` bundle** (stable bundle-id) for a durable Accessibility grant;
   a bare `~/.cargo/bin` binary can't hold one. The bundle is an LSUIElement agent/permission
   identity only: no native preferences window, menu-bar settings UI, Dock control surface, or
   AppleScript `.sdef` command surface.
+- **macOS permission prompting is a managed-install privilege.** Record the owner-only
+  per-update marker before opening native UI; if eligibility or secure state fails, retain the
+  existing denied/degraded runtime without prompting. A denied managed app enters the engine's
+  permission wait, while Windows and Linux never activate that task.
 - The original `Deck` shuffle is **biased** (`System.Random`, low-bound 0 / exclusive high).
   Decide faithful-port vs. corrected and pin the choice with a test.
 
@@ -187,8 +207,8 @@ family's local gate:
 - `cargo clippy --all-targets --workspace -- -D warnings`
 - `cargo test --workspace`  ·  single test: `cargo test -p honk-engine <name>`
 - `cargo build --release`
-- `dist plan --tag=v0.3.2`
-- `cargo audit`
+- `dist plan --tag=v0.3.3`
+- `cargo audit --version 0.22.2`
 
 Release packaging uses **cargo-dist** for portable archives plus project-owned atomic release,
 Windows installer, macOS bundle, and bootstrap workflows; **`crates-publish.yml` is intentionally

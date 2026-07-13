@@ -1,20 +1,26 @@
 # Tasks
 
 ## Backlog
-- [ ] **Runtime-loop dedup** - extract the three hand-cloned platform runtime loops (`src/runtime/{windows,macos,linux}.rs`) into a shared skeleton; deferred until after R1-R3 stabilize (regression-risky) #r5d
-- [ ] **Native Wayland full-support research + integration path** - Emmett or a follow-up agent researches what fully integrated native Wayland support would require, then turns the findings into an accepted implementation plan #a6e
-  - [ ] Read the current Wayland assumptions in `honk300_plan.md`, `AGENTS.md`, and the queued `M16-M18` board item.
-  - [ ] Research current Wayland protocol and compositor-extension support for overlay surfaces, input regions, global pointer observation, pointer warping, synthetic input, and foreign-window enumeration/move.
-  - [ ] Build a capability matrix separating portable Wayland, wlroots-specific, KDE-specific, GNOME-specific, portal-based, XWayland-only, and privileged-helper options.
-  - [ ] Decide what "fully integrated native Wayland" can honestly mean for honk300: full parity, partial parity with compositor-specific adapters, or documented limited mode.
-  - [ ] Convert the finding into concrete repo work: plan edits, backend crate tasks, capability-trait changes, tests, packaging/runtime flags, and user-facing documentation.
-  - [ ] If implementation is feasible and accepted, split integration into follow-up board tasks with dependencies near M16-M18.
-- [ ] **Measure and optimize fullscreen overlay present cost** - M7.0 audit found the current M3+ fullscreen primary-monitor layered overlay is correct for world-space trails but no longer matches the old small-window dirty-rect claim; measure CPU/GPU cost and plan dirty-rect/per-monitor optimization before packaging #p4d
 
 ## To-Do
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
+- [ ] **Portable Wayland observation and portal spike** - probe staging toplevel identity plus explicit XDG Remote Desktop/libei cursor capability without claiming geometry/move parity; terminal protection and revocation are hard gates (needs #a6e) #wlp
+- [ ] **KDE native Wayland companion** - prototype a user-enabled KWin script and authenticated same-user bridge for exact window geometry, move-state, bounded movement, topology, and terminal-negative enforcement (needs #a6e) #wlk
+- [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## Active
+- [ ] **v0.3.3 macOS native qualification, signed distribution, and DMG-first site** - fix the AppKit renderer bridge, qualify all native functionality, publish a Developer ID-signed and notarized release, then promote its DMG on the website (owner codex) #m20q
+  - [x] Repair and visually verify the macOS renderer bridge.
+  - [x] Fix dark-mode Mac note contrast and audit equivalent Windows/Linux presentation paths.
+  - [x] Refine cross-platform planted-foot timing and cap visible leg stretch.
+  - [x] Optimize and profile the macOS runtime.
+  - [x] Implement the approved first-run Accessibility prompt and calm permission-wait behavior.
+  - [ ] Complete denied and granted Accessibility qualification.
+  - [x] Verify CLI, TUI, IPC, and preliminary lifecycle behavior; repeat terminal/lifecycle checks on the exact candidate.
+  - [x] Add the per-user graphical DMG installer.
+  - [ ] Add Developer ID signing, notarization, and packaging evidence.
+  - [ ] Cut and independently verify the immutable v0.3.3 release.
+  - [ ] Promote and deploy the verified DMG on the website.
 - [x] **Name interchangeability + site usage clarity** - verified `honk300`/`honk`/`goose` are fully interchangeable across every command (install aliases all three → same binary; `normalize_args` never branches on arg0; only internal `honk300 --version` self-call in update.rs). Locked in with `all_three_names_are_fully_interchangeable` test (13 CLI tests green). Site usage section reworked: consistent `honk300` display (no more honk300↔goose switching), natural order (start/stop → configure → install/autostart → pokes → flags), goose-speak kept as "Also:" notes, interchangeability banner (done 2026-07-08) #names
 - [x] **v0.2.1 release — side-view neck refinement** - version bump + changelog cut (commit eb40260); tag `v0.2.1` drove cargo-dist Release → chained macOS Packaging + Windows Installers; wrap-up email sent (done 2026-07-08) #v021
   - [x] Release + macOS Packaging + Windows Installers workflows green; full 40-asset set verified (universal2 DMG + darwin tarballs + Windows MSI/EXE ×2 arch); v0.2.1 is latest, latest/download serves real bytes.
@@ -40,12 +46,23 @@
 - [ ] **M16.1 — macOS host readiness smoke** - hosted macOS bundle/status smoke plus Accessibility granted evidence from a pre-granted self-hosted/manual macOS run #m16r
   - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
     > Latest checked successful run `29131779321` passed Intel and Apple Silicon bundle smoke and still skipped the optional pre-granted Accessibility job.
-  - [ ] Run `script/smoke_m16_macos_accessibility.sh` on a pre-granted self-hosted/manual macOS host.
-    > Deferred until a pre-granted Mac or self-hosted runner is available; no more macOS Accessibility work in the current M19-first pass.
-  - [ ] Record Accessibility-granted evidence in `docs/readiness/m16-m18-readiness.md`.
+  - [x] Run the preliminary denied/granted smoke on one unchanged Developer ID-signed app on the physical M2.
+    > The exact v0.3.3 candidate still needs ADR 0022's first-denied, non-nagging relaunch, live-grant, and live-revocation sequence.
+  - [x] Record the preliminary Accessibility-granted evidence in `docs/readiness/m16-m18-readiness.md`.
+  - [ ] Record exact-candidate protected-terminal negatives and one ordinary-window positive.
+  - [~] Live multi-monitor/hot-plug is hardware-waived on this one-display Mac; automated signed-coordinate/topology/hot-plug tests pass, and no live claim is made.
   - [ ] Verify or waive every `#m16r` verification item before moving the card to Done.
 
 ## Done
+- [x] **Native Wayland full-support research + integration path** - current upstream review found no portable full-parity client path; ADR 0021 defines a reduced portable base plus explicit portal/KDE/GNOME/wlroots capability adapters, with implementation split into follow-up cards (done 2026-07-12) #a6e
+  - [x] Reconcile current plan and architecture assumptions.
+  - [x] Research overlay, pointer, input, toplevel, move, portal, and compositor-extension paths.
+  - [x] Publish the portable/wlroots/KDE/GNOME/portal/XWayland/privileged capability matrix.
+  - [x] Define honest native support as capability strata rather than universal parity.
+  - [x] Record ADR 0021 and the concrete adapter/testing/release path.
+  - [x] Split portable/portal, KDE, and GNOME/wlroots implementations into follow-up cards.
+- [x] **Runtime-loop dedup** - verified the shared `RuntimeCore` owns clock sampling, 120 Hz fixed-step sequencing, 60 Hz damage cadence, restart-required detection, and frame-order enforcement for all three platform runtimes; focused tests and both Windows cross-target checks pass (done 2026-07-12) #r5d
+- [x] **Measure and optimize fullscreen overlay present cost** - M15/R5 already replaced the old fullscreen-redraw model with current/previous visual bounds, bounded dirty canvases, one layered window per monitor, and per-monitor clipping; 4K non-accumulation tests plus Windows x64/ARM64 checks pass (done 2026-07-12) #p4d
 - [x] **Replace MSI placeholder with PolyForm + Great Honk Accord** - shipped the real license and non-binding goose appendix in every Windows MSI as stable/latest v0.3.2 (done 2026-07-11) #gla
   - [x] Add the combined RTF and regression contract.
   - [x] Wire Global and Corporate MSI manifests to the shared agreement.

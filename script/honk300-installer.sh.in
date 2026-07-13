@@ -353,6 +353,11 @@ fi
 if [ "$OS" = Darwin ] && [ -d "$DEST" ]; then
   existing_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$DEST/Contents/Info.plist" 2>/dev/null || true)"
   [ "$existing_id" = "dev.emmetts.honk300" ] || die "refusing to replace foreign app bundle: $DEST"
+  [ ! -L "$RECEIPT" ] && [ -f "$RECEIPT" ] || die "refusing to replace an unreceipted macOS app bundle: $DEST"
+  grep -F '"schema": "honk300.install.v1"' "$RECEIPT" >/dev/null 2>&1 \
+    || die "refusing to replace an unreceipted macOS app bundle: $DEST"
+  grep -F '"install_root": "'"$(json_escape "$DEST")"'"' "$RECEIPT" >/dev/null 2>&1 \
+    || die "refusing to replace an unreceipted macOS app bundle: $DEST"
 fi
 
 TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/honk300.XXXXXX")"
@@ -456,5 +461,5 @@ SWAPPED=0
 printf 'honk300 %s installed at %s\n' "$VERSION" "$DEST"
 printf 'Open a new terminal, then run: honk300 start\n'
 if [ "$OS" = Darwin ]; then
-  printf 'This build is ad-hoc signed and not notarized. macOS may require approval in System Settings > Privacy & Security.\n'
+  printf 'This app is Developer ID-signed, notarized, and stapled for normal macOS verification.\n'
 fi

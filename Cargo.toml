@@ -7,8 +7,8 @@
 #
 # M19 owns the release metadata and installer/update lifecycle. Round R3 (ADR 0017) adds the two
 # Apple targets so cargo-dist emits darwin tar.xz archives and the shell installer covers macOS;
-# the universal2 `.app`/DMG is built by the hand-authored `macos-packaging.yml`. macOS artifacts
-# are unsigned personal-use (ad-hoc codesign only) — no Developer ID signing or notarization.
+# the universal2 `.app`/DMG is built by the hand-authored `macos-packaging.yml`. Stable macOS
+# artifacts are Developer ID signed, notarized, and stapled under ADR 0020.
 
 [workspace]
 resolver = "2"
@@ -42,7 +42,7 @@ tiny-skia = { version = "0.11", features = ["png-format"] }
 # and M12 owns the full config TUI.
 [package]
 name = "honk300"
-version = "0.3.2"
+version = "0.3.3"
 description = "Cross-platform Desktop Goose — a procedural goose that roams your screen"
 edition.workspace = true
 rust-version.workspace = true

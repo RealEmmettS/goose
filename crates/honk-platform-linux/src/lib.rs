@@ -134,6 +134,16 @@ fn xfixes_supports_regions(major_version: u32) -> bool {
     major_version >= 2
 }
 
+#[cfg(any(test, target_os = "linux"))]
+fn premultiplied_bgra_from_rgba(rgba: &[u8]) -> Vec<u8> {
+    assert_eq!(rgba.len() % 4, 0);
+    let mut out = Vec::with_capacity(rgba.len());
+    for pixel in rgba.chunks_exact(4) {
+        out.extend_from_slice(&[pixel[2], pixel[1], pixel[0], pixel[3]]);
+    }
+    out
+}
+
 #[cfg(test)]
 fn x11_setup_steps() -> [&'static str; 2] {
     ["shape", "map"]
@@ -182,7 +192,7 @@ pub use platform::{Overlay, OverlayMode};
 
 #[cfg(target_os = "linux")]
 mod platform {
-    use super::{default_world_bounds, DisplayServer};
+    use super::{default_world_bounds, premultiplied_bgra_from_rgba, DisplayServer};
     use honk_engine::tiny_skia::Pixmap;
     use honk_engine::{Pointer, Rect, Vec2};
     use std::io;
@@ -393,14 +403,7 @@ mod platform {
     }
 
     fn x11_bgra_from_rgba(pixmap: &Pixmap) -> Vec<u8> {
-        let mut out = Vec::with_capacity(pixmap.data().len());
-        for px in pixmap.data().chunks_exact(4) {
-            out.push(px[2]);
-            out.push(px[1]);
-            out.push(px[0]);
-            out.push(px[3]);
-        }
-        out
+        premultiplied_bgra_from_rgba(pixmap.data())
     }
 
     fn clamp_i16(value: f32) -> i16 {
@@ -1953,6 +1956,16 @@ mod imp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn x11_and_wayland_preserve_asymmetric_channels_and_alpha_when_swizzling_to_bgra() {
+        let rgba = [17_u8, 83, 149, 211, 7, 61, 203, 0];
+
+        assert_eq!(
+            premultiplied_bgra_from_rgba(&rgba),
+            [149, 83, 17, 211, 203, 61, 7, 0]
+        );
+    }
 
     #[test]
     fn x11_requires_one_overlay_per_monitor() {

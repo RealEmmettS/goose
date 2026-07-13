@@ -46,6 +46,7 @@ impl InstallSource {
         }
     }
 
+    #[cfg(any(test, windows, target_os = "linux"))]
     pub fn marker_value(self) -> &'static str {
         match self {
             Self::MsiGlobal => "msi-global",
@@ -178,40 +179,119 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
     let app_dir = macos_app_install_path()?;
     let installed_bin = app_dir.join("Contents").join("MacOS").join("honk300");
     let current_exe = std::env::current_exe()?;
-    if !is_exact_macos_managed_executable(&current_exe, &app_dir) {
-        return Err(format!(
-            "honk300 install: this command may only configure the sealed app already installed at {}. Install it with the official shell installer first, then run `{}` install.",
-            app_dir.display(),
-            installed_bin.display()
-        )
-        .into());
-    }
+    let disposition = macos_install_disposition(&current_exe, &app_dir)?;
 
     let media = macos_media_root()?;
-    ensure_external_media_root(&media)?;
-    migrate_legacy_user_media(
-        &app_dir.join("Contents").join("Resources").join("Assets"),
-        &media,
-        LegacyMigrationMode::Copy,
-    )?;
 
     let aliases_dir = macos_user_alias_dir()?;
-    fs::create_dir_all(&aliases_dir)?;
+    ensure_real_directory(&aliases_dir)?;
     let owned_targets = [&installed_bin as &Path];
-    for name in COMMAND_NAMES {
-        install_owned_unix_alias(&aliases_dir.join(name), &installed_bin, &owned_targets)?;
+    let alias_paths = COMMAND_NAMES
+        .iter()
+        .map(|name| aliases_dir.join(name))
+        .collect::<Vec<_>>();
+    for alias in &alias_paths {
+        if unix_alias_install_decision(alias, &installed_bin, &owned_targets)?
+            == AliasInstallDecision::PreserveForeign
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                format!(
+                    "refusing to replace foreign command alias {}; move it aside and retry",
+                    alias.display()
+                ),
+            )
+            .into());
+        }
     }
-
     let plist_path = macos_launch_agent_path()?;
     if autostart {
-        write_owned_text_file(
-            &plist_path,
-            &macos_launch_agent_plist(&installed_bin),
-            OWNERSHIP_MARKER,
-        )?;
-    } else {
-        remove_owned_text_file(&plist_path, OWNERSHIP_MARKER)?;
+        preflight_owned_text_file(&plist_path, OWNERSHIP_MARKER)?;
     }
+    let receipt_path = macos_receipt_path()?;
+    preflight_owned_macos_receipt(&receipt_path, &app_dir)?;
+    let destination_exists = fs::symlink_metadata(&app_dir).is_ok();
+    let receipt_owned = receipt_is_owned(&receipt_path, &app_dir)?;
+    if matches!(disposition, MacosInstallDisposition::CopyBundle(_))
+        && !macos_bundle_replacement_is_owned(destination_exists, receipt_owned)
+    {
+        return Err(io::Error::other(format!(
+            "refusing to replace an unreceipted macOS app bundle {}; move it aside or uninstall it first",
+            app_dir.display()
+        ))
+            .into());
+    }
+    let mut integrations =
+        MacosIntegrationTransaction::capture(&alias_paths, &plist_path, &receipt_path)?;
+
+    let (mut swap, bundle_metadata) = match disposition {
+        MacosInstallDisposition::ConfigureExisting => (None, validate_macos_bundle(&app_dir)?),
+        MacosInstallDisposition::CopyBundle(source) => {
+            let (swap, metadata) = MacosBundleSwap::begin(&source, &app_dir)?;
+            (Some(swap), metadata)
+        }
+    };
+    integrations.begin();
+
+    let configure = (|| -> Result<(), DynError> {
+        if std::env::var_os("HONK300_TEST_FAIL_AFTER_BUNDLE_SWAP").as_deref()
+            == Some(std::ffi::OsStr::new("1"))
+        {
+            return Err("honk300 install: injected failure after macOS bundle activation".into());
+        }
+        let media_changes = migrate_legacy_user_media(
+            &app_dir.join("Contents").join("Resources").join("Assets"),
+            &media,
+            LegacyMigrationMode::Copy,
+        )?;
+        integrations.record_media_migration(media_changes);
+        for alias in &alias_paths {
+            install_owned_unix_alias(alias, &installed_bin, &owned_targets)?;
+        }
+
+        if autostart {
+            write_owned_text_file(
+                &plist_path,
+                &macos_launch_agent_plist(&installed_bin),
+                OWNERSHIP_MARKER,
+            )?;
+        } else {
+            remove_owned_text_file(&plist_path, OWNERSHIP_MARKER)?;
+        }
+        write_macos_receipt(&receipt_path, &app_dir, &bundle_metadata, autostart)?;
+        Ok(())
+    })();
+    if let Err(error) = configure {
+        let mut rollback_errors = Vec::new();
+        if let Err(rollback) = integrations.rollback() {
+            rollback_errors.push(format!("integration rollback failed: {rollback}"));
+        }
+        if let Some(swap) = swap.as_mut() {
+            if let Err(rollback) = swap.rollback() {
+                rollback_errors.push(format!("app bundle rollback failed: {rollback}"));
+            }
+        }
+        if !rollback_errors.is_empty() {
+            return Err(format!("{error}; additionally {}", rollback_errors.join("; ")).into());
+        }
+        return Err(error);
+    }
+    if let Some(swap) = swap.as_mut() {
+        if let Err(error) = swap.commit() {
+            let mut rollback_errors = Vec::new();
+            if let Err(rollback) = integrations.rollback() {
+                rollback_errors.push(format!("integration rollback failed: {rollback}"));
+            }
+            if let Err(rollback) = swap.rollback() {
+                rollback_errors.push(format!("app bundle rollback failed: {rollback}"));
+            }
+            if rollback_errors.is_empty() {
+                return Err(error.into());
+            }
+            return Err(format!("{error}; additionally {}", rollback_errors.join("; ")).into());
+        }
+    }
+    integrations.commit();
 
     println!("honk300: installed {}.", app_dir.display());
     println!("honk300: aliases linked in {}.", aliases_dir.display());
@@ -221,7 +301,7 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
             aliases_dir.display()
         );
     }
-    println!("honk300: first launch is Gatekeeper-quarantined (unsigned) — right-click the app in Finder and choose Open once to approve it.");
+    println!("honk300: installed app signature and release metadata verified.");
     if autostart {
         println!("honk300: login autostart enabled via LaunchAgent.");
     }
@@ -587,6 +667,31 @@ fn ensure_external_media_root(media_root: &Path) -> io::Result<()> {
     ensure_real_directory(&media_root.join("Notes"))
 }
 
+fn ensure_real_directory_tracked(path: &Path, created: &mut Vec<PathBuf>) -> io::Result<()> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => validate_real_directory(path),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            let parent = path
+                .parent()
+                .ok_or_else(|| io::Error::other("tracked directory has no parent"))?;
+            ensure_real_directory_tracked(parent, created)?;
+            fs::create_dir(path)?;
+            created.push(path.to_path_buf());
+            Ok(())
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn ensure_external_media_root_tracked(
+    media_root: &Path,
+    created: &mut Vec<PathBuf>,
+) -> io::Result<()> {
+    ensure_real_directory_tracked(media_root, created)?;
+    ensure_real_directory_tracked(&media_root.join("Memes"), created)?;
+    ensure_real_directory_tracked(&media_root.join("Notes"), created)
+}
+
 fn ensure_real_directory(path: &Path) -> io::Result<()> {
     match fs::symlink_metadata(path) {
         Ok(metadata) => {
@@ -619,7 +724,10 @@ fn validate_real_directory(path: &Path) -> io::Result<()> {
     }
 }
 
-fn ensure_media_destination_parent(media_root: &Path, destination: &Path) -> io::Result<()> {
+fn ensure_media_destination_parent(
+    media_root: &Path,
+    destination: &Path,
+) -> io::Result<Vec<PathBuf>> {
     let parent = destination
         .parent()
         .ok_or_else(|| io::Error::other("external media destination has no parent"))?;
@@ -630,6 +738,7 @@ fn ensure_media_destination_parent(media_root: &Path, destination: &Path) -> io:
         ))
     })?;
     let mut current = media_root.to_path_buf();
+    let mut created = Vec::new();
     for component in relative.components() {
         match component {
             std::path::Component::Normal(name) => current.push(name),
@@ -640,16 +749,79 @@ fn ensure_media_destination_parent(media_root: &Path, destination: &Path) -> io:
                 )));
             }
         }
-        ensure_real_directory(&current)?;
+        match fs::symlink_metadata(&current) {
+            Ok(_) => validate_real_directory(&current)?,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                fs::create_dir(&current)?;
+                created.push(current.clone());
+            }
+            Err(error) => return Err(error),
+        }
     }
-    Ok(())
+    Ok(created)
+}
+
+#[derive(Debug, Default)]
+struct MediaMigrationChanges {
+    created_files: Vec<(PathBuf, PathBuf)>,
+    created_dirs: Vec<PathBuf>,
+}
+
+impl MediaMigrationChanges {
+    fn rollback(&mut self) -> io::Result<()> {
+        let mut failures = Vec::new();
+        while let Some((source, destination)) = self.created_files.pop() {
+            let result = match fs::symlink_metadata(&destination) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+                Err(error) => Err(error),
+                Ok(metadata)
+                    if metadata.is_file()
+                        && !metadata.file_type().is_symlink()
+                        && regular_files_equal(&source, &destination).unwrap_or(false) =>
+                {
+                    fs::remove_file(&destination)
+                }
+                Ok(_) => Err(io::Error::other(
+                    "created media changed before rollback; preserving it",
+                )),
+            };
+            if let Err(error) = result {
+                failures.push(format!("{}: {error}", destination.display()));
+            }
+        }
+        while let Some(directory) = self.created_dirs.pop() {
+            match fs::remove_dir(&directory) {
+                Ok(()) => {}
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::NotFound | io::ErrorKind::DirectoryNotEmpty
+                    ) => {}
+                Err(error) => failures.push(format!("{}: {error}", directory.display())),
+            }
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(io::Error::other(failures.join("; ")))
+        }
+    }
+}
+
+fn media_migration_error(changes: &mut MediaMigrationChanges, error: io::Error) -> io::Error {
+    match changes.rollback() {
+        Ok(()) => error,
+        Err(rollback) => io::Error::other(format!(
+            "{error}; additionally failed to roll back migrated media: {rollback}"
+        )),
+    }
 }
 
 fn migrate_legacy_user_media(
     legacy_assets: &Path,
     media_root: &Path,
     mode: LegacyMigrationMode,
-) -> io::Result<()> {
+) -> io::Result<MediaMigrationChanges> {
     let mappings = [
         (
             legacy_assets.join("Images").join("Memes").join("user"),
@@ -667,39 +839,60 @@ fn migrate_legacy_user_media(
     for (source, destination) in &mappings {
         collect_migration_files(source, destination, &mut files)?;
     }
-    ensure_external_media_root(media_root)?;
     let mut pending = Vec::new();
+    let mut changes = MediaMigrationChanges::default();
+    if let Err(error) = ensure_external_media_root_tracked(media_root, &mut changes.created_dirs) {
+        return Err(media_migration_error(&mut changes, error));
+    }
     for (source, destination) in &files {
-        ensure_media_destination_parent(media_root, destination)?;
+        match ensure_media_destination_parent(media_root, destination) {
+            Ok(created) => changes.created_dirs.extend(created),
+            Err(error) => {
+                return Err(media_migration_error(&mut changes, error));
+            }
+        }
         match fs::symlink_metadata(destination) {
             Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => {
-                if !regular_files_equal(source, destination)? {
-                    return Err(io::Error::new(
+                let equal = match regular_files_equal(source, destination) {
+                    Ok(equal) => equal,
+                    Err(error) => return Err(media_migration_error(&mut changes, error)),
+                };
+                if !equal {
+                    let error = io::Error::new(
                         io::ErrorKind::AlreadyExists,
                         format!(
                             "refusing to overwrite existing external media {}",
                             destination.display()
                         ),
-                    ));
+                    );
+                    return Err(media_migration_error(&mut changes, error));
                 }
             }
             Ok(_) => {
-                return Err(io::Error::new(
+                let error = io::Error::new(
                     io::ErrorKind::AlreadyExists,
                     format!(
                         "refusing to overwrite existing external media {}",
                         destination.display()
                     ),
-                ));
+                );
+                return Err(media_migration_error(&mut changes, error));
             }
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
                 pending.push((source, destination));
             }
-            Err(error) => return Err(error),
+            Err(error) => {
+                return Err(media_migration_error(&mut changes, error));
+            }
         }
     }
     for (source, destination) in pending {
-        fs::copy(source, destination)?;
+        if let Err(error) = fs::copy(source, destination) {
+            return Err(media_migration_error(&mut changes, error));
+        }
+        changes
+            .created_files
+            .push((source.to_path_buf(), destination.to_path_buf()));
     }
     #[cfg(all(target_os = "macos", not(test)))]
     let _ = mode;
@@ -711,7 +904,7 @@ fn migrate_legacy_user_media(
             }
         }
     }
-    Ok(())
+    Ok(changes)
 }
 
 fn regular_files_equal(left: &Path, right: &Path) -> io::Result<bool> {
@@ -1647,6 +1840,29 @@ fn linux_desktop_entry(exe: &Path) -> String {
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn install_owned_unix_alias(link: &Path, target: &Path, owned_targets: &[&Path]) -> io::Result<()> {
+    match unix_alias_install_decision(link, target, owned_targets)? {
+        AliasInstallDecision::Keep => Ok(()),
+        AliasInstallDecision::Create => std::os::unix::fs::symlink(target, link),
+        AliasInstallDecision::ReplaceOwned => {
+            fs::remove_file(link)?;
+            std::os::unix::fs::symlink(target, link)
+        }
+        AliasInstallDecision::PreserveForeign => Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!(
+                "refusing to replace foreign command alias {}; move it aside and retry",
+                link.display()
+            ),
+        )),
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn unix_alias_install_decision(
+    link: &Path,
+    target: &Path,
+    owned_targets: &[&Path],
+) -> io::Result<AliasInstallDecision> {
     let state_target;
     let state = match fs::symlink_metadata(link) {
         Err(error) if error.kind() == io::ErrorKind::NotFound => AliasState::Missing,
@@ -1664,21 +1880,7 @@ fn install_owned_unix_alias(link: &Path, target: &Path, owned_targets: &[&Path])
         }
         Ok(_) => AliasState::Other,
     };
-    match alias_install_decision(state, target, owned_targets) {
-        AliasInstallDecision::Keep => Ok(()),
-        AliasInstallDecision::Create => std::os::unix::fs::symlink(target, link),
-        AliasInstallDecision::ReplaceOwned => {
-            fs::remove_file(link)?;
-            std::os::unix::fs::symlink(target, link)
-        }
-        AliasInstallDecision::PreserveForeign => Err(io::Error::new(
-            io::ErrorKind::AlreadyExists,
-            format!(
-                "refusing to replace foreign command alias {}; move it aside and retry",
-                link.display()
-            ),
-        )),
-    }
+    Ok(alias_install_decision(state, target, owned_targets))
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -1773,6 +1975,86 @@ fn is_exact_macos_managed_executable(executable: &Path, managed_app: &Path) -> b
     )
 }
 
+#[cfg(any(test, target_os = "macos"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum MacosInstallDisposition {
+    ConfigureExisting,
+    CopyBundle(PathBuf),
+}
+
+#[cfg(any(test, target_os = "macos"))]
+fn macos_bundle_replacement_is_owned(destination_exists: bool, receipt_owned: bool) -> bool {
+    !destination_exists || receipt_owned
+}
+
+#[cfg(any(test, target_os = "macos"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MacosBundleMetadata {
+    version: String,
+    tag: String,
+    commit: String,
+}
+
+#[cfg(any(test, target_os = "macos"))]
+fn macos_install_receipt(
+    metadata: &MacosBundleMetadata,
+    install_root: &Path,
+    autostart: bool,
+) -> serde_json::Value {
+    let home = install_root
+        .parent()
+        .and_then(Path::parent)
+        .unwrap_or_else(|| Path::new(""));
+    let alias = |name: &str| {
+        home.join(".local")
+            .join("bin")
+            .join(name)
+            .to_string_lossy()
+            .into_owned()
+    };
+    serde_json::json!({
+        "schema": OWNERSHIP_MARKER,
+        "version": metadata.version,
+        "tag": metadata.tag,
+        "commit": metadata.commit,
+        "channel": "dmg",
+        "layout": "mac-app",
+        "target": "universal2-apple-darwin",
+        "artifact": { "name": "honk300-universal2.dmg" },
+        "install_root": install_root.to_string_lossy(),
+        "aliases": [alias("honk300"), alias("honk"), alias("goose")],
+        "autostart": { "enabled": autostart, "owner": "honk300-install" }
+    })
+}
+
+#[cfg(any(test, target_os = "macos"))]
+fn macos_install_disposition(
+    executable: &Path,
+    managed_app: &Path,
+) -> io::Result<MacosInstallDisposition> {
+    if is_exact_macos_managed_executable(executable, managed_app) {
+        return Ok(MacosInstallDisposition::ConfigureExisting);
+    }
+    let source_app = executable
+        .ancestors()
+        .find(|path| path.extension().and_then(|ext| ext.to_str()) == Some("app"))
+        .map(Path::to_path_buf)
+        .ok_or_else(|| {
+            io::Error::other(format!(
+                "honk300 install: {} is not inside a macOS app bundle",
+                executable.display()
+            ))
+        })?;
+    let expected = source_app.join("Contents").join("MacOS").join("honk300");
+    if !paths_match(executable, &expected) {
+        return Err(io::Error::other(format!(
+            "honk300 install: source executable is not the bundle's sealed honk300 binary: {}",
+            executable.display()
+        )));
+    }
+    Ok(MacosInstallDisposition::CopyBundle(source_app))
+}
+
 #[cfg(test)]
 fn macos_external_mutation_paths(home: &Path) -> Vec<PathBuf> {
     let mut paths: Vec<_> = COMMAND_NAMES
@@ -1792,6 +2074,406 @@ fn macos_external_mutation_paths(home: &Path) -> Vec<PathBuf> {
             .join("install-receipt.json"),
     );
     paths
+}
+
+#[cfg(target_os = "macos")]
+fn plist_value(app: &Path, key: &str) -> io::Result<String> {
+    let output = std::process::Command::new("/usr/libexec/PlistBuddy")
+        .arg("-c")
+        .arg(format!("Print :{key}"))
+        .arg(app.join("Contents").join("Info.plist"))
+        .output()?;
+    if !output.status.success() {
+        return Err(io::Error::other(format!(
+            "could not read {key} from {}: {}",
+            app.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        )));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+}
+
+#[cfg(target_os = "macos")]
+fn checked_macos_command(program: &str, args: &[&Path]) -> io::Result<()> {
+    let output = std::process::Command::new(program).args(args).output()?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!(
+            "{} failed: {}",
+            program,
+            String::from_utf8_lossy(&output.stderr).trim()
+        )))
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn validate_macos_bundle(app: &Path) -> io::Result<MacosBundleMetadata> {
+    validate_real_directory(app)?;
+    if plist_value(app, "CFBundleIdentifier")? != "dev.emmetts.honk300" {
+        return Err(io::Error::other(format!(
+            "refusing app bundle with an unexpected identifier: {}",
+            app.display()
+        )));
+    }
+    let version = plist_value(app, "CFBundleShortVersionString")?;
+    let tag = plist_value(app, "Honk300ReleaseTag")?;
+    let commit = plist_value(app, "Honk300ReleaseCommit")?.to_ascii_lowercase();
+    if tag != format!("v{version}") {
+        return Err(io::Error::other(format!(
+            "bundle release tag {tag} does not match version {version}"
+        )));
+    }
+    if commit.len() != 40 || !commit.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(io::Error::other(
+            "bundle release commit is not a full hexadecimal SHA",
+        ));
+    }
+    let executable = app.join("Contents").join("MacOS").join("honk300");
+    let metadata = fs::symlink_metadata(&executable)?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(io::Error::other(format!(
+            "bundle executable is not a regular sealed file: {}",
+            executable.display()
+        )));
+    }
+    let verify = std::process::Command::new("/usr/bin/codesign")
+        .args(["--verify", "--strict", "--verbose=2"])
+        .arg(app)
+        .output()?;
+    if !verify.status.success() {
+        return Err(io::Error::other(format!(
+            "bundle signature validation failed: {}",
+            String::from_utf8_lossy(&verify.stderr).trim()
+        )));
+    }
+    let lipo = std::process::Command::new("/usr/bin/lipo")
+        .arg(&executable)
+        .args(["-verify_arch", "x86_64", "arm64"])
+        .output()?;
+    if !lipo.status.success() {
+        return Err(io::Error::other(format!(
+            "bundle is not universal Apple Silicon/Intel code: {}",
+            String::from_utf8_lossy(&lipo.stderr).trim()
+        )));
+    }
+    Ok(MacosBundleMetadata {
+        version,
+        tag,
+        commit,
+    })
+}
+
+#[cfg(target_os = "macos")]
+struct MacosBundleSwap {
+    destination: PathBuf,
+    previous: Option<PathBuf>,
+    active: bool,
+}
+
+#[cfg(target_os = "macos")]
+impl MacosBundleSwap {
+    fn begin(source: &Path, destination: &Path) -> io::Result<(Self, MacosBundleMetadata)> {
+        let source_metadata = validate_macos_bundle(source)?;
+        let parent = destination
+            .parent()
+            .ok_or_else(|| io::Error::other("managed app path has no parent"))?;
+        ensure_real_directory(parent)?;
+        let stage = parent.join(format!(".Honk300.app.stage.{}", std::process::id()));
+        let previous = parent.join(format!(".Honk300.app.previous.{}", std::process::id()));
+        for path in [&stage, &previous] {
+            if fs::symlink_metadata(path).is_ok() {
+                return Err(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    format!(
+                        "stale lifecycle transaction path exists: {}",
+                        path.display()
+                    ),
+                ));
+            }
+        }
+        if let Ok(metadata) = fs::symlink_metadata(destination) {
+            if !metadata.is_dir() || metadata.file_type().is_symlink() {
+                return Err(io::Error::other(format!(
+                    "refusing to replace non-directory or symlinked app {}",
+                    destination.display()
+                )));
+            }
+            if plist_value(destination, "CFBundleIdentifier")? != "dev.emmetts.honk300" {
+                return Err(io::Error::other(format!(
+                    "refusing to replace foreign app bundle {}",
+                    destination.display()
+                )));
+            }
+        }
+
+        if let Err(error) = checked_macos_command("/usr/bin/ditto", &[source, &stage]) {
+            let _ = remove_path_no_follow(&stage);
+            return Err(error);
+        }
+        let staged_metadata = match validate_macos_bundle(&stage) {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                let _ = remove_path_no_follow(&stage);
+                return Err(error);
+            }
+        };
+        if staged_metadata != source_metadata {
+            let _ = remove_path_no_follow(&stage);
+            return Err(io::Error::other(
+                "staged app release metadata changed during bundle copy",
+            ));
+        }
+        let previous = if destination.exists() {
+            fs::rename(destination, &previous)?;
+            Some(previous)
+        } else {
+            None
+        };
+        if let Err(error) = fs::rename(&stage, destination) {
+            if let Some(previous) = &previous {
+                let _ = fs::rename(previous, destination);
+            }
+            let _ = remove_path_no_follow(&stage);
+            return Err(error);
+        }
+        Ok((
+            Self {
+                destination: destination.to_path_buf(),
+                previous,
+                active: true,
+            },
+            staged_metadata,
+        ))
+    }
+
+    fn rollback(&mut self) -> io::Result<()> {
+        if !self.active {
+            return Ok(());
+        }
+        remove_path_no_follow(&self.destination)?;
+        if let Some(previous) = &self.previous {
+            fs::rename(previous, &self.destination)?;
+        }
+        self.active = false;
+        Ok(())
+    }
+
+    fn commit(&mut self) -> io::Result<()> {
+        if let Some(previous) = &self.previous {
+            remove_path_no_follow(previous)?;
+        }
+        self.previous = None;
+        self.active = false;
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for MacosBundleSwap {
+    fn drop(&mut self) {
+        let _ = self.rollback();
+    }
+}
+
+#[cfg(target_os = "macos")]
+enum MacosPathState {
+    Missing,
+    Symlink(PathBuf),
+    Regular {
+        bytes: Vec<u8>,
+        permissions: fs::Permissions,
+    },
+}
+
+#[cfg(target_os = "macos")]
+struct MacosPathSnapshot {
+    path: PathBuf,
+    state: MacosPathState,
+}
+
+#[cfg(target_os = "macos")]
+impl MacosPathSnapshot {
+    fn capture(path: &Path) -> io::Result<Self> {
+        let state = match fs::symlink_metadata(path) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => MacosPathState::Missing,
+            Err(error) => return Err(error),
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                MacosPathState::Symlink(fs::read_link(path)?)
+            }
+            Ok(metadata) if metadata.is_file() => MacosPathState::Regular {
+                bytes: fs::read(path)?,
+                permissions: metadata.permissions(),
+            },
+            Ok(_) => {
+                return Err(io::Error::other(format!(
+                    "cannot snapshot non-file integration {}",
+                    path.display()
+                )))
+            }
+        };
+        Ok(Self {
+            path: path.to_path_buf(),
+            state,
+        })
+    }
+
+    fn restore(&self) -> io::Result<()> {
+        remove_path_no_follow(&self.path)?;
+        match &self.state {
+            MacosPathState::Missing => Ok(()),
+            MacosPathState::Symlink(target) => {
+                let parent = self
+                    .path
+                    .parent()
+                    .ok_or_else(|| io::Error::other("integration symlink has no parent"))?;
+                ensure_real_directory(parent)?;
+                std::os::unix::fs::symlink(target, &self.path)
+            }
+            MacosPathState::Regular { bytes, permissions } => {
+                let parent = self
+                    .path
+                    .parent()
+                    .ok_or_else(|| io::Error::other("integration file has no parent"))?;
+                ensure_real_directory(parent)?;
+                fs::write(&self.path, bytes)?;
+                fs::set_permissions(&self.path, permissions.clone())
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+struct MacosIntegrationTransaction {
+    snapshots: Vec<MacosPathSnapshot>,
+    media_changes: MediaMigrationChanges,
+    active: bool,
+}
+
+#[cfg(target_os = "macos")]
+impl MacosIntegrationTransaction {
+    fn capture(aliases: &[PathBuf], launch_agent: &Path, receipt: &Path) -> io::Result<Self> {
+        let mut paths = aliases.to_vec();
+        paths.push(launch_agent.to_path_buf());
+        paths.push(receipt.to_path_buf());
+        let snapshots = paths
+            .iter()
+            .map(|path| MacosPathSnapshot::capture(path))
+            .collect::<io::Result<Vec<_>>>()?;
+        Ok(Self {
+            snapshots,
+            media_changes: MediaMigrationChanges::default(),
+            active: false,
+        })
+    }
+
+    fn begin(&mut self) {
+        self.active = true;
+    }
+
+    fn record_media_migration(&mut self, mut changes: MediaMigrationChanges) {
+        self.media_changes
+            .created_files
+            .append(&mut changes.created_files);
+        self.media_changes
+            .created_dirs
+            .append(&mut changes.created_dirs);
+    }
+
+    fn rollback(&mut self) -> io::Result<()> {
+        if !self.active {
+            return Ok(());
+        }
+        let mut failures = Vec::new();
+        for snapshot in self.snapshots.iter().rev() {
+            if let Err(error) = snapshot.restore() {
+                failures.push(format!("{}: {error}", snapshot.path.display()));
+            }
+        }
+        if let Err(error) = self.media_changes.rollback() {
+            failures.push(format!("media rollback: {error}"));
+        }
+        if failures.is_empty() {
+            self.active = false;
+            Ok(())
+        } else {
+            Err(io::Error::other(failures.join("; ")))
+        }
+    }
+
+    fn commit(&mut self) {
+        self.active = false;
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for MacosIntegrationTransaction {
+    fn drop(&mut self) {
+        let _ = self.rollback();
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn preflight_owned_macos_receipt(path: &Path, root: &Path) -> io::Result<()> {
+    match fs::symlink_metadata(path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+        Ok(_) if receipt_is_owned(path, root)? => Ok(()),
+        Ok(_) => Err(io::Error::other(format!(
+            "refusing to replace foreign install receipt {}",
+            path.display()
+        ))),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn preflight_owned_text_file(path: &Path, marker: &str) -> io::Result<()> {
+    match fs::symlink_metadata(path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+        Ok(metadata)
+            if metadata.is_file()
+                && !metadata.file_type().is_symlink()
+                && fs::read_to_string(path)?.contains(marker) =>
+        {
+            Ok(())
+        }
+        Ok(_) => Err(io::Error::other(format!(
+            "refusing to replace foreign integration {}",
+            path.display()
+        ))),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn write_macos_receipt(
+    path: &Path,
+    root: &Path,
+    metadata: &MacosBundleMetadata,
+    autostart: bool,
+) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    preflight_owned_macos_receipt(path, root)?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::other("install receipt has no parent"))?;
+    ensure_real_directory(parent)?;
+    let temp = parent.join(format!(".install-receipt.{}.tmp", std::process::id()));
+    if fs::symlink_metadata(&temp).is_ok() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!("stale receipt transaction exists: {}", temp.display()),
+        ));
+    }
+    let bytes = serde_json::to_vec_pretty(&macos_install_receipt(metadata, root, autostart))?;
+    fs::write(&temp, bytes)?;
+    fs::set_permissions(&temp, fs::Permissions::from_mode(0o600))?;
+    if let Err(error) = fs::rename(&temp, path) {
+        let _ = fs::remove_file(&temp);
+        return Err(error);
+    }
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]
@@ -1975,19 +2657,25 @@ mod tests {
     }
 
     #[test]
-    fn macos_install_requires_exact_managed_app_and_mutates_only_external_paths() {
+    fn macos_install_accepts_managed_or_mounted_source_bundle_and_mutates_only_owned_paths() {
         let home = Path::new("/Users/goose");
         let app = home.join("Applications/Honk300.app");
         let exact = app.join("Contents/MacOS/honk300");
-        assert!(is_exact_macos_managed_executable(&exact, &app));
-        assert!(!is_exact_macos_managed_executable(
-            Path::new("/Volumes/Honk300/Honk300.app/Contents/MacOS/honk300"),
-            &app
-        ));
-        assert!(!is_exact_macos_managed_executable(
-            Path::new("/Users/goose/.local/bin/honk300"),
-            &app
-        ));
+        assert_eq!(
+            macos_install_disposition(&exact, &app).unwrap(),
+            MacosInstallDisposition::ConfigureExisting
+        );
+        assert_eq!(
+            macos_install_disposition(
+                Path::new("/Volumes/Honk300/Honk300.app/Contents/MacOS/honk300"),
+                &app
+            )
+            .unwrap(),
+            MacosInstallDisposition::CopyBundle(PathBuf::from("/Volumes/Honk300/Honk300.app"))
+        );
+        assert!(
+            macos_install_disposition(Path::new("/Users/goose/.local/bin/honk300"), &app).is_err()
+        );
 
         for mutation in macos_external_mutation_paths(home) {
             assert!(
@@ -1996,6 +2684,198 @@ mod tests {
                 mutation.display()
             );
         }
+    }
+
+    #[test]
+    fn macos_dmg_receipt_is_updater_compatible_and_release_bound() {
+        let root = Path::new("/Users/goose/Applications/Honk300.app");
+        let metadata = MacosBundleMetadata {
+            version: "0.3.3".into(),
+            tag: "v0.3.3".into(),
+            commit: "0123456789abcdef0123456789abcdef01234567".into(),
+        };
+        let receipt = macos_install_receipt(&metadata, root, false);
+
+        assert_eq!(receipt["schema"], OWNERSHIP_MARKER);
+        assert_eq!(receipt["install_root"], root.to_string_lossy().as_ref());
+        assert_eq!(receipt["version"], "0.3.3");
+        assert_eq!(receipt["tag"], "v0.3.3");
+        assert_eq!(
+            receipt["commit"],
+            "0123456789abcdef0123456789abcdef01234567"
+        );
+        assert_eq!(receipt["channel"], "dmg");
+        assert_eq!(receipt["layout"], "mac-app");
+    }
+
+    #[test]
+    fn macos_existing_bundle_replacement_requires_an_owned_receipt() {
+        assert!(macos_bundle_replacement_is_owned(false, false));
+        assert!(macos_bundle_replacement_is_owned(false, true));
+        assert!(macos_bundle_replacement_is_owned(true, true));
+        assert!(!macos_bundle_replacement_is_owned(true, false));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_integration_snapshot_is_inert_until_mutations_begin() {
+        let home = test_dir("macos-integration-inert");
+        let launch_agent = home.join("Library/LaunchAgents/dev.emmetts.honk300.plist");
+        let receipt = home.join("Library/Application Support/honk300/install-receipt.json");
+        fs::create_dir_all(launch_agent.parent().unwrap()).unwrap();
+        fs::create_dir_all(receipt.parent().unwrap()).unwrap();
+        fs::write(&launch_agent, b"before").unwrap();
+        let transaction =
+            MacosIntegrationTransaction::capture(&[], &launch_agent, &receipt).unwrap();
+        fs::write(&launch_agent, b"after capture").unwrap();
+
+        drop(transaction);
+
+        assert_eq!(fs::read(&launch_agent).unwrap(), b"after capture");
+        let _ = fs::remove_dir_all(home);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_integration_transaction_removes_fresh_mutations_after_receipt_collision() {
+        let home = test_dir("macos-integration-rollback");
+        let app = home.join("Applications/Honk300.app");
+        let installed = app.join("Contents/MacOS/honk300");
+        let aliases = home.join(".local/bin");
+        let launch_agent = home.join("Library/LaunchAgents/dev.emmetts.honk300.plist");
+        let receipt = home.join("Library/Application Support/honk300/install-receipt.json");
+        let media = home.join("Library/Application Support/honk300/media");
+        let legacy_assets = app.join("Contents/Resources/Assets");
+        fs::create_dir_all(installed.parent().unwrap()).unwrap();
+        fs::create_dir_all(&aliases).unwrap();
+        fs::create_dir_all(receipt.parent().unwrap()).unwrap();
+        fs::write(&installed, b"fixture").unwrap();
+        ensure_external_media_root(&media).unwrap();
+        fs::write(media.join("Memes/keep.png"), b"keep").unwrap();
+        let legacy_note = legacy_assets.join("Text/NotepadMessages/user/nested/new.txt");
+        fs::create_dir_all(legacy_note.parent().unwrap()).unwrap();
+        fs::write(&legacy_note, b"new").unwrap();
+        let alias_paths = COMMAND_NAMES
+            .iter()
+            .map(|name| aliases.join(name))
+            .collect::<Vec<_>>();
+        let mut transaction =
+            MacosIntegrationTransaction::capture(&alias_paths, &launch_agent, &receipt).unwrap();
+        transaction.begin();
+        let media_changes =
+            migrate_legacy_user_media(&legacy_assets, &media, LegacyMigrationMode::Copy).unwrap();
+        transaction.record_media_migration(media_changes);
+        let owned_targets = [installed.as_path()];
+        for alias in &alias_paths {
+            install_owned_unix_alias(alias, &installed, &owned_targets).unwrap();
+        }
+        write_owned_text_file(
+            &launch_agent,
+            &format!("<!-- {OWNERSHIP_MARKER} -->\nnew\n"),
+            OWNERSHIP_MARKER,
+        )
+        .unwrap();
+        let stale = receipt
+            .parent()
+            .unwrap()
+            .join(format!(".install-receipt.{}.tmp", std::process::id()));
+        fs::write(&stale, b"collision").unwrap();
+        let metadata = MacosBundleMetadata {
+            version: "0.3.3".into(),
+            tag: "v0.3.3".into(),
+            commit: "0123456789abcdef0123456789abcdef01234567".into(),
+        };
+
+        assert!(write_macos_receipt(&receipt, &app, &metadata, false).is_err());
+        transaction.rollback().unwrap();
+
+        for alias in &alias_paths {
+            assert!(
+                fs::symlink_metadata(alias).is_err(),
+                "{} leaked",
+                alias.display()
+            );
+        }
+        assert!(!launch_agent.exists());
+        assert!(!receipt.exists());
+        assert_eq!(fs::read(&stale).unwrap(), b"collision");
+        assert_eq!(fs::read(media.join("Memes/keep.png")).unwrap(), b"keep");
+        assert!(!media.join("Notes/nested/new.txt").exists());
+        assert!(!media.join("Notes/nested").exists());
+        let _ = fs::remove_dir_all(home);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_integration_transaction_restores_existing_owned_files() {
+        let home = test_dir("macos-integration-restore");
+        let app = home.join("Applications/Honk300.app");
+        let installed = app.join("Contents/MacOS/honk300");
+        let aliases = home.join(".local/bin");
+        let launch_agent = home.join("Library/LaunchAgents/dev.emmetts.honk300.plist");
+        let receipt = home.join("Library/Application Support/honk300/install-receipt.json");
+        fs::create_dir_all(installed.parent().unwrap()).unwrap();
+        fs::create_dir_all(&aliases).unwrap();
+        fs::create_dir_all(launch_agent.parent().unwrap()).unwrap();
+        fs::create_dir_all(receipt.parent().unwrap()).unwrap();
+        fs::write(&installed, b"fixture").unwrap();
+        let alias_paths = COMMAND_NAMES
+            .iter()
+            .map(|name| aliases.join(name))
+            .collect::<Vec<_>>();
+        for alias in &alias_paths {
+            std::os::unix::fs::symlink(&installed, alias).unwrap();
+        }
+        let old_launch_agent = format!("<!-- {OWNERSHIP_MARKER} -->\nold\n");
+        fs::write(&launch_agent, &old_launch_agent).unwrap();
+        let old_receipt = format!(
+            "{{\"schema\":\"{OWNERSHIP_MARKER}\",\"install_root\":{:?},\"version\":\"0.3.2\"}}",
+            app.to_string_lossy()
+        );
+        fs::write(&receipt, &old_receipt).unwrap();
+        let mut transaction =
+            MacosIntegrationTransaction::capture(&alias_paths, &launch_agent, &receipt).unwrap();
+        transaction.begin();
+
+        for alias in &alias_paths {
+            fs::remove_file(alias).unwrap();
+        }
+        fs::write(&launch_agent, format!("<!-- {OWNERSHIP_MARKER} -->\nnew\n")).unwrap();
+        fs::write(&receipt, b"new receipt").unwrap();
+        transaction.rollback().unwrap();
+
+        for alias in &alias_paths {
+            assert_eq!(fs::read_link(alias).unwrap(), installed);
+        }
+        assert_eq!(fs::read_to_string(&launch_agent).unwrap(), old_launch_agent);
+        assert_eq!(fs::read_to_string(&receipt).unwrap(), old_receipt);
+        let _ = fs::remove_dir_all(home);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_receipt_preflight_preserves_a_dangling_foreign_symlink() {
+        let home = test_dir("macos-dangling-receipt");
+        let app = home.join("Applications/Honk300.app");
+        let receipt = home.join("Library/Application Support/honk300/install-receipt.json");
+        let foreign_target = home.join("missing-foreign-receipt.json");
+        fs::create_dir_all(receipt.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(&foreign_target, &receipt).unwrap();
+        let metadata = MacosBundleMetadata {
+            version: "0.3.3".into(),
+            tag: "v0.3.3".into(),
+            commit: "0123456789abcdef0123456789abcdef01234567".into(),
+        };
+
+        assert!(preflight_owned_macos_receipt(&receipt, &app).is_err());
+        assert!(write_macos_receipt(&receipt, &app, &metadata, false).is_err());
+        assert_eq!(fs::read_link(&receipt).unwrap(), foreign_target);
+        assert!(fs::symlink_metadata(&receipt)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+
+        let _ = fs::remove_dir_all(home);
     }
 
     #[test]
@@ -2144,6 +3024,39 @@ mod tests {
         assert!(migrate_legacy_user_media(&assets, &media, LegacyMigrationMode::Move).is_err());
         assert_eq!(fs::read(media.join("Memes/mine.png")).unwrap(), b"png");
         assert_eq!(fs::read(legacy_memes.join("mine.png")).unwrap(), b"new");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn media_migration_rollback_removes_fresh_tree_and_preserves_existing_content() {
+        let root = test_dir("media-migrate-rollback");
+        let assets = root.join("Assets");
+        let fresh_media = root.join("fresh/state/media");
+        let legacy_note = assets.join("Text/NotepadMessages/user/nested/new.txt");
+        fs::create_dir_all(legacy_note.parent().unwrap()).unwrap();
+        fs::write(&legacy_note, b"new").unwrap();
+
+        let mut fresh =
+            migrate_legacy_user_media(&assets, &fresh_media, LegacyMigrationMode::Copy).unwrap();
+        assert_eq!(
+            fs::read(fresh_media.join("Notes/nested/new.txt")).unwrap(),
+            b"new"
+        );
+        fresh.rollback().unwrap();
+        assert!(!fresh_media.exists());
+
+        let existing_media = root.join("existing/media");
+        ensure_external_media_root(&existing_media).unwrap();
+        fs::write(existing_media.join("Memes/keep.png"), b"keep").unwrap();
+        let mut existing =
+            migrate_legacy_user_media(&assets, &existing_media, LegacyMigrationMode::Copy).unwrap();
+        existing.rollback().unwrap();
+        assert_eq!(
+            fs::read(existing_media.join("Memes/keep.png")).unwrap(),
+            b"keep"
+        );
+        assert!(!existing_media.join("Notes/nested").exists());
+        assert!(existing_media.exists());
         let _ = fs::remove_dir_all(root);
     }
 

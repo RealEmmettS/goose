@@ -233,9 +233,11 @@ jobs:
         id: cargo-dist
         shell: bash
         run: |
-          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          dist print-upload-files-from-manifest --manifest dist-manifest.json >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          {
+            echo "paths<<EOF"
+            dist print-upload-files-from-manifest --manifest dist-manifest.json
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Upload portable artifacts to the orchestrator
         uses: actions/upload-artifact@v6
@@ -260,6 +262,13 @@ jobs:
       tag: ${{ needs.plan.outputs.tag }}
       commit: ${{ needs.plan.outputs.commit }}
       candidate: ${{ inputs.candidate || false }}
+    secrets:
+      MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+      APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+      APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+      APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
 
   assemble-and-publish:
     name: Verify, upload once, and publish latest
@@ -318,6 +327,8 @@ jobs:
             --tag "$TAG" \
             --commit "$COMMIT"
           sh -n release-assets/honk300-installer.sh
+          # PowerShell, not Bash, expands these variables.
+          # shellcheck disable=SC2016
           pwsh -NoProfile -Command '$tokens=$null; $errors=$null; [void][System.Management.Automation.Language.Parser]::ParseFile("release-assets/honk300-installer.ps1", [ref]$tokens, [ref]$errors); if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }'
 
       - name: Validate exact compatibility and primary artifact set
@@ -379,7 +390,7 @@ jobs:
           set -euo pipefail
           smoke="$(mktemp -d)"
           mkdir -p "$smoke/home"
-          for pass in 1 2; do
+          for _ in 1 2; do
             HOME="$smoke/home" \
             XDG_DATA_HOME="$smoke/data" \
             XDG_CONFIG_HOME="$smoke/config" \

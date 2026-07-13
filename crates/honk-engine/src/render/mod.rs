@@ -52,8 +52,14 @@ impl LayerScratch {
             .as_ref()
             .is_none_or(|pixmap| pixmap.width() < width || pixmap.height() < height);
         if needs_growth {
-            let width = width.next_power_of_two();
-            let height = height.next_power_of_two();
+            // Goose bounds breathe and bob by a handful of supersampled pixels. Power-of-two
+            // growth made a 257 px body allocate, clear, paint, filter, and composite 512 px on
+            // every frame. Small grow-only quanta retain allocation stability without asking the
+            // rasterizer to process a large transparent fringe.
+            let current_width = self.pixmap.as_ref().map_or(0, Pixmap::width);
+            let current_height = self.pixmap.as_ref().map_or(0, Pixmap::height);
+            let width = rounded_scratch_extent(width.max(current_width));
+            let height = rounded_scratch_extent(height.max(current_height));
             self.pixmap = Pixmap::new(width, height);
             #[cfg(test)]
             {
@@ -67,6 +73,10 @@ impl LayerScratch {
         pixmap.fill(Color::TRANSPARENT);
         pixmap
     }
+}
+
+fn rounded_scratch_extent(extent: u32) -> u32 {
+    extent.saturating_add(31) / 32 * 32
 }
 
 /// User-customizable goose palette — six tones, defaults from the reference art.
@@ -271,8 +281,16 @@ fn render_rig_layer(
     origin: Vec2,
     palette: RenderPalette,
     opacity: f32,
+    supersample: f32,
 ) {
-    let ss = GOOSE_SUPERSAMPLE;
+    let ss = supersample.max(1.0);
+    if !layer_needs_offscreen_composite(ss, opacity) {
+        match rig.view {
+            RigView::Side { .. } => side::paint_side(pixmap, rig, origin, ss, &palette),
+            RigView::TopDown { .. } => top::paint_top(pixmap, rig, origin, ss, &palette),
+        }
+        return;
+    }
     let bb = rig.bounding_box();
     let w = (bb.width() * ss).ceil() as u32;
     let h = (bb.height() * ss).ceil() as u32;
@@ -292,13 +310,23 @@ fn render_rig_layer(
             layer.as_ref(),
             &PixmapPaint {
                 opacity: opacity.clamp(0.0, 1.0),
-                quality: FilterQuality::Bilinear,
+                quality: if ss > 1.0 {
+                    FilterQuality::Bilinear
+                } else {
+                    // At 1x there is no downsampling to filter. Nearest preserves the
+                    // antialiased tiny-skia pixels and avoids a second bilinear pass.
+                    FilterQuality::Nearest
+                },
                 ..PixmapPaint::default()
             },
             transform,
             None,
         );
     });
+}
+
+fn layer_needs_offscreen_composite(supersample: f32, opacity: f32) -> bool {
+    (supersample - 1.0).abs() > f32::EPSILON || opacity < 1.0 - f32::EPSILON
 }
 
 /// Render the full drawable pose — the active view plus, mid-crossfade, the outgoing
@@ -309,12 +337,32 @@ pub fn render_pose_with_palette(
     origin: Vec2,
     palette: RenderPalette,
 ) {
+    render_pose_with_palette_at_scale(pixmap, pose, origin, palette, GOOSE_SUPERSAMPLE);
+}
+
+/// Render the full pose at an explicit raster scale. Native backends may select the
+/// 1x antialiased path when their compositor already performs a second image copy;
+/// golden/reference renders retain [`GOOSE_SUPERSAMPLE`].
+pub fn render_pose_with_palette_at_scale(
+    pixmap: &mut Pixmap,
+    pose: &GoosePose,
+    origin: Vec2,
+    palette: RenderPalette,
+    supersample: f32,
+) {
     let mut incoming_opacity = 1.0;
     if let Some((rig, alpha)) = &pose.fading {
-        render_rig_layer(pixmap, rig, origin, palette, *alpha);
+        render_rig_layer(pixmap, rig, origin, palette, *alpha, supersample);
         incoming_opacity = 1.0 - alpha.clamp(0.0, 1.0);
     }
-    render_rig_layer(pixmap, &pose.primary, origin, palette, incoming_opacity);
+    render_rig_layer(
+        pixmap,
+        &pose.primary,
+        origin,
+        palette,
+        incoming_opacity,
+        supersample,
+    );
 }
 
 /// Render one goose view with the default palette (tests/tools).
@@ -329,7 +377,7 @@ pub fn render_rig_with_palette(
     origin: Vec2,
     palette: RenderPalette,
 ) {
-    render_rig_layer(pixmap, rig, origin, palette, 1.0);
+    render_rig_layer(pixmap, rig, origin, palette, 1.0, GOOSE_SUPERSAMPLE);
 }
 
 /// Render one goose view into a fresh transparent pixmap at an arbitrary vector scale
@@ -505,6 +553,43 @@ mod tests {
 
         assert_eq!(first, second);
         assert_eq!(scratch.allocations, 1);
+    }
+
+    #[test]
+    fn layer_scratch_growth_wastes_at_most_one_small_quantum_per_axis() {
+        let mut scratch = LayerScratch::default();
+        let pixmap = scratch.prepare(257, 129);
+
+        assert_eq!(pixmap.width(), 288);
+        assert_eq!(pixmap.height(), 160);
+    }
+
+    #[test]
+    fn stipple_shadow_cache_stays_bounded_during_subpixel_motion() {
+        geom::clear_stipple_shadow_cache();
+        let mut pixmap = Pixmap::new(256, 256).expect("alloc");
+        for frame in 0..2_000 {
+            let fraction = frame as f32 / 2_000.0;
+            geom::stipple_shadow(
+                &mut pixmap,
+                Vec2::new(96.0 + fraction, 96.0 + fraction * 0.73),
+                24.0,
+                6.5,
+                1.0,
+            );
+        }
+
+        assert!(
+            geom::stipple_shadow_cache_size() <= 16,
+            "subpixel motion must select from a bounded cache"
+        );
+    }
+
+    #[test]
+    fn opaque_one_x_frames_do_not_need_an_offscreen_composite() {
+        assert!(!layer_needs_offscreen_composite(1.0, 1.0));
+        assert!(layer_needs_offscreen_composite(1.0, 0.5));
+        assert!(layer_needs_offscreen_composite(2.0, 1.0));
     }
 
     #[test]

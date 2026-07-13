@@ -1,3 +1,5 @@
 self-hosted-runner:
   labels:
     - honk300-a11y
+    # GitHub-hosted Intel preview label; actionlint v1.7.7 predates it.
+    - macos-15-intel

@@ -1,8 +1,8 @@
 # macOS Accessibility First-Run Design
 
-Date: 2026-07-13  
-Status: Approved  
-Release: Honk300 v0.3.3  
+Date: 2026-07-13
+Status: Approved
+Release: Honk300 v0.3.3
 Board: `#m20q` / `#m16r`
 
 ## Goal

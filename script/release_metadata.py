@@ -114,7 +114,7 @@ def _classify(name: str) -> tuple[str, str]:
         "honk300-installer.sh": ("universal-unix", "bootstrap-shell"),
         "honk300-installer.ps1": ("windows", "bootstrap-powershell"),
         "honk300-universal2.app.zip": ("universal2-apple-darwin", "mac-app"),
-        "honk300-universal2.dmg": ("universal2-apple-darwin", "compat-mac-dmg"),
+        "honk300-universal2.dmg": ("universal2-apple-darwin", "mac-dmg"),
     }
     if name in exact:
         return exact[name]

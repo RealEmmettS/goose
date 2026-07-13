@@ -8,7 +8,9 @@ use app::{Action, AppState, CommandResult, TuiCommand};
 use color_eyre::eyre::Result;
 use crossterm::event::{self, Event, KeyEvent, KeyEventKind};
 use honk_config::{Config, ConfigError, ConfigLoadState, LoadedConfig};
-use honk_control::{send_command, ControlCommand, ControlResponse, RuntimeStatus};
+use honk_control::{
+    send_command, wait_for_shutdown, ControlCommand, ControlResponse, RuntimeStatus,
+};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -171,7 +173,10 @@ fn handle_command(app: &AppState, command: TuiCommand) -> CommandResult {
             Err(err) => result(format!("status failed: {err}"), true, false),
         },
         TuiCommand::Stop => match send_command(ControlCommand::Stop) {
-            Ok(ControlResponse::Ok) => result("stop sent", false, false),
+            Ok(ControlResponse::Ok) => match wait_for_shutdown() {
+                Ok(()) => result("stopped", false, false),
+                Err(err) => result(format!("stop stalled: {err}"), true, false),
+            },
             Ok(ControlResponse::Err(code)) => result(format!("stop rejected: {code}"), true, false),
             Ok(ControlResponse::Status(_)) => result("stop got unexpected status", true, false),
             Err(err) => result(format!("stop failed: {err}"), true, false),
@@ -314,7 +319,7 @@ fn spawn_start(config_path: &Path) -> std::io::Result<(Child, bool)> {
 fn build_start_command(exe: PathBuf, config_path: &Path) -> Command {
     #[cfg(target_os = "macos")]
     {
-        return build_macos_start_command(exe, config_path);
+        build_macos_start_command(exe, config_path)
     }
     #[cfg(not(target_os = "macos"))]
     {

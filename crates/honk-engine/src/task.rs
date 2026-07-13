@@ -84,6 +84,9 @@ pub trait Task {
     fn collect_kind(&self) -> Option<CollectWindowKind> {
         None
     }
+    /// Update the stable anchor used by the permission-wait task after a display-layout
+    /// change. Other tasks deliberately ignore this platform-neutral lifecycle signal.
+    fn set_permission_wait_anchor(&mut self, _anchor: Vec2) {}
     /// Advance one tick; return `true` when finished (the engine then picks the next task).
     fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool;
 }
@@ -785,6 +788,39 @@ impl Task for PerchRideTask {
                 false
             }
         }
+    }
+}
+
+/// A safe holding task used while a platform runtime waits for a required permission.
+/// The goose walks to a runtime-selected anchor, settles there, and never yields to roaming.
+pub struct PermissionWaitTask {
+    anchor: Vec2,
+}
+
+impl PermissionWaitTask {
+    pub fn new(anchor: Vec2) -> Self {
+        Self { anchor }
+    }
+}
+
+impl Task for PermissionWaitTask {
+    fn id(&self) -> &'static str {
+        "permission_wait"
+    }
+
+    fn set_permission_wait_anchor(&mut self, anchor: Vec2) {
+        self.anchor = anchor;
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, _ctx: &mut TaskCtx) -> bool {
+        goose.current_speed = goose.parameters.walk_speed;
+        goose.current_acceleration = goose.parameters.acceleration_normal;
+        goose.target_pos = self.anchor;
+        if arrived(goose, 2.0) {
+            goose.current_speed = 0.0;
+            goose.velocity = Vec2::ZERO;
+        }
+        false
     }
 }
 

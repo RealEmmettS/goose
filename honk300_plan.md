@@ -72,7 +72,8 @@ still build the full installer matrix because matching the `*300` family is an e
 | **Config UI** | A **ratatui** Claude-Code/QubeTX-family-style TUI at `<name> config`, toggling every behavior incl. Autumn; **hot-apply where cheap**, restart-note otherwise. |
 | **Linux** | **X11-first** (runs under XWayland). **Native Wayland** behind an opt-in `--wayland` flag (reduced mischief). |
 | **Targets** | **Every OS + arch we advertise:** Windows x64 **and ARM64**, macOS Intel **and Apple Silicon** (universal2), Linux x64 **and ARM** (gnu + musl). |
-| **Packaging** | Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) **built per-arch** + shell/PowerShell installers + macOS `.app`/`.dmg` + Linux `.desktop`. **No crates.io** (`crates-publish.yml` dropped). |
+| **Packaging** | Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) **built per-arch** + shell/PowerShell installers + a Developer ID-signed/notarized macOS universal DMG with per-user helper + Linux `.desktop`. **No crates.io** (`crates-publish.yml` dropped). |
+| **macOS first run** | Only the exact receipted app at `~/Applications/Honk300.app` may request Accessibility automatically. It records an owner-only prompt marker before opening UI, asks at most once per installed update, waits calmly at a safe screen edge while denied, and detects grants/revocations in the same process. Development, bare, source-tree, and mounted-DMG launches retain non-prompting degraded behavior. |
 
 ---
 
@@ -260,10 +261,12 @@ toolkit`/`gtk4-layer-shell` (`--wayland`), `enigo` (cursor warp + keystrokes), `
 `ureq` + `sha2` + `serde_json` (self-update), error handling via `thiserror` (engine/CLI) and
 `color-eyre` (TUI, matching WB300).
 
-**Hard impossibilities (documented, not fought):** native-Wayland foreign-window move;
-native-Wayland cursor-warp / keystroke-synth; softbuffer per-pixel-alpha on a
+**Portable-client impossibilities (documented, not hidden):** native-Wayland foreign-window move;
+native-Wayland global cursor-warp / keystroke-synth; softbuffer per-pixel-alpha on a
 Windows layered window (use `UpdateLayeredWindow`); a bare (un-bundled) macOS binary holding a
 durable Accessibility grant (a real `.app` with a stable bundle-id is mandatory).
+ADR 0021 permits separately tested opt-in portal or compositor-specific adapters; none of those
+changes the reduced portable Wayland guarantee.
 
 ---
 
@@ -685,15 +688,37 @@ after cargo-dist's `Release`, torn-release guard via `dist-manifest.json` + the 
 builds ARM64 via the MSVC ARM64 toolchain (native ARM runner or cross), honestly noting any
 emulation-only test gaps.
 
-### 13.3 macOS: universal2 `.app` staging + M19 `.dmg`
+### 13.3 macOS: universal2 Developer ID app + graphical per-user DMG
 A real `.app` bundle with a **stable bundle-id** (`dev.emmetts.honk300`) is **mandatory** for
 durable Accessibility grants (mischief features). Ship a **universal2** binary (Intel + Apple
-Silicon) in one `.app`; `.dmg`, Developer ID signing, notarization, installer/update/uninstall,
-and icon polish remain M19. Unsigned/un-notarized for personal use → document
-`xattr -dr com.apple.quarantine`; degrade mischief gracefully until Accessibility is granted.
-M16 sets `LSUIElement=true` by default: the bundle is an agent/permission identity only, while
-configuration and status stay CLI/TUI-only. No native preferences window, menu-bar settings UI,
-Dock controls, or AppleScript `.sdef` commands ship in M16.
+Silicon) in one `.app`. ADR 0020 requires Developer ID signing for team `M9D5379H93`, hardened
+runtime, secure timestamps, App Store Connect API-key notarization, stapling, and Gatekeeper
+validation. Release workflows fail closed when credentials are absent; there is no ad-hoc public
+fallback.
+
+The recommended `honk300-universal2.dmg` contains the app, a separately signed universal
+x86_64/arm64 `Install Honk300.app` targeting macOS 11.0, and concise instructions—never a
+misleading `/Applications` symlink. The
+helper verifies bundle id, signature, and matching Developer ID team before delegating to the
+shared `honk300 install` transaction. Installation remains no-sudo and per-user at
+`~/Applications/Honk300.app`; the exact-tag shell bootstrap stays a secondary terminal path.
+`LSUIElement=true` still makes the product app an agent/permission identity only: configuration
+and status remain CLI/TUI-only, with no native settings window, menu-bar UI, Dock control surface,
+or AppleScript `.sdef` commands.
+
+ADR 0022 restricts automatic Accessibility onboarding to that exact installed app plus a matching
+bundle release identity and `honk300.install.v1` receipt. Before the native prompt or Settings
+pane opens, the runtime atomically records an owner-only per-update marker under Honk300's state
+tree. A missing or unsafe marker path, identity mismatch, development binary, source-tree bundle,
+or direct mounted-DMG launch fails closed to the existing non-prompting degraded startup.
+
+While a managed app remains denied, the platform-neutral engine walks the goose to a lower-right
+safe-edge anchor and holds a calm permission wait. Status, reload, direct honk, stop, exit, and
+quit stay available; every other direct or automatic prank is blocked. The macOS runtime polls
+Accessibility no more than once per second: a live grant restores permission-bound capabilities
+and starts a fresh FirstUX introduction without restarting, while a live revocation returns to
+the safe wait without reopening UI for the already-marked update. Windows and Linux never
+activate this engine mode.
 
 ### 13.4 Linux: `.desktop` + tarball/AppImage, X11-first, per-arch
 Shell installer drops the binary (all three aliases), extracts assets, installs
@@ -753,6 +778,7 @@ being implemented three more times.
 | M17 | Linux X11 backend (XShape + EWMH + device_query) | full parity on X11/XWayland |
 | M18 | `--wayland` layer-shell degraded mode (stop/poke via IPC) | renders on Wayland; mischief self-disables; `goose stop` works |
 | M19 | install/update/uninstall(`--purge`)/setup + packaging **all targets** (Win x64+ARM64 ×4 installers, mac universal2 `.dmg`, Linux x64/ARM gnu+musl) + 3 aliases | installers produce working artifacts w/ autostart + shortcut on every OS/arch |
+| R6 / v0.3.3 | native macOS qualification, AppKit RGBA repair, shared gait refinement, Developer ID/notarization, graphical per-user DMG, managed Accessibility first run, DMG-first site | exact signed app passes renderer, denied/non-nag/grant/revoke Accessibility, lifecycle, and performance gates; immutable DMG is independently verified before promotion |
 
 Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
 and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus
@@ -760,6 +786,9 @@ and native Wayland reduced layer-shell path have landed in `honk-platform-linux`
 detects X11-first vs. forced/native Wayland sessions, samples local time, protects common terminal
 apps, plays audio through command-line players when available, renders through X11 or reduced
 Wayland when the display server is available, and reports honest unsupported/failed capabilities.
+ADR 0021 records the completed full-support research: the portable path stays reduced, while
+future portal/libei, KDE KWin, GNOME Shell, and wlroots integrations are distinct capability
+adapters with distinct permission and version claims.
 M16.1-M18.1 completion is CI-proven: readiness cards close only after the hosted Linux/macOS jobs
 and optional Accessibility-granted macOS job record their run evidence in
 `docs/readiness/m16-m18-readiness.md`.
@@ -774,7 +803,7 @@ and optional Accessibility-granted macOS job record their run evidence in
 | W1 | softbuffer can't do per-pixel alpha on a Windows layered window | HIGH | winit owns the `WS_EX_LAYERED` HWND; tiny-skia → premultiplied BGRA; present via `UpdateLayeredWindow` directly. softbuffer = X11/Wayland only. |
 | W2 | Click-through vs clickable conflict | HIGH | Per-pixel-alpha natural hit-test (no `WS_EX_TRANSPARENT`); fallback ex-style toggle; X11 XShape input region. (§6) |
 | G1 | AV/SmartScreen flags an unsigned app that warps cursor + synth keys + moves windows | HIGH | Personal use: document "Run anyway"; keep runtime control on local IPC; ship source. Optional Authenticode later. |
-| M_perm | macOS Accessibility/Input-Monitoring gates; a bare binary can't hold a stable grant | HIGH | universal2 `.app` (stable bundle-id) mandatory; `AXIsProcessTrusted()`, deep-link to Settings, degrade. |
+| M_perm | macOS Accessibility/Input-Monitoring gates; a bare binary can't hold a stable grant | HIGH | universal2 Developer ID `.app` (stable bundle-id/team) mandatory; exact managed-receipt eligibility, one secure prompt marker per update, native consent/Settings handoff, calm safe-edge wait, and denied/non-nag/grant/revoke evidence on one exact signed artifact. |
 | E1 | 120 Hz full-screen layered redraw = CPU/battery killer | HIGH→mit | Per-monitor windows + present only the dirty rect; sim 120 Hz, present on-dirty ~60. Idle ≈ near-zero. |
 | W_dpi | Per-monitor DPI + signed/negative multi-monitor coords | MED-HIGH | **CLOSED (ADR 0015):** PMv2 declared at startup; `WM_DPICHANGED`/`WM_DISPLAYCHANGE` rebuild per-monitor overlays; signed virtual space verified end-to-end. |
 | L_xwl | XWayland window-move no-ops on native-Wayland windows | MED | `enumerate()`/`watch_move()` return only X11 windows; tasks targeting non-enumerable windows self-skip. |
@@ -842,8 +871,10 @@ durable macOS Accessibility for an un-bundled binary.
   meme-drop; pat-hover hearts; moods; seasonal; multi-monitor + mixed-DPI; **start/stop grammar**
   (`start`/`stop`/`honk bad`/`goose no honk`); **`goose config` hot-apply**; autostart on/off;
   terminal windows are visually overlaid but not manipulated.
-- **Degradation tests:** macOS without Accessibility; Wayland (`--wayland` and default XWayland);
-  X11 with a native-Wayland window present (perch-ride/window-drag self-skip).
+- **Degradation tests:** macOS without Accessibility, including exact managed eligibility,
+  one-prompt-per-update state, safe-edge permission wait, same-process grant/revocation, and
+  non-prompting development/unmanaged launches; Wayland (`--wayland` and default XWayland); X11
+  with a native-Wayland window present (perch-ride/window-drag self-skip).
 - **Packaging smoke across every target/arch:** install → `--version` → `<name> stop` on Win
   x64+ARM64, mac Intel + Apple Silicon (universal2), Linux x64 + ARM (gnu + musl); verify
   Start-Menu/.desktop/LaunchAgent, `InstallSource`, arch-matched `<name> update`, `uninstall
@@ -866,8 +897,8 @@ source. The repo ships:
 ---
 
 ## 19. Out of scope / future
-Code signing (Authenticode / Apple notarization); App Store / store distribution; macOS
-AppleScript `.sdef` surface; **any external/WASM mod system** (explicitly future, low priority —
+Windows Authenticode; App Store / store distribution; macOS AppleScript `.sdef` surface;
+**any external/WASM mod system** (explicitly future, low priority —
 internal docs are the chosen extensibility path); Music/streaming features; the default-OFF spicy
 behaviors (§5.12) remain opt-in extras; exotic tiling-WM polish. Native Wayland mischief stays
 intentionally limited.
@@ -889,5 +920,5 @@ intentionally limited.
 
 ### Document control
 - **Historical role:** this plan defined the original implementation sequence; current behavior
-  is governed by code, accepted ADRs, the active R5 task, and verification evidence.
+  is governed by code, accepted ADRs, active v0.3.3 task `#m20q`, and verification evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).
