@@ -83,6 +83,12 @@ All notable changes to this project are documented here. Format based on
   allowing denied and granted Accessibility evidence on one unchanged signed identity.
 
 ### Fixed
+- **Current macOS hands-on release runbook** - replaced the historical ad-hoc, unnotarized,
+  terminal-first checklist with the exact v0.3.3 Developer ID/notarized/stapled DMG-first flow.
+  The runbook now preserves one candidate identity across four Accessibility states, native
+  terminal protection, renderer and performance evidence, lifecycle rollback, the one-display
+  waiver, immutable publication, and fresh-download verification. The README now links the exact
+  release DMG and distinguishes the stapled app inside the ZIP from the ZIP container itself.
 - **Readable macOS notes in every appearance** - note text now uses AppKit's semantic label color
   instead of absolute black, so it follows light, dark, and increased-contrast appearances. A
   native regression pins the semantic-color contract. The equivalent platform paths were audited:

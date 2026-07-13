@@ -28,7 +28,7 @@ compatibility.
 The signed and notarized universal DMG is the recommended install for both Apple Silicon and
 Intel Macs:
 
-- [Download Honk300 for macOS](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-universal2.dmg)
+- [Download Honk300 for macOS](https://github.com/RealEmmettS/goose/releases/download/v0.3.3/honk300-universal2.dmg)
 
 Open the disk image and run **Install Honk300**. The universal Intel/Apple Silicon helper verifies
 the adjacent app's Developer ID team and bundle identity, installs it without `sudo` into
@@ -46,9 +46,9 @@ either starts the normal introduction or returns to the safe wait. Development b
 copies, source-tree bundles, and an app launched directly from a mounted DMG do not open
 permission UI automatically.
 
-The app and graphical helper use hardened Developer ID signatures. The app ZIP and DMG are
-Apple-notarized and stapled, and release checks publish SHA-256 values for every artifact. The
-exact-tag terminal bootstrap remains a supported secondary install:
+The app and graphical helper use hardened Developer ID signatures. The app sealed inside the ZIP
+and the DMG are Apple-notarized and stapled, and release checks publish SHA-256 values for every
+artifact. The exact-tag terminal bootstrap remains a supported secondary install:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -fsSL https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.sh | sh

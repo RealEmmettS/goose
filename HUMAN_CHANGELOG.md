@@ -77,6 +77,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   Accessibility checks happen without rebuilding the app between them.
 
 ### Fixed
+- **The Mac release checklist now matches the download people will actually use.** It starts with
+  the signed and Apple-approved disk image and keeps one unchanged Goose through permission,
+  window-safety, appearance, performance, update, cleanup, and fresh-download checks. It also
+  separates the before-release and after-release gates, which helps prevent an older or weaker
+  Mac download from being promoted by mistake.
 - **Goose notes stay readable in Mac dark mode.** Note lettering now follows the Mac's chosen
   appearance and accessibility contrast instead of always being black. Windows notes already use
   the system Notepad's colors, and Linux does not currently offer the note-window prank, so the
