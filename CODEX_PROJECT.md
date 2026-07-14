@@ -15,13 +15,16 @@ recommended macOS download at thegoose.app.
 - Stable public release remains v0.3.2 until the v0.3.3 readiness checklist is complete.
 - Active board card: `#m20q`; live shared task board is tracked under `.tasks/`.
 - Version: 0.3.3 in source.
-- Renderer: AppKit/CoreGraphics RGBA regressions pass; exact current Developer ID-signed
-  direct-layer captures show the complete opaque goose on both light and dark appearances.
+- Renderer: AppKit/CoreGraphics RGBA regressions pass. A custom child layer was found to bypass
+  reliable WindowServer capture, so the fixed reusable AppKit image-view presenter is awaiting
+  fresh Developer ID-signed light/dark compositor evidence.
 - Shared gait: releases planted feet at four pixels, preserves the weighted normal/moderate
   cadence, caps visible lag at 16 px for Walk and 26 px for Run/Charge, and passes cadence guards,
   eight-direction tests, and seven goldens without overcorrecting ordinary walking.
-- Performance: the latest 10-second-warm-up/60-second run passes at 8.30% median CPU, 54.48 MiB
-  maximum RSS, and negative 5.12 MiB growth; an exact signed-candidate confirmation remains.
+- Performance: a follow-up active-motion profile invalidated the earlier idle-path 8.30% CPU
+  baseline. Sampling traced 40.45% median active CPU after a large transient to stale oversized
+  transparent canvas/bitmap capacity rather than the engine; bounded shrinking is implemented and
+  the exact signed 10-second-warm-up/60-second confirmation remains open.
 - Lifecycle: mounted-bundle copy, aliases, autostart, release-bound receipt, preservation, purge
   backup, rollback structure, and isolated-home cleanup are implemented and tested.
 - Packaging: a universal x86_64/arm64 installer helper targeting macOS 11.0 in both slices and a
@@ -49,7 +52,8 @@ recommended macOS download at thegoose.app.
   procedural raster renderer. No OS dependencies.
 - `crates/honk-control`: closed local IPC protocol and same-user transport.
 - `crates/honk-config` / `honk-config-tui`: schema-v2 TOML and ratatui control surface.
-- `crates/honk-platform-*`: native Windows, AppKit/CoreGraphics, X11, and Wayland adapters.
+- `crates/honk-platform-*`: native Windows, capture-safe AppKit/CoreGraphics, X11, and Wayland
+  adapters.
 - `src/runtime`: platform event loops built around shared `RuntimeCore` ordering.
 - `src/install.rs` / `src/update.rs`: ownership receipts, atomic lifecycle transactions,
   channel-aware updates, and foreign-file preservation.

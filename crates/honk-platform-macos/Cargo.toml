@@ -30,15 +30,16 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
     "libc",
     "objc2-core-foundation",
     "objc2-core-graphics",
-    "objc2-quartz-core",
     "std",
     "NSApplication",
     "NSBitmapImageRep",
+    "NSCell",
     "NSColor",
     "NSControl",
     "NSEvent",
     "NSGraphics",
     "NSImage",
+    "NSImageCell",
     "NSImageRep",
     "NSImageView",
     "NSResponder",
@@ -68,11 +69,6 @@ objc2-core-graphics = { version = "0.3.2", default-features = false, features = 
     "CGGeometry",
     "CGImage",
     "CGRemoteOperation",
-] }
-objc2-quartz-core = { version = "0.3.2", default-features = false, features = [
-    "std",
-    "CALayer",
-    "CATransaction",
 ] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = [
     "std",

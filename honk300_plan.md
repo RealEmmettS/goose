@@ -706,6 +706,12 @@ shared `honk300 install` transaction. Installation remains no-sudo and per-user 
 and status remain CLI/TUI-only, with no native settings window, menu-bar UI, Dock control surface,
 or AppleScript `.sdef` commands.
 
+Transparent overlay pixels are presented through reusable premultiplied-RGBA AppKit image views
+in the ordinary window backing store so WindowServer capture and screen sharing match the
+physical display. The runtime presents only active damage and shrinks canvas/bitmap capacity
+after unusually large transient regions; it must not keep color-converting stale transparent
+screen-sized buffers during later normal motion.
+
 ADR 0022 restricts automatic Accessibility onboarding to that exact installed app plus a matching
 bundle release identity and `honk300.install.v1` receipt. Before the native prompt or Settings
 pane opens, the runtime atomically records an owner-only per-update marker under Honk300's state

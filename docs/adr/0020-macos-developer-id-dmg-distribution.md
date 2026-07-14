@@ -31,11 +31,17 @@ the sealed application bundle.
   CoreGraphics. Visual qualification requires body, outline, wing, beak, legs, and shadow on
   light and dark backgrounds.
 - The engine rig and reference renderer remain platform-neutral. Gait refinements and shared
-  renderer allocation improvements apply on every backend; AppKit/Core Animation presentation
-  remains a macOS concern.
+  renderer allocation improvements apply on every backend; AppKit presentation remains a macOS
+  concern.
 - macOS reuses each display's bitmap/image storage, presents at at most 60 Hz, advances the
   simulation at 120 Hz, drains native objects inside autorelease pools, and caches display
   geometry until topology changes.
+- The reusable `NSImageView` participates in the ordinary AppKit window backing store so
+  WindowServer screenshots and screen sharing observe the same alpha-composited pixels as the
+  physical display. A custom child layer that bypasses that capture path is not used.
+- Native canvas and bitmap capacity may be bucketed for ordinary frame-size jitter, but must
+  shrink after an unusually large transient frame. Only the active RGBA rectangle is presented;
+  stale transparent capacity must not be color-converted and composited indefinitely.
 
 ### Installation shape
 
@@ -101,6 +107,8 @@ the sealed application bundle.
 ## Verification
 
 - Native AppKit/CoreGraphics pixel tests and light/dark semantic screenshot assertions.
+- Full-compositor and window-capture assertions after a large transient frame, plus an active-
+  motion CPU/RSS/leak profile rather than an idle or off-screen sample.
 - Shared gait invariants, eight foot directions, renderer goldens, and platform runtime tests.
 - Exact prebuilt-app smoke scripts for denied and granted Accessibility without a rebuild between
   identity checks.

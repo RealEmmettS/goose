@@ -63,8 +63,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   shared animation runs on Windows, Mac, X11, and Wayland.
 - **Mac drawing does less repeated work.** The renderer reuses drawing space and shadows, while
   the Mac app reuses native images, remembers screen geometry, and limits display updates without
-  slowing the simulation. The final repeated image copy is gone, and a full timed run now passes
-  both the processor and memory release limits with room to spare.
+  slowing the simulation. After a temporarily large note or meme interaction, its drawing space
+  returns to a sensible size instead of making every later walking frame process a mostly empty
+  screen-sized image.
 - **A mounted disk image can use the normal safe installer.** The Goose can now copy its own
   verified app bundle into the user's Applications folder while preserving aliases, autostart,
   user media, updates, removal, and rollback. Automated release checks can interrupt the swap on
@@ -90,6 +91,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   the renderer's color and transparency bytes in the format they were actually produced, so the
   body, wing, beak, legs, outline, and shadow appear as intended. The underlying shared Goose art
   did not need to be replaced.
+- **Mac screenshots and screen sharing use the real transparent Goose window.** The overlay now
+  goes through the normal Mac window drawing path, so capture tools no longer lose the Goose or
+  replace unused transparent space with large black blocks. Returning the drawing space to normal
+  after a big interaction also keeps ordinary movement from wasting processor time. The walking
+  rhythm and leg animation are unchanged by this Mac-only presentation fix.
 - **Mac-only build warnings are cleared.** Old and unnecessary platform paths were removed or
   corrected, which keeps strict build checks useful instead of hiding new mistakes among known
   warnings.

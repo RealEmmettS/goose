@@ -66,11 +66,11 @@ All notable changes to this project are documented here. Format based on
   golden changes.
 - **Lower-allocation renderer and macOS runtime** - renderer scratch surfaces grow in bounded
   increments, stippled shadows are cached, and opaque 1x frames can paint directly. macOS reuses
-  bitmap/image/layer storage, avoids swizzle buffers and redundant window/display work, drains
-  native objects in autorelease pools, caches desktop geometry, retains 120 Hz simulation, and
-  caps presentation at 60 Hz. AppKit's reusable bitmap-to-CGImage bridge also removes the final
-  per-frame CFData copy; the 10-second-warm-up/60-second M2 profile passes at 8.30% median CPU,
-  54.48 MiB maximum RSS, and negative 5.12 MiB RSS growth.
+  bitmap/image storage, avoids swizzle buffers and redundant window/display work, drains native
+  objects in autorelease pools, caches desktop geometry, retains 120 Hz simulation, and caps
+  presentation at 60 Hz. The AppKit view now draws only the active RGBA rectangle and both the
+  tiny-skia canvas and native bitmap shrink after an unusually large note, meme, or distant dirty
+  region instead of color-converting that stale transparent capacity on every later frame.
 - **Mounted-bundle lifecycle transaction** - `honk300 install` can copy its enclosing mounted
   source app into `~/Applications/Honk300.app` after validating bundle id, stamped release
   identity, strict signature, and both architectures. It preserves the shared aliases/media/
@@ -98,6 +98,13 @@ All notable changes to this project are documented here. Format based on
   premultiplied RGBA bytes as alpha-last instead of interpreting them through the former
   BGRA/alpha-first contract. Native captures show the articulated goose rather than a translucent
   color blob; the seven shared engine goldens remain stable apart from the intentional gait poses.
+- **macOS overlay capture and post-transient CPU** - replaced the custom child Core Animation
+  layer with a reusable `NSImageView` in the ordinary AppKit backing store. WindowServer capture
+  and screen sharing now receive the same transparent pixels as the physical display instead of
+  omitting the goose or turning unused surface capacity into black rectangles. Capacity-shrink
+  regressions prevent a large transient frame from making later normal walking redraw and color-
+  convert an oversized image; exact signed active-motion capture and profiling remain release
+  gates.
 - **macOS lint debt** - removed the obsolete world-bounds path and corrected the three remaining
   target-specific warning failures so workspace clippy can run with `-D warnings` on macOS.
 - **Stop/start singleton race** - a successful `stop`, including the `exit` and `quit` aliases,

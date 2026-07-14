@@ -119,6 +119,9 @@ checklist is complete and the immutable v0.3.3 release is independently verified
   `~/Applications/Honk300.app`. It prompts at most once per installed update, waits calmly at a
   safe screen edge while denied, and handles grants/revocations in the same process. Development,
   bare, source-tree, and mounted-DMG launches must not open permission UI automatically.
+- macOS transparent presentation uses reusable premultiplied-RGBA AppKit image views in the
+  ordinary window backing store. Keep canvas/bitmap capacity bounded after transiently large
+  damage so screen capture stays alpha-correct and normal walking does not redraw stale space.
 - Starting, stopping, and configuration are **CLI/TUI-only over local IPC**. There is no system
   tray and no global quit key.
 - Terminal windows are protected: the goose may visually overlay them, but must never move,

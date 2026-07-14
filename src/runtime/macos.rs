@@ -480,17 +480,30 @@ fn prepare_dirty_canvas(
 ) -> Result<&mut Pixmap, &'static str> {
     let width = width.max(1);
     let height = height.max(1);
-    let needs_growth = canvas
+    let rounded = |extent: u32| extent.saturating_add(31) / 32 * 32;
+    let requested_width = rounded(width);
+    let requested_height = rounded(height);
+    let (next_width, next_height) =
+        canvas
+            .as_ref()
+            .map_or((requested_width, requested_height), |canvas| {
+                let resize_extent = |current: u32, required: u32, requested: u32| {
+                    if current < required || current > requested.saturating_mul(2) {
+                        requested
+                    } else {
+                        current
+                    }
+                };
+                (
+                    resize_extent(canvas.width(), width, requested_width),
+                    resize_extent(canvas.height(), height, requested_height),
+                )
+            });
+    let needs_resize = canvas
         .as_ref()
-        .is_none_or(|canvas| canvas.width() < width || canvas.height() < height);
-    if needs_growth {
-        let current_width = canvas.as_ref().map_or(0, Pixmap::width);
-        let current_height = canvas.as_ref().map_or(0, Pixmap::height);
-        let rounded = |extent: u32| extent.saturating_add(31) / 32 * 32;
-        *canvas = Pixmap::new(
-            rounded(width.max(current_width)),
-            rounded(height.max(current_height)),
-        );
+        .is_none_or(|canvas| canvas.width() != next_width || canvas.height() != next_height);
+    if needs_resize {
+        *canvas = Pixmap::new(next_width, next_height);
     }
     canvas
         .as_mut()
@@ -947,7 +960,7 @@ mod tests {
     }
 
     #[test]
-    fn dirty_canvas_reuses_a_small_grow_only_allocation() {
+    fn dirty_canvas_reuses_an_allocation_across_small_size_jitter() {
         let mut canvas = None;
         let first = prepare_dirty_canvas(&mut canvas, 257, 129)
             .expect("allocate canvas")
@@ -961,5 +974,17 @@ mod tests {
             .data()
             .as_ptr() as usize;
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn dirty_canvas_shrinks_after_a_large_transient_frame() {
+        let mut canvas = None;
+        prepare_dirty_canvas(&mut canvas, 1440, 900).expect("allocate transient canvas");
+        assert_eq!(canvas.as_ref().map(Pixmap::width), Some(1440));
+        assert_eq!(canvas.as_ref().map(Pixmap::height), Some(928));
+
+        prepare_dirty_canvas(&mut canvas, 320, 300).expect("shrink canvas");
+        assert_eq!(canvas.as_ref().map(Pixmap::width), Some(320));
+        assert_eq!(canvas.as_ref().map(Pixmap::height), Some(320));
     }
 }

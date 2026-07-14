@@ -127,7 +127,7 @@ state. Autostart is opt-in and off by default.
 | Platform | Architectures | Desktop path |
 | --- | --- | --- |
 | Windows | x64, ARM64 | PMv2 layered overlays, one per monitor |
-| macOS 11+ | Intel, Apple Silicon | Universal LSUIElement app bundle |
+| macOS 11+ | Intel, Apple Silicon | Universal LSUIElement app; capture-safe AppKit RGBA overlays, one per display |
 | Linux X11/XWayland | x64/ARM64, GNU/musl | Full overlay and supported mischief |
 | Linux native Wayland | x64/ARM64, GNU/musl | Opt-in reduced overlay mode |
 

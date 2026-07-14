@@ -130,14 +130,14 @@ mod platform {
         ForeignWindowId, ForeignWindowSnapshot, LocalTime, PresenceSnapshot, Rect, Vec2,
     };
     use objc2::rc::{autoreleasepool, Retained};
-    use objc2::runtime::AnyObject;
     use objc2::MainThreadMarker;
     use objc2::{AnyThread, MainThreadOnly};
     use objc2_app_kit::{
         NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSBitmapFormat,
         NSBitmapImageRep, NSColor, NSDeviceRGBColorSpace, NSEvent, NSEventMask, NSImage,
-        NSImageCacheMode, NSImageRep, NSImageView, NSRunningApplication, NSScreenSaverWindowLevel,
-        NSTextField, NSView, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
+        NSImageAlignment, NSImageCacheMode, NSImageRep, NSImageScaling, NSImageView,
+        NSRunningApplication, NSScreenSaverWindowLevel, NSTextField, NSView, NSWindow,
+        NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
     };
     use objc2_application_services::{
         kAXTrustedCheckOptionPrompt, AXError, AXIsProcessTrusted, AXIsProcessTrustedWithOptions,
@@ -146,14 +146,15 @@ mod platform {
     use objc2_core_foundation::{
         CFBoolean, CFDictionary, CFRetained, CFString, CFType, CGPoint, CGRect, CGSize,
     };
+    #[cfg(test)]
+    use objc2_core_graphics::CGImage;
     use objc2_core_graphics::{
-        CGDisplayBounds, CGError, CGEventSourceStateID, CGGetActiveDisplayList, CGImage,
-        CGMainDisplayID, CGMouseButton, CGWarpMouseCursorPosition,
+        CGDisplayBounds, CGError, CGEventSourceStateID, CGGetActiveDisplayList, CGMainDisplayID,
+        CGMouseButton, CGWarpMouseCursorPosition,
     };
     use objc2_foundation::{
         NSBundle, NSDate, NSDefaultRunLoopMode, NSInteger, NSPoint, NSRect, NSSize, NSString, NSURL,
     };
-    use objc2_quartz_core::{CALayer, CATransaction};
     use std::collections::HashMap;
     use std::ffi::c_void;
     use std::io;
@@ -510,8 +511,7 @@ mod platform {
     struct DisplayWindow {
         info: DisplayInfo,
         window: Retained<NSWindow>,
-        image_view: Retained<NSView>,
-        image_layer: Retained<CALayer>,
+        image_view: Retained<NSImageView>,
         surface: Option<BitmapSurface>,
         view_frame: Option<AppKitFrame>,
         visible: bool,
@@ -564,12 +564,12 @@ mod platform {
                 height: frame.height,
             });
             let root_view = NSView::initWithFrame(NSView::alloc(mtm), view_frame);
-            let image_view = NSView::initWithFrame(NSView::alloc(mtm), view_frame);
-            let image_layer = CALayer::new();
-            image_layer.setOpaque(false);
-            image_layer.setGeometryFlipped(true);
-            image_view.setWantsLayer(true);
-            image_view.setLayer(Some(&image_layer));
+            let image_view = NSImageView::initWithFrame(NSImageView::alloc(mtm), view_frame);
+            image_view.setImageScaling(NSImageScaling::ScaleNone);
+            image_view.setImageAlignment(NSImageAlignment::AlignTopLeft);
+            // Keep the pixels in AppKit's ordinary window backing store. A custom child CALayer
+            // looked correct on the physical display, but WindowServer capture and screen sharing
+            // could omit it or composite its clear pixels as opaque black rectangles.
             root_view.addSubview(&image_view);
             window.setContentView(Some(&root_view));
             window.orderFrontRegardless();
@@ -578,7 +578,6 @@ mod platform {
                 info,
                 window,
                 image_view,
-                image_layer,
                 surface: None,
                 view_frame: None,
                 visible: false,
@@ -589,13 +588,14 @@ mod platform {
             let clip = clip.pixel_aligned();
             let width = clip.width().ceil().max(1.0) as u32;
             let height = clip.height().ceil().max(1.0) as u32;
-            let resized = self
-                .surface
-                .as_ref()
-                .is_none_or(|surface| surface.width < width || surface.height < height);
-            if resized {
-                let capacity_width = rounded_surface_extent(width);
-                let capacity_height = rounded_surface_extent(height);
+            let replacement = replacement_surface_extent(
+                self.surface
+                    .as_ref()
+                    .map(|surface| (surface.width, surface.height)),
+                width,
+                height,
+            );
+            if let Some((capacity_width, capacity_height)) = replacement {
                 self.surface = Some(BitmapSurface::new(capacity_width, capacity_height)?);
             }
             let surface = self
@@ -603,13 +603,7 @@ mod platform {
                 .as_ref()
                 .expect("surface allocated for the requested dimensions");
             surface.copy_clipped_rgba(dirty, clip, pixmap, width, height)?;
-            let local_frame = AppKitFrame {
-                x: (clip.min.x - self.info.bounds.min.x) as f64,
-                y: (self.info.bounds.max.y - clip.max.y) as f64
-                    - f64::from(surface.height - height),
-                width: surface.width as f64,
-                height: surface.height as f64,
-            };
+            let local_frame = active_image_frame(self.info.bounds, clip, width, height);
             if self.view_frame != Some(local_frame) {
                 if self.view_frame.is_some_and(|frame| {
                     frame.width == local_frame.width && frame.height == local_frame.height
@@ -623,14 +617,14 @@ mod platform {
                 }
                 self.view_frame = Some(local_frame);
             }
-            let cg_image = surface.direct_cg_image()?;
-            let contents = <objc2_core_graphics::CGImage as AsRef<AnyObject>>::as_ref(&cg_image);
-            CATransaction::begin();
-            CATransaction::setDisableActions(true);
-            unsafe {
-                self.image_layer.setContents(Some(contents));
+            if replacement.is_some() || !self.visible {
+                self.image_view.setImage(Some(&surface.image));
             }
-            CATransaction::commit();
+            // The NSImage and NSBitmapImageRep stay stable while their RGBA storage is reused.
+            // Explicitly invalidate the image view because mutating that storage does not change
+            // the NSImage object's identity, then flush just this window's pending AppKit draw.
+            NSView::setNeedsDisplay(&self.image_view, true);
+            self.window.displayIfNeeded();
             self.visible = true;
 
             Ok(())
@@ -638,12 +632,9 @@ mod platform {
 
         fn clear(&mut self) {
             if self.visible {
-                CATransaction::begin();
-                CATransaction::setDisableActions(true);
-                unsafe {
-                    self.image_layer.setContents(None);
-                }
-                CATransaction::commit();
+                self.image_view.setImage(None);
+                NSView::setNeedsDisplay(&self.image_view, true);
+                self.window.displayIfNeeded();
                 self.visible = false;
             }
         }
@@ -747,6 +738,41 @@ mod platform {
 
     fn rounded_surface_extent(extent: u32) -> u32 {
         extent.saturating_add(31) / 32 * 32
+    }
+
+    fn replacement_surface_extent(
+        current: Option<(u32, u32)>,
+        active_width: u32,
+        active_height: u32,
+    ) -> Option<(u32, u32)> {
+        let desired = (
+            rounded_surface_extent(active_width),
+            rounded_surface_extent(active_height),
+        );
+        let Some((current_width, current_height)) = current else {
+            return Some(desired);
+        };
+        let must_grow = current_width < active_width || current_height < active_height;
+        // A note, meme, or distant dirty region can temporarily make the union much larger than
+        // the goose. Do not make every later frame redraw that stale capacity: shrink once either
+        // axis exceeds twice the active bucket, while retaining small 32-pixel variations.
+        let should_shrink = current_width > desired.0.saturating_mul(2)
+            || current_height > desired.1.saturating_mul(2);
+        (must_grow || should_shrink).then_some(desired)
+    }
+
+    fn active_image_frame(
+        display_bounds: Rect,
+        clip: Rect,
+        active_width: u32,
+        active_height: u32,
+    ) -> AppKitFrame {
+        AppKitFrame {
+            x: (clip.min.x - display_bounds.min.x) as f64,
+            y: (display_bounds.max.y - clip.max.y) as f64,
+            width: active_width as f64,
+            height: active_height as f64,
+        }
     }
 
     impl BitmapSurface {
@@ -866,6 +892,7 @@ mod platform {
             }
         }
 
+        #[cfg(test)]
         fn direct_cg_image(&self) -> io::Result<Retained<CGImage>> {
             self.rep
                 .CGImage()
@@ -1528,6 +1555,36 @@ mod platform {
             assert_eq!(rounded_surface_extent(1), 32);
             assert_eq!(rounded_surface_extent(244), 256);
             assert_eq!(rounded_surface_extent(257), 288);
+        }
+
+        #[test]
+        fn bitmap_surface_capacity_shrinks_after_a_large_transient_frame() {
+            assert_eq!(replacement_surface_extent(None, 244, 193), Some((256, 224)));
+            assert_eq!(replacement_surface_extent(Some((256, 224)), 247, 199), None);
+            assert_eq!(
+                replacement_surface_extent(Some((1_216, 928)), 244, 193),
+                Some((256, 224))
+            );
+            assert_eq!(
+                replacement_surface_extent(Some((256, 224)), 257, 193),
+                Some((288, 224))
+            );
+        }
+
+        #[test]
+        fn image_view_frame_tracks_active_pixels_instead_of_surface_capacity() {
+            let display = Rect::new(Vec2::new(0.0, 0.0), Vec2::new(1440.0, 900.0));
+            let clip = Rect::new(Vec2::new(100.0, 620.0), Vec2::new(344.0, 813.0));
+
+            assert_eq!(
+                active_image_frame(display, clip, 244, 193),
+                AppKitFrame {
+                    x: 100.0,
+                    y: 87.0,
+                    width: 244.0,
+                    height: 193.0,
+                }
+            );
         }
 
         #[test]

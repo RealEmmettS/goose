@@ -13,7 +13,7 @@
   - [x] Repair and visually verify the macOS renderer bridge.
   - [x] Fix dark-mode Mac note contrast and audit equivalent Windows/Linux presentation paths.
   - [x] Refine cross-platform planted-foot timing and cap visible leg stretch.
-  - [x] Optimize and profile the macOS runtime.
+  - [ ] Optimize and profile the macOS runtime; repeat active-motion capture and the 10+60 second profile on the fixed exact candidate.
   - [x] Implement the approved first-run Accessibility prompt and calm permission-wait behavior.
   - [ ] Complete denied and granted Accessibility qualification.
   - [x] Verify CLI, TUI, IPC, and preliminary lifecycle behavior; repeat terminal/lifecycle checks on the exact candidate.
