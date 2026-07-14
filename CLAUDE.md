@@ -136,6 +136,8 @@ checklist is complete and the immutable v0.3.3 release is independently verified
 - macOS transparent presentation uses reusable premultiplied-RGBA AppKit image views in the
   ordinary window backing store. Keep canvas/bitmap capacity bounded after transiently large
   damage so screen capture stays alpha-correct and normal walking does not redraw stale space.
+  Keep the Device RGB bitmap and overlay-window color spaces aligned; final display-profile
+  composition belongs to WindowServer, not a per-frame application-side ICC conversion.
 - Starting, stopping, and configuration are **CLI/TUI-only over local IPC**. There is no system
   tray and no global quit key.
 - Terminal windows are protected: the goose may visually overlay them, but must never move,

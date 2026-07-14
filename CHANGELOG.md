@@ -70,7 +70,10 @@ All notable changes to this project are documented here. Format based on
   objects in autorelease pools, caches desktop geometry, retains 120 Hz simulation, and caps
   presentation at 60 Hz. The AppKit view now draws only the active RGBA rectangle and both the
   tiny-skia canvas and native bitmap shrink after an unusually large note, meme, or distant dirty
-  region instead of color-converting that stale transparent capacity on every later frame.
+  region instead of color-converting that stale transparent capacity on every later frame. Its
+  Device RGB bitmap and window backing store now also share one declared color space, avoiding a
+  redundant per-frame Display P3 ICC/vImage conversion while leaving final per-display
+  composition to WindowServer.
 - **Mounted-bundle lifecycle transaction** - `honk300 install` can copy its enclosing mounted
   source app into `~/Applications/Honk300.app` after validating bundle id, stamped release
   identity, strict signature, and both architectures. It preserves the shared aliases/media/

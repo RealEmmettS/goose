@@ -39,6 +39,9 @@ the sealed application bundle.
 - The reusable `NSImageView` participates in the ordinary AppKit window backing store so
   WindowServer screenshots and screen sharing observe the same alpha-composited pixels as the
   physical display. A custom child layer that bypasses that capture path is not used.
+- The bitmap and overlay window both declare Device RGB. AppKit must not repeat a Device RGB to
+  display-profile ICC conversion in the application process on every frame; WindowServer owns
+  final per-display composition. Native capture and palette checks guard the resulting color.
 - Native canvas and bitmap capacity may be bucketed for ordinary frame-size jitter, but must
   shrink after an unusually large transient frame. Only the active RGBA rectangle is presented;
   stale transparent capacity must not be color-converted and composited indefinitely.

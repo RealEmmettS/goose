@@ -15,17 +15,17 @@ recommended macOS download at thegoose.app.
 - Stable public release remains v0.3.2 until the v0.3.3 readiness checklist is complete.
 - Active board card: `#m20q`; live shared task board is tracked under `.tasks/`.
 - Version: 0.3.3 in source.
-- Renderer: AppKit/CoreGraphics RGBA regressions pass. A custom child layer was found to bypass
-  reliable WindowServer capture, so the fixed reusable AppKit image-view presenter is awaiting
-  fresh Developer ID-signed light/dark compositor evidence.
+- Renderer: AppKit/CoreGraphics RGBA regressions pass. The reusable AppKit image-view presenter
+  now produces opaque, black-rectangle-free WindowServer captures in normal motion and readable
+  dark-mode notes; byte-exact candidate light/dark repetition remains required.
 - Shared gait: releases planted feet at four pixels, preserves the weighted normal/moderate
   cadence, caps visible lag at 16 px for Walk and 26 px for Run/Charge, and passes cadence guards,
   eight-direction tests, and seven goldens without overcorrecting ordinary walking.
-- Performance: a follow-up active-motion profile invalidated the earlier idle-path 8.30% CPU
-  baseline. Sampling traced 40.45% median active CPU after a large transient to stale oversized
-  transparent canvas/bitmap capacity rather than the engine. Exact fixed commit `753c0f4` passes
-  a locked-session post-transient rehearsal at 9.35% median CPU, 28.55 MiB maximum RSS, +3.11 MiB
-  growth, and zero leaks; unlocked visible-motion and byte-exact candidate confirmation remain.
+- Performance: bounded capture-safe surfaces reduced the post-transient regression from 40.45%
+  to 12.00% median CPU during unlocked visible motion, with 18.17 MiB maximum RSS and negative
+  growth. Sampling found the remaining release-gate miss in AppKit's redundant Device RGB to
+  Display P3 conversion, so the bitmap/window color spaces are now aligned for an exact signed
+  reprofile; the hard median CPU limit remains 10%.
 - Lifecycle: mounted-bundle copy, aliases, autostart, release-bound receipt, preservation, purge
   backup, rollback structure, and isolated-home cleanup are implemented and tested.
 - Packaging: a universal x86_64/arm64 installer helper targeting macOS 11.0 in both slices and a

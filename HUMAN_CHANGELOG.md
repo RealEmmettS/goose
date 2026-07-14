@@ -65,7 +65,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   the Mac app reuses native images, remembers screen geometry, and limits display updates without
   slowing the simulation. After a temporarily large note or meme interaction, its drawing space
   returns to a sensible size instead of making every later walking frame process a mostly empty
-  screen-sized image.
+  screen-sized image. The Mac window and the pixels it receives now also agree on color handling,
+  avoiding a repeated conversion on every frame. This saves processor and battery work without
+  changing the Goose's colors, motion, or update rate.
 - **A mounted disk image can use the normal safe installer.** The Goose can now copy its own
   verified app bundle into the user's Applications folder while preserving aliases, autostart,
   user media, updates, removal, and rollback. Automated release checks can interrupt the swap on

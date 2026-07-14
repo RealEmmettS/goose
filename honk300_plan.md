@@ -710,7 +710,9 @@ Transparent overlay pixels are presented through reusable premultiplied-RGBA App
 in the ordinary window backing store so WindowServer capture and screen sharing match the
 physical display. The runtime presents only active damage and shrinks canvas/bitmap capacity
 after unusually large transient regions; it must not keep color-converting stale transparent
-screen-sized buffers during later normal motion.
+screen-sized buffers during later normal motion. The bitmap and overlay window both declare
+Device RGB so AppKit does not repeat a display-profile ICC conversion on every frame;
+WindowServer remains responsible for final per-display composition.
 
 ADR 0022 restricts automatic Accessibility onboarding to that exact installed app plus a matching
 bundle release identity and `honk300.install.v1` receipt. Before the native prompt or Settings

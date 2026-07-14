@@ -134,8 +134,8 @@ mod platform {
     use objc2::{AnyThread, MainThreadOnly};
     use objc2_app_kit::{
         NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSBitmapFormat,
-        NSBitmapImageRep, NSColor, NSDeviceRGBColorSpace, NSEvent, NSEventMask, NSImage,
-        NSImageAlignment, NSImageCacheMode, NSImageRep, NSImageScaling, NSImageView,
+        NSBitmapImageRep, NSColor, NSColorSpace, NSDeviceRGBColorSpace, NSEvent, NSEventMask,
+        NSImage, NSImageAlignment, NSImageCacheMode, NSImageRep, NSImageScaling, NSImageView,
         NSRunningApplication, NSScreenSaverWindowLevel, NSTextField, NSView, NSWindow,
         NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
     };
@@ -542,6 +542,10 @@ mod platform {
             };
             window.setOpaque(false);
             window.setBackgroundColor(Some(&NSColor::clearColor()));
+            // The reusable bitmap is explicitly Device RGB. Match the window backing store so
+            // AppKit does not run a Device RGB -> display-profile ICC/vImage conversion on every
+            // frame; WindowServer still performs the final display composition for each screen.
+            window.setColorSpace(Some(&NSColorSpace::deviceRGBColorSpace()));
             window.setHasShadow(false);
             unsafe {
                 window.setReleasedWhenClosed(false);
