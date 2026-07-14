@@ -107,9 +107,10 @@ The canonical checklist is `docs/readiness/v0.3.3-readiness.md`; board source is
   `src/update.rs`, and both installer templates.
 - Added exact G2 Developer ID, hardened runtime, notarization, stapling, Gatekeeper, final-ZIP,
   final-DMG, and internal evidence requirements to the release workflows.
-- Created and authenticated the App Store Connect API key, stored its local copy only under the
-  ignored owner-only `.private-release/` directory, and configured all six encrypted GitHub
-  Actions secrets without tracking or printing credential contents.
+- Created and authenticated the App Store Connect API key, kept the repository-local copy only
+  under ignored owner-only `.private-release/`, and configured all six encrypted GitHub Actions
+  secrets without tracking or printing credential contents. At Emmett's request, a second 0600
+  backup exists outside Git at `/Users/realemmetts/Downloads/AuthKey_MP82YT2K7G.p8`.
 - Completed/pushed the site's progressive-disclosure design at exact SHA
   `85954409a54d88019f29c1209102586cfd497bff`; its protected preview intentionally fails closed
   against the still-live v0.3.2 manifest.
@@ -244,8 +245,9 @@ DMG, notarizes/staples/remounts it, and Gatekeeper-assesses both contained apps.
   `MACOS_CERTIFICATE_PASSWORD`, `MACOS_KEYCHAIN_PASSWORD`,
   `APPLE_NOTARY_KEY_P8_BASE64`, `APPLE_NOTARY_KEY_ID`,
   `APPLE_NOTARY_ISSUER_ID`. All six exist in `RealEmmettS/goose`.
-- Local key path exists only on the Mac under ignored `.private-release/`; the handoff never stores
-  its contents. Directory mode is 0700 and key mode is 0600.
+- The repository-local key is under ignored `.private-release/` (directory 0700, key 0600). A
+  separate owner-only backup is `/Users/realemmetts/Downloads/AuthKey_MP82YT2K7G.p8`. The handoff
+  never stores key contents; neither path may be staged or printed.
 - Website repo: `/Users/realemmetts/Downloads/temp_git/desktop-goose-site`; branch
   `codex/macos-v0.3.3-dmg-first`; exact pushed SHA
   `85954409a54d88019f29c1209102586cfd497bff`; production remains on stable v0.3.2.
