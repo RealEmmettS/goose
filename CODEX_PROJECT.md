@@ -23,8 +23,9 @@ recommended macOS download at thegoose.app.
   eight-direction tests, and seven goldens without overcorrecting ordinary walking.
 - Performance: a follow-up active-motion profile invalidated the earlier idle-path 8.30% CPU
   baseline. Sampling traced 40.45% median active CPU after a large transient to stale oversized
-  transparent canvas/bitmap capacity rather than the engine; bounded shrinking is implemented and
-  the exact signed 10-second-warm-up/60-second confirmation remains open.
+  transparent canvas/bitmap capacity rather than the engine. Exact fixed commit `753c0f4` passes
+  a locked-session post-transient rehearsal at 9.35% median CPU, 28.55 MiB maximum RSS, +3.11 MiB
+  growth, and zero leaks; unlocked visible-motion and byte-exact candidate confirmation remain.
 - Lifecycle: mounted-bundle copy, aliases, autostart, release-bound receipt, preservation, purge
   backup, rollback structure, and isolated-home cleanup are implemented and tested.
 - Packaging: a universal x86_64/arm64 installer helper targeting macOS 11.0 in both slices and a
