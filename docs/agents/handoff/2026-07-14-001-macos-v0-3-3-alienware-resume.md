@@ -75,7 +75,7 @@ The canonical checklist is `docs/readiness/v0.3.3-readiness.md`; board source is
    x64/ARM64 gates and analyzers are wired into candidate/post-release workflows. Alienware/hosted
    CI must run the first native Windows gates; hosted Linux must run X11/Sway x64/ARM64 gates.
 8. **Done for this stopping tree — local Mac-hosted gate.** Formatting, native strict clippy,
-   389 workspace tests, release build, both Apple release targets, 71 Python tests, actionlint,
+   423 workspace tests, release build, both Apple release targets, 71 Python tests, actionlint,
    shell syntax/shellcheck, PowerShell parsing, cargo-dist plan, cargo-audit 0.22.2, diff checks,
    and Windows x64/ARM64 strict clippy pass.
 9. **Not done — candidate and exact native qualification.** Commit/push this branch, dispatch the

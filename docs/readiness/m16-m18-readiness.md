@@ -152,7 +152,7 @@ foreach ($target in $targets) {
 
 ## CI Evidence Log
 
-- 2026-07-14 - Mac stopping-tree gate passed all 389 workspace tests, 22 native Mac platform
+- 2026-07-14 - Mac stopping-tree gate passed all 423 workspace tests, 22 native Mac platform
   tests, strict clippy, both Apple release builds, 71 packaging/workflow contracts, actionlint,
   shell/PowerShell validation, cargo-dist planning, cargo-audit, and cross-target checks. The host
   is clean/uninstalled. No candidate was dispatched, so ADR 0022's four-state exact-candidate,
