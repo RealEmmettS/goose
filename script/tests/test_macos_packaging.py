@@ -51,6 +51,18 @@ class MacosPackagingTests(unittest.TestCase):
         self.assertIn("codesign -d -r-", WORKFLOW)
         self.assertIn("anchor apple generic", WORKFLOW)
         self.assertIn("certificate leaf[subject.OU] = M9D5379H93", WORKFLOW)
+        self.assertIn("739B04530883FF9B665C66BD464F98C622971B32", WORKFLOW)
+        self.assertIn("CN=Developer ID Certification Authority", WORKFLOW)
+        self.assertIn("OU=G2", WORKFLOW)
+        self.assertIn('security list-keychains -d user -s "$keychain"', WORKFLOW)
+        self.assertNotIn('"$keychain" "$login_keychain"', WORKFLOW)
+        self.assertIn("MACOS_SIGN_KEYCHAIN", WORKFLOW)
+        self.assertIn('codesign --keychain "$MACOS_SIGN_KEYCHAIN"', WORKFLOW)
+        self.assertIn("codesign -d --extract-certificates=", WORKFLOW)
+        self.assertIn("honk300-sealed-certificate-", WORKFLOW)
+        self.assertIn("honk300-final-zip-certificate-", WORKFLOW)
+        self.assertIn("honk300-dmg-certificate-", WORKFLOW)
+        self.assertIn('openssl x509 -inform DER -in "${certificate_prefix}0"', WORKFLOW)
         self.assertNotIn('ln -s /Applications', WORKFLOW)
         self.assertNotIn("gh release upload", WORKFLOW)
 
@@ -82,6 +94,22 @@ class MacosPackagingTests(unittest.TestCase):
         self.assertIn('${{ runner.temp }}/AuthKey.p8', WORKFLOW)
         self.assertNotIn("ad-hoc fallback", WORKFLOW)
         self.assertNotIn("--entitlements", PACKAGE)
+        self.assertIn("MACOS_SIGN_KEYCHAIN", PACKAGE)
+        self.assertIn("MACOS_SIGN_KEYCHAIN", HELPER_PACKAGE)
+        self.assertIn('codesign --keychain "$KEYCHAIN"', PACKAGE)
+        self.assertIn('codesign --keychain "$KEYCHAIN"', HELPER_PACKAGE)
+
+    def test_final_zip_and_notarization_evidence_fail_closed(self) -> None:
+        self.assertIn('ditto -x -k "$output/honk300-universal2.app.zip" "$extracted"', WORKFLOW)
+        self.assertIn('codesign --verify --strict --verbose=4 "$extracted/Honk300.app"', WORKFLOW)
+        self.assertIn('xcrun stapler validate "$extracted/Honk300.app"', WORKFLOW)
+        self.assertIn('spctl --assess --type execute --verbose=4 "$extracted/Honk300.app"', WORKFLOW)
+        self.assertIn("Require complete notarization evidence", WORKFLOW)
+        self.assertIn("target/notarization-evidence/app-log.json", WORKFLOW)
+        self.assertIn("target/notarization-evidence/dmg-log.json", WORKFLOW)
+        evidence_tail = WORKFLOW[WORKFLOW.index("Preserve notarization evidence for this workflow run") :]
+        self.assertIn("if-no-files-found: error", evidence_tail)
+        self.assertNotIn("if-no-files-found: warn", evidence_tail)
 
     def test_release_explicitly_installs_both_apple_targets(self) -> None:
         self.assertIn(

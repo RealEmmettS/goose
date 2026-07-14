@@ -28,6 +28,12 @@ jobs:
         run: python3 -m unittest discover -s script/tests -p 'test_macos_packaging.py' -v
       - name: Windows packaging contract tests
         run: python3 -m unittest discover -s script/tests -p 'test_windows_packaging.py' -v
+      - name: Windows overlay capture analyzer tests
+        run: python3 -m unittest discover -s script/tests -p 'test_windows_overlay_smoke.py' -v
+      - name: Linux overlay capture analyzer tests
+        run: python3 -m unittest discover -s script/tests -p 'test_linux_overlay_smoke.py' -v
+      - name: Binary architecture verifier tests
+        run: python3 -m unittest discover -s script/tests -p 'test_verify_binary_architecture.py' -v
       - name: Atomic workflow contract tests
         run: python3 -m unittest discover -s script/tests -p 'test_release_workflows.py' -v
 
@@ -46,10 +52,70 @@ jobs:
         run: cargo clippy --all-targets --workspace -- -D warnings
       - name: Release build
         run: cargo build --release
+      - name: Prove x64 PE identity
+        shell: pwsh
+        run: |
+          python script/verify_binary_architecture.py --format pe --machine 0x8664 target/release/honk300.exe
+          if ($LASTEXITCODE -ne 0) { throw 'x64 PE identity check failed' }
+      - name: Windows layered-overlay compositor and lifecycle smoke
+        shell: pwsh
+        run: >-
+          ./script/smoke_windows_overlay.ps1
+          -Binary target/release/honk300.exe
+          -EvidenceDirectory target/windows-overlay-evidence
+      - name: Upload Windows overlay qualification evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: honk300-windows-overlay-ci
+          path: target/windows-overlay-evidence
+          if-no-files-found: error
       - name: Windows target checks
         run: |
           cargo check --workspace --target x86_64-pc-windows-msvc
           cargo check --workspace --target aarch64-pc-windows-msvc
+
+  windows-arm64-overlay:
+    name: Windows ARM64 native overlay gate
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up native ARM64 Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          toolchain: 1.95.0
+          targets: aarch64-pc-windows-msvc
+      - name: Prove native ARM64 host
+        shell: pwsh
+        run: |
+          if ($env:PROCESSOR_ARCHITECTURE -ne 'ARM64') {
+            throw "Expected a native ARM64 Windows runner, got '$env:PROCESSOR_ARCHITECTURE'"
+          }
+          $version = rustc -vV | Out-String
+          if ($version -notmatch '(?m)^host: aarch64-pc-windows-msvc\s*$') {
+            throw "Rust toolchain is not native ARM64:`n$version"
+          }
+      - name: Native ARM64 tests and release build
+        run: |
+          cargo test --workspace --locked --target aarch64-pc-windows-msvc
+          cargo build --release --locked --target aarch64-pc-windows-msvc --bin honk300
+      - name: ARM64 layered-overlay compositor and lifecycle smoke
+        shell: pwsh
+        run: |
+          python script/verify_binary_architecture.py `
+            --format pe `
+            --machine 0xAA64 `
+            target/aarch64-pc-windows-msvc/release/honk300.exe
+          ./script/smoke_windows_overlay.ps1 `
+            -Binary target/aarch64-pc-windows-msvc/release/honk300.exe `
+            -EvidenceDirectory target/windows-overlay-evidence-arm64
+      - name: Upload Windows ARM64 overlay qualification evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: honk300-windows-overlay-arm64-ci
+          path: target/windows-overlay-evidence-arm64
+          if-no-files-found: error
 
   macos:
     name: macOS bundle smoke (${{ matrix.runner }})
@@ -104,13 +170,24 @@ jobs:
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway
+          sudo apt-get install -y libasound2-dev xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway grim
       - name: Install Rust targets
         run: rustup target add ${{ matrix.gnu_target }} ${{ matrix.musl_target }}
       - name: Test
         run: cargo test --workspace
       - name: Linux X11 and Wayland smoke
-        run: bash script/smoke_m17_m18_linux.sh
+        run: |
+          cargo build --locked --bin honk300
+          HONK300_BIN="$PWD/target/debug/honk300" \
+          HONK300_EVIDENCE_DIR="$PWD/target/linux-overlay-evidence-${{ matrix.gnu_target }}" \
+            bash script/smoke_m17_m18_linux.sh
+      - name: Upload Linux compositor qualification evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: honk300-linux-overlay-ci-${{ matrix.gnu_target }}
+          path: target/linux-overlay-evidence-${{ matrix.gnu_target }}
+          if-no-files-found: error
       - name: Linux target checks
         env:
           PKG_CONFIG_ALLOW_CROSS: "1"

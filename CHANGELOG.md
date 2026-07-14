@@ -10,7 +10,9 @@ All notable changes to this project are documented here. Format based on
 > live-revocation evidence. The goose now renders, walks, leaves mud, plays sounds, reacts to the
 > cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
-> Notepad/meme windows on Windows, and can be controlled through a single-instance local IPC
+> Notepad/meme windows on Windows. It now enters/leaves through real exposed edges, occasionally
+> wraps only while fully hidden, and can react when a user closes one of its collected windows.
+> It can be controlled through a single-instance local IPC
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
 > ratatui config TUI, dynamic moods, the local on-hour double honk, quiet-hours/DND/fullscreen
 > manners, built-in Autumn leaves, Windows multi-monitor chase, and live appearance/recolor
@@ -55,6 +57,36 @@ All notable changes to this project are documented here. Format based on
   intentional premultiplied RGBA-to-BGRA conversion used by Windows layered windows and both
   Linux X11 and Wayland presenters. This extends the macOS regression audit to every native
   pixel bridge without changing the platform-neutral renderer output.
+- **Linux compositor-visible release evidence** - the native smoke can hold an exact
+  `HONK300_BIN` unchanged instead of silently rebuilding it. Headless Sway now has two
+  fractional-scale outputs and a deterministic background, and `grim` captures the actual
+  composed desktop for semantic body/wing/asymmetric-orange assertions rather than checking only
+  the renderer's internal PNG. X11 also fails closed unless the selected direct visual is the
+  exact little-endian, 32-bpp ARGB8888 ZPixmap layout required by its hard-coded BGRA upload.
+- **Windows compositor-visible release evidence** - native CI and the reusable release-candidate
+  workflow now run exact x64 and native ARM64 executables through start/status/single-instance/
+  reload/stop and immediate-restart lifecycle checks; the published-MSI smoke repeats the x64
+  path. The native ARM job consumes the exact executable produced for ARM installer packaging,
+  rather than accepting an independent rebuild as equivalent. Each smoke freezes a real
+  `UpdateLayeredWindow` surface and captures that unchanged articulated pose over controlled dark
+  and light desktops. A dependency-free analyzer assigns every pixel to one nearest palette color
+  and fails closed unless the captures independently prove transparent margins, semi-transparent
+  edges and shadow, body/shade/outline/wing, spatially separated beak and two-tone legs, and the
+  asymmetric orange channel order; screenshots, analysis, logs, and the executable hash are
+  retained even on failure.
+- **Cross-platform exposed-edge traversal and animated lifecycle** - `DesktopLayout` now derives
+  real exposed edges by subtracting touching monitor seams. Four wander entries plus one
+  `EdgeWrapTask` keep hidden Pac-Man-style wrapping at 20% of baseline deck draws; relocation is
+  legal only after the entire rendered pose is outside every monitor, and deliberate puddle/prank
+  excursions return through their own edge without wrapping. Initial startup is staged fully
+  offscreen. Stop/exit/quit uses an adaptive Run-to-Charge-bounded `GracefulExitTask`, continues
+  ticking/presenting until the full pose is hidden, and gives singleton release a finite 30-second
+  client wait for immediate-restart safety on every backend.
+- **User-close annoyed reaction** - native macOS and Windows collect snapshots distinguish a user
+  closing a spawned note/meme from Honk300 cleanup. An independent deterministic stream selects a
+  visible annoyed reaction with 30% probability and may then chain the existing bounded nab only
+  when mouse-steal configuration, manners, pointer state, permission, and capability allow it.
+  Program cleanup never rolls; Linux remains explicitly collect-unsupported and has no trigger.
 
 ### Changed
 - **Quicker shared walk recovery** - the platform-neutral planted-foot trigger now releases at
@@ -71,9 +103,11 @@ All notable changes to this project are documented here. Format based on
   presentation at 60 Hz. The AppKit view now draws only the active RGBA rectangle and both the
   tiny-skia canvas and native bitmap shrink after an unusually large note, meme, or distant dirty
   region instead of color-converting that stale transparent capacity on every later frame. Its
-  Device RGB bitmap and window backing store now also share one declared color space, avoiding a
-  redundant per-frame Display P3 ICC/vImage conversion while leaving final per-display
-  composition to WindowServer.
+  alpha-last bitmap remains Device RGB while the overlay window uses a stable standard-sRGB
+  destination, avoiding a redundant per-frame Device-RGB-to-Display-P3 ICC/vImage conversion and
+  leaving final per-display-profile composition to WindowServer. The active diagnostic measured
+  5.55% median CPU, 29.52 MiB maximum RSS, negative 9.89 MiB growth, zero leaks, and 20 clean
+  compositor captures; exact signed-candidate repetition remains required.
 - **Mounted-bundle lifecycle transaction** - `honk300 install` can copy its enclosing mounted
   source app into `~/Applications/Honk300.app` after validating bundle id, stamped release
   identity, strict signature, and both architectures. It preserves the shared aliases/media/
@@ -86,6 +120,11 @@ All notable changes to this project are documented here. Format based on
   allowing denied and granted Accessibility evidence on one unchanged signed identity.
 
 ### Fixed
+- **Lingering collect windows cannot starve a newer request** - the macOS and Windows native
+  controllers now prefer the most recently spawned typed request over older notes or memes that
+  remain open. Dead-window events are still drained first, matched by request id and kind, and
+  removed exactly once, so delayed user-close reactions remain truthful without making a newer
+  collect task time out behind arbitrary map iteration order.
 - **Current macOS hands-on release runbook** - replaced the historical ad-hoc, unnotarized,
   terminal-first checklist with the exact v0.3.3 Developer ID/notarized/stapled DMG-first flow.
   The runbook now preserves one candidate identity across four Accessibility states, native
@@ -111,9 +150,24 @@ All notable changes to this project are documented here. Format based on
 - **macOS lint debt** - removed the obsolete world-bounds path and corrected the three remaining
   target-specific warning failures so workspace clippy can run with `-D warnings` on macOS.
 - **Stop/start singleton race** - a successful `stop`, including the `exit` and `quit` aliases,
-  now waits for the shared singleton to be released before returning. An immediate restart can no
-  longer lose the race between the old runtime acknowledging shutdown and actually exiting on
-  Windows, macOS, or Linux; the wait is bounded and reports a stalled shutdown explicitly.
+  now keeps the runtime alive while the goose walks completely beyond its nearest exposed edge,
+  then waits for the shared singleton to be released before returning. Exit speed adapts within
+  the existing Run/Charge envelope. An immediate restart can no longer lose the race between the
+  old runtime acknowledging shutdown and actually exiting on Windows, macOS, or Linux; the wait
+  is bounded and reports a stalled shutdown explicitly.
+- **Install/update/uninstall lifecycle race** - managed mutations now stop the active runtime and
+  retain its real cross-platform singleton as a `LifecycleLease` until every owned file and
+  integration change is finished. The exact-tag Unix installer holds that lease through a staged
+  binary and parent-owned FIFO; Windows bootstraps and updaters use the manifest-hashed portable
+  executable as a redirected-stdin lease holder. Windows uninstall first performs ownership-only
+  preflight, then hands off to a private temporary copy which owns the singleton before the
+  installed CLI exits, preventing both running-EXE deletion failures and partial mutation before
+  a helper is ready. Verified Windows payloads remain pinned by the same read-only stream through
+  execution, generated updates explicitly release/reacquire rather than trusting ambient state,
+  Restart Manager checks exact machine-wide paths across sessions, and reboot-deferred MSI results
+  fail closed. Unix signals carry explicit rollback statuses, and every pre-READY deferred helper
+  is killed and reaped on error. Missing, rejected, timed-out, or interrupted ownership fails or
+  rolls back before an unowned partial state can be accepted.
 - **Release-board runtime debt** - re-audited the shared `RuntimeCore` and the Windows per-monitor
   dirty-region presenter against their deferred cards. Focused sequencing, 4K bounded-damage, and
   Windows x64/ARM64 cross-target checks confirm the old loop-duplication and fullscreen-redraw
@@ -124,6 +178,9 @@ All notable changes to this project are documented here. Format based on
   explicit, permissioned compositor adapters rather than one false universal-support claim.
 
 ### Security
+- **Local release credentials stay outside Git** - `/.private-release/` is ignored as the
+  owner-only location for one-time local signing/notarization material. Credential contents are
+  supplied to GitHub only through encrypted Actions secrets and never tracked in the repository.
 - **Bound graphical installation** - mounted-source installation preflights foreign aliases,
   receipts, LaunchAgents, symlinks, bundle identity, release metadata, architecture, and code
   signature before mutation. DMG receipts bind updates to the exact tag and full commit, and the

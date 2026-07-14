@@ -306,6 +306,14 @@ sub-toggles. Autumn ships as the worked example of "a season is a built-in task 
 ### 5.5 Multi-monitor chase *(default ON)*
 The goose exits one monitor's edge and re-enters the adjacent monitor, traversing the continuous
 signed virtual-desktop space. Builds directly on the per-monitor-window architecture (§7.3).
+Touching monitor seams are ordinary continuous space, never wrap points. The baseline roaming
+deck contains four wander beats for one exposed-edge wrap beat (20%): the goose walks fully out
+through a genuinely exposed boundary, relocates only while its complete pose is outside every
+real monitor, then walks in from the far opposite exposed boundary. Deliberate puddle/prank
+errands never use this wrap and return through the edge they left. Startup is likewise staged
+fully offscreen before the goose walks in; stop/exit/quit keeps simulation/presentation alive
+until an adaptive Run-to-Charge-speed exit has hidden the complete pose, with a bounded client
+wait preserving immediate-restart safety.
 
 ### 5.6 Dynamic moods — parameter-modulation state machine *(default ON)*
 Spontaneous, weighted-timer transitions among `{content, hyper, sad, sleepy, mischievous}`:
@@ -330,6 +338,14 @@ sits and rides the title bar.** **If you release the drag before it arrives → 
 abandons and resumes its prior task** (existing task-interrupt/resume; the prior task's data is
 preserved and restored). Hooks: `SetWinEventHook(EVENT_SYSTEM_MOVESIZESTART/END)` (Win), AX
 move observers (mac), ConfigureNotify tracking (X11). `Cap`-degrades (self-skips) on Wayland.
+
+### 5.8.1 Collect-window close reaction
+When the user closes a note or meme window Honk300 opened, an independent random stream gives the
+goose a 30% chance to play a visible annoyed beat and then attempt the existing bounded cursor
+nab. Program-owned close/stop/cleanup never rolls. The nab remains gated by configuration,
+manners, a present pointer, and live backend permission/capability, so an unsupported or denied
+session shows only the safe reaction. Linux has no collect-window implementation and therefore
+has no native close event for this behavior.
 
 ### 5.9 Pat streak + hearts *(default ON)*
 **"Pat" = repeated cursor hover-sweeps over the goose** (not clicks). Sweeping the cursor across
@@ -359,10 +375,11 @@ OS/display-server-driven, handled by `Cap<T>`:
 |---|---|---|---|---|
 | Config TUI + goose-speak CLI + help | ✅ | ✅ | ✅ | ✅ |
 | Single-instance + IPC (stop/do/reload, hot-apply) | ✅ pipe/event | ✅ socket | ✅ socket | ✅ socket |
-| Dynamic moods · on-hour honk · seasonal · pat-hover+hearts · multi-monitor chase | ✅ | ✅ | ✅ | ✅ (render/sim only) |
+| Dynamic moods · on-hour honk · seasonal · pat-hover+hearts · multi-monitor chase/wrap · animated startup/exit | ✅ | ✅ | ✅ | ✅ (render/sim only) |
 | Quiet-hours / DND-fullscreen respect | ✅ | ✅ | ✅ | ⚠️ best-effort |
 | Perch & ride | ✅ | ✅ | ✅ | ❌ self-skips |
 | Pokes that move windows/cursor (nab/meme/note) | ✅ | ✅ (A11y) | ✅ | ❌ self-disable |
+| User-close annoyed reaction | ✅; nab gated | ✅; A11y-gated nab | ❌ no collect window | ❌ no collect window |
 
 Engine-side behaviors (moods, seasonal, hearts, multi-monitor) are platform-free and identical
 everywhere; only OS-interaction behaviors degrade, and they degrade **honestly** (the TUI marks
@@ -489,7 +506,9 @@ The goose **acquires a singleton** at startup (Windows named mutex/event; unix s
 on mac/Linux). A second launch is refused with a friendly message. The running instance **serves
 a small command channel** (named pipe/event on Windows; unix domain socket on mac/Linux)
 carrying:
-- **`Stop`** — graceful shutdown (restore cursor, close spawned windows, flush).
+- **`Stop`** — graceful shutdown: restore cursor, close spawned windows, walk fully beyond an
+  exposed edge, flush, then release the singleton. The client waits a finite 30 seconds for this
+  animated exit so an immediate restart cannot race the old process.
 - **`Do(action)`** — trigger a poke immediately.
 - **`Reload`** — hot-apply config (§9).
 - **`Status`** — report running state plus platform, bundle, permission, capability, and asset
@@ -710,9 +729,10 @@ Transparent overlay pixels are presented through reusable premultiplied-RGBA App
 in the ordinary window backing store so WindowServer capture and screen sharing match the
 physical display. The runtime presents only active damage and shrinks canvas/bitmap capacity
 after unusually large transient regions; it must not keep color-converting stale transparent
-screen-sized buffers during later normal motion. The bitmap and overlay window both declare
-Device RGB so AppKit does not repeat a display-profile ICC conversion on every frame;
-WindowServer remains responsible for final per-display composition.
+screen-sized buffers during later normal motion. The premultiplied-RGBA, alpha-last bitmap
+declares Device RGB, while the overlay window uses a stable standard-sRGB destination rather
+than inheriting a dynamic physical-display profile. WindowServer remains responsible for final
+per-display-profile composition.
 
 ADR 0022 restricts automatic Accessibility onboarding to that exact installed app plus a matching
 bundle release identity and `honk300.install.v1` receipt. Before the native prompt or Settings
@@ -824,7 +844,7 @@ and optional Accessibility-granted macOS job record their run evidence in
 | O_tele | Privacy / phone-home perception | **No telemetry, no network** except `<name> update` (only `update.rs` has an HTTP client). |
 | O_ipc | IPC channel abused | Local-only pipe/socket, no network, authenticated to the same user; commands are a closed enum (Stop/Do/Reload). |
 | O_supply | Dependency supply chain | Pin `Cargo.lock`; `cargo audit`; prefer pure-Rust crates (tiny-skia, rodio, symphonia, ureq, sha2, ratatui). |
-| O_lock | Locked running binary on update | Windows Installer Restart Manager; mac/Linux: ask to quit or detached-helper swap after exit; surface msiexec 3010. |
+| O_lock | Running process or artifact replacement races install/update/uninstall | Retain the real singleton through every mutation; Unix staged FIFO lease + explicit signal rollback; Windows same-stream pinned payloads, cross-session exact-path Restart Manager checks, guarded deferred uninstall, and rejection of reboot-deferred MSI results. |
 | O_cargo | Accidental crates.io contamination | No `cargo install` update strategy; test that no strategy invokes `cargo install`; post-install `--version` always. |
 | O_arch | ARM build/test gaps | Build all arches in CI; note any emulation-only test coverage honestly; arch-matched self-update. |
 | O_race | TUI/engine config races | Reducer-only TUI state + versioned config + the `Reload` hot-apply protocol (engine re-reads atomically). |

@@ -69,6 +69,76 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertIn("Developer ID-signed, notarized, and stapled", SHELL)
         self.assertNotIn("This build is ad-hoc signed and not notarized", SHELL)
 
+    def test_shell_bootstrap_quiesces_before_swap_and_pins_bundle_release_identity(self) -> None:
+        hold = SHELL[SHELL.index("hold_lifecycle_lease() {"):SHELL.index("\nrollback() {")]
+        self.assertIn('[ "$waited" -ge 35 ]', hold)
+        self.assertIn("did not release lifecycle ownership within 35 seconds", hold)
+        self.assertIn("HONK300_INTERNAL_HOLD_LIFECYCLE_LEASE=1", hold)
+        self.assertIn("HONK300_INTERNAL_LIFECYCLE_LEASE_READY", hold)
+        self.assertIn('exec 9>"$LEASE_FIFO"', hold)
+        self.assertIn("release_lifecycle_lease", hold)
+        self.assertLess(hold.index("mkfifo"), hold.index("LEASE_FD_OPEN=1"))
+
+        mac_swap = SHELL.index('swap_install "$CANDIDATE" "$DEST"')
+        linux_swap = SHELL.index('swap_install "$STAGE_ROOT/install" "$DEST"')
+        self.assertLess(
+            SHELL.rindex('hold_lifecycle_lease "$STAGED_BINARY"', 0, mac_swap),
+            mac_swap,
+        )
+        self.assertLess(
+            SHELL.rindex(
+                'hold_lifecycle_lease "$STAGE_ROOT/install/bin/honk300"',
+                0,
+                linux_swap,
+            ),
+            linux_swap,
+        )
+        cleanup = SHELL[SHELL.index("cleanup() {"):SHELL.index("\nsafe_link() {")]
+        self.assertLess(cleanup.index("rollback || true"), cleanup.index("release_lifecycle_lease"))
+        self.assertIn('on_exit() { status=$?; cleanup "$status"; }', cleanup)
+        self.assertIn("on_hup() { cleanup 129; }", cleanup)
+        self.assertIn("on_int() { cleanup 130; }", cleanup)
+        self.assertIn("on_term() { cleanup 143; }", cleanup)
+        self.assertIn("Print :Honk300ReleaseTag", SHELL)
+        self.assertIn('[ "$bundle_tag" = "$TAG" ]', SHELL)
+        self.assertIn("Print :Honk300ReleaseCommit", SHELL)
+        self.assertIn('[ "$bundle_commit" = "$COMMIT" ]', SHELL)
+
+    @unittest.skipIf(os.name == "nt", "POSIX signal semantics are validated on Unix hosts")
+    def test_shell_term_after_swap_restores_previous_install_and_exits_143(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            destination = root / "install"
+            previous = root / "install.previous"
+            destination.write_text("new\n", encoding="utf-8")
+            previous.write_text("old\n", encoding="utf-8")
+            prefix = SHELL[: SHELL.index("\nsafe_link() {")]
+            harness = root / "interrupt-after-swap.sh"
+            harness.write_text(
+                prefix
+                + "\n"
+                + 'DEST="$TEST_DEST"\n'
+                + 'PREVIOUS="$TEST_PREVIOUS"\n'
+                + "SWAPPED=1\n"
+                + 'kill -TERM "$$"\n'
+                + "exit 99\n",
+                encoding="utf-8",
+            )
+            environment = os.environ.copy()
+            environment.update(
+                {"TEST_DEST": str(destination), "TEST_PREVIOUS": str(previous)}
+            )
+            result = subprocess.run(
+                [self._bash(), str(harness)],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=environment,
+            )
+            self.assertEqual(result.returncode, 143, result.stdout + result.stderr)
+            self.assertEqual(destination.read_text(encoding="utf-8"), "old\n")
+            self.assertFalse(previous.exists())
+
     def test_shell_bootstrap_is_user_scoped_transactional_and_rejects_bad_archives(self) -> None:
         self.assertIn("$HOME/Applications/Honk300.app", SHELL)
         self.assertIn("${XDG_DATA_HOME:-$HOME/.local/share}/honk300/install", SHELL)
@@ -95,9 +165,23 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertNotIn('cp -R "$assets_source"', SHELL)
 
     def test_powershell_bootstrap_installs_only_verified_global_msi(self) -> None:
-        for token in ["__VERSION__", "__TAG__", "__COMMIT__", "__SHA_WINDOWS_X64_MSI__", "__SHA_WINDOWS_ARM64_MSI__"]:
+        for token in [
+            "__VERSION__",
+            "__TAG__",
+            "__COMMIT__",
+            "__SHA_WINDOWS_X64_MSI__",
+            "__SHA_WINDOWS_ARM64_MSI__",
+            "__SHA_WINDOWS_X64_PORTABLE__",
+            "__SHA_WINDOWS_ARM64_PORTABLE__",
+            "__SIZE_WINDOWS_X64_MSI__",
+            "__SIZE_WINDOWS_ARM64_MSI__",
+            "__SIZE_WINDOWS_X64_PORTABLE__",
+            "__SIZE_WINDOWS_ARM64_PORTABLE__",
+        ]:
             self.assertIn(token, POWERSHELL)
-        self.assertIn("Get-FileHash", POWERSHELL)
+        self.assertIn("[IO.FileShare]::Read", POWERSHELL)
+        self.assertIn("$sha.ComputeHash($stream)", POWERSHELL)
+        self.assertIn("$stream.Length -ne $ExpectedSize", POWERSHELL)
         self.assertIn("msiexec.exe", POWERSHELL)
         self.assertIn("[Environment+SpecialFolder]::System", POWERSHELL)
         self.assertIn("Get-Item -LiteralPath $msiexec -Force", POWERSHELL)
@@ -111,8 +195,54 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertIn("$Commit", POWERSHELL)
         self.assertIn("refusing to replace a reparse-point install receipt", POWERSHELL)
         self.assertIn("refusing to replace a foreign install receipt", POWERSHELL)
+        self.assertIn("HONK300_INTERNAL_HOLD_LIFECYCLE_LEASE", POWERSHELL)
+        self.assertIn("HONK300_INTERNAL_LIFECYCLE_LEASE_READY", POWERSHELL)
+        self.assertIn("RedirectStandardInput", POWERSHELL)
+        self.assertIn("portable lifecycle archive must contain exactly one honk300.exe", POWERSHELL)
+        self.assertIn("[IO.Compression.ZipArchive]::new", POWERSHELL)
+        self.assertIn("rstrtmgr.dll", POWERSHELL)
+        self.assertIn("Assert-NoRestartManagerLocks", POWERSHELL)
+        self.assertIn("another Windows session is using", POWERSHELL)
+        self.assertNotIn("@(0, 3010)", POWERSHELL)
+        self.assertIn("pending or reboot-deferred replacement is not accepted", POWERSHELL)
+        self.assertLess(
+            POWERSHELL.index("$leaseProcess = Start-LifecycleLease"),
+            POWERSHELL.index("Assert-NoRestartManagerLocks @("),
+        )
+        self.assertLess(
+            POWERSHELL.index("Assert-NoRestartManagerLocks @("),
+            POWERSHELL.index("Start-Process -FilePath $msiexec"),
+        )
+        self.assertLess(
+            POWERSHELL.index("Start-Process -FilePath $msiexec"),
+            POWERSHELL.rindex("$artifactStream.Dispose()"),
+        )
         self.assertNotIn("corporate", POWERSHELL.lower())
-        self.assertNotIn(".zip", POWERSHELL.lower())
+
+    def test_powershell_bootstrap_template_parses_when_powershell_is_available(self) -> None:
+        shell = shutil.which("pwsh") or shutil.which("powershell")
+        if not shell:
+            self.skipTest("PowerShell parser is unavailable")
+        parser = (
+            "$tokens=$null; $errors=$null; "
+            "[System.Management.Automation.Language.Parser]::ParseFile("
+            "$env:HONK300_POWERSHELL_TEMPLATE,"
+            "[ref]$tokens,[ref]$errors) > $null; "
+            "if ($errors.Count) { $errors | ForEach-Object { "
+            "[Console]::Error.WriteLine($_.Message) }; exit 1 }"
+        )
+        environment = os.environ.copy()
+        environment["HONK300_POWERSHELL_TEMPLATE"] = str(
+            ROOT / "script" / "honk300-installer.ps1.in"
+        )
+        result = subprocess.run(
+            [shell, "-NoProfile", "-Command", parser],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=environment,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_templates_contain_only_release_renderer_tokens(self) -> None:
         shell_tokens = set(re.findall(r"__[A-Z0-9_]+__", SHELL))
@@ -131,7 +261,19 @@ class InstallerTemplateTests(unittest.TestCase):
         )
         self.assertEqual(
             set(re.findall(r"__[A-Z0-9_]+__", POWERSHELL)),
-            {"__VERSION__", "__TAG__", "__COMMIT__", "__SHA_WINDOWS_X64_MSI__", "__SHA_WINDOWS_ARM64_MSI__"},
+            {
+                "__VERSION__",
+                "__TAG__",
+                "__COMMIT__",
+                "__SHA_WINDOWS_X64_MSI__",
+                "__SHA_WINDOWS_ARM64_MSI__",
+                "__SHA_WINDOWS_X64_PORTABLE__",
+                "__SHA_WINDOWS_ARM64_PORTABLE__",
+                "__SIZE_WINDOWS_X64_MSI__",
+                "__SIZE_WINDOWS_ARM64_MSI__",
+                "__SIZE_WINDOWS_X64_PORTABLE__",
+                "__SIZE_WINDOWS_ARM64_PORTABLE__",
+            },
         )
 
     def test_archive_validators_execute_and_reject_traversal_duplicates_and_links(self) -> None:

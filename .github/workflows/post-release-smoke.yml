@@ -18,31 +18,78 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner:
-          - ubuntu-latest
-          - ubuntu-24.04-arm
-          - macos-15
-          - macos-15-intel
+        include:
+          - runner: ubuntu-22.04
+            linux: true
+            slug: linux-x86_64
+          - runner: ubuntu-22.04-arm
+            linux: true
+            slug: linux-aarch64
+          - runner: macos-15
+            linux: false
+            slug: macos-arm64
+          - runner: macos-15-intel
+            linux: false
+            slug: macos-x86_64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.tag }}
           persist-credentials: false
+      - name: Install Linux compositor qualification packages
+        if: ${{ matrix.linux }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            grim imagemagick libasound2-dev openbox python3 sway x11-utils \
+            x11-xserver-utils xcompmgr xvfb
       - name: Install twice and prove complete rollback from live assets
         env:
           HONK300_SMOKE_TAG: ${{ inputs.tag }}
+          HONK300_RUN_LINUX_OVERLAY_SMOKE: ${{ matrix.linux }}
+          HONK300_LINUX_EVIDENCE_DIR: ${{ github.workspace }}/target/post-release-linux-overlay-${{ matrix.slug }}
         shell: bash
         run: sh script/smoke_released_unix.sh "$HONK300_SMOKE_TAG"
+      - name: Upload published Linux exact-install compositor evidence
+        if: ${{ always() && matrix.linux }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: honk300-linux-overlay-published-${{ matrix.slug }}-${{ inputs.tag }}
+          path: target/post-release-linux-overlay-${{ matrix.slug }}
+          if-no-files-found: error
 
   windows-global-msi:
-    name: live Global MSI rollback and lifecycle
-    runs-on: windows-2022
+    name: live Global MSI rollback and lifecycle (${{ matrix.triple }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            triple: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            triple: aarch64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.tag }}
           persist-credentials: false
-      - name: Prove rollback, upgrade, repair, downgrade refusal, ARM extraction, and uninstall
+      - name: Prove native rollback, upgrade, repair, PE identity, compositor, and uninstall
         env:
           HONK300_SMOKE_TAG: ${{ inputs.tag }}
         shell: pwsh
-        run: ./script/smoke_released_windows.ps1 -Tag $env:HONK300_SMOKE_TAG
+        run: |
+          ./script/smoke_released_windows.ps1 `
+            -Tag $env:HONK300_SMOKE_TAG `
+            -TargetTriple '${{ matrix.triple }}' `
+            -OverlayEvidenceDirectory 'target/post-release-windows-overlay-${{ matrix.triple }}'
+      - name: Upload published Windows overlay qualification evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: honk300-windows-overlay-published-${{ matrix.triple }}-${{ inputs.tag }}
+          path: target/post-release-windows-overlay-${{ matrix.triple }}
+          if-no-files-found: error

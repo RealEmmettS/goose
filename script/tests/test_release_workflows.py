@@ -54,6 +54,14 @@ class ReleaseWorkflowTests(unittest.TestCase):
         for workflow in (RELEASE, WINDOWS, MACOS):
             self.assertIn("candidate:", workflow)
         self.assertIn("Candidate artifact set verified without publication", RELEASE)
+        self.assertIn("Preserve the complete verified candidate artifact set", RELEASE)
+        self.assertIn("candidate-release-assets-${{ needs.plan.outputs.tag }}", RELEASE)
+        self.assertIn("path: release-assets/*", RELEASE)
+        candidate_upload = RELEASE.index("Preserve the complete verified candidate artifact set")
+        local_verify = RELEASE.index("Verify every local checksum and manifest hash")
+        installer_smoke = RELEASE.index("Smoke shell installer twice without sudo")
+        self.assertGreater(candidate_upload, local_verify)
+        self.assertGreater(candidate_upload, installer_smoke)
         self.assertIn("if: ${{ !inputs.candidate }}", RELEASE)
         self.assertIn("candidate: ${{ inputs.candidate || false }}", RELEASE)
         self.assertIn('$tagExists = [bool](git tag --list "${{ inputs.tag }}")', WINDOWS)
@@ -84,12 +92,77 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def test_release_portable_jobs_cover_native_host_prerequisites(self) -> None:
         self.assertIn("command -v sha256sum", RELEASE)
         self.assertIn("shasum -a 256 -c -", RELEASE)
-        self.assertIn("sudo apt-get install --no-install-recommends -y libasound2-dev", RELEASE)
+        self.assertIn("Install Linux audio and compositor qualification packages", RELEASE)
+        self.assertIn("grim imagemagick libasound2-dev", RELEASE)
         self.assertIn("Join-Path $env:RUNNER_TEMP 'dist.exe'", RELEASE)
         self.assertNotIn(
             "cargo-dist-x86_64-pc-windows-msvc\\dist.exe",
             RELEASE,
         )
+
+    def test_linux_release_payloads_are_exact_native_compositor_qualified(self) -> None:
+        for target in (
+            "x86_64-unknown-linux-gnu",
+            "x86_64-unknown-linux-musl",
+            "aarch64-unknown-linux-gnu",
+            "aarch64-unknown-linux-musl",
+        ):
+            self.assertIn(target, RELEASE)
+        for required in (
+            'archive="target/distrib/honk300-$target.tar.xz"',
+            'binary="target/exact-linux-$target/$root/honk300"',
+            "--format elf --machine \"$machine\"",
+            "x86_64-unknown-linux-gnu|x86_64-unknown-linux-musl) machine=62",
+            "aarch64-unknown-linux-gnu|aarch64-unknown-linux-musl) machine=183",
+            'HONK300_BIN="$PWD/$binary"',
+            'HONK300_EVIDENCE_DIR="$PWD/$evidence/compositor"',
+            'archive_sha256_before=$archive_before',
+            'archive_sha256_after=$archive_after',
+            'binary_sha256_before=$binary_before',
+            'binary_sha256_after=$binary_after',
+            "if-no-files-found: error",
+        ):
+            self.assertIn(required, RELEASE)
+        self.assertLess(
+            RELEASE.index("Qualify exact Linux archive payload before upload"),
+            RELEASE.index("Upload portable artifacts to the orchestrator"),
+        )
+
+    def test_windows_cargo_dist_zips_are_native_qualified_before_assembly(self) -> None:
+        portable = RELEASE[RELEASE.index("qualify-windows-portable:") :]
+        for required in (
+            "runs-on: ${{ matrix.runner }}",
+            "windows-2022",
+            "windows-11-arm",
+            "0x8664",
+            "0xAA64",
+            "release-portable-${{ matrix.triple }}",
+            "honk300-${{ matrix.triple }}.zip",
+            "cargo-dist ZIP must contain root honk300.exe",
+            "verify_binary_architecture.py --format pe",
+            "zip_sha256_before",
+            "zip_sha256_after",
+            "binary_sha256_before",
+            "binary_sha256_after",
+            "smoke_windows_overlay.ps1",
+            "qualification-windows-portable-${{ matrix.triple }}",
+        ):
+            self.assertIn(required, portable)
+        assemble = RELEASE[RELEASE.index("assemble-and-publish:") :]
+        self.assertIn("- qualify-windows-portable", assemble)
+
+    def test_windows_msi_payload_identity_and_native_arm_qualification_are_required(self) -> None:
+        for required in (
+            "Prove Global MSI contains the exact PE build",
+            "MSI payload does not match exact qualified build",
+            "qualification-windows-msi-identity-${{ matrix.triple }}",
+            "qualification-input-windows-aarch64-pc-windows-msvc",
+            "runs-on: windows-11-arm",
+            "-TargetTriple aarch64-pc-windows-msvc",
+            "-CurrentMsiPath target/qualification-input-aarch64-pc-windows-msvc/",
+            "-SourceBinaryPath target/qualification-input-aarch64-pc-windows-msvc/honk300.exe",
+        ):
+            self.assertIn(required, WINDOWS)
 
 
 if __name__ == "__main__":

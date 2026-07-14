@@ -13,14 +13,47 @@
   - [x] Repair and visually verify the macOS renderer bridge.
   - [x] Fix dark-mode Mac note contrast and audit equivalent Windows/Linux presentation paths.
   - [x] Refine cross-platform planted-foot timing and cap visible leg stretch.
+  - [x] Finish shared exposed-edge movement: natural monitor seams, occasional hidden wrap, non-wrapping errands, fully offscreen entry, and graceful animated exit.
+    > Final-clear, gapped-monitor staging, permission-wait hot-plug, stop-transition, and bounded-deadline regressions pass independent review.
+  - [x] Finish the user-only 30% note/meme-close annoyed reaction with separately gated bounded mouse nab.
+    > Typed request correlation, lingering-window routing, Windows close provenance, onscreen deferral, and exact-once behavior pass independent review.
+  - [x] Pin an exact Linux binary and add compositor-visible X11/Wayland color evidence.
+  - [x] Add exact-binary Windows layered-compositor and lifecycle evidence to CI, candidate, and published-MSI gates.
+  - [ ] Run the new exact-candidate compositor gates natively on Windows x64/ARM64 and Linux x64/ARM64.
   - [ ] Optimize and profile the macOS runtime; repeat active-motion capture and the 10+60 second profile on the fixed exact candidate.
   - [x] Implement the approved first-run Accessibility prompt and calm permission-wait behavior.
   - [ ] Complete denied and granted Accessibility qualification.
   - [x] Verify CLI, TUI, IPC, and preliminary lifecycle behavior; repeat terminal/lifecycle checks on the exact candidate.
   - [x] Add the per-user graphical DMG installer.
+  - [x] Quiesce the running managed app before shell update, mounted-DMG replacement, or uninstall; fail closed before mutation and verify release metadata before writing a receipt.
+    - [x] Retain the lifecycle singleton through each mutation; remove ambient lease bypasses.
+    - [x] Pin Windows payload identity from same-stream size/hash verification through execution.
+    - [x] Roll Unix HUP/INT/TERM back with explicit nonzero status, including after-swap interruption.
+    - [x] Check machine-wide Windows paths across sessions and reject reboot-deferred MSI state.
+    - [x] Kill and reap every deferred-uninstall helper that fails before the exact READY handoff.
+  - [x] Pin the exact G2 Developer ID leaf in CI and revalidate the extracted final app ZIP, stapling, Gatekeeper result, and required notarization evidence.
+  - [x] Run the complete integrated local Rust, universal-Apple, packaging, workflow, audit, shell, cross-target, and diff gate on the Mac stopping commit.
+  - [ ] Capture and inspect the exact Mac candidate across light/dark output, eight headings, animation/secondary motion, mud/prank states, entry/wrap/exit, and a real user-close reaction.
+  - [ ] Repeat exact-candidate CLI/TUI/IPC/audio/terminal behavior, including ordinary-window positives and protected-terminal negatives.
+  - [ ] Prove helper install, autostart, stop/start, v0.3.2→v0.3.3 update, rollback injection, foreign-file preservation, uninstall/purge, and final host cleanup.
   - [ ] Add Developer ID signing, notarization, and packaging evidence.
-  - [ ] Cut and independently verify the immutable v0.3.3 release.
-  - [ ] Promote and deploy the verified DMG on the website.
+  - [ ] Pass candidate and default-branch CI on the same exact SHA before creating the immutable tag.
+  - [ ] Cut the immutable v0.3.3 release and pass atomic publication plus post-release smoke tests.
+  - [ ] Fresh-download the published app ZIP and DMG and independently recheck hashes, trust, install, and v0.3.2→v0.3.3 update.
+  - [ ] Validate the website preview against the live v0.3.3 manifest, then promote and verify the DMG-first production deployment.
+  - [ ] Synchronize ADRs, README, both changelogs, readiness evidence, CODEX_PROJECT, guidance, task activity, and the Alienware handoff; commit and push the completed board.
+- [ ] **M16.1 — exact-candidate macOS host readiness** - one unchanged signed candidate through first-denied, non-nagging relaunch, live grant/revocation, terminal protection, and ordinary-window evidence #m16r
+  - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
+    > Latest checked successful run `29131779321` passed Intel and Apple Silicon bundle smoke and still skipped the optional pre-granted Accessibility job.
+  - [x] Run the preliminary denied/granted smoke on one unchanged Developer ID-signed app on the physical M2.
+    > The exact v0.3.3 candidate still needs ADR 0022's first-denied, non-nagging relaunch, live-grant, and live-revocation sequence.
+  - [x] Record the preliminary Accessibility-granted evidence in `docs/readiness/m16-m18-readiness.md`.
+  - [ ] Run ADR 0022's exact-candidate first-denied, denied non-nag relaunch, live-grant, and live-revocation sequence on one recorded binary digest.
+  - [ ] Record exact-candidate protected-terminal negatives and one ordinary-window positive.
+  - [~] Live multi-monitor/hot-plug is hardware-waived on this one-display Mac; automated signed-coordinate/topology/hot-plug tests pass, and no live claim is made.
+  - [ ] Verify or waive every `#m16r` verification item before moving the card to Done.
+
+## Done
 - [x] **Name interchangeability + site usage clarity** - verified `honk300`/`honk`/`goose` are fully interchangeable across every command (install aliases all three → same binary; `normalize_args` never branches on arg0; only internal `honk300 --version` self-call in update.rs). Locked in with `all_three_names_are_fully_interchangeable` test (13 CLI tests green). Site usage section reworked: consistent `honk300` display (no more honk300↔goose switching), natural order (start/stop → configure → install/autostart → pokes → flags), goose-speak kept as "Also:" notes, interchangeability banner (done 2026-07-08) #names
 - [x] **v0.2.1 release — side-view neck refinement** - version bump + changelog cut (commit eb40260); tag `v0.2.1` drove cargo-dist Release → chained macOS Packaging + Windows Installers; wrap-up email sent (done 2026-07-08) #v021
   - [x] Release + macOS Packaging + Windows Installers workflows green; full 40-asset set verified (universal2 DMG + darwin tarballs + Windows MSI/EXE ×2 arch); v0.2.1 is latest, latest/download serves real bytes.
@@ -43,17 +76,6 @@
   - [x] R4b elevation (Fable hands-on): accurate hero from real walk frames, OS-aware download surfacing, Corporate-MSI-first Windows ordering, macOS column live (v0.2.0), micro-interactions, thegoose.app domain meta (commit d6ebbc1).
     > Done 2026-07-08 hands-on (spend limit blocked the delegated subagent). Hero now animates the real 12-frame sprite sheet; OS detect reorders columns + adapts hero CTA; Windows leads with per-user Corporate MSI then global; macOS live with universal2 DMG + apple-darwin tarballs; honk easter egg, scroll bar, magnetic CTA, typewriter terminal. `npm run build` clean, no console errors, verified in Chrome at desktop + 390px mobile.
   - [x] Vercel deploy verify: d6ebbc1 built and live at https://thegoose.app (walking-goose sprite + OS badge + v0.2.0 confirmed serving in prod).
-- [ ] **M16.1 — macOS host readiness smoke** - hosted macOS bundle/status smoke plus Accessibility granted evidence from a pre-granted self-hosted/manual macOS run #m16r
-  - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
-    > Latest checked successful run `29131779321` passed Intel and Apple Silicon bundle smoke and still skipped the optional pre-granted Accessibility job.
-  - [x] Run the preliminary denied/granted smoke on one unchanged Developer ID-signed app on the physical M2.
-    > The exact v0.3.3 candidate still needs ADR 0022's first-denied, non-nagging relaunch, live-grant, and live-revocation sequence.
-  - [x] Record the preliminary Accessibility-granted evidence in `docs/readiness/m16-m18-readiness.md`.
-  - [ ] Record exact-candidate protected-terminal negatives and one ordinary-window positive.
-  - [~] Live multi-monitor/hot-plug is hardware-waived on this one-display Mac; automated signed-coordinate/topology/hot-plug tests pass, and no live claim is made.
-  - [ ] Verify or waive every `#m16r` verification item before moving the card to Done.
-
-## Done
 - [x] **Native Wayland full-support research + integration path** - current upstream review found no portable full-parity client path; ADR 0021 defines a reduced portable base plus explicit portal/KDE/GNOME/wlroots capability adapters, with implementation split into follow-up cards (done 2026-07-12) #a6e
   - [x] Reconcile current plan and architecture assumptions.
   - [x] Research overlay, pointer, input, toplevel, move, portal, and compositor-extension paths.

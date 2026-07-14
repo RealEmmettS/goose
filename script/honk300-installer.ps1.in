@@ -14,28 +14,195 @@ switch -Regex ($arch) {
     '^(AMD64|x86_64)$' {
         $triple = 'x86_64-pc-windows-msvc'
         $expectedHash = '__SHA_WINDOWS_X64_MSI__'
+        $expectedSize = [int64]"__SIZE_WINDOWS_X64_MSI__"
+        $leaseExpectedHash = '__SHA_WINDOWS_X64_PORTABLE__'
+        $leaseExpectedSize = [int64]"__SIZE_WINDOWS_X64_PORTABLE__"
     }
     '^(ARM64|aarch64)$' {
         $triple = 'aarch64-pc-windows-msvc'
         $expectedHash = '__SHA_WINDOWS_ARM64_MSI__'
+        $expectedSize = [int64]"__SIZE_WINDOWS_ARM64_MSI__"
+        $leaseExpectedHash = '__SHA_WINDOWS_ARM64_PORTABLE__'
+        $leaseExpectedSize = [int64]"__SIZE_WINDOWS_ARM64_PORTABLE__"
     }
     default { throw "Unsupported Windows architecture: $arch" }
 }
 
 $artifact = "honk300-$triple.msi"
+$leaseArtifact = "honk300-$triple.zip"
 $base = if ($env:HONK300_DOWNLOAD_BASE) { $env:HONK300_DOWNLOAD_BASE.TrimEnd('/') } else { "$Repository/releases/download/$Tag" }
 $url = "$base/$artifact"
+$leaseUrl = "$base/$leaseArtifact"
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("honk300-" + [guid]::NewGuid().ToString('N'))
 $path = Join-Path $tempRoot $artifact
+$leasePath = Join-Path $tempRoot $leaseArtifact
+$leaseProcess = $null
+$artifactStream = $null
+$leaseStream = $null
+
+function Open-VerifiedPinnedFile([string] $Path, [int64] $ExpectedSize, [string] $ExpectedHash, [string] $Label) {
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    if ($item.PSIsContainer -or (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+        throw "$Label is not a regular file: $Path"
+    }
+    $stream = [IO.File]::Open(
+        $Path,
+        [IO.FileMode]::Open,
+        [IO.FileAccess]::Read,
+        [IO.FileShare]::Read
+    )
+    try {
+        if ($stream.Length -ne $ExpectedSize -or $item.Length -ne $ExpectedSize) {
+            throw "$Label size changed while its identity was pinned"
+        }
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try {
+            $stream.Position = 0
+            $digest = $sha.ComputeHash($stream)
+        } finally {
+            $sha.Dispose()
+        }
+        $actualHash = [BitConverter]::ToString($digest).Replace('-', '').ToLowerInvariant()
+        if ($actualHash -ne $ExpectedHash.ToLowerInvariant()) {
+            throw "SHA-256 mismatch for $Label; refusing to run it"
+        }
+        $stream.Position = 0
+        return $stream
+    } catch {
+        $stream.Dispose()
+        throw
+    }
+}
+
+function Start-LifecycleLease([IO.Stream] $ArchiveStream, [string] $WorkRoot) {
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [IO.Compression.ZipArchive]::new(
+        $ArchiveStream,
+        [IO.Compression.ZipArchiveMode]::Read,
+        $true
+    )
+    try {
+        $entries = @($archive.Entries | Where-Object { $_.Name -ieq 'honk300.exe' })
+        if ($entries.Count -ne 1) {
+            throw "portable lifecycle archive must contain exactly one honk300.exe; found $($entries.Count)"
+        }
+        $entry = $entries[0]
+        $segments = @($entry.FullName.Replace('\', '/').Split('/') | Where-Object { $_ -ne '' })
+        if ($entry.FullName.Contains('\') -or $entry.FullName.Contains(':') -or
+            $segments.Count -eq 0 -or $segments -contains '.' -or $segments -contains '..') {
+            throw 'portable lifecycle archive contains an unsafe executable path'
+        }
+        $leaseBinary = Join-Path $WorkRoot 'lifecycle-honk300.exe'
+        [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $leaseBinary, $false)
+    } finally {
+        $archive.Dispose()
+    }
+
+    $start = [Diagnostics.ProcessStartInfo]::new()
+    $start.FileName = $leaseBinary
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = $true
+    $start.RedirectStandardInput = $true
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    $start.EnvironmentVariables['HONK300_INTERNAL_HOLD_LIFECYCLE_LEASE'] = '1'
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $start
+    if (-not $process.Start()) {
+        throw 'failed to start the verified lifecycle lease holder'
+    }
+    $ready = $process.StandardOutput.ReadLine()
+    if ($ready -ne 'HONK300_INTERNAL_LIFECYCLE_LEASE_READY') {
+        $failure = $process.StandardError.ReadToEnd().Trim()
+        $process.StandardInput.Close()
+        $process.WaitForExit()
+        if ([string]::IsNullOrWhiteSpace($failure)) {
+            throw 'verified lifecycle helper could not acquire exclusive runtime ownership'
+        }
+        throw "verified lifecycle helper could not acquire exclusive runtime ownership: $failure"
+    }
+    return $process
+}
+
+function Assert-NoRestartManagerLocks([string[]] $Paths) {
+    if (-not ('Honk300RestartManagerProbe' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+
+public static class Honk300RestartManagerProbe
+{
+    private const int ErrorMoreData = 234;
+
+    [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)]
+    private static extern int RmStartSession(out uint handle, int flags, StringBuilder sessionKey);
+
+    [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)]
+    private static extern int RmRegisterResources(
+        uint handle,
+        uint fileCount,
+        string[] fileNames,
+        uint applicationCount,
+        IntPtr applications,
+        uint serviceCount,
+        string[] serviceNames);
+
+    [DllImport("rstrtmgr.dll")]
+    private static extern int RmGetList(
+        uint handle,
+        out uint processInfoNeeded,
+        ref uint processInfoCount,
+        IntPtr processInfo,
+        ref uint rebootReasons);
+
+    [DllImport("rstrtmgr.dll")]
+    private static extern int RmEndSession(uint handle);
+
+    public static void AssertUnlocked(string path)
+    {
+        if (!File.Exists(path)) return;
+        uint handle;
+        var key = new StringBuilder(64);
+        int result = RmStartSession(out handle, 0, key);
+        if (result != 0) throw new Win32Exception(result, "Restart Manager session failed");
+        try
+        {
+            result = RmRegisterResources(handle, 1, new[] { path }, 0, IntPtr.Zero, 0, null);
+            if (result != 0) throw new Win32Exception(result, "Restart Manager registration failed");
+            uint needed = 0;
+            uint count = 0;
+            uint reasons = 0;
+            result = RmGetList(handle, out needed, ref count, IntPtr.Zero, ref reasons);
+            if (result != 0 && result != ErrorMoreData)
+                throw new Win32Exception(result, "Restart Manager lock query failed");
+            if (needed != 0)
+                throw new InvalidOperationException("another Windows session is using " + path);
+        }
+        finally
+        {
+            RmEndSession(handle);
+        }
+    }
+}
+'@
+    }
+    foreach ($candidate in $Paths) {
+        [Honk300RestartManagerProbe]::AssertUnlocked($candidate)
+    }
+}
 
 try {
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $path -Headers @{ 'User-Agent' = 'honk300-installer' }
-    $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualHash -ne $expectedHash.ToLowerInvariant()) {
-        throw "SHA-256 mismatch for $artifact; refusing to run it"
-    }
+    $artifactStream = Open-VerifiedPinnedFile $path $expectedSize $expectedHash $artifact
+    Invoke-WebRequest -UseBasicParsing -Uri $leaseUrl -OutFile $leasePath -Headers @{ 'User-Agent' = 'honk300-installer' }
+    $leaseStream = Open-VerifiedPinnedFile $leasePath $leaseExpectedSize $leaseExpectedHash $leaseArtifact
+    $leaseProcess = Start-LifecycleLease $leaseStream $tempRoot
 
     $systemDirectory = [Environment]::GetFolderPath([Environment+SpecialFolder]::System)
     if ([string]::IsNullOrWhiteSpace($systemDirectory)) {
@@ -46,10 +213,16 @@ try {
     if ($msiexecItem.PSIsContainer -or (($msiexecItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
         throw "Windows Installer is not a regular system executable: $msiexec"
     }
+    $installedBin = Join-Path $env:ProgramFiles 'honk300\bin'
+    Assert-NoRestartManagerLocks @(
+        (Join-Path $installedBin 'honk300.exe'),
+        (Join-Path $installedBin 'honk.exe'),
+        (Join-Path $installedBin 'goose.exe')
+    )
     $arguments = @('/i', ('"' + $path + '"'), '/passive', '/norestart')
     $process = Start-Process -FilePath $msiexec -ArgumentList $arguments -Verb RunAs -Wait -PassThru
-    if ($process.ExitCode -notin @(0, 3010)) {
-        throw "msiexec.exe exited with code $($process.ExitCode)"
+    if ($process.ExitCode -ne 0) {
+        throw "msiexec.exe exited with code $($process.ExitCode); pending or reboot-deferred replacement is not accepted"
     }
 
     $installed = Join-Path $env:ProgramFiles 'honk300\bin\honk300.exe'
@@ -117,5 +290,19 @@ try {
 
     Write-Host "honk300 $Version installed for all Windows users."
 } finally {
+    if ($null -ne $leaseProcess) {
+        $leaseProcess.StandardInput.Close()
+        if (-not $leaseProcess.WaitForExit(10000)) {
+            $leaseProcess.Kill()
+            $leaseProcess.WaitForExit()
+        }
+        $leaseProcess.Dispose()
+    }
+    if ($null -ne $leaseStream) {
+        $leaseStream.Dispose()
+    }
+    if ($null -ne $artifactStream) {
+        $artifactStream.Dispose()
+    }
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

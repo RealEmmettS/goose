@@ -27,6 +27,10 @@ DESKTOP_CREATED=0
 RECEIPT=""
 RECEIPT_BACKUP=""
 RECEIPT_CREATED=0
+LEASE_PID=""
+LEASE_FIFO=""
+LEASE_LOG=""
+LEASE_FD_OPEN=0
 
 die() {
   printf 'honk300 installer: %s\n' "$*" >&2
@@ -111,18 +115,51 @@ verify_binary() {
   [ "$(reported_version "$binary")" = "$VERSION" ] || die "staged binary version does not match $VERSION"
 }
 
-stop_existing() {
+hold_lifecycle_lease() {
   binary="$1"
-  [ -x "$binary" ] || return 0
-  "$binary" stop >/dev/null 2>&1 &
-  stop_pid=$!
+  [ -x "$binary" ] || die "staged lifecycle lease binary is missing or not executable"
+  LEASE_FIFO="$TEMP_ROOT/lifecycle-lease.fifo"
+  LEASE_LOG="$TEMP_ROOT/lifecycle-lease.log"
+  mkfifo "$LEASE_FIFO"
+  HONK300_INTERNAL_HOLD_LIFECYCLE_LEASE=1 "$binary" \
+    <"$LEASE_FIFO" >"$LEASE_LOG" 2>&1 &
+  LEASE_PID=$!
+  # Opening the writer unblocks the child's stdin redirection. Keeping fd 9 open retains the
+  # child's lease; any parent exit (including SIGKILL) closes it and delivers EOF automatically.
+  exec 9>"$LEASE_FIFO"
+  LEASE_FD_OPEN=1
   waited=0
-  while kill -0 "$stop_pid" >/dev/null 2>&1; do
-    [ "$waited" -lt 5 ] || { kill "$stop_pid" >/dev/null 2>&1 || true; break; }
+  while ! grep -Fqx 'HONK300_INTERNAL_LIFECYCLE_LEASE_READY' "$LEASE_LOG" 2>/dev/null; do
+    if ! kill -0 "$LEASE_PID" >/dev/null 2>&1; then
+      exec 9>&-
+      LEASE_FD_OPEN=0
+      wait "$LEASE_PID" >/dev/null 2>&1 || true
+      LEASE_PID=""
+      die "staged binary could not stop the runtime and acquire lifecycle ownership"
+    fi
+    if [ "$waited" -ge 35 ]; then
+      exec 9>&-
+      LEASE_FD_OPEN=0
+      kill "$LEASE_PID" >/dev/null 2>&1 || true
+      wait "$LEASE_PID" >/dev/null 2>&1 || true
+      LEASE_PID=""
+      die "existing runtime did not release lifecycle ownership within 35 seconds"
+    fi
     sleep 1
     waited=$((waited + 1))
   done
-  wait "$stop_pid" >/dev/null 2>&1 || true
+}
+
+release_lifecycle_lease() {
+  if [ "$LEASE_FD_OPEN" -eq 1 ]; then
+    exec 9>&-
+    LEASE_FD_OPEN=0
+  fi
+  if [ -n "$LEASE_PID" ]; then
+    wait "$LEASE_PID" || return 1
+    LEASE_PID=""
+  fi
+  return 0
 }
 
 rollback() {
@@ -173,17 +210,27 @@ rollback_integrations() {
 }
 
 cleanup() {
-  status=$?
+  status="$1"
   trap - EXIT HUP INT TERM
   if [ "$status" -ne 0 ] && [ "$COMMITTED" -ne 1 ]; then
     rollback || true
     rollback_integrations || true
   fi
+  if ! release_lifecycle_lease; then
+    [ "$status" -ne 0 ] || status=1
+  fi
   [ -z "$TEMP_ROOT" ] || rm -rf "$TEMP_ROOT"
   [ -z "$STAGE_ROOT" ] || rm -rf "$STAGE_ROOT"
   exit "$status"
 }
-trap cleanup EXIT HUP INT TERM
+on_exit() { status=$?; cleanup "$status"; }
+on_hup() { cleanup 129; }
+on_int() { cleanup 130; }
+on_term() { cleanup 143; }
+trap on_exit EXIT
+trap on_hup HUP
+trap on_int INT
+trap on_term TERM
 
 safe_link() {
   link="$1"
@@ -381,8 +428,6 @@ else
 fi
 verify_file "$PAYLOAD" "$EXPECTED_SHA"
 
-stop_existing "$EXISTING_BINARY"
-
 if [ "$OS" = Darwin ]; then
   validate_zip "$PAYLOAD"
   ditto -x -k "$PAYLOAD" "$STAGE_ROOT"
@@ -397,6 +442,11 @@ if [ "$OS" = Darwin ]; then
   [ "$bundle_id" = "dev.emmetts.honk300" ] || die "unexpected bundle identifier: $bundle_id"
   bundle_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$CANDIDATE/Contents/Info.plist")"
   [ "$bundle_version" = "$VERSION" ] || die "unexpected bundle version: $bundle_version"
+  bundle_tag="$(/usr/libexec/PlistBuddy -c 'Print :Honk300ReleaseTag' "$CANDIDATE/Contents/Info.plist")"
+  [ "$bundle_tag" = "$TAG" ] || die "unexpected bundle release tag: $bundle_tag"
+  bundle_commit="$(/usr/libexec/PlistBuddy -c 'Print :Honk300ReleaseCommit' "$CANDIDATE/Contents/Info.plist")"
+  [ "$bundle_commit" = "$COMMIT" ] || die "unexpected bundle release commit: $bundle_commit"
+  hold_lifecycle_lease "$STAGED_BINARY"
   swap_install "$CANDIDATE" "$DEST"
   INSTALLED_BINARY="$DEST/Contents/MacOS/honk300"
   verify_binary "$INSTALLED_BINARY"
@@ -414,6 +464,7 @@ else
   cp "$staged_source" "$STAGE_ROOT/install/bin/honk300"
   chmod 755 "$STAGE_ROOT/install/bin/honk300"
   verify_binary "$STAGE_ROOT/install/bin/honk300"
+  hold_lifecycle_lease "$STAGE_ROOT/install/bin/honk300"
   swap_install "$STAGE_ROOT/install" "$DEST"
   INSTALLED_BINARY="$DEST/bin/honk300"
   verify_binary "$INSTALLED_BINARY"

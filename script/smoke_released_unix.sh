@@ -11,6 +11,7 @@ if ! printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
 fi
 VERSION="${TAG#v}"
 REPOSITORY="https://github.com/RealEmmettS/goose"
+PROJECT_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 ROOT="$(mktemp -d "${TMPDIR:-/tmp}/honk300-live-smoke.XXXXXX")"
 trap 'rm -rf "$ROOT"' EXIT HUP INT TERM
 
@@ -139,6 +140,24 @@ for pass in 1 2; do
   sh "$INSTALLER"
   verify_install
 done
+
+if [ "$OS" = Linux ] && [ "${HONK300_RUN_LINUX_OVERLAY_SMOKE:-false}" = true ]; then
+  EVIDENCE_DIR="${HONK300_LINUX_EVIDENCE_DIR:-}"
+  [ -n "$EVIDENCE_DIR" ] || { printf 'Linux overlay evidence directory is required\n' >&2; exit 1; }
+  binary_before_overlay="$(file_sha256 "$BINARY")"
+  HONK300_BIN="$BINARY" \
+  HONK300_EVIDENCE_DIR="$EVIDENCE_DIR" \
+    sh "$PROJECT_ROOT/script/smoke_m17_m18_linux.sh"
+  binary_after_overlay="$(file_sha256 "$BINARY")"
+  [ "$binary_after_overlay" = "$binary_before_overlay" ] || {
+    printf 'installed Linux binary changed during exact compositor qualification\n' >&2
+    exit 1
+  }
+  {
+    printf 'installed_binary_sha256_before=%s\n' "$binary_before_overlay"
+    printf 'installed_binary_sha256_after=%s\n' "$binary_after_overlay"
+  } > "$EVIDENCE_DIR/installed-binary-identity.txt"
+fi
 
 BEFORE_STATE="$ROOT/before.state"
 AFTER_STATE="$ROOT/after.state"

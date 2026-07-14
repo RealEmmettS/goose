@@ -51,8 +51,9 @@ pub use autumn::{
     LEAVES_PER_PILE, MAX_LEAF_PILES,
 };
 pub use collect_window::{
-    CollectWindowCapabilities, CollectWindowCommand, CollectWindowId, CollectWindowKind,
-    CollectWindowOptions, CollectWindowPayload, CollectWindowRequestId, CollectWindowSnapshot,
+    CollectWindowCapabilities, CollectWindowCloseEvent, CollectWindowCloseOrigin,
+    CollectWindowCommand, CollectWindowId, CollectWindowKind, CollectWindowOptions,
+    CollectWindowPayload, CollectWindowRequestId, CollectWindowSnapshot,
 };
 pub use command::{PokeAction, PokeOutcome};
 pub use cursor::{
@@ -67,7 +68,7 @@ pub use foreign_window::{
 };
 pub use hearts::{Heart, Hearts};
 pub use interaction::{PatTracker, Pointer};
-pub use layout::{DesktopLayout, DesktopLayoutError};
+pub use layout::{DesktopLayout, DesktopLayoutError, EdgeDirection, ExposedEdge};
 pub use math::{Rect, Vec2};
 pub use mood::{
     HourlyHonkOptions, LocalHour, LocalTime, MoodIntensity, MoodKind, MoodMachine, MoodOptions,
@@ -79,8 +80,9 @@ pub use rng::{Deck, RandomSource, SplitMix64};
 pub use schedule::{LocalMinute, PresenceSnapshot, PresenceState, ScheduleOptions};
 pub use sound::{HonkTone, Sound};
 pub use task::{
-    AutumnLeafPileTask, CollectWindowTask, FirstUxTask, HyperTask, NabMouseTask, PerchRideTask,
-    PermissionWaitTask, Task, WanderTask,
+    AnnoyedReactionTask, AutumnLeafPileTask, CollectWindowTask, EdgeEntryTask, EdgeWrapTask,
+    FirstUxTask, GracefulExitTask, HyperTask, NabMouseTask, PerchRideTask, PermissionWaitTask,
+    Task, WanderTask,
 };
 pub use time::{Accumulator, Clock, DT, FRAMERATE};
 pub use world::World;

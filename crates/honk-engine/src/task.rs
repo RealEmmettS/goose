@@ -11,6 +11,8 @@
 //! external mod ABI.
 
 use crate::autumn::{AutumnPileId, AutumnPileTarget};
+#[cfg(test)]
+use crate::collect_window::CollectWindowCloseOrigin;
 use crate::collect_window::{
     CollectWindowCommand, CollectWindowKind, CollectWindowOptions, CollectWindowPayload,
     CollectWindowRequestId, CollectWindowSnapshot,
@@ -19,7 +21,7 @@ use crate::cursor::{CursorCommand, MouseStealOptions, TimingOptions};
 use crate::entity::GooseEntity;
 use crate::foreign_window::{ForeignWindowOptions, ForeignWindowSnapshot};
 use crate::interaction::Pointer;
-use crate::layout::DesktopLayout;
+use crate::layout::{DesktopLayout, ExposedEdge};
 use crate::math::{Rect, Vec2};
 use crate::rng::{RandomSource, SplitMix64};
 use crate::sound::Sound;
@@ -36,6 +38,16 @@ const COLLECT_SPAWN_TIMEOUT: f64 = 3.0;
 const COLLECT_VISIBLE_DWELL: f64 = 4.0;
 const COLLECT_PICKUP_DISTANCE: f32 = 42.0;
 const COLLECT_RELEASE_DISTANCE: f32 = 5.0;
+const EDGE_CORNER_INSET: f32 = 56.0;
+const OFFSCREEN_TRAVEL: f32 = 220.0;
+const EDGE_ENTRY_DEPTH: f32 = 220.0;
+const ANNOYED_REACTION_DURATION: f64 = 0.75;
+const LIFECYCLE_EXIT_TARGET_SECONDS: f32 = 12.0;
+const LIFECYCLE_EXIT_MIN_SPEED: f32 = 200.0;
+const LIFECYCLE_EXIT_MAX_SPEED: f32 = 400.0;
+const LIFECYCLE_EXIT_MIN_ACCELERATION: f32 = 2300.0;
+const LIFECYCLE_EXIT_ACCELERATION_SECONDS: f32 = 0.25;
+const LIFECYCLE_EXIT_STEP_TIME: f32 = 0.14;
 
 /// Per-tick context handed to a running task.
 pub struct TaskCtx<'a> {
@@ -47,6 +59,8 @@ pub struct TaskCtx<'a> {
     pub bounds: Rect,
     /// Actual visible monitor regions; ordinary targets must stay inside one of them.
     pub layout: &'a DesktopLayout,
+    /// Whether any part of the current goose pose intersects a real monitor.
+    pub goose_visible: bool,
     /// Shared RNG for target/dwell choices.
     pub rng: &'a mut SplitMix64,
     /// Sound requests a task wants played this frame.
@@ -84,6 +98,10 @@ pub trait Task {
     fn collect_kind(&self) -> Option<CollectWindowKind> {
         None
     }
+    /// Identity of the active collect request, if this task has emitted one.
+    fn collect_request(&self) -> Option<(CollectWindowRequestId, CollectWindowKind)> {
+        None
+    }
     /// Update the stable anchor used by the permission-wait task after a display-layout
     /// change. Other tasks deliberately ignore this platform-neutral lifecycle signal.
     fn set_permission_wait_anchor(&mut self, _anchor: Vec2) {}
@@ -104,6 +122,173 @@ fn random_point(ctx: &mut TaskCtx) -> Vec2 {
 #[derive(Default)]
 pub struct WanderTask {
     end_time: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct EdgePassage {
+    exit_edge: ExposedEdge,
+    exit_target: Vec2,
+    entry_point: Vec2,
+    return_target: Vec2,
+}
+
+impl EdgePassage {
+    fn wrap(goose: &GooseEntity, ctx: &mut TaskCtx) -> Self {
+        let region = ctx.layout.region_at(goose.position);
+        let exit_edge = ctx.layout.sample_exposed_edge(ctx.rng, region);
+        let exit_point = exit_edge.point_near(goose.position, EDGE_CORNER_INSET);
+        let entry_edge = ctx.layout.opposite_exposed_edge(exit_edge, exit_point);
+        let entry_boundary = entry_edge.point_near(exit_point, EDGE_CORNER_INSET);
+        Self {
+            exit_edge,
+            exit_target: exit_point + exit_edge.direction().outward() * OFFSCREEN_TRAVEL,
+            entry_point: entry_boundary + entry_edge.direction().outward() * OFFSCREEN_TRAVEL,
+            return_target: ctx
+                .layout
+                .clamp_point(entry_boundary + entry_edge.direction().inward() * EDGE_ENTRY_DEPTH),
+        }
+    }
+
+    fn depart(goose: &GooseEntity, ctx: &DesktopLayout) -> Self {
+        let exit_edge = ctx.nearest_exposed_edge(goose.position);
+        let exit_point = exit_edge.point_near(goose.position, EDGE_CORNER_INSET);
+        Self {
+            exit_edge,
+            exit_target: exit_point + exit_edge.direction().outward() * OFFSCREEN_TRAVEL,
+            entry_point: Vec2::ZERO,
+            return_target: Vec2::ZERO,
+        }
+    }
+
+    fn extend_exit_if_needed(&mut self, goose: &GooseEntity, visible: bool) {
+        if visible && arrived(goose, 8.0) {
+            self.exit_target =
+                self.exit_target + self.exit_edge.direction().outward() * OFFSCREEN_TRAVEL;
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EdgeWrapState {
+    Depart,
+    Return,
+}
+
+/// An ordinary roaming beat that walks through a genuinely exposed edge and wraps, while
+/// fully hidden, to the far opposite exposed edge. Shared monitor seams are never selected.
+#[derive(Default)]
+pub struct EdgeWrapTask {
+    passage: Option<EdgePassage>,
+    state: Option<EdgeWrapState>,
+}
+
+impl EdgeWrapTask {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Task for EdgeWrapTask {
+    fn id(&self) -> &'static str {
+        "edge_wrap"
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        goose.current_speed = goose.parameters.walk_speed;
+        goose.current_acceleration = goose.parameters.acceleration_normal;
+        let passage = self
+            .passage
+            .get_or_insert_with(|| EdgePassage::wrap(goose, ctx));
+        let state = self.state.get_or_insert(EdgeWrapState::Depart);
+        match *state {
+            EdgeWrapState::Depart => {
+                goose.target_pos = passage.exit_target;
+                passage.extend_exit_if_needed(goose, ctx.goose_visible);
+                if !ctx.goose_visible {
+                    // This is the only teleport in the wrap contract, and both its source and
+                    // destination are fully outside real monitor regions.
+                    goose.position = passage.entry_point;
+                    goose.target_pos = passage.return_target;
+                    goose.velocity = Vec2::ZERO;
+                    *state = EdgeWrapState::Return;
+                }
+                false
+            }
+            EdgeWrapState::Return => {
+                goose.target_pos = passage.return_target;
+                arrived(goose, 6.0)
+            }
+        }
+    }
+}
+
+/// Terminal lifecycle task: walk out through the nearest exposed edge and remain hidden.
+#[derive(Default)]
+pub struct GracefulExitTask {
+    passage: Option<EdgePassage>,
+    speed: Option<f32>,
+}
+
+/// Walks into the current topology after a hot-plug invalidated an offscreen/removed-monitor
+/// position. The world stages the start fully outside an exposed edge before installing it.
+pub struct EdgeEntryTask {
+    target: Vec2,
+}
+
+impl EdgeEntryTask {
+    pub fn new(target: Vec2) -> Self {
+        Self { target }
+    }
+}
+
+impl Task for EdgeEntryTask {
+    fn id(&self) -> &'static str {
+        "edge_entry"
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, _ctx: &mut TaskCtx) -> bool {
+        goose.current_speed = goose.parameters.walk_speed;
+        goose.current_acceleration = goose.parameters.acceleration_normal;
+        goose.target_pos = self.target;
+        arrived(goose, 6.0)
+    }
+}
+
+impl GracefulExitTask {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Task for GracefulExitTask {
+    fn id(&self) -> &'static str {
+        "graceful_exit"
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        let passage = self
+            .passage
+            .get_or_insert_with(|| EdgePassage::depart(goose, ctx.layout));
+        // Lifecycle movement deliberately ignores user-tunable speeds. Typical displays use the
+        // ordinary run tier; large supported monitor walls scale only up to the normal charge
+        // tier so the exit stays articulated without stretching the gait. Absurd topologies time
+        // out fail-closed at the IPC layer instead of inventing a super-charge speed.
+        let speed = *self.speed.get_or_insert_with(|| {
+            (Vec2::distance(goose.position, passage.exit_target) / LIFECYCLE_EXIT_TARGET_SECONDS)
+                .clamp(LIFECYCLE_EXIT_MIN_SPEED, LIFECYCLE_EXIT_MAX_SPEED)
+        });
+        goose.current_speed = speed;
+        goose.current_acceleration =
+            LIFECYCLE_EXIT_MIN_ACCELERATION.max(speed / LIFECYCLE_EXIT_ACCELERATION_SECONDS);
+        goose.step_interval = LIFECYCLE_EXIT_STEP_TIME;
+        goose.target_pos = passage.exit_target;
+        passage.extend_exit_if_needed(goose, ctx.goose_visible);
+        if !ctx.goose_visible {
+            goose.velocity = Vec2::ZERO;
+            goose.target_pos = goose.position;
+        }
+        false
+    }
 }
 
 impl WanderTask {
@@ -265,10 +450,21 @@ impl Task for ExcursionTask {
                 goose.current_speed = goose.parameters.walk_speed;
                 goose.current_acceleration = goose.parameters.acceleration_normal;
                 goose.target_pos = self.exit;
-                if arrived(goose, 8.0) {
+                if !ctx.goose_visible {
                     self.state = ExcursionState::Away {
                         until: ctx.now + self.away_secs as f64,
                     };
+                } else if arrived(goose, 8.0) {
+                    let boundary = ctx.layout.clamp_point(self.exit);
+                    let mut outward = (self.exit - boundary).normalize();
+                    if outward == Vec2::ZERO {
+                        outward = ctx
+                            .layout
+                            .nearest_exposed_edge(goose.position)
+                            .direction()
+                            .outward();
+                    }
+                    self.exit = self.exit + outward * OFFSCREEN_TRAVEL;
                 }
                 false
             }
@@ -307,6 +503,51 @@ impl Task for ExcursionTask {
 #[derive(Default)]
 pub struct HyperTask {
     end_time: Option<f64>,
+}
+
+/// Short visible beat used after a person closes a Honk300 prop: the goose plants its feet,
+/// raises its neck, and shakes its head before the world optionally chains a bounded nab.
+pub struct AnnoyedReactionTask {
+    until: Option<f64>,
+    base_direction: f32,
+    audible: bool,
+    sounded: bool,
+}
+
+impl AnnoyedReactionTask {
+    pub fn new(audible: bool) -> Self {
+        Self {
+            until: None,
+            base_direction: 0.0,
+            audible,
+            sounded: false,
+        }
+    }
+}
+
+impl Task for AnnoyedReactionTask {
+    fn id(&self) -> &'static str {
+        "annoyed_reaction"
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        let until = *self.until.get_or_insert_with(|| {
+            self.base_direction = goose.direction;
+            ctx.now + ANNOYED_REACTION_DURATION
+        });
+        goose.current_speed = 0.0;
+        goose.current_acceleration = goose.parameters.acceleration_normal;
+        goose.target_pos = goose.position;
+        goose.velocity = Vec2::ZERO;
+        goose.extending_neck = true;
+        let phase = ((until - ctx.now) as f32 * 28.0).sin();
+        goose.direction = self.base_direction + phase * 13.0;
+        if self.audible && !self.sounded {
+            self.sounded = true;
+            ctx.sounds.push(Sound::high_honk());
+        }
+        ctx.now >= until
+    }
 }
 
 impl HyperTask {
@@ -578,6 +819,22 @@ impl CollectWindowTask {
             None
         }
     }
+
+    fn active_request_payload(&self) -> Option<(CollectWindowRequestId, CollectWindowPayload)> {
+        match self.state {
+            CollectState::Choose => None,
+            CollectState::WaitForSpawn {
+                request, payload, ..
+            }
+            | CollectState::RunToPickup { request, payload }
+            | CollectState::DraggingBack {
+                request, payload, ..
+            }
+            | CollectState::Release {
+                request, payload, ..
+            } => Some((request, payload)),
+        }
+    }
 }
 
 impl Task for CollectWindowTask {
@@ -595,7 +852,19 @@ impl Task for CollectWindowTask {
         })
     }
 
+    fn collect_request(&self) -> Option<(CollectWindowRequestId, CollectWindowKind)> {
+        self.active_request_payload()
+            .map(|(request, payload)| (request, payload.kind()))
+    }
+
     fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        if let Some((request, payload)) = self.active_request_payload() {
+            if ctx.collect_window_snapshot.is_some_and(|snapshot| {
+                snapshot.request == request && snapshot.kind == payload.kind() && !snapshot.alive
+            }) {
+                return true;
+            }
+        }
         if !ctx.collect_window.active()
             || self
                 .collect_kind()
@@ -830,11 +1099,21 @@ impl Task for PermissionWaitTask {
 #[derive(Default)]
 pub struct FirstUxTask {
     intro_until: Option<f64>,
+    entry_target: Option<Vec2>,
 }
 
 impl FirstUxTask {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// FirstUX variant used at process startup, preserving the on-screen destination paired
+    /// with the off-screen spawn selected by the world.
+    pub fn entering(entry_target: Vec2) -> Self {
+        Self {
+            intro_until: None,
+            entry_target: Some(entry_target),
+        }
     }
 }
 
@@ -849,9 +1128,10 @@ impl Task for FirstUxTask {
                 // Walk in to centre stage.
                 goose.current_speed = goose.parameters.walk_speed;
                 goose.current_acceleration = goose.parameters.acceleration_normal;
-                goose.target_pos = ctx
-                    .layout
-                    .clamp_point((ctx.bounds.min + ctx.bounds.max) * 0.5);
+                goose.target_pos = self.entry_target.unwrap_or_else(|| {
+                    ctx.layout
+                        .clamp_point((ctx.bounds.min + ctx.bounds.max) * 0.5)
+                });
                 if arrived(goose, 2.0) {
                     self.intro_until = Some(ctx.now + ctx.timing.first_wander_time as f64);
                 }
@@ -880,6 +1160,7 @@ mod tests {
             dt: 1.0 / 120.0,
             bounds: ctx_bounds(),
             layout,
+            goose_visible: true,
             rng,
             sounds,
             cursor_commands,
@@ -938,6 +1219,22 @@ mod tests {
             kind,
             rect,
             alive: true,
+            close_origin: None,
+        }
+    }
+
+    fn collect_close_snapshot(
+        request: CollectWindowRequestId,
+        kind: CollectWindowKind,
+        origin: CollectWindowCloseOrigin,
+    ) -> CollectWindowSnapshot {
+        CollectWindowSnapshot {
+            id: crate::collect_window::CollectWindowId(99),
+            request,
+            kind,
+            rect: Rect::new(Vec2::ZERO, Vec2::ZERO),
+            alive: false,
+            close_origin: Some(origin),
         }
     }
 
@@ -1098,6 +1395,137 @@ mod tests {
             &mut cursor_commands,
         );
         assert!(task.run(&mut goose, &mut ctx));
+    }
+
+    #[test]
+    fn edge_wrap_teleports_only_after_hidden_and_stages_the_opposite_entry_offscreen() {
+        let mut rng = SplitMix64::seed(21);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        goose.position = Vec2::new(500.0, 400.0);
+        let mut task = EdgeWrapTask::new();
+
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        assert!(!task.run(&mut goose, &mut ctx));
+        let exit_target = goose.target_pos;
+        assert!(!ctx.layout.contains(exit_target));
+
+        goose.position = exit_target;
+        ctx.goose_visible = true;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(
+            goose.position, exit_target,
+            "a still-visible goose never wraps"
+        );
+
+        ctx.goose_visible = false;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert!(!ctx.layout.contains(goose.position));
+        assert!(ctx.layout.contains(goose.target_pos));
+        let passage = task.passage.expect("chosen passage");
+        assert_eq!(
+            passage.exit_edge.direction().opposite(),
+            ctx.layout.nearest_exposed_edge(goose.position).direction(),
+            "the hidden entry is staged at an opposite-facing edge"
+        );
+    }
+
+    #[test]
+    fn deliberate_excursion_waits_until_hidden_and_returns_from_its_own_entry_without_wrap() {
+        let mut rng = SplitMix64::seed(22);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        goose.position = Vec2::new(500.0, 400.0);
+        let exit = Vec2::new(-220.0, 400.0);
+        let entry = Vec2::new(500.0, -220.0);
+        let return_target = Vec2::new(500.0, 220.0);
+        let mut task = ExcursionTask::new(ExcursionKind::Errand, exit, entry, return_target, 1.0);
+
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        goose.position = exit;
+        ctx.goose_visible = true;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(task.state, ExcursionState::Depart);
+
+        ctx.goose_visible = false;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert!(matches!(task.state, ExcursionState::Away { .. }));
+        ctx.now = 1.1;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(
+            goose.position, entry,
+            "an errand returns from its staged edge"
+        );
+        assert_eq!(goose.target_pos, return_target);
+    }
+
+    #[test]
+    fn graceful_exit_never_completes_as_a_roaming_task_or_reenters() {
+        let mut rng = SplitMix64::seed(23);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        goose.position = Vec2::new(500.0, 400.0);
+        let mut task = GracefulExitTask::new();
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+
+        assert!(!task.run(&mut goose, &mut ctx));
+        goose.position = goose.target_pos;
+        ctx.goose_visible = false;
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(goose.velocity, Vec2::ZERO);
+        assert_eq!(goose.target_pos, goose.position);
+    }
+
+    #[test]
+    fn collect_task_ends_only_for_a_matching_dead_request() {
+        for origin in [
+            CollectWindowCloseOrigin::User,
+            CollectWindowCloseOrigin::Program,
+        ] {
+            let mut rng = SplitMix64::seed(24);
+            let mut sounds = Vec::new();
+            let mut cursor_commands = Vec::new();
+            let mut goose = GooseEntity::new();
+            let mut task = CollectWindowTask::forced(CollectWindowKind::Note);
+            let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+            ctx.collect_window = collect_options(1, 0);
+            assert!(!task.run(&mut goose, &mut ctx));
+            let request = match ctx.collect_window_commands.as_slice() {
+                [CollectWindowCommand::Spawn { request, .. }] => *request,
+                other => panic!("unexpected commands: {other:?}"),
+            };
+            ctx.collect_window_snapshot = Some(collect_close_snapshot(
+                request,
+                CollectWindowKind::Note,
+                origin,
+            ));
+            assert!(task.run(&mut goose, &mut ctx));
+        }
+    }
+
+    #[test]
+    fn annoyed_reaction_is_visible_and_audible_only_when_allowed() {
+        let mut rng = SplitMix64::seed(25);
+        let mut sounds = Vec::new();
+        let mut cursor_commands = Vec::new();
+        let mut goose = GooseEntity::new();
+        goose.position = Vec2::new(500.0, 400.0);
+        let starting_direction = goose.direction;
+        let mut task = AnnoyedReactionTask::new(true);
+        let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursor_commands);
+        assert!(!task.run(&mut goose, &mut ctx));
+        assert_eq!(goose.position, Vec2::new(500.0, 400.0));
+        assert_ne!(goose.direction, starting_direction);
+        assert!(goose.extending_neck);
+        assert_eq!(&*ctx.sounds, &[Sound::high_honk()]);
+
+        let mut quiet = AnnoyedReactionTask::new(false);
+        ctx.sounds.clear();
+        assert!(!quiet.run(&mut goose, &mut ctx));
+        assert!(ctx.sounds.is_empty());
     }
 
     #[test]

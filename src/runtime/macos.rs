@@ -108,7 +108,8 @@ pub fn run(
             "honk300: waiting calmly for macOS Accessibility permission; status, reload, honk, and stop remain available."
         );
     }
-    let mut collect_controller = CollectWindowController::new(primary_bounds, primary_bounds);
+    let mut collect_controller =
+        CollectWindowController::new(primary_bounds, overlay.virtual_desktop_bounds());
     let mut core = RuntimeCore::new();
     let mut canvas: Option<Pixmap> = None;
     const AUDIO_RETRY_INTERVAL: f64 = 5.0;
@@ -136,7 +137,7 @@ pub fn run(
             if world.permission_waiting() {
                 world.update_permission_wait_anchor(safe_anchor(primary));
             }
-            collect_controller.update_display_bounds(primary, primary);
+            collect_controller.update_display_bounds(primary, overlay.virtual_desktop_bounds());
         }
 
         let frame = core.begin_frame();
@@ -146,7 +147,7 @@ pub fn run(
                 ControlCommand::Stop => {
                     println!("honk300: stop command received.");
                     request.respond(ControlResponse::Ok);
-                    return Ok(());
+                    RuntimeCore::begin_graceful_stop(&mut world);
                 }
                 ControlCommand::Reload => {
                     let response = match Config::load_existing(&options.config_path) {
@@ -465,6 +466,12 @@ pub fn run(
             render_hearts(canvas, world.hearts(), world.now(), origin);
             render_sleepies(canvas, world.sleepies(), world.now(), origin);
             overlay.present(dirty, canvas)?;
+            core.acknowledge_present();
+        }
+
+        if core.graceful_stop_complete(&world) {
+            println!("honk300: goose walked home; stopping.");
+            return Ok(());
         }
 
         std::thread::sleep(core.next_tick_delay());

@@ -211,13 +211,15 @@ jobs:
           Copy-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'dist.exe') -Destination (Join-Path $destination 'dist.exe') -Force
           $destination | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Install GNU Linux audio headers
-        if: ${{ runner.os == 'Linux' && contains(join(matrix.targets, ','), '-unknown-linux-gnu') }}
+      - name: Install Linux audio and compositor qualification packages
+        if: ${{ runner.os == 'Linux' && contains(join(matrix.targets, ','), '-unknown-linux-') }}
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y libasound2-dev
+          sudo apt-get install --no-install-recommends -y \
+            grim imagemagick libasound2-dev openbox python3 sway x11-utils \
+            x11-xserver-utils xcompmgr xvfb
 
       - name: Install native packages
         run: |
@@ -228,6 +230,59 @@ jobs:
         run: |
           set -euo pipefail
           dist build --tag='${{ needs.plan.outputs.tag }}' --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
+
+      - name: Qualify exact Linux archive payload before upload
+        if: ${{ runner.os == 'Linux' && contains(join(matrix.targets, ','), '-unknown-linux-') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='${{ join(matrix.targets, '') }}'
+          case "$target" in
+            x86_64-unknown-linux-gnu|x86_64-unknown-linux-musl) machine=62 ;;
+            aarch64-unknown-linux-gnu|aarch64-unknown-linux-musl) machine=183 ;;
+            *) echo "unexpected Linux portable target: $target" >&2; exit 1 ;;
+          esac
+          archive="target/distrib/honk300-$target.tar.xz"
+          root="honk300-$target"
+          binary="target/exact-linux-$target/$root/honk300"
+          evidence="target/linux-portable-qualification-$target"
+          test -f "$archive" && test ! -L "$archive"
+          rm -rf "target/exact-linux-$target" "$evidence"
+          mkdir -p "target/exact-linux-$target" "$evidence"
+          tar -tJf "$archive" | LC_ALL=C sort > "$evidence/archive-members.txt"
+          test "$(grep -Fxc "$root/honk300" "$evidence/archive-members.txt")" -eq 1
+          tar -xJf "$archive" -C "target/exact-linux-$target"
+          test -x "$binary" && test ! -L "$binary"
+          python3 script/verify_binary_architecture.py --format elf --machine "$machine" "$binary" \
+            | tee "$evidence/architecture.txt"
+          archive_before="$(sha256sum "$archive" | awk '{print $1}')"
+          binary_before="$(sha256sum "$binary" | awk '{print $1}')"
+          {
+            echo "target=$target"
+            echo "elf_machine=$machine"
+            echo "archive_sha256_before=$archive_before"
+            echo "binary_sha256_before=$binary_before"
+          } > "$evidence/identity.txt"
+          HONK300_BIN="$PWD/$binary" \
+          HONK300_EVIDENCE_DIR="$PWD/$evidence/compositor" \
+            sh script/smoke_m17_m18_linux.sh
+          archive_after="$(sha256sum "$archive" | awk '{print $1}')"
+          binary_after="$(sha256sum "$binary" | awk '{print $1}')"
+          test "$archive_after" = "$archive_before"
+          test "$binary_after" = "$binary_before"
+          {
+            echo "archive_sha256_after=$archive_after"
+            echo "binary_sha256_after=$binary_after"
+          } >> "$evidence/identity.txt"
+
+      - name: Upload exact Linux portable qualification evidence
+        if: ${{ always() && runner.os == 'Linux' && contains(join(matrix.targets, ','), '-unknown-linux-') }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualification-linux-portable-${{ join(matrix.targets, '_') }}
+          path: target/linux-portable-qualification-${{ join(matrix.targets, '') }}
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Collect upload paths
         id: cargo-dist
@@ -244,6 +299,92 @@ jobs:
         with:
           name: release-portable-${{ join(matrix.targets, '_') }}
           path: ${{ steps.cargo-dist.outputs.paths }}
+          if-no-files-found: error
+          retention-days: 7
+
+  qualify-windows-portable:
+    name: exact portable ZIP (${{ matrix.triple }})
+    needs:
+      - plan
+      - build-portable-artifacts
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - triple: x86_64-pc-windows-msvc
+            runner: windows-2022
+            machine: '0x8664'
+            host_arch: AMD64
+          - triple: aarch64-pc-windows-msvc
+            runner: windows-11-arm
+            machine: '0xAA64'
+            host_arch: ARM64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+          persist-credentials: false
+
+      - name: Download exact cargo-dist ZIP payload
+        uses: actions/download-artifact@v7
+        with:
+          name: release-portable-${{ matrix.triple }}
+          path: target/windows-portable-input
+
+      - name: Prove host, PE identity, ZIP shape, hashes, compositor, and lifecycle
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:PROCESSOR_ARCHITECTURE -ne '${{ matrix.host_arch }}') {
+            throw "Expected ${{ matrix.host_arch }} host, got '$env:PROCESSOR_ARCHITECTURE'"
+          }
+          $zip = 'target/windows-portable-input/honk300-${{ matrix.triple }}.zip'
+          if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) {
+            throw "Exact cargo-dist ZIP is missing: $zip"
+          }
+          $extract = 'target/windows-portable-extracted-${{ matrix.triple }}'
+          $evidence = 'target/windows-portable-qualification-${{ matrix.triple }}'
+          Remove-Item -LiteralPath $extract, $evidence -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $extract, $evidence | Out-Null
+          Expand-Archive -LiteralPath $zip -DestinationPath $extract
+          $binary = Join-Path $extract 'honk300.exe'
+          if (-not (Test-Path -LiteralPath $binary -PathType Leaf)) {
+            throw "cargo-dist ZIP must contain root honk300.exe"
+          }
+          $unexpected = Get-ChildItem -LiteralPath $extract -Recurse -Filter honk300.exe |
+            Where-Object { $_.FullName -ne (Resolve-Path -LiteralPath $binary).Path }
+          if ($unexpected) { throw 'cargo-dist ZIP contains duplicate honk300.exe payloads' }
+          python script/verify_binary_architecture.py --format pe --machine '${{ matrix.machine }}' $binary |
+            Tee-Object -FilePath (Join-Path $evidence 'architecture.txt')
+          if ($LASTEXITCODE -ne 0) { throw 'cargo-dist PE identity check failed' }
+          $zipBefore = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $binaryBefore = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
+          @(
+            "triple=${{ matrix.triple }}",
+            "pe_machine=${{ matrix.machine }}",
+            "zip_sha256_before=$zipBefore",
+            "binary_sha256_before=$binaryBefore"
+          ) | Set-Content -LiteralPath (Join-Path $evidence 'identity.txt') -Encoding utf8
+          ./script/smoke_windows_overlay.ps1 `
+            -Binary $binary `
+            -EvidenceDirectory (Join-Path $evidence 'compositor')
+          $zipAfter = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $binaryAfter = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($zipAfter -ne $zipBefore) { throw 'cargo-dist ZIP changed during qualification' }
+          if ($binaryAfter -ne $binaryBefore) { throw 'extracted binary changed during qualification' }
+          @(
+            "zip_sha256_after=$zipAfter",
+            "binary_sha256_after=$binaryAfter"
+          ) | Add-Content -LiteralPath (Join-Path $evidence 'identity.txt') -Encoding utf8
+
+      - name: Upload exact Windows portable qualification evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualification-windows-portable-${{ matrix.triple }}
+          path: target/windows-portable-qualification-${{ matrix.triple }}
           if-no-files-found: error
           retention-days: 7
 
@@ -275,6 +416,7 @@ jobs:
     needs:
       - plan
       - build-portable-artifacts
+      - qualify-windows-portable
       - windows-installers
       - macos-app
     runs-on: ubuntu-22.04
@@ -420,6 +562,15 @@ jobs:
         if: ${{ inputs.candidate }}
         shell: bash
         run: echo "Candidate artifact set verified without publication for $TAG at $COMMIT"
+
+      - name: Preserve the complete verified candidate artifact set
+        if: ${{ inputs.candidate }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: candidate-release-assets-${{ needs.plan.outputs.tag }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Refuse mutable or pre-existing release state
         if: ${{ !inputs.candidate }}

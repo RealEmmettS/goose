@@ -144,6 +144,29 @@ fn premultiplied_bgra_from_rgba(rgba: &[u8]) -> Vec<u8> {
     out
 }
 
+#[cfg(any(test, target_os = "linux"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct X11Argb8888Layout {
+    direct: bool,
+    depth: u8,
+    channel_shifts: [u16; 4],
+    channel_masks: [u16; 4],
+    image_lsb_first: bool,
+    bits_per_pixel: u8,
+    scanline_pad: u8,
+}
+
+#[cfg(any(test, target_os = "linux"))]
+fn x11_accepts_hard_coded_bgra(layout: X11Argb8888Layout) -> bool {
+    layout.direct
+        && layout.depth == 32
+        && layout.channel_shifts == [16, 8, 0, 24]
+        && layout.channel_masks == [0xff; 4]
+        && layout.image_lsb_first
+        && layout.bits_per_pixel == 32
+        && layout.scanline_pad == 32
+}
+
 #[cfg(test)]
 fn x11_setup_steps() -> [&'static str; 2] {
     ["shape", "map"]
@@ -415,7 +438,10 @@ mod platform {
     }
 
     mod x11 {
-        use super::super::{x11_mapping_allowed, xfixes_supports_regions};
+        use super::super::{
+            x11_accepts_hard_coded_bgra, x11_mapping_allowed, xfixes_supports_regions,
+            X11Argb8888Layout,
+        };
         use super::{clamp_i16, clamp_u16, x11_bgra_from_rgba};
         use honk_engine::tiny_skia::Pixmap;
         use honk_engine::{ForeignWindowId, ForeignWindowSnapshot, Pointer, Rect, Vec2};
@@ -423,15 +449,15 @@ mod platform {
         use std::io;
         use x11rb::connection::Connection;
         use x11rb::protocol::randr::{ConnectionExt as RandrConnectionExt, NotifyMask};
-        use x11rb::protocol::render::ConnectionExt as RenderConnectionExt;
+        use x11rb::protocol::render::{ConnectionExt as RenderConnectionExt, PictType};
         use x11rb::protocol::shape::{self, ConnectionExt as ShapeConnectionExt};
         use x11rb::protocol::xfixes::ConnectionExt as XFixesConnectionExt;
         use x11rb::protocol::xinerama::ConnectionExt as XineramaConnectionExt;
         use x11rb::protocol::xproto::{
             AtomEnum, ButtonMask, ColormapAlloc, ConfigureWindowAux,
             ConnectionExt as XprotoConnectionExt, CreateGCAux, CreateWindowAux, EventMask,
-            GetPropertyReply, ImageFormat, PropMode, Rectangle, Screen, StackMode, Visualid,
-            Window, WindowClass,
+            GetPropertyReply, ImageFormat, ImageOrder, PropMode, Rectangle, Screen, StackMode,
+            Visualid, Window, WindowClass,
         };
         use x11rb::protocol::Event;
         use x11rb::rust_connection::RustConnection;
@@ -484,8 +510,9 @@ mod platform {
                 let root = screen.root;
                 let atoms = Atoms::new(&conn).map_err(to_io)?.reply().map_err(to_io)?;
                 initialize_input_shape_extensions(&conn)?;
-                let visual = choose_argb_visual(&conn, screen_num)
-                    .ok_or_else(|| io::Error::other("X11 overlay requires a 32-bit ARGB visual"))?;
+                let visual = choose_argb_visual(&conn, screen_num).ok_or_else(|| {
+                    io::Error::other("X11 overlay requires a little-endian 32-bpp ARGB8888 visual")
+                })?;
                 if !compositor_running(&conn, screen_num)? {
                     return Err(io::Error::other(
                         "X11 overlay requires an active compositing manager",
@@ -696,8 +723,11 @@ mod platform {
             fn reconcile_monitors(&mut self) -> io::Result<()> {
                 let screen = &self.conn.setup().roots[self.screen_num];
                 let monitors = query_monitors(&self.conn, self.root, screen);
-                let visual = choose_argb_visual(&self.conn, self.screen_num)
-                    .ok_or_else(|| io::Error::other("X11 overlay lost its required ARGB visual"))?;
+                let visual = choose_argb_visual(&self.conn, self.screen_num).ok_or_else(|| {
+                    io::Error::other(
+                        "X11 overlay lost its required little-endian 32-bpp ARGB8888 visual",
+                    )
+                })?;
                 if !compositor_running(&self.conn, self.screen_num)? {
                     return Err(io::Error::other(
                         "X11 compositing manager disappeared during topology refresh",
@@ -902,6 +932,11 @@ mod platform {
             let Ok(reply) = cookie.reply() else {
                 return None;
             };
+            let setup = conn.setup();
+            let pixmap_format = setup
+                .pixmap_formats
+                .iter()
+                .find(|format| format.depth == 32)?;
             let screen = reply.screens.get(screen_num)?;
             for depth in &screen.depths {
                 if depth.depth != 32 {
@@ -915,7 +950,26 @@ mod platform {
                     else {
                         continue;
                     };
-                    if format.depth == 32 && format.direct.alpha_mask != 0 {
+                    let layout = X11Argb8888Layout {
+                        direct: format.type_ == PictType::DIRECT,
+                        depth: format.depth,
+                        channel_shifts: [
+                            format.direct.red_shift,
+                            format.direct.green_shift,
+                            format.direct.blue_shift,
+                            format.direct.alpha_shift,
+                        ],
+                        channel_masks: [
+                            format.direct.red_mask,
+                            format.direct.green_mask,
+                            format.direct.blue_mask,
+                            format.direct.alpha_mask,
+                        ],
+                        image_lsb_first: setup.image_byte_order == ImageOrder::LSB_FIRST,
+                        bits_per_pixel: pixmap_format.bits_per_pixel,
+                        scanline_pad: pixmap_format.scanline_pad,
+                    };
+                    if x11_accepts_hard_coded_bgra(layout) {
                         return Some(ChosenVisual {
                             depth: depth.depth,
                             visual: visual.visual,
@@ -1979,6 +2033,54 @@ mod tests {
         assert!(!x11_mapping_allowed(true, false, true));
         assert!(!x11_mapping_allowed(true, true, false));
         assert!(x11_mapping_allowed(true, true, true));
+    }
+
+    #[test]
+    fn x11_hard_coded_bgra_requires_exact_little_endian_argb8888() {
+        let expected = X11Argb8888Layout {
+            direct: true,
+            depth: 32,
+            channel_shifts: [16, 8, 0, 24],
+            channel_masks: [0xff; 4],
+            image_lsb_first: true,
+            bits_per_pixel: 32,
+            scanline_pad: 32,
+        };
+        assert!(x11_accepts_hard_coded_bgra(expected));
+
+        let rejected = [
+            X11Argb8888Layout {
+                direct: false,
+                ..expected
+            },
+            X11Argb8888Layout {
+                depth: 24,
+                ..expected
+            },
+            X11Argb8888Layout {
+                channel_shifts: [0, 8, 16, 24],
+                ..expected
+            },
+            X11Argb8888Layout {
+                channel_masks: [0xff, 0xff, 0xff, 0],
+                ..expected
+            },
+            X11Argb8888Layout {
+                image_lsb_first: false,
+                ..expected
+            },
+            X11Argb8888Layout {
+                bits_per_pixel: 24,
+                ..expected
+            },
+            X11Argb8888Layout {
+                scanline_pad: 16,
+                ..expected
+            },
+        ];
+        assert!(rejected
+            .into_iter()
+            .all(|layout| !x11_accepts_hard_coded_bgra(layout)));
     }
 
     #[test]

@@ -21,6 +21,15 @@ pub enum CollectWindowKind {
     Meme,
 }
 
+/// Why a previously live Honk300-owned collect window disappeared.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CollectWindowCloseOrigin {
+    /// The person used the native close control.
+    User,
+    /// Honk300 closed its own prop as part of normal behavior or cleanup.
+    Program,
+}
+
 /// A selected content item known to the runtime asset catalog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CollectWindowPayload {
@@ -142,11 +151,43 @@ pub struct CollectWindowSnapshot {
     pub kind: CollectWindowKind,
     pub rect: Rect,
     pub alive: bool,
+    /// Set only for a one-shot dead-window snapshot.
+    pub close_origin: Option<CollectWindowCloseOrigin>,
 }
 
 impl CollectWindowSnapshot {
     pub fn center(self) -> Vec2 {
         (self.rect.min + self.rect.max) * 0.5
+    }
+}
+
+/// One-shot evidence that a specific Honk300-owned prop stopped existing.
+///
+/// This is deliberately separate from the latest live snapshot. A backend can report a close
+/// for a lingering note while a newer collect request is active, and the engine must retain both
+/// facts without allowing the unrelated close to terminate the newer request.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CollectWindowCloseEvent {
+    pub id: CollectWindowId,
+    pub request: CollectWindowRequestId,
+    pub kind: CollectWindowKind,
+    pub rect: Rect,
+    pub origin: CollectWindowCloseOrigin,
+}
+
+impl CollectWindowCloseEvent {
+    pub fn from_dead_snapshot(snapshot: CollectWindowSnapshot) -> Option<Self> {
+        (!snapshot.alive).then_some(Self {
+            id: snapshot.id,
+            request: snapshot.request,
+            kind: snapshot.kind,
+            rect: snapshot.rect,
+            origin: snapshot.close_origin?,
+        })
+    }
+
+    pub fn matches(self, request: CollectWindowRequestId, kind: CollectWindowKind) -> bool {
+        self.request == request && self.kind == kind
     }
 }
 

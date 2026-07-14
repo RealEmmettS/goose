@@ -9,6 +9,7 @@ fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="${HONK300_VERSION:-0.0.0}"
 IDENTITY="${MACOS_SIGN_IDENTITY:--}"
+KEYCHAIN="${MACOS_SIGN_KEYCHAIN:-}"
 STAGE_DIR="${1:-"$ROOT/target/dist/macos-universal2"}"
 APP_DIR="$STAGE_DIR/Install Honk300.app"
 CONTENTS="$APP_DIR/Contents"
@@ -77,8 +78,13 @@ if [[ "$IDENTITY" == "-" ]]; then
   codesign --force --options runtime --sign - "$EXECUTABLE"
   codesign --force --options runtime --sign - "$APP_DIR"
 else
-  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$EXECUTABLE"
-  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
+  if [[ -n "$KEYCHAIN" ]]; then
+    codesign --keychain "$KEYCHAIN" --force --options runtime --timestamp --sign "$IDENTITY" "$EXECUTABLE"
+    codesign --keychain "$KEYCHAIN" --force --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
+  else
+    codesign --force --options runtime --timestamp --sign "$IDENTITY" "$EXECUTABLE"
+    codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
+  fi
 fi
 codesign --verify --strict --verbose=2 "$EXECUTABLE"
 codesign --verify --strict --verbose=2 "$APP_DIR"

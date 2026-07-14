@@ -2,7 +2,16 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^v[0-9]+\.[0-9]+\.[0-9]+$')]
-    [string] $Tag
+    [string] $Tag,
+
+    [ValidateSet('x86_64-pc-windows-msvc', 'aarch64-pc-windows-msvc')]
+    [string] $TargetTriple = 'x86_64-pc-windows-msvc',
+
+    [string] $CurrentMsiPath = '',
+
+    [string] $SourceBinaryPath = '',
+
+    [string] $OverlayEvidenceDirectory = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,12 +22,26 @@ $Version = $Tag.Substring(1)
 $Root = Join-Path $env:RUNNER_TEMP "honk300-live-msi-$([Guid]::NewGuid().ToString('N'))"
 $MsiExec = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) 'msiexec.exe'
 $Binary = Join-Path $env:ProgramFiles 'honk300\bin\honk300.exe'
+$ArchitectureScript = Join-Path $PSScriptRoot 'verify_binary_architecture.py'
 $script:MsiInvocation = 0
+$ExpectedHost = if ($TargetTriple -eq 'aarch64-pc-windows-msvc') { 'ARM64' } else { 'AMD64' }
+$ExpectedMachine = if ($TargetTriple -eq 'aarch64-pc-windows-msvc') { '0xAA64' } else { '0x8664' }
+if ($env:PROCESSOR_ARCHITECTURE -ne $ExpectedHost) {
+    throw "Expected native $ExpectedHost host for $TargetTriple, got '$env:PROCESSOR_ARCHITECTURE'"
+}
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
+if (-not $OverlayEvidenceDirectory) {
+    $OverlayEvidenceDirectory = Join-Path (Split-Path -Parent $PSScriptRoot) `
+        "target\post-release-windows-overlay-evidence-$TargetTriple"
+}
+$OverlayEvidenceDirectory = [IO.Path]::GetFullPath($OverlayEvidenceDirectory)
+New-Item -ItemType Directory -Force -Path $OverlayEvidenceDirectory | Out-Null
 
 function Download-VerifiedReleaseAsset {
     param([string] $ReleaseTag, [string] $Name)
-    $path = Join-Path $Root $Name
+    $directory = Join-Path $Root $ReleaseTag
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    $path = Join-Path $directory $Name
     $sidecar = "$path.sha256"
     $base = "$Repository/releases/download/$ReleaseTag"
     Invoke-WebRequest -UseBasicParsing "$base/$Name" -OutFile $path -MaximumRetryCount 4 -RetryIntervalSec 2
@@ -53,6 +76,12 @@ function Reported-Version {
     return ((& $Binary --version | Select-Object -Last 1).Trim() -replace '^.*\s', '')
 }
 
+function Assert-PeMachine {
+    param([string] $Path)
+    & python $ArchitectureScript --format pe --machine $ExpectedMachine $Path
+    if ($LASTEXITCODE -ne 0) { throw "PE identity check failed for $Path" }
+}
+
 function Add-ForcedRollbackFailure {
     param([string] $Path)
     $installer = New-Object -ComObject WindowsInstaller.Installer
@@ -79,18 +108,32 @@ function Add-ForcedRollbackFailure {
 $CurrentMsi = $null
 $PreviousMsi = $null
 try {
-    $CurrentName = 'honk300-x86_64-pc-windows-msvc.msi'
-    $ArmName = 'honk300-aarch64-pc-windows-msvc.msi'
-    $CurrentMsi = Download-VerifiedReleaseAsset -ReleaseTag $Tag -Name $CurrentName
-    $ArmMsi = Download-VerifiedReleaseAsset -ReleaseTag $Tag -Name $ArmName
+    $CurrentName = "honk300-$TargetTriple.msi"
+    if ($CurrentMsiPath) {
+        $CurrentMsi = (Resolve-Path -LiteralPath $CurrentMsiPath).Path
+    } else {
+        $CurrentMsi = Download-VerifiedReleaseAsset -ReleaseTag $Tag -Name $CurrentName
+    }
+    $PreviousMsi = Download-VerifiedReleaseAsset -ReleaseTag 'v0.2.1' -Name $CurrentName
 
-    $PreviousMsi = Join-Path $Root 'honk300-v0.2.1-x86_64-global.msi'
-    Invoke-WebRequest -UseBasicParsing `
-        "$Repository/releases/download/v0.2.1/honk300-x86_64-pc-windows-msvc.msi" `
-        -OutFile $PreviousMsi -MaximumRetryCount 4 -RetryIntervalSec 2
-    $previousHash = (Get-FileHash -LiteralPath $PreviousMsi -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($previousHash -ne '9566f3cc4c97fd16b087f72f16aedf0f80e1044868f2c0694329b4462929e022') {
-        throw "v0.2.1 MSI hash mismatch: $previousHash"
+    $SourceHash = $null
+    if ($SourceBinaryPath) {
+        $SourceBinaryPath = (Resolve-Path -LiteralPath $SourceBinaryPath).Path
+        Assert-PeMachine -Path $SourceBinaryPath
+        $SourceHash = (Get-FileHash -LiteralPath $SourceBinaryPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+
+    $AdministrativeStage = Join-Path $Root 'administrative-extraction'
+    Require-MsiSuccess -Mode '/a' -Path $CurrentMsi -Extra @("TARGETDIR=`"$AdministrativeStage`"")
+    $ExtractedBinaries = @(Get-ChildItem -LiteralPath $AdministrativeStage -Recurse -Filter honk300.exe -File)
+    if ($ExtractedBinaries.Count -ne 1) {
+        throw "administrative extraction expected one honk300.exe, got $($ExtractedBinaries.Count)"
+    }
+    $ExtractedBinary = $ExtractedBinaries[0].FullName
+    Assert-PeMachine -Path $ExtractedBinary
+    $ExtractedHash = (Get-FileHash -LiteralPath $ExtractedBinary -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($SourceHash -and $ExtractedHash -ne $SourceHash) {
+        throw 'MSI-extracted binary does not match the exact qualified build'
     }
 
     foreach ($package in @($CurrentMsi, $PreviousMsi)) {
@@ -115,21 +158,36 @@ try {
 
     Require-MsiSuccess -Mode '/i' -Path $CurrentMsi
     if ((Reported-Version) -ne $Version) { throw "upgrade did not install $Version" }
+    Assert-PeMachine -Path $Binary
+    $InstalledHash = (Get-FileHash -LiteralPath $Binary -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($InstalledHash -ne $ExtractedHash) {
+        throw 'installed binary does not match the administratively extracted MSI payload'
+    }
     Require-MsiSuccess -Mode '/fa' -Path $CurrentMsi
+    $RepairedHash = (Get-FileHash -LiteralPath $Binary -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($RepairedHash -ne $ExtractedHash) { throw 'MSI repair changed the installed executable' }
+
+    @(
+        "target=$TargetTriple",
+        "pe_machine=$ExpectedMachine",
+        "msi_sha256=$((Get-FileHash -LiteralPath $CurrentMsi -Algorithm SHA256).Hash.ToLowerInvariant())",
+        "source_sha256=$SourceHash",
+        "extracted_sha256=$ExtractedHash",
+        "installed_sha256=$InstalledHash",
+        "repaired_sha256=$RepairedHash"
+    ) | Set-Content -LiteralPath (Join-Path $OverlayEvidenceDirectory 'msi-identity.txt') -Encoding utf8
+
+    & (Join-Path $PSScriptRoot 'smoke_windows_overlay.ps1') `
+        -Binary $Binary `
+        -EvidenceDirectory (Join-Path $OverlayEvidenceDirectory 'compositor')
 
     $downgrade = Start-Msi -Mode '/i' -Path $PreviousMsi
     if ($downgrade.ExitCode -in @(0, 3010)) { throw 'Downgrade unexpectedly succeeded' }
     if ((Reported-Version) -ne $Version) { throw 'rejected downgrade changed the installed version' }
 
-    $ArmStage = Join-Path $Root 'arm64-administrative-extraction'
-    Require-MsiSuccess -Mode '/a' -Path $ArmMsi -Extra @("TARGETDIR=`"$ArmStage`"")
-    if (-not (Get-ChildItem -LiteralPath $ArmStage -Recurse -Filter honk300.exe)) {
-        throw 'ARM64 administrative extraction did not contain honk300.exe'
-    }
-
     Require-MsiSuccess -Mode '/x' -Path $CurrentMsi
     if (Test-Path -LiteralPath $Binary -PathType Leaf) { throw 'MSI uninstall left honk300.exe behind' }
-    Write-Output "live Windows $Tag rollback, upgrade, repair, downgrade, ARM extraction, and uninstall smoke passed"
+    Write-Output "native Windows $TargetTriple $Tag rollback, upgrade, repair, downgrade, compositor, and uninstall smoke passed"
 }
 finally {
     foreach ($package in @($CurrentMsi, $PreviousMsi)) {
@@ -140,5 +198,8 @@ finally {
             }
         }
     }
+    $MsiLogDirectory = Join-Path $OverlayEvidenceDirectory 'msi-logs'
+    New-Item -ItemType Directory -Force -Path $MsiLogDirectory | Out-Null
+    Copy-Item -Path (Join-Path $Root 'msi-*.log') -Destination $MsiLogDirectory -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue
 }

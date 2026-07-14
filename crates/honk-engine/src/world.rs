@@ -6,7 +6,10 @@
 //! goose; the gait + footmark logic here is mechanical.
 
 use crate::autumn::AutumnState;
-use crate::collect_window::{CollectWindowCommand, CollectWindowKind, CollectWindowSnapshot};
+use crate::collect_window::{
+    CollectWindowCloseEvent, CollectWindowCloseOrigin, CollectWindowCommand, CollectWindowKind,
+    CollectWindowSnapshot,
+};
 use crate::command::{PokeAction, PokeOutcome};
 use crate::cursor::{CursorCommand, WorldOptions};
 use crate::foreign_window::ForeignWindowSnapshot;
@@ -22,14 +25,19 @@ use crate::rng::{Deck, RandomSource, SplitMix64};
 use crate::schedule::PresenceSnapshot;
 use crate::sound::Sound;
 use crate::task::{
-    AutumnLeafPileTask, CollectWindowTask, ExcursionKind, ExcursionTask, FirstUxTask, HyperTask,
-    NabMouseTask, PerchRideTask, PermissionWaitTask, Task, TaskCtx, WanderTask,
+    AnnoyedReactionTask, AutumnLeafPileTask, CollectWindowTask, EdgeEntryTask, EdgeWrapTask,
+    ExcursionKind, ExcursionTask, FirstUxTask, GracefulExitTask, HyperTask, NabMouseTask,
+    PerchRideTask, PermissionWaitTask, Task, TaskCtx, WanderTask,
 };
 use crate::time::DT;
+use std::collections::VecDeque;
 
 /// Distance travelled per full walking-gait cycle (radians of `gait_phase` per `TAU`).
 const GAIT_CYCLE_DISTANCE: f32 = 22.0;
 const SECOND_HOURLY_HONK_DELAY: f64 = 0.35;
+const LIFECYCLE_EDGE_MARGIN: f32 = 220.0;
+const LIFECYCLE_EDGE_INSET: f32 = 56.0;
+const USER_CLOSE_REACTION_PROBABILITY: f64 = 0.30;
 
 /// The whole simulation: one goose roaming within `bounds` (the virtual-desktop space).
 pub struct World {
@@ -39,6 +47,8 @@ pub struct World {
     /// Actual visible monitor regions used for targets, clipping, and hotplug recovery.
     layout: DesktopLayout,
     rng: SplitMix64,
+    /// Dedicated stream so close-reaction probability is stable across unrelated animation RNG.
+    reaction_rng: SplitMix64,
     current: Box<dyn Task>,
     /// Factories for the randomly-pickable roaming tasks (the original's `TaskDatabase`).
     pickable: Vec<fn() -> Box<dyn Task>>,
@@ -104,13 +114,35 @@ pub struct World {
     meander_amp: f32,
     meander_amp_target: f32,
     next_meander_shift: f64,
+    /// A user-close reaction should chain the existing bounded cursor prank after its visible beat.
+    close_reaction_nab: bool,
+    /// Ordered, typed close evidence. Lingering props can close while another request is active.
+    pending_collect_closes: VecDeque<CollectWindowCloseEvent>,
+    /// Bounded one-shot key history protects against a backend repeating the same dead snapshot.
+    observed_collect_closes: VecDeque<CollectWindowCloseEvent>,
+    /// Lifecycle intent is latched independently from the active task so permission/topology
+    /// transitions can never cancel an in-progress terminal exit.
+    graceful_exit_requested: bool,
 }
 
 use crate::entity::GooseEntity;
 
 impl World {
-    /// A world bounded by `bounds`, with the goose entering from just off the bottom edge
-    /// for the FirstUX intro. `seed` makes the whole simulation deterministic.
+    fn staged_entry(layout: &DesktopLayout, rng: &mut impl RandomSource) -> (Vec2, Vec2) {
+        let edge = layout.sample_exposed_edge(rng, Some(0));
+        let primary = layout.regions()[0];
+        let primary_center = (primary.min + primary.max) * 0.5;
+        let boundary = edge.point_near(primary_center, LIFECYCLE_EDGE_INSET);
+        let target =
+            layout.clamp_point(boundary + edge.direction().inward() * LIFECYCLE_EDGE_MARGIN);
+        (
+            boundary + edge.direction().outward() * LIFECYCLE_EDGE_MARGIN,
+            target,
+        )
+    }
+
+    /// A world bounded by `bounds`, with the goose entering through a real exposed edge for the
+    /// FirstUX intro. `seed` makes the whole simulation deterministic.
     pub fn new(bounds: Rect, seed: u64) -> Self {
         Self::with_options(bounds, seed, WorldOptions::default())
     }
@@ -132,12 +164,14 @@ impl World {
         options: WorldOptions,
     ) -> Self {
         let bounds = layout.bounds();
-        let center = (bounds.min + bounds.max) * 0.5;
+        let mut rng = SplitMix64::seed(seed);
+        let (startup_position, startup_target) = Self::staged_entry(&layout, &mut rng);
         let mut goose = GooseEntity::new();
         goose.parameters = options.parameters;
-        // Enter from just off the bottom edge; FirstUX walks the goose on-stage.
-        goose.position = Vec2::new(center.x, bounds.max.y + 60.0);
-        goose.target_pos = center;
+        // Enter through a genuinely exposed edge on the first monitor. Shared monitor seams
+        // are excluded, so startup never materializes on top of another real display.
+        goose.position = startup_position;
+        goose.target_pos = startup_target;
         goose.current_speed = goose.parameters.walk_speed;
         goose.current_acceleration = goose.parameters.acceleration_normal;
         goose.anim = RigAnim::new(goose.position, goose.direction);
@@ -147,7 +181,6 @@ impl World {
                 .update(&RigInput::static_pose(goose.position, goose.direction, 0.0));
         goose.rig = goose.pose.primary;
 
-        let mut rng = SplitMix64::seed(seed);
         let mood = MoodMachine::new(0.0, options.mood, &mut rng);
         let presence = PresenceSnapshot::default();
         let local_time = None;
@@ -172,7 +205,8 @@ impl World {
             bounds,
             layout,
             rng,
-            current: Box::new(FirstUxTask::new()), // scripted intro runs first
+            reaction_rng: SplitMix64::seed(seed ^ 0xD1B5_4A32_D192_ED03),
+            current: Box::new(FirstUxTask::entering(startup_target)), // scripted intro runs first
             pickable,
             deck,
             elapsed: 0.0,
@@ -203,6 +237,10 @@ impl World {
             meander_amp: 0.0,
             meander_amp_target: 0.0,
             next_meander_shift: 0.0,
+            close_reaction_nab: false,
+            pending_collect_closes: VecDeque::new(),
+            observed_collect_closes: VecDeque::new(),
+            graceful_exit_requested: false,
             pending_nab: false,
             pending_collect: None,
             interrupted: None,
@@ -223,29 +261,56 @@ impl World {
     /// monitors or gaps. Transient desktop-control tasks are cancelled safely; ordinary
     /// animation/task state survives with its position and target clamped to visible space.
     pub fn apply_layout(&mut self, layout: DesktopLayout) {
+        let was_exiting = self.graceful_exit_requested();
+        let was_permission_waiting = self.permission_waiting();
         let was_collecting = self.is_collect_window_active();
-        if was_collecting {
+        if was_collecting && !was_exiting && !was_permission_waiting {
             self.abandon_collect_window();
-        } else if matches!(self.current.id(), "excursion" | "nab_mouse" | "perch_ride") {
+        } else if !was_exiting
+            && !was_permission_waiting
+            && matches!(
+                self.current.id(),
+                "edge_wrap" | "excursion" | "nab_mouse" | "perch_ride"
+            )
+        {
             self.resume_or_wander();
         }
 
         self.bounds = layout.bounds();
         self.layout = layout;
-        let clamped_position = self.layout.clamp_point(self.goose.position);
-        let clamped_target = self.layout.clamp_point(self.goose.target_pos);
-        if clamped_position != self.goose.position {
-            self.goose.position = clamped_position;
+        let permission_anchor = self.layout.clamp_point(self.goose.target_pos);
+        let still_visible = self
+            .layout
+            .clip_rect(self.goose.pose.bounding_box().grow(3.0))
+            .is_some();
+        if still_visible {
+            self.goose.target_pos = self.layout.clamp_point(self.goose.target_pos);
+            if was_exiting {
+                self.current = Box::new(GracefulExitTask::new());
+            } else if was_permission_waiting {
+                self.current = Box::new(PermissionWaitTask::new(permission_anchor));
+            }
+        } else {
+            let (entry_position, entry_target) = Self::staged_entry(&self.layout, &mut self.rng);
+            self.goose.position = entry_position;
+            self.goose.target_pos = entry_target;
             self.goose.velocity = Vec2::ZERO;
-            self.goose.anim = RigAnim::new(clamped_position, self.goose.direction);
+            self.goose.anim = RigAnim::new(entry_position, self.goose.direction);
             self.goose.pose = self.goose.anim.update(&RigInput::static_pose(
-                clamped_position,
+                entry_position,
                 self.goose.direction,
                 0.45,
             ));
             self.goose.rig = self.goose.pose.primary;
+            self.interrupted = None;
+            self.current = if was_exiting {
+                Box::new(GracefulExitTask::new())
+            } else if was_permission_waiting {
+                Box::new(PermissionWaitTask::new(permission_anchor))
+            } else {
+                Box::new(EdgeEntryTask::new(entry_target))
+            };
         }
-        self.goose.target_pos = clamped_target;
         if !self.layout.contains(self.pointer.pos) {
             self.pointer.present = false;
             self.prev_left_down = false;
@@ -255,6 +320,7 @@ impl World {
         self.pending_nab = false;
         self.pending_collect = None;
         self.excursion_prank = false;
+        self.close_reaction_nab = false;
         self.autumn.clear();
         self.refresh_schedule_state();
         self.rebuild_pickable();
@@ -266,8 +332,15 @@ impl World {
         manners_active: bool,
         autumn_pickable: bool,
     ) -> Vec<fn() -> Box<dyn Task>> {
-        let mut pickable: Vec<fn() -> Box<dyn Task>> =
-            vec![|| Box::new(WanderTask::new()) as Box<dyn Task>];
+        // Ordinary deck weighting: four normal wander beats for each edge wrap. This keeps the
+        // Pac-Man flourish occasional (20% of baseline deck draws) instead of every other task.
+        let mut pickable: Vec<fn() -> Box<dyn Task>> = vec![
+            || Box::new(WanderTask::new()) as Box<dyn Task>,
+            || Box::new(WanderTask::new()) as Box<dyn Task>,
+            || Box::new(WanderTask::new()) as Box<dyn Task>,
+            || Box::new(WanderTask::new()) as Box<dyn Task>,
+            || Box::new(EdgeWrapTask::new()) as Box<dyn Task>,
+        ];
         if manners_active {
             return pickable;
         }
@@ -355,6 +428,9 @@ impl World {
 
     /// Replace all active work with a platform-neutral safe wait at `anchor`.
     pub fn enter_permission_wait(&mut self, anchor: Vec2) {
+        if self.graceful_exit_requested() {
+            return;
+        }
         self.pending_cursor_commands.clear();
         self.pending_collect_window_commands.clear();
         if self.is_collect_window_active() {
@@ -371,6 +447,8 @@ impl World {
         self.pending_collect = None;
         self.dragged_window = None;
         self.excursion_prank = false;
+        self.close_reaction_nab = false;
+        self.pending_collect_closes.clear();
         self.second_hourly_honk_at = None;
         self.pat = PatTracker::new();
         self.hearts = Hearts::new();
@@ -387,6 +465,9 @@ impl World {
 
     /// Leave the safe wait and restart the normal first-run introduction.
     pub fn leave_permission_wait(&mut self) {
+        if self.graceful_exit_requested() {
+            return;
+        }
         self.current = Box::new(FirstUxTask::new());
         self.interrupted = None;
         self.pending_hyper = false;
@@ -401,6 +482,9 @@ impl World {
 
     /// Apply a live CLI/TUI poke to the world without exposing OS details to the engine.
     pub fn poke(&mut self, action: PokeAction) -> PokeOutcome {
+        if self.graceful_exit_requested() {
+            return PokeOutcome::Busy;
+        }
         if self.permission_waiting() && action != PokeAction::Honk {
             return PokeOutcome::Busy;
         }
@@ -508,7 +592,45 @@ impl World {
         &mut self,
         collect_window_snapshot: Option<CollectWindowSnapshot>,
     ) {
-        self.collect_window_snapshot = collect_window_snapshot;
+        let active = self.current.collect_request();
+        match collect_window_snapshot {
+            Some(snapshot) if !snapshot.alive => {
+                if let Some(event) = CollectWindowCloseEvent::from_dead_snapshot(snapshot) {
+                    let duplicate = self.observed_collect_closes.iter().any(|queued| {
+                        queued.id == event.id
+                            && queued.request == event.request
+                            && queued.kind == event.kind
+                            && queued.origin == event.origin
+                    });
+                    if !duplicate {
+                        self.observed_collect_closes.push_back(event);
+                        if self.observed_collect_closes.len() > 64 {
+                            self.observed_collect_closes.pop_front();
+                        }
+                        self.pending_collect_closes.push_back(event);
+                    }
+                }
+                if active.is_some_and(|(request, kind)| {
+                    request == snapshot.request && kind == snapshot.kind
+                }) {
+                    // Matching dead evidence reaches the active task. An unrelated lingering
+                    // close is queued without replacing the active request's live snapshot.
+                    self.collect_window_snapshot = Some(snapshot);
+                } else if active.is_none() {
+                    self.collect_window_snapshot = None;
+                }
+            }
+            Some(snapshot) => {
+                if active.is_none()
+                    || active.is_some_and(|(request, kind)| {
+                        request == snapshot.request && kind == snapshot.kind
+                    })
+                {
+                    self.collect_window_snapshot = Some(snapshot);
+                }
+            }
+            None => self.collect_window_snapshot = None,
+        }
     }
 
     /// Force a collect-window action for smoke tests before M10/M11 public pokes exist.
@@ -665,7 +787,8 @@ impl World {
     /// Feed one frame of pointer state (cursor + buttons, world space). Detects pats
     /// (hover sweeps → hearts + calm) and a click on the goose (→ a hyper burst next tick).
     pub fn set_pointer(&mut self, pointer: Pointer) {
-        if self.permission_waiting()
+        if self.graceful_exit_requested()
+            || self.permission_waiting()
             || self.is_cursor_mischief_active()
             || self.is_perch_ride_active()
             || self.is_collect_window_active()
@@ -788,10 +911,112 @@ impl World {
         self.current.id()
     }
 
+    /// Replace active behavior with a safe walk through the nearest exposed desktop edge.
+    /// The runtime must continue ticking/presenting until [`Self::graceful_exit_complete`].
+    pub fn request_graceful_exit(&mut self) {
+        if self.graceful_exit_requested() {
+            return;
+        }
+        self.graceful_exit_requested = true;
+        if self.is_collect_window_active() {
+            self.abandon_collect_window();
+        }
+        self.pending_cursor_commands.clear();
+        self.pending_collect = None;
+        self.pending_hyper = false;
+        self.pending_nab = false;
+        self.interrupted = None;
+        self.dragged_window = None;
+        self.collect_window_snapshot = None;
+        self.excursion_prank = false;
+        self.close_reaction_nab = false;
+        self.pending_collect_closes.clear();
+        self.second_hourly_honk_at = None;
+        self.pat = PatTracker::new();
+        self.hearts = Hearts::new();
+        self.sleepies = ZParticles::new();
+        self.goose.track_mud_end_time = self.elapsed;
+        self.goose.foot_marks = Default::default();
+        self.autumn.clear();
+        self.current = Box::new(GracefulExitTask::new());
+    }
+
+    /// Whether shutdown has been requested but the exit walk is still in progress.
+    pub fn graceful_exit_requested(&self) -> bool {
+        self.graceful_exit_requested
+    }
+
+    /// True only after the complete rendered goose pose has crossed beyond real monitor pixels.
+    pub fn graceful_exit_complete(&self) -> bool {
+        self.graceful_exit_requested()
+            && self
+                .layout
+                .clip_rect(self.goose.pose.bounding_box().grow(3.0))
+                .is_none()
+    }
+
     /// Pick the next roaming task from the shuffle-bag.
     fn next_task(&mut self) -> Box<dyn Task> {
         let idx = self.deck.draw();
         (self.pickable[idx])()
+    }
+
+    fn user_close_reaction_roll(rng: &mut impl RandomSource) -> bool {
+        rng.next_f64() < USER_CLOSE_REACTION_PROBABILITY
+    }
+
+    fn start_user_close_reaction(&mut self, manners_active: bool) -> bool {
+        let goose_visible = self
+            .layout
+            .clip_rect(self.goose.pose.bounding_box().grow(3.0))
+            .is_some();
+        if !goose_visible {
+            return false;
+        }
+        if !Self::user_close_reaction_roll(&mut self.reaction_rng) {
+            return false;
+        }
+        // The visual reaction is safe everywhere. Cursor movement is separately gated by the
+        // existing backend capability contract, live pointer availability, and manners mode.
+        self.close_reaction_nab =
+            self.options.mouse_steal.active() && self.pointer.present && !manners_active;
+        let prior = std::mem::replace(
+            &mut self.current,
+            Box::new(AnnoyedReactionTask::new(!manners_active)),
+        );
+        if self.interrupted.is_none() {
+            self.interrupted = Some(prior);
+        }
+        true
+    }
+
+    fn maybe_handle_user_collect_close(&mut self, manners_active: bool) {
+        if self.permission_waiting() || self.graceful_exit_requested() {
+            self.pending_collect_closes.clear();
+            return;
+        }
+        let Some(event) = self.pending_collect_closes.front().copied() else {
+            return;
+        };
+        if event.origin == CollectWindowCloseOrigin::Program {
+            self.pending_collect_closes.pop_front();
+            return;
+        }
+        if self.is_collect_window_active() || self.interrupted.is_some() {
+            // An unrelated lingering prop may close during a newer collect/transient. Preserve
+            // its keyed event and react exactly once only after the active chain has unwound.
+            return;
+        }
+        let goose_visible = self
+            .layout
+            .clip_rect(self.goose.pose.bounding_box().grow(3.0))
+            .is_some();
+        if !goose_visible {
+            // Never convert an invisible startup/wrap beat directly into a silent mouse nab.
+            return;
+        }
+        self.pending_collect_closes.pop_front();
+        let _ = self.start_user_close_reaction(manners_active);
     }
 
     /// Advance the world by one fixed [`DT`] tick.
@@ -800,47 +1025,52 @@ impl World {
         self.refresh_schedule_state();
         let manners_active = self.manners_active();
         let permission_waiting = self.permission_waiting();
-        self.apply_hourly_honk();
+        let lifecycle_exiting = self.graceful_exit_requested();
+        if !lifecycle_exiting {
+            self.apply_hourly_honk();
+        }
 
         let mood_event = self.mood.tick(self.elapsed, &mut self.rng);
         if mood_event.changed {
             self.rebuild_pickable();
         }
         let start_mood_hyper = mood_event.trigger_hyper
+            && !lifecycle_exiting
             && !permission_waiting
             && !manners_active
             && !self.is_cursor_mischief_active()
             && !self.is_perch_ride_active()
             && !self.is_collect_window_active()
             && self.interrupted.is_none();
-        if let Some(sound) = mood_event
-            .sound
-            .filter(|_| !permission_waiting && !manners_active && !start_mood_hyper)
-        {
+        if let Some(sound) = mood_event.sound.filter(|_| {
+            !lifecycle_exiting && !permission_waiting && !manners_active && !start_mood_hyper
+        }) {
             self.pending_sounds.push(sound);
         }
-        if mood_event.spawn_sleepy_particle && !permission_waiting {
+        if mood_event.spawn_sleepy_particle && !lifecycle_exiting && !permission_waiting {
             let jitter = Vec2::new(self.rng.range(-5.0, 5.0), self.rng.range(-4.0, 2.0));
             self.sleepies
                 .add(self.goose.rig.neck_head + jitter, self.elapsed);
         }
-        if start_mood_hyper {
+        if start_mood_hyper && !lifecycle_exiting {
             self.start_hyper();
         }
 
-        if let Some(kind) = self.pending_collect.take() {
-            if self.options.collect_window.kind_active(kind)
-                && !self.is_cursor_mischief_active()
-                && !self.is_perch_ride_active()
-                && !self.is_collect_window_active()
-            {
-                self.start_collect_window(kind);
+        if !lifecycle_exiting {
+            if let Some(kind) = self.pending_collect.take() {
+                if self.options.collect_window.kind_active(kind)
+                    && !self.is_cursor_mischief_active()
+                    && !self.is_perch_ride_active()
+                    && !self.is_collect_window_active()
+                {
+                    self.start_collect_window(kind);
+                }
             }
         }
 
         // A click landed last frame: when cursor stealing is available it takes precedence
         // over the older M6 hyper reaction; otherwise fall back to hyper.
-        if self.pending_nab {
+        if self.pending_nab && !lifecycle_exiting {
             self.pending_nab = false;
             if self.options.mouse_steal.active()
                 && !self.is_cursor_mischief_active()
@@ -853,6 +1083,7 @@ impl World {
 
         // Install the hyper burst only when nab did not consume the click.
         if self.pending_hyper
+            && !lifecycle_exiting
             && !self.is_cursor_mischief_active()
             && !self.is_collect_window_active()
         {
@@ -862,7 +1093,8 @@ impl World {
             self.pending_hyper = false;
         }
 
-        if self.options.foreign_window.watch_active()
+        if !lifecycle_exiting
+            && self.options.foreign_window.watch_active()
             && !manners_active
             && self.dragged_window.is_some()
             && !self.is_cursor_mischief_active()
@@ -872,8 +1104,12 @@ impl World {
             self.start_perch_ride();
         }
 
+        self.maybe_handle_user_collect_close(manners_active);
+
         // Off-screen excursions (ADR 0016): timed interrupts over plain wandering.
-        self.maybe_start_excursion();
+        if !lifecycle_exiting {
+            self.maybe_start_excursion();
+        }
 
         // Run the current task (it only sets targets/params); pick the next when it's done.
         let calm = self.pat.is_calm(self.elapsed) || manners_active;
@@ -882,12 +1118,17 @@ impl World {
         } else {
             Vec::new()
         };
+        let goose_visible = self
+            .layout
+            .clip_rect(self.goose.pose.bounding_box().grow(3.0))
+            .is_some();
         let done = {
             let mut ctx = TaskCtx {
                 now: self.elapsed,
                 dt: DT,
                 bounds: self.bounds,
                 layout: &self.layout,
+                goose_visible,
                 rng: &mut self.rng,
                 sounds: &mut self.pending_sounds,
                 cursor_commands: &mut self.pending_cursor_commands,
@@ -904,8 +1145,26 @@ impl World {
             };
             self.current.run(&mut self.goose, &mut ctx)
         };
-        if done {
-            if self.current.id() == "excursion"
+        let ended_collect = done && self.current.id() == "collect_window";
+        if done && !lifecycle_exiting {
+            if ended_collect {
+                self.collect_window_snapshot = None;
+            }
+            if self.current.id() == "annoyed_reaction" {
+                let can_nab_now = self.close_reaction_nab
+                    && self.options.mouse_steal.active()
+                    && self.pointer.present
+                    && !manners_active;
+                self.close_reaction_nab = false;
+                if can_nab_now {
+                    self.current = Box::new(NabMouseTask::new());
+                } else {
+                    self.current = self
+                        .interrupted
+                        .take()
+                        .unwrap_or_else(|| Box::new(WanderTask::new()));
+                }
+            } else if self.current.id() == "excursion"
                 && self.excursion_prank
                 && !manners_active
                 && self.options.collect_window.active()
@@ -923,6 +1182,9 @@ impl World {
                     Some(prev) => prev,
                     None => self.next_task(),
                 };
+            }
+            if ended_collect {
+                self.maybe_handle_user_collect_close(manners_active);
             }
         }
 
@@ -1015,7 +1277,7 @@ impl World {
         let had_autumn_pickable = self.autumn_pickable();
         self.autumn.tick_layout(
             self.elapsed,
-            !permission_waiting && self.autumn_active(),
+            !lifecycle_exiting && !permission_waiting && self.autumn_active(),
             &self.layout,
             &self.goose,
             &mut self.rng,
@@ -1104,84 +1366,42 @@ impl World {
             ExcursionKind::Puddle { .. } => self.rng.range(t.puddle_away_min, t.puddle_away_max),
         };
 
-        // Exit: prefer the nearest horizontal edge (a goose strolls off left/right);
-        // occasionally the far side or a vertical edge for variety.
-        let b = self.bounds;
         let pos = self.goose.position;
-        let margin = 90.0;
         let roll = self.rng.next_f64();
-        let near_left = (pos.x - b.min.x) <= (b.max.x - pos.x);
-        let exit = if roll < 0.8 {
-            let x = if near_left {
-                b.min.x - margin
-            } else {
-                b.max.x + margin
-            };
-            Vec2::new(x, pos.y.clamp(b.min.y + 40.0, b.max.y - 40.0))
-        } else if roll < 0.9 {
-            let x = if near_left {
-                b.max.x + margin
-            } else {
-                b.min.x - margin
-            };
-            Vec2::new(x, pos.y.clamp(b.min.y + 40.0, b.max.y - 40.0))
+        // Deliberate errands leave only through real exposed spans. A touching monitor seam
+        // is not exposed, so an adjacent display is crossed naturally instead of mistaken for
+        // "away" space. Usually choose the nearest edge; occasionally take a scenic side.
+        let exit_edge = if roll < 0.8 {
+            self.layout.nearest_exposed_edge(pos)
         } else {
-            let y = if (pos.y - b.min.y) <= (b.max.y - pos.y) {
-                b.min.y - margin
-            } else {
-                b.max.y + margin
-            };
-            Vec2::new(pos.x.clamp(b.min.x + 40.0, b.max.x - 40.0), y)
+            self.layout
+                .sample_exposed_edge(&mut self.rng, self.layout.region_at(pos))
         };
+        let exit_boundary = exit_edge.point_near(pos, LIFECYCLE_EDGE_INSET);
+        let exit = exit_boundary + exit_edge.direction().outward() * LIFECYCLE_EDGE_MARGIN;
 
-        // Entry: puddle hops come back near where they left (it went to *that* puddle);
-        // errands may reappear anywhere along a horizontal edge.
-        let entry = match kind {
+        // Puddle hops return through the same exposed edge. Errands may return through any
+        // exposed edge, but are staged fully offscreen and always walk back in.
+        let entry_edge = match kind {
+            ExcursionKind::Puddle { .. } => exit_edge,
+            ExcursionKind::Errand => self.layout.sample_exposed_edge(&mut self.rng, None),
+        };
+        let entry_reference = match kind {
             ExcursionKind::Puddle { .. } => {
-                if exit.x < b.min.x || exit.x > b.max.x {
-                    Vec2::new(
-                        exit.x,
-                        (exit.y + self.rng.range(-60.0, 60.0))
-                            .clamp(b.min.y + 40.0, b.max.y - 40.0),
-                    )
+                let jitter = self.rng.range(-60.0, 60.0);
+                if exit_edge.direction().outward().x != 0.0 {
+                    exit_boundary + Vec2::new(0.0, jitter)
                 } else {
-                    Vec2::new(
-                        (exit.x + self.rng.range(-60.0, 60.0))
-                            .clamp(b.min.x + 40.0, b.max.x - 40.0),
-                        exit.y,
-                    )
+                    exit_boundary + Vec2::new(jitter, 0.0)
                 }
             }
-            ExcursionKind::Errand => {
-                let left = self.rng.next_f64() < 0.5;
-                let x = if left {
-                    b.min.x - margin
-                } else {
-                    b.max.x + margin
-                };
-                Vec2::new(x, self.rng.range(b.min.y + 60.0, b.max.y - 60.0))
-            }
+            ExcursionKind::Errand => self.layout.sample_point(&mut self.rng),
         };
-        let inward_x = if entry.x < b.min.x {
-            1.0
-        } else if entry.x > b.max.x {
-            -1.0
-        } else {
-            0.0
-        };
-        let inward_y = if entry.y < b.min.y {
-            1.0
-        } else if entry.y > b.max.y {
-            -1.0
-        } else {
-            0.0
-        };
-        let return_target = self.layout.clamp_point(Vec2::new(
-            (entry.x + inward_x * self.rng.range(160.0, 380.0))
-                .clamp(b.min.x + 60.0, b.max.x - 60.0),
-            (entry.y + inward_y * self.rng.range(160.0, 380.0))
-                .clamp(b.min.y + 60.0, b.max.y - 60.0),
-        ));
+        let entry_boundary = entry_edge.point_near(entry_reference, LIFECYCLE_EDGE_INSET);
+        let entry = entry_boundary + entry_edge.direction().outward() * LIFECYCLE_EDGE_MARGIN;
+        let return_target = self.layout.clamp_point(
+            entry_boundary + entry_edge.direction().inward() * self.rng.range(160.0, 380.0),
+        );
 
         let task = Box::new(ExcursionTask::new(kind, exit, entry, return_target, away));
         self.interrupted = Some(std::mem::replace(&mut self.current, task as Box<dyn Task>));
@@ -1190,7 +1410,7 @@ impl World {
     /// Lateral wander offset for casual walks; `Vec2::ZERO` when meander is inactive.
     fn meander_offset(&mut self) -> Vec2 {
         let id = self.current.id();
-        if id != "wander" && id != "excursion" {
+        if id != "wander" {
             return Vec2::ZERO;
         }
         self.meander_phase = (self.meander_phase + DT * 2.2).rem_euclid(std::f32::consts::TAU);
@@ -1212,7 +1432,10 @@ impl World {
     }
 
     fn apply_mood_locomotion_modulation(&mut self) {
-        if self.permission_waiting() || !self.mood.options().dynamic_moods {
+        if self.graceful_exit_requested()
+            || self.permission_waiting()
+            || !self.mood.options().dynamic_moods
+        {
             return;
         }
         match self.mood.current() {
@@ -1283,8 +1506,8 @@ impl World {
 mod tests {
     use super::*;
     use crate::collect_window::{
-        CollectWindowCapabilities, CollectWindowId, CollectWindowKind, CollectWindowOptions,
-        CollectWindowRequestId, CollectWindowSnapshot,
+        CollectWindowCapabilities, CollectWindowCloseOrigin, CollectWindowId, CollectWindowKind,
+        CollectWindowOptions, CollectWindowRequestId, CollectWindowSnapshot,
     };
     use crate::cursor::{AppearanceOptions, InteractionOptions, MouseStealOptions, TimingOptions};
     use crate::entity::ParametersTable;
@@ -1360,7 +1583,7 @@ mod tests {
     }
 
     #[test]
-    fn roams_within_bounds_after_intro() {
+    fn roaming_leaves_bounds_only_for_explicit_edge_behaviors() {
         let mut w = World::new(bounds(), 2);
         // Warm up past the off-stage entrance (it reaches centre within ~1 s of walking).
         for _ in 0..1_000 {
@@ -1369,10 +1592,17 @@ mod tests {
         for _ in 0..5_000 {
             w.tick();
             let p = w.goose.position;
-            assert!(
-                p.x >= -1.0 && p.x <= 1001.0 && p.y >= -1.0 && p.y <= 801.0,
-                "{p:?}"
-            );
+            if !w.layout.contains(p) {
+                assert!(
+                    matches!(w.current_task(), "edge_wrap" | "excursion"),
+                    "ordinary task {} left the real desktop at {p:?}",
+                    w.current_task()
+                );
+                assert!(
+                    p.x >= -500.0 && p.x <= 1500.0 && p.y >= -500.0 && p.y <= 1300.0,
+                    "edge behavior drifted unbounded at {p:?}"
+                );
+            }
         }
     }
 
@@ -1406,7 +1636,7 @@ mod tests {
         );
         for _ in 0..1_000 {
             w.tick();
-            if w.current_task() == "wander" {
+            if w.current_task() != "first_ux" {
                 return;
             }
         }
@@ -1633,6 +1863,230 @@ mod tests {
     }
 
     #[test]
+    fn startup_is_fully_offscreen_then_walks_through_an_exposed_edge() {
+        let layout = DesktopLayout::new(vec![
+            Rect::new(Vec2::new(-800.0, 0.0), Vec2::new(0.0, 600.0)),
+            Rect::new(Vec2::new(0.0, 100.0), Vec2::new(1000.0, 800.0)),
+        ])
+        .expect("layout");
+        let mut world = World::with_layout(layout.clone(), 432);
+        assert_eq!(world.current_task(), "first_ux");
+        assert!(
+            world.visual_bounds().is_none(),
+            "startup begins fully hidden"
+        );
+        assert!(layout.contains(world.goose.target_pos));
+
+        let mut prior = world.goose.position;
+        let mut emerged = false;
+        for _ in 0..(120 * 12) {
+            world.tick();
+            let step = Vec2::distance(prior, world.goose.position);
+            assert!(
+                step < 5.0,
+                "startup must walk continuously, not teleport ({step})"
+            );
+            prior = world.goose.position;
+            if world.visual_bounds().is_some() {
+                emerged = true;
+                break;
+            }
+        }
+        assert!(emerged, "startup goose should walk into a real monitor");
+    }
+
+    #[test]
+    fn ordinary_wrap_crosses_hidden_space_and_reenters_without_a_visible_teleport() {
+        let layout = DesktopLayout::new(vec![
+            Rect::new(Vec2::ZERO, Vec2::new(500.0, 400.0)),
+            Rect::new(Vec2::new(700.0, 100.0), Vec2::new(1100.0, 500.0)),
+        ])
+        .expect("gapped layout");
+        let mut world = World::with_layout(layout, 433);
+        place_static_goose(&mut world, Vec2::new(250.0, 200.0));
+        world.current = Box::new(EdgeWrapTask::new());
+        world.interrupted = None;
+
+        let mut prior_position = world.goose.position;
+        let mut prior_visible = world.visual_bounds().is_some();
+        let mut hidden_teleport = false;
+        let mut reentered = false;
+        for _ in 0..(120 * 30) {
+            world.tick();
+            let visible = world.visual_bounds().is_some();
+            let moved = Vec2::distance(prior_position, world.goose.position);
+            if moved > 100.0 {
+                assert!(
+                    !prior_visible && !visible,
+                    "the wrap teleport must be fully hidden on both sides"
+                );
+                hidden_teleport = true;
+            }
+            if hidden_teleport && visible {
+                reentered = true;
+                break;
+            }
+            prior_position = world.goose.position;
+            prior_visible = visible;
+        }
+        assert!(
+            hidden_teleport,
+            "the deterministic wrap should reach its hidden hop"
+        );
+        assert!(
+            reentered,
+            "the wrapped goose should walk back through the far edge"
+        );
+    }
+
+    #[test]
+    fn touching_monitor_corridor_crosses_naturally_without_wrap_or_hidden_frame() {
+        let layout = DesktopLayout::new(vec![
+            Rect::new(Vec2::ZERO, Vec2::new(500.0, 400.0)),
+            Rect::new(Vec2::new(500.0, 100.0), Vec2::new(1000.0, 500.0)),
+        ])
+        .expect("touching layout");
+        let mut world = World::with_layout(layout.clone(), 436);
+        place_static_goose(&mut world, Vec2::new(420.0, 220.0));
+        world.current = Box::new(EdgeEntryTask::new(Vec2::new(620.0, 220.0)));
+        world.interrupted = Some(Box::new(WanderTask::new()));
+        let mut crossed = false;
+        for _ in 0..600 {
+            world.tick();
+            assert!(
+                world.visual_bounds().is_some(),
+                "shared seam must stay visible"
+            );
+            assert_ne!(world.current_task(), "edge_wrap");
+            if layout.region_at(world.goose.position) == Some(1) {
+                crossed = true;
+                break;
+            }
+        }
+        assert!(
+            crossed,
+            "goose should continue into the touching monitor corridor"
+        );
+    }
+
+    #[test]
+    fn graceful_exit_walks_until_the_complete_pose_is_offscreen() {
+        let mut world = World::new(bounds(), 434);
+        place_static_goose(&mut world, Vec2::new(500.0, 400.0));
+        world.current = Box::new(WanderTask::new());
+        world.request_graceful_exit();
+        assert!(world.graceful_exit_requested());
+        assert!(!world.graceful_exit_complete());
+
+        let mut prior = world.goose.position;
+        for _ in 0..(120 * 20) {
+            world.tick();
+            let step = Vec2::distance(prior, world.goose.position);
+            assert!(step < 5.0, "graceful shutdown must not teleport ({step})");
+            prior = world.goose.position;
+            if world.graceful_exit_complete() {
+                break;
+            }
+        }
+        assert!(world.graceful_exit_complete());
+        assert!(world.visual_bounds().is_none());
+        assert_eq!(world.current_task(), "graceful_exit");
+        assert_eq!(world.poke(PokeAction::Honk), PokeOutcome::Busy);
+    }
+
+    #[test]
+    fn four_k_graceful_exit_completes_well_inside_terminal_wait_budget() {
+        let four_k = Rect::new(Vec2::ZERO, Vec2::new(3840.0, 2160.0));
+        let mut world = World::new(four_k, 435);
+        place_static_goose(&mut world, Vec2::new(1920.0, 1080.0));
+        world.current = Box::new(WanderTask::new());
+        world.request_graceful_exit();
+
+        let mut ticks = 0usize;
+        while ticks < 120 * 15 && !world.graceful_exit_complete() {
+            let prior = world.goose.position;
+            world.tick();
+            ticks += 1;
+            assert!(
+                Vec2::distance(prior, world.goose.position) <= 2.0,
+                "the brisk exit still uses continuous bounded locomotion"
+            );
+        }
+        assert!(world.graceful_exit_complete());
+        assert!(
+            ticks < 120 * 15,
+            "4K exit took {:.2}s",
+            ticks as f32 / 120.0
+        );
+    }
+
+    #[test]
+    fn large_signed_monitor_wall_uses_adaptive_exit_inside_wait_budget() {
+        let mut regions = Vec::new();
+        for row in 0..5 {
+            for column in 0..5 {
+                let min = Vec2::new(
+                    -4800.0 + column as f32 * 1920.0,
+                    -2700.0 + row as f32 * 1080.0,
+                );
+                regions.push(Rect::new(min, min + Vec2::new(1920.0, 1080.0)));
+            }
+        }
+        let mut world = World::with_layout(DesktopLayout::new(regions).expect("monitor wall"), 437);
+        place_static_goose(&mut world, Vec2::ZERO);
+        world.current = Box::new(WanderTask::new());
+        world.request_graceful_exit();
+
+        let mut ticks = 0usize;
+        while ticks < 120 * 20 && !world.graceful_exit_complete() {
+            world.tick();
+            ticks += 1;
+            assert!(
+                world.goose.current_speed <= 400.0,
+                "lifecycle exit must stay inside the normal charge tier"
+            );
+        }
+        assert!(world.graceful_exit_complete());
+        assert!(
+            ticks < 120 * 20,
+            "adaptive monitor-wall exit took {:.2}s",
+            ticks as f32 / 120.0
+        );
+    }
+
+    #[test]
+    fn graceful_exit_ignores_near_zero_user_locomotion_tuning() {
+        let mut options = WorldOptions::default();
+        options.parameters.walk_speed = 0.001;
+        options.parameters.run_speed = 0.001;
+        options.parameters.charge_speed = 0.001;
+        options.parameters.acceleration_normal = 0.001;
+        options.parameters.acceleration_charged = 0.001;
+        let mut world = World::with_options(
+            Rect::new(Vec2::ZERO, Vec2::new(3840.0, 2160.0)),
+            438,
+            options,
+        );
+        place_static_goose(&mut world, Vec2::new(1920.0, 1080.0));
+        world.current = Box::new(WanderTask::new());
+        world.request_graceful_exit();
+
+        let mut ticks = 0usize;
+        while ticks < 120 * 15 && !world.graceful_exit_complete() {
+            let prior = world.goose.position;
+            world.tick();
+            ticks += 1;
+            assert!(world.goose.current_speed <= 400.0);
+            assert!(
+                Vec2::distance(prior, world.goose.position) < 5.0,
+                "lifecycle-owned motion remains continuous"
+            );
+        }
+        assert!(world.graceful_exit_complete());
+        assert!(ticks < 120 * 15, "stop exceeded the bounded IPC wait");
+    }
+
+    #[test]
     fn region_layout_never_samples_targets_in_monitor_gaps() {
         let left = Rect::new(Vec2::new(0.0, 0.0), Vec2::new(100.0, 100.0));
         let right = Rect::new(Vec2::new(200.0, 0.0), Vec2::new(300.0, 100.0));
@@ -1674,11 +2128,20 @@ mod tests {
         let replacement = DesktopLayout::new(vec![left]).expect("valid layout");
         w.apply_layout(replacement.clone());
 
-        assert!(replacement.contains(w.goose.position));
+        assert!(!replacement.contains(w.goose.position));
         assert!(replacement.contains(w.goose.target_pos));
         assert_eq!(w.goose.velocity, Vec2::ZERO);
-        assert_eq!(w.current_task(), "wander");
+        assert_eq!(w.current_task(), "edge_entry");
+        assert!(w.visual_bounds().is_none());
         assert!(!w.excursion_prank);
+        for _ in 0..600 {
+            w.tick();
+            if w.current_task() != "edge_entry" {
+                break;
+            }
+        }
+        assert!(w.visual_bounds().is_some());
+        assert_ne!(w.current_task(), "edge_entry");
     }
 
     #[test]
@@ -1716,6 +2179,16 @@ mod tests {
             .anim
             .update(&RigInput::static_pose(position, 0.0, 0.45));
         w.goose.rig = w.goose.pose.primary;
+    }
+
+    fn set_next_close_reaction(world: &mut World, expected: bool) {
+        let seed = (0..10_000)
+            .find(|seed| {
+                let mut rng = SplitMix64::seed(*seed);
+                World::user_close_reaction_roll(&mut rng) == expected
+            })
+            .expect("both sides of the close-reaction roll");
+        world.reaction_rng = SplitMix64::seed(seed);
     }
 
     #[test]
@@ -1868,11 +2341,11 @@ mod tests {
                 ..WorldOptions::default()
             },
         );
-        assert_eq!(w.pickable.len(), 1);
+        assert_eq!(w.pickable.len(), 5);
 
         w.set_collect_window_supported(true);
 
-        assert_eq!(w.pickable.len(), 2);
+        assert_eq!(w.pickable.len(), 6);
     }
 
     #[test]
@@ -2155,12 +2628,25 @@ mod tests {
     }
 
     #[test]
+    fn baseline_roaming_weights_edge_wrap_to_one_in_five_deck_draws() {
+        let world = World::new(bounds(), 701);
+        let ids: Vec<_> = world
+            .pickable
+            .iter()
+            .map(|factory| factory().id())
+            .collect();
+        assert_eq!(ids.iter().filter(|id| **id == "wander").count(), 4);
+        assert_eq!(ids.iter().filter(|id| **id == "edge_wrap").count(), 1);
+        assert_eq!(ids.len(), 5);
+    }
+
+    #[test]
     fn nab_is_pickable_only_when_enabled_and_supported() {
         let default_world = World::new(bounds(), 1);
         assert_eq!(
             default_world.pickable.len(),
-            1,
-            "default engine options do not assume cursor warp support"
+            5,
+            "ordinary roaming weights four wander beats to one edge wrap"
         );
 
         let disabled = World::with_options(
@@ -2175,7 +2661,7 @@ mod tests {
                 ..WorldOptions::default()
             },
         );
-        assert_eq!(disabled.pickable.len(), 1);
+        assert_eq!(disabled.pickable.len(), 5);
 
         let supported = World::with_options(
             bounds(),
@@ -2187,7 +2673,7 @@ mod tests {
         );
         assert_eq!(
             supported.pickable.len(),
-            2,
+            6,
             "nab_mouse joins roaming only when the backend can warp the cursor"
         );
     }
@@ -2428,6 +2914,7 @@ mod tests {
                 max: Vec2::new(500.0, 300.0),
             },
             alive: true,
+            close_origin: None,
         }));
         w.set_collect_window_supported(false);
         w.tick();
@@ -2571,6 +3058,7 @@ mod tests {
                 max: Vec2::new(500.0, 300.0),
             },
             alive: true,
+            close_origin: None,
         }));
         world
             .pending_collect_window_commands
@@ -2592,6 +3080,54 @@ mod tests {
                 CollectWindowCommand::Close { id },
             ]
         );
+    }
+
+    #[test]
+    fn permission_wait_survives_visible_and_offscreen_topology_changes() {
+        let mut world = World::new(bounds(), 492);
+        place_static_goose(&mut world, Vec2::new(500.0, 400.0));
+        world.enter_permission_wait(Vec2::new(600.0, 450.0));
+        world.apply_layout(DesktopLayout::single(Rect::new(
+            Vec2::ZERO,
+            Vec2::new(900.0, 700.0),
+        )));
+        assert!(world.permission_waiting());
+
+        world.apply_layout(DesktopLayout::single(Rect::new(
+            Vec2::new(2000.0, -600.0),
+            Vec2::new(3200.0, 300.0),
+        )));
+        assert!(world.permission_waiting());
+        assert_eq!(world.current_task(), "permission_wait");
+        for _ in 0..240 {
+            world.tick();
+            assert!(world.permission_waiting());
+        }
+    }
+
+    #[test]
+    fn graceful_exit_latch_rejects_permission_transitions_and_survives_hotplug() {
+        let mut world = World::new(bounds(), 493);
+        place_static_goose(&mut world, Vec2::new(500.0, 400.0));
+        world.request_graceful_exit();
+        world.enter_permission_wait(Vec2::new(600.0, 450.0));
+        world.leave_permission_wait();
+        assert!(world.graceful_exit_requested());
+        assert_eq!(world.current_task(), "graceful_exit");
+
+        world.apply_layout(DesktopLayout::single(Rect::new(
+            Vec2::new(-200.0, -100.0),
+            Vec2::new(1400.0, 900.0),
+        )));
+        assert!(world.graceful_exit_requested());
+        assert_eq!(world.current_task(), "graceful_exit");
+        for _ in 0..120 * 15 {
+            world.tick();
+            if world.graceful_exit_complete() {
+                break;
+            }
+        }
+        assert!(world.graceful_exit_complete());
     }
 
     #[test]
@@ -2689,7 +3225,7 @@ mod tests {
     #[test]
     fn apply_options_rebuilds_pickable_tasks() {
         let mut w = World::new(bounds(), 26);
-        assert_eq!(w.pickable.len(), 1);
+        assert_eq!(w.pickable.len(), 5);
         w.apply_options(WorldOptions {
             mouse_steal: MouseStealOptions::with_backend_support(true),
             collect_window: CollectWindowOptions::with_backend_support(
@@ -2705,7 +3241,7 @@ mod tests {
             ),
             ..WorldOptions::default()
         });
-        assert_eq!(w.pickable.len(), 3);
+        assert_eq!(w.pickable.len(), 7);
     }
 
     #[test]
@@ -2724,8 +3260,8 @@ mod tests {
 
         assert_eq!(
             World::pickable_for(WorldOptions::default(), MoodKind::Mischievous, false, false).len(),
-            1,
-            "unsupported defaults keep only wander pickable"
+            5,
+            "unsupported defaults retain weighted wander plus safe edge wrapping"
         );
         assert_eq!(
             World::pickable_for(
@@ -2738,7 +3274,7 @@ mod tests {
                 false
             )
             .len(),
-            3,
+            7,
             "active nab appears once normally and once as mischievous bias"
         );
         assert_eq!(
@@ -2752,7 +3288,7 @@ mod tests {
                 false
             )
             .len(),
-            3,
+            7,
             "active collect appears once normally and once as mischievous bias"
         );
         assert_eq!(
@@ -2767,7 +3303,7 @@ mod tests {
                 false
             )
             .len(),
-            5,
+            9,
             "mischievous mode duplicates only the two already-enabled mischief tasks"
         );
         assert_eq!(
@@ -2782,12 +3318,12 @@ mod tests {
                 true,
             )
             .len(),
-            1,
-            "manners suppress random mischief and Autumn chase, leaving only wander"
+            5,
+            "manners suppress random mischief and Autumn chase, retaining calm roaming"
         );
         assert_eq!(
             World::pickable_for(WorldOptions::default(), MoodKind::Content, false, true).len(),
-            2,
+            6,
             "Autumn chase is pickable when an unkicked pile exists"
         );
     }
@@ -3023,6 +3559,7 @@ mod tests {
                 max: Vec2::new(500.0, 320.0),
             },
             alive: true,
+            close_origin: None,
         }));
         w.apply_options(WorldOptions::default());
         assert_eq!(w.current_task(), "wander");
@@ -3035,6 +3572,292 @@ mod tests {
                 },
                 CollectWindowCommand::Close { id }
             ]
+        );
+    }
+
+    fn stage_closed_note(world: &mut World, origin: CollectWindowCloseOrigin) {
+        world.current = Box::new(CollectWindowTask::forced(CollectWindowKind::Note));
+        world.interrupted = Some(Box::new(WanderTask::new()));
+        world.tick();
+        let request = match world.take_collect_window_commands().as_slice() {
+            [CollectWindowCommand::Spawn { request, .. }] => *request,
+            other => panic!("unexpected commands: {other:?}"),
+        };
+        world.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id: CollectWindowId(88),
+            request,
+            kind: CollectWindowKind::Note,
+            rect: Rect::new(Vec2::ZERO, Vec2::ZERO),
+            alive: false,
+            close_origin: Some(origin),
+        }));
+    }
+
+    #[test]
+    fn user_close_can_react_then_chain_the_existing_bounded_nab() {
+        let mut world = World::with_options(
+            bounds(),
+            500,
+            WorldOptions {
+                mouse_steal: MouseStealOptions::with_backend_support(true),
+                collect_window: CollectWindowOptions::with_backend_support(
+                    CollectWindowCapabilities {
+                        spawn_note: true,
+                        spawn_image: true,
+                        move_window: true,
+                        set_passthrough: true,
+                        synthesize_text: true,
+                    },
+                    1,
+                    1,
+                ),
+                ..WorldOptions::default()
+            },
+        );
+        place_static_goose(&mut world, Vec2::new(500.0, 400.0));
+        world.set_pointer(Pointer {
+            pos: world.goose.rig.beak_tip,
+            present: true,
+            left_down: false,
+        });
+        stage_closed_note(&mut world, CollectWindowCloseOrigin::User);
+        set_next_close_reaction(&mut world, true);
+        world.tick();
+        assert_eq!(world.current_task(), "annoyed_reaction");
+        assert!(world.close_reaction_nab);
+
+        for _ in 0..120 {
+            world.set_pointer(Pointer {
+                pos: world.goose.rig.beak_tip,
+                present: true,
+                left_down: false,
+            });
+            world.tick();
+            if world.current_task() == "nab_mouse" {
+                break;
+            }
+        }
+        assert_eq!(world.current_task(), "nab_mouse");
+        world.set_pointer(Pointer {
+            pos: world.goose.rig.beak_tip,
+            present: true,
+            left_down: false,
+        });
+        world.tick();
+        assert!(
+            world
+                .take_cursor_commands()
+                .iter()
+                .any(|command| matches!(command, CursorCommand::WarpTo(_))),
+            "the reaction chains the already-bounded nab implementation"
+        );
+    }
+
+    #[test]
+    fn program_cleanup_and_negative_roll_do_not_start_close_reaction() {
+        let mut program_close = world_with_collect(501);
+        stage_closed_note(&mut program_close, CollectWindowCloseOrigin::Program);
+        set_next_close_reaction(&mut program_close, true);
+        program_close.tick();
+        assert_eq!(program_close.current_task(), "wander");
+
+        let mut negative_roll = world_with_collect(502);
+        stage_closed_note(&mut negative_roll, CollectWindowCloseOrigin::User);
+        set_next_close_reaction(&mut negative_roll, false);
+        negative_roll.tick();
+        assert_eq!(negative_roll.current_task(), "wander");
+    }
+
+    #[test]
+    fn closing_a_lingering_honk_note_after_collection_still_reacts() {
+        let mut world = world_with_collect(505);
+        place_static_goose(&mut world, Vec2::new(500.0, 400.0));
+        world.current = Box::new(WanderTask::new());
+        world.interrupted = None;
+        set_next_close_reaction(&mut world, true);
+        world.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id: CollectWindowId(89),
+            request: CollectWindowRequestId(1234),
+            kind: CollectWindowKind::Note,
+            rect: Rect::new(Vec2::ZERO, Vec2::ZERO),
+            alive: false,
+            close_origin: Some(CollectWindowCloseOrigin::User),
+        }));
+
+        world.tick();
+
+        assert_eq!(world.current_task(), "annoyed_reaction");
+        assert!(
+            world.interrupted.is_some(),
+            "normal roaming is resumed afterward"
+        );
+    }
+
+    #[test]
+    fn hidden_user_close_waits_for_a_visible_goose_and_reacts_once() {
+        let mut world = world_with_collect(506);
+        world.current = Box::new(WanderTask::new());
+        world.interrupted = None;
+        set_next_close_reaction(&mut world, true);
+        world.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id: CollectWindowId(90),
+            request: CollectWindowRequestId(1235),
+            kind: CollectWindowKind::Note,
+            rect: Rect::new(Vec2::new(100.0, 100.0), Vec2::new(300.0, 250.0)),
+            alive: false,
+            close_origin: Some(CollectWindowCloseOrigin::User),
+        }));
+
+        world.tick();
+        assert_ne!(world.current_task(), "annoyed_reaction");
+        assert_eq!(world.pending_collect_closes.len(), 1);
+
+        place_static_goose(&mut world, Vec2::new(500.0, 400.0));
+        world.tick();
+        assert_eq!(world.current_task(), "annoyed_reaction");
+        assert!(world.pending_collect_closes.is_empty());
+
+        for _ in 0..240 {
+            world.tick();
+        }
+        assert_ne!(world.current_task(), "annoyed_reaction");
+        assert!(world.pending_collect_closes.is_empty());
+
+        world.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id: CollectWindowId(90),
+            request: CollectWindowRequestId(1235),
+            kind: CollectWindowKind::Note,
+            rect: Rect::new(Vec2::new(100.0, 100.0), Vec2::new(300.0, 250.0)),
+            alive: false,
+            close_origin: Some(CollectWindowCloseOrigin::User),
+        }));
+        assert!(
+            world.pending_collect_closes.is_empty(),
+            "the same backend close evidence is exactly-once"
+        );
+    }
+
+    #[test]
+    fn unrelated_lingering_close_does_not_abort_newer_collect_request() {
+        let mut world = world_with_collect(507);
+        place_static_goose(&mut world, Vec2::new(500.0, 400.0));
+        world.current = Box::new(CollectWindowTask::forced(CollectWindowKind::Meme));
+        world.interrupted = Some(Box::new(WanderTask::new()));
+        world.tick();
+        let active_request = match world.take_collect_window_commands().as_slice() {
+            [CollectWindowCommand::Spawn { request, .. }] => *request,
+            other => panic!("unexpected commands: {other:?}"),
+        };
+        world.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id: CollectWindowId(91),
+            request: active_request,
+            kind: CollectWindowKind::Meme,
+            rect: Rect::new(Vec2::new(300.0, 200.0), Vec2::new(500.0, 350.0)),
+            alive: true,
+            close_origin: None,
+        }));
+        world.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id: CollectWindowId(89),
+            request: CollectWindowRequestId(1234),
+            kind: CollectWindowKind::Note,
+            rect: Rect::new(Vec2::new(100.0, 100.0), Vec2::new(280.0, 220.0)),
+            alive: false,
+            close_origin: Some(CollectWindowCloseOrigin::User),
+        }));
+        set_next_close_reaction(&mut world, true);
+
+        world.tick();
+        assert_eq!(world.current_task(), "collect_window");
+        assert_eq!(world.pending_collect_closes.len(), 1);
+        assert_eq!(
+            world
+                .collect_window_snapshot
+                .map(|snapshot| snapshot.request),
+            Some(active_request),
+            "unrelated close must not replace the active request snapshot"
+        );
+
+        world.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id: CollectWindowId(91),
+            request: active_request,
+            kind: CollectWindowKind::Meme,
+            rect: Rect::new(Vec2::new(300.0, 200.0), Vec2::new(500.0, 350.0)),
+            alive: false,
+            close_origin: Some(CollectWindowCloseOrigin::Program),
+        }));
+        world.tick();
+        assert_eq!(world.current_task(), "annoyed_reaction");
+        assert_eq!(world.pending_collect_closes.len(), 1);
+        world.tick();
+        assert!(world.pending_collect_closes.is_empty());
+    }
+
+    #[test]
+    fn unsupported_cursor_and_manners_keep_user_close_reaction_visible_only() {
+        let mut unsupported = world_with_collect(503);
+        place_static_goose(&mut unsupported, Vec2::new(500.0, 400.0));
+        unsupported.set_pointer(Pointer {
+            pos: unsupported.goose.rig.beak_tip,
+            present: true,
+            left_down: false,
+        });
+        stage_closed_note(&mut unsupported, CollectWindowCloseOrigin::User);
+        set_next_close_reaction(&mut unsupported, true);
+        unsupported.tick();
+        assert_eq!(unsupported.current_task(), "annoyed_reaction");
+        assert!(!unsupported.close_reaction_nab);
+        for _ in 0..120 {
+            unsupported.tick();
+        }
+        assert_ne!(unsupported.current_task(), "nab_mouse");
+        assert!(unsupported.take_cursor_commands().is_empty());
+
+        let mut manners = World::with_options(
+            bounds(),
+            504,
+            WorldOptions {
+                mouse_steal: MouseStealOptions::with_backend_support(true),
+                collect_window: CollectWindowOptions::with_backend_support(
+                    CollectWindowCapabilities {
+                        spawn_note: true,
+                        spawn_image: true,
+                        move_window: true,
+                        set_passthrough: true,
+                        synthesize_text: true,
+                    },
+                    1,
+                    1,
+                ),
+                ..WorldOptions::default()
+            },
+        );
+        place_static_goose(&mut manners, Vec2::new(500.0, 400.0));
+        manners.set_presence(PresenceSnapshot::do_not_disturb());
+        manners.set_pointer(Pointer {
+            pos: manners.goose.rig.beak_tip,
+            present: true,
+            left_down: false,
+        });
+        stage_closed_note(&mut manners, CollectWindowCloseOrigin::User);
+        set_next_close_reaction(&mut manners, true);
+        manners.tick();
+        assert_eq!(manners.current_task(), "annoyed_reaction");
+        assert!(!manners.close_reaction_nab);
+        manners.tick();
+        assert!(manners.take_sounds().is_empty(), "DND reaction stays quiet");
+    }
+
+    #[test]
+    fn user_close_reaction_distribution_stays_near_thirty_percent() {
+        let mut rng = SplitMix64::seed(0xC105_E300);
+        let trials = 20_000;
+        let reactions = (0..trials)
+            .filter(|_| World::user_close_reaction_roll(&mut rng))
+            .count();
+        let rate = reactions as f64 / trials as f64;
+        assert!(
+            (rate - USER_CLOSE_REACTION_PROBABILITY).abs() <= 0.02,
+            "observed reaction rate {rate:.4}"
         );
     }
 }

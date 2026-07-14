@@ -81,6 +81,33 @@ impl Singleton {
     }
 }
 
+/// Exclusive ownership of the process singleton for a managed lifecycle transaction.
+///
+/// Unlike [`wait_for_shutdown`], this guard deliberately retains the singleton after the old
+/// runtime exits. Keeping it alive across install/update/uninstall closes the race where a login
+/// item or concurrent `start` could launch between the shutdown probe and on-disk replacement.
+pub struct LifecycleLease {
+    _singleton: Singleton,
+    was_running: bool,
+}
+
+impl LifecycleLease {
+    /// Ask any active runtime to walk off-screen, then retain exclusive singleton ownership.
+    pub fn acquire() -> io::Result<Self> {
+        let was_running = stop_runtime_for_lifecycle_with(|| send_command(ControlCommand::Stop))?;
+        let singleton = wait_for_shutdown_lease()?;
+        Ok(Self {
+            _singleton: singleton,
+            was_running,
+        })
+    }
+
+    /// Whether an active command server accepted the stop request before the lease was acquired.
+    pub const fn was_running(&self) -> bool {
+        self.was_running
+    }
+}
+
 pub struct CommandServer {
     _imp: imp::CommandServer,
     rx: Receiver<ControlRequest>,
@@ -102,7 +129,9 @@ pub fn send_command(command: ControlCommand) -> io::Result<ControlResponse> {
     imp::send_command(command)
 }
 
-const SHUTDOWN_PROBE_ATTEMPTS: usize = 80;
+// A graceful edge walk can take several seconds from the middle of a large display. Keep the
+// restart-safety wait long enough for that animation while still failing a genuinely stuck stop.
+const SHUTDOWN_PROBE_ATTEMPTS: usize = 1_200;
 const SHUTDOWN_PROBE_INTERVAL: Duration = Duration::from_millis(25);
 
 /// Wait until the runtime has actually released its singleton after acknowledging `Stop`.
@@ -111,33 +140,76 @@ const SHUTDOWN_PROBE_INTERVAL: Duration = Duration::from_millis(25);
 /// startup closes the small interval where an immediate restart could see the old process and
 /// exit, only for that old process to finish a moment later and leave no instance running.
 pub fn wait_for_shutdown() -> io::Result<()> {
-    wait_for_shutdown_with(SHUTDOWN_PROBE_ATTEMPTS, SHUTDOWN_PROBE_INTERVAL, || {
-        Singleton::acquire().map(|(_guard, status)| status)
+    drop(wait_for_shutdown_lease()?);
+    Ok(())
+}
+
+/// Wait for shutdown and return the acquired singleton instead of releasing it immediately.
+pub fn wait_for_shutdown_lease() -> io::Result<Singleton> {
+    wait_for_shutdown_lease_with(SHUTDOWN_PROBE_ATTEMPTS, SHUTDOWN_PROBE_INTERVAL, || {
+        Singleton::acquire()
     })
 }
 
-fn wait_for_shutdown_with(
+fn wait_for_shutdown_lease_with<T>(
     attempts: usize,
     interval: Duration,
-    mut probe: impl FnMut() -> io::Result<SingletonStatus>,
-) -> io::Result<()> {
+    mut probe: impl FnMut() -> io::Result<(T, SingletonStatus)>,
+) -> io::Result<T> {
     for attempt in 0..attempts {
-        if probe()? == SingletonStatus::Acquired {
-            return Ok(());
+        let (guard, status) = probe()?;
+        if status == SingletonStatus::Acquired {
+            return Ok(guard);
         }
+        drop(guard);
         if attempt + 1 < attempts {
             std::thread::sleep(interval);
         }
     }
     Err(io::Error::new(
         io::ErrorKind::TimedOut,
-        "runtime accepted stop but did not release its singleton within two seconds",
+        "runtime accepted stop but did not release its singleton within thirty seconds",
     ))
+}
+
+fn stop_runtime_for_lifecycle_with(
+    stop: impl FnOnce() -> io::Result<ControlResponse>,
+) -> io::Result<bool> {
+    match stop() {
+        Ok(ControlResponse::Ok) => Ok(true),
+        Ok(ControlResponse::Err(code)) => Err(io::Error::other(format!(
+            "runtime rejected stop before lifecycle mutation: {code}"
+        ))),
+        Ok(ControlResponse::Status(_)) => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "runtime returned status to lifecycle stop request",
+        )),
+        Err(error)
+            if matches!(
+                error.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused
+            ) =>
+        {
+            Ok(false)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RuntimeStatus;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    struct TestGuard(Rc<Cell<bool>>);
+
+    impl Drop for TestGuard {
+        fn drop(&mut self) {
+            self.0.set(true);
+        }
+    }
 
     #[test]
     fn local_ipc_nodes_use_owner_only_modes() {
@@ -178,18 +250,75 @@ mod tests {
         ]
         .into_iter();
 
-        wait_for_shutdown_with(4, Duration::ZERO, || {
-            Ok(probes.next().expect("shutdown probe count"))
+        let returned_dropped = Rc::new(Cell::new(false));
+        let guard = wait_for_shutdown_lease_with(4, Duration::ZERO, || {
+            let status = probes.next().expect("shutdown probe count");
+            let dropped = if status == SingletonStatus::Acquired {
+                Rc::clone(&returned_dropped)
+            } else {
+                Rc::new(Cell::new(false))
+            };
+            Ok((TestGuard(dropped), status))
         })
         .unwrap();
+        assert!(
+            !returned_dropped.get(),
+            "the acquired singleton must remain held after the wait"
+        );
+        drop(guard);
+        assert!(returned_dropped.get());
+    }
+
+    #[test]
+    fn graceful_stop_wait_budget_is_thirty_seconds_and_accepts_the_final_probe() {
+        assert_eq!(SHUTDOWN_PROBE_ATTEMPTS, 1_200);
+        assert_eq!(SHUTDOWN_PROBE_INTERVAL, Duration::from_millis(25));
+        assert_eq!(
+            (SHUTDOWN_PROBE_ATTEMPTS - 1) as u128 * SHUTDOWN_PROBE_INTERVAL.as_millis(),
+            29_975
+        );
+
+        let mut probes = 0usize;
+        wait_for_shutdown_lease_with(SHUTDOWN_PROBE_ATTEMPTS, Duration::ZERO, || {
+            probes += 1;
+            let status = if probes == SHUTDOWN_PROBE_ATTEMPTS {
+                SingletonStatus::Acquired
+            } else {
+                SingletonStatus::AlreadyRunning
+            };
+            Ok(((), status))
+        })
+        .expect("the final bounded probe still preserves immediate-restart safety");
+        assert_eq!(probes, SHUTDOWN_PROBE_ATTEMPTS);
     }
 
     #[test]
     fn stop_reports_a_bounded_timeout_when_the_runtime_never_releases() {
-        let err = wait_for_shutdown_with(2, Duration::ZERO, || Ok(SingletonStatus::AlreadyRunning))
-            .unwrap_err();
+        let err = wait_for_shutdown_lease_with(2, Duration::ZERO, || {
+            Ok(((), SingletonStatus::AlreadyRunning))
+        })
+        .unwrap_err();
 
         assert_eq!(err.kind(), io::ErrorKind::TimedOut);
+    }
+
+    #[test]
+    fn lifecycle_stop_is_fail_closed_but_accepts_an_absent_runtime() {
+        assert!(stop_runtime_for_lifecycle_with(|| Ok(ControlResponse::Ok)).unwrap());
+        assert!(!stop_runtime_for_lifecycle_with(|| Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "no command server",
+        )))
+        .unwrap());
+        assert!(
+            stop_runtime_for_lifecycle_with(|| Ok(ControlResponse::Err("BUSY".into()))).is_err()
+        );
+        assert!(
+            stop_runtime_for_lifecycle_with(|| Ok(ControlResponse::Status(
+                RuntimeStatus::not_running(),
+            )))
+            .is_err()
+        );
     }
 }
 

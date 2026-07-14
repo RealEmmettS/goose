@@ -15,6 +15,7 @@ VERSION="${HONK300_VERSION:-0.0.0}"
 TAG="${HONK300_TAG:-v$VERSION}"
 COMMIT="${HONK300_COMMIT:-$(git -C "$ROOT" rev-parse HEAD)}"
 IDENTITY="${MACOS_SIGN_IDENTITY:--}"
+KEYCHAIN="${MACOS_SIGN_KEYCHAIN:-}"
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
   echo "invalid bundle version: $VERSION" >&2
   exit 1
@@ -96,8 +97,13 @@ if [[ "$IDENTITY" == "-" ]]; then
   codesign --force --options runtime --sign - "$BIN"
   codesign --force --options runtime --sign - "$APP_DIR"
 else
-  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$BIN"
-  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
+  if [[ -n "$KEYCHAIN" ]]; then
+    codesign --keychain "$KEYCHAIN" --force --options runtime --timestamp --sign "$IDENTITY" "$BIN"
+    codesign --keychain "$KEYCHAIN" --force --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
+  else
+    codesign --force --options runtime --timestamp --sign "$IDENTITY" "$BIN"
+    codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
+  fi
 fi
 codesign --verify --strict "$BIN"
 codesign --verify --strict "$APP_DIR"

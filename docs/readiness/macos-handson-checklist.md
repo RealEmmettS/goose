@@ -165,12 +165,32 @@ identity classifier; never report an uninstalled app as live-tested.
 
 Capture the unchanged candidate on both light and dark backgrounds. Require a visible opaque
 body, outline, wing, beak, legs, and shadow; there must be no translucent white/purple blob.
+The alpha-last premultiplied-RGBA bitmap must remain Device RGB, the overlay window must report
+the stable standard-sRGB destination, and WindowServer—not the app—owns final display-profile
+composition.
 Record frames for:
 
 - all eight headings and the side/top dual-view transition;
 - idle and walk cycles, restrained planted-foot release, blink, breath, and tail motion;
 - puddle hop, resulting mud/footmarks, and prank-return frames; and
 - note and meme windows, including readable dark-mode note text.
+
+Also record lifecycle/movement without accepting a visible pop:
+
+- launch with the complete pose staged beyond a genuinely exposed edge and watch it walk in;
+- cross a touching-monitor seam naturally where hardware permits;
+- observe one ordinary exposed-edge wrap, proving the pose is fully hidden before it returns from
+  the opposite exposed edge;
+- observe a deliberate puddle/prank errand return through its own departure edge without wrapping;
+  and
+- issue stop/exit/quit and keep capture running until the complete pose has walked out and the
+  singleton is released, then immediately restart successfully within the bounded client wait.
+
+Spawn a note or meme and close it manually enough times to observe the probabilistic user-close
+path. Record the visible annoyed reaction when it occurs. If the existing bounded nab follows,
+verify live Accessibility, mouse-steal configuration, pointer availability, and manners allow it;
+program cleanup must never trigger the reaction. Linux's no-collect limitation is outside this
+native Mac observation and must remain documented rather than emulated.
 
 Ordinary walking must keep its weighted cadence and must not look stretched or overcorrected.
 Do not refresh the shared engine goldens merely to hide a native presentation defect.
@@ -188,6 +208,11 @@ then sample for 60 seconds. Record the binary hash again plus:
 
 The earlier development profile is useful baseline evidence but does not replace this final
 signed-candidate run.
+
+The latest standard-sRGB development diagnostic measured 5.55% median CPU, 29.52 MiB maximum
+RSS, negative 9.89 MiB growth, zero leaks, and 20 clean compositor captures. Treat those numbers
+only as a comparison point: repeat every metric above on the exact candidate and do not copy the
+diagnostic result into the candidate evidence.
 
 ## 7. Complete lifecycle and rollback qualification
 

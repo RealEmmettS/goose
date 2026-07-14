@@ -121,6 +121,8 @@ class ReleaseMetadataTests(unittest.TestCase):
                 "honk300-aarch64-unknown-linux-musl.tar.xz": b"arm-musl",
                 "honk300-x86_64-pc-windows-msvc.msi": b"x64-msi",
                 "honk300-aarch64-pc-windows-msvc.msi": b"arm-msi",
+                "honk300-x86_64-pc-windows-msvc.zip": b"x64-portable",
+                "honk300-aarch64-pc-windows-msvc.zip": b"arm-portable",
             }
             for name, body in payloads.items():
                 (root / name).write_bytes(body)
@@ -135,10 +137,13 @@ class ReleaseMetadataTests(unittest.TestCase):
 
             shell = (root / "honk300-installer.sh").read_text(encoding="utf-8")
             powershell = (root / "honk300-installer.ps1").read_text(encoding="utf-8")
-            self.assertNotIn("__SHA_", shell + powershell)
+            self.assertNotRegex(shell + powershell, r"__(?:SHA|SIZE)_")
             self.assertIn(hashlib.sha256(b"app").hexdigest(), shell)
             self.assertIn(hashlib.sha256(b"x64-gnu").hexdigest(), shell)
             self.assertIn(hashlib.sha256(b"arm-msi").hexdigest(), powershell)
+            self.assertIn(hashlib.sha256(b"x64-portable").hexdigest(), powershell)
+            self.assertIn('[int64]"7"', powershell)
+            self.assertIn('[int64]"12"', powershell)
             self.assertIn('TAG="v0.3.0"', shell)
             self.assertIn('COMMIT="0123456789abcdef0123456789abcdef01234567"', shell)
             self.assertIn("$Tag = 'v0.3.0'", powershell)

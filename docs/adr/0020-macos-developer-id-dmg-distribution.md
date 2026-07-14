@@ -33,15 +33,17 @@ the sealed application bundle.
 - The engine rig and reference renderer remain platform-neutral. Gait refinements and shared
   renderer allocation improvements apply on every backend; AppKit presentation remains a macOS
   concern.
-- macOS reuses each display's bitmap/image storage, presents at at most 60 Hz, advances the
+- macOS reuses each display's bitmap/image storage, presents at most 60 Hz, advances the
   simulation at 120 Hz, drains native objects inside autorelease pools, and caches display
   geometry until topology changes.
 - The reusable `NSImageView` participates in the ordinary AppKit window backing store so
   WindowServer screenshots and screen sharing observe the same alpha-composited pixels as the
   physical display. A custom child layer that bypasses that capture path is not used.
-- The bitmap and overlay window both declare Device RGB. AppKit must not repeat a Device RGB to
-  display-profile ICC conversion in the application process on every frame; WindowServer owns
-  final per-display composition. Native capture and palette checks guard the resulting color.
+- The alpha-last `NSBitmapImageRep` declares Device RGB to match the premultiplied RGBA byte
+  contract, while the overlay `NSWindow` uses a stable standard-sRGB destination rather than
+  inheriting a physical display's dynamic wide-gamut profile. WindowServer owns final
+  display-profile composition. Native capture and palette checks guard that split contract and
+  prevent per-frame application-side Device-RGB-to-Display-P3 conversion from returning.
 - Native canvas and bitmap capacity may be bucketed for ordinary frame-size jitter, but must
   shrink after an unusually large transient frame. Only the active RGBA rectangle is presented;
   stale transparent capacity must not be color-converted and composited indefinitely.
@@ -67,6 +69,13 @@ the sealed application bundle.
 - Bundle activation and external integrations form one rollback boundary. A failure after the
   bundle swap restores/removes aliases, LaunchAgent, receipt, and only newly migrated media,
   preserving foreign files and pre-existing user media.
+- Replacement and uninstall stop an active goose, wait through its animated exit, and retain the
+  shared singleton for the entire mutation. The exact-tag shell bootstrap starts the already-
+  verified staged binary as a lease holder and keeps its stdin FIFO open through swap, receipt,
+  verification, and rollback; parent death closes the FIFO so the lease cannot orphan.
+- Shell HUP, INT, and TERM handlers provide explicit nonzero cleanup statuses. An interruption
+  after bundle/binary activation therefore restores the prior installation and integrations rather
+  than mistaking the signal trap's ambient `$?` for success.
 - The exact-tag, SHA-256-verifying shell bootstrap remains a supported secondary terminal path.
 
 ### Signing and notarization

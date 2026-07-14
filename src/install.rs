@@ -2,6 +2,9 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+use honk_control::LifecycleLease;
+
 const APP_NAME: &str = "honk300";
 #[cfg(windows)]
 const DISPLAY_NAME: &str = "Honk300";
@@ -14,6 +17,15 @@ const PATH_MARKER_START: &str = "# >>> honk300 managed PATH >>>";
 const PATH_MARKER_END: &str = "# <<< honk300 managed PATH <<<";
 
 type DynError = Box<dyn std::error::Error>;
+
+#[cfg(test)]
+fn mutate_with_lifecycle_lease<L, T>(
+    acquire: impl FnOnce() -> io::Result<L>,
+    mutation: impl FnOnce() -> io::Result<T>,
+) -> io::Result<T> {
+    let _lease = acquire()?;
+    mutation()
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InstallSource {
@@ -103,6 +115,7 @@ fn path_is_in_app_bundle(path: &Path) -> bool {
 pub fn install(autostart: bool) -> Result<(), DynError> {
     let root = windows_user_install_root()?;
     ensure_owned_install_root(&root, &[InstallSource::ManualLocal])?;
+    let _lifecycle_lease = LifecycleLease::acquire()?;
     let bin_dir = root.join("bin");
     fs::create_dir_all(&bin_dir)?;
 
@@ -133,6 +146,7 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
 pub fn install(autostart: bool) -> Result<(), DynError> {
     let root = linux_user_install_root()?;
     ensure_owned_install_root(&root, &[InstallSource::ManualLocal, InstallSource::Shell])?;
+    let _lifecycle_lease = LifecycleLease::acquire()?;
     let bin_dir = root.join("bin");
     fs::create_dir_all(&bin_dir)?;
 
@@ -180,11 +194,8 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
     let installed_bin = app_dir.join("Contents").join("MacOS").join("honk300");
     let current_exe = std::env::current_exe()?;
     let disposition = macos_install_disposition(&current_exe, &app_dir)?;
-
     let media = macos_media_root()?;
-
     let aliases_dir = macos_user_alias_dir()?;
-    ensure_real_directory(&aliases_dir)?;
     let owned_targets = [&installed_bin as &Path];
     let alias_paths = COMMAND_NAMES
         .iter()
@@ -221,6 +232,7 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
         ))
             .into());
     }
+    let _lifecycle_lease = LifecycleLease::acquire()?;
     let mut integrations =
         MacosIntegrationTransaction::capture(&alias_paths, &plist_path, &receipt_path)?;
 
@@ -239,6 +251,7 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
         {
             return Err("honk300 install: injected failure after macOS bundle activation".into());
         }
+        ensure_real_directory(&aliases_dir)?;
         let media_changes = migrate_legacy_user_media(
             &app_dir.join("Contents").join("Resources").join("Assets"),
             &media,
@@ -316,45 +329,26 @@ pub fn install(_autostart: bool) -> Result<(), DynError> {
 #[cfg(windows)]
 pub fn uninstall(purge: bool) -> Result<(), DynError> {
     let source = detect_install_source();
-    if matches!(
+    let current_exe = std::env::current_exe()?;
+    let deferred_source = if matches!(
         source,
         InstallSource::MsiGlobal
             | InstallSource::MsiCorporate
             | InstallSource::ExeGlobal
             | InstallSource::ExeCorporate
     ) {
-        return uninstall_windows_managed(source, purge);
-    }
-
-    let root = windows_user_install_root()?;
-    let bin_dir = root.join("bin");
-    ensure_owned_install_root(&root, &[InstallSource::ManualLocal])?;
-    let media = windows_media_root()?;
-    ensure_external_media_root(&media)?;
-    migrate_legacy_user_media(&bin_dir.join("Assets"), &media, LegacyMigrationMode::Move)?;
-    let backup_root = windows_backup_root()?;
-    let backup = if purge {
-        backup_user_content(&media, &backup_root)?
+        if find_windows_managed_uninstall(source, &current_exe)?.is_none() {
+            return Err("honk300 uninstall: the Windows installer identity could not be proven, so no installed files were touched. Uninstall Honk300 from Windows Installed Apps instead.".into());
+        }
+        source
     } else {
-        None
+        ensure_owned_install_root(&windows_user_install_root()?, &[InstallSource::ManualLocal])?;
+        // A portable copy can legitimately remove an existing receipt-owned manual install. Once
+        // that ownership proof succeeds, normalize the helper request instead of trusting the
+        // portable binary's otherwise-unknown provenance marker.
+        InstallSource::ManualLocal
     };
-
-    set_windows_autostart(None)?;
-    remove_windows_start_menu_shortcut()?;
-    remove_windows_user_path(&bin_dir)?;
-    remove_windows_install_source_marker()?;
-    remove_dir_if_exists(&root)?;
-
-    if purge {
-        purge_config_state_preserving_foreign_receipt(&windows_config_state_root()?, &root)?;
-        report_backup(backup);
-    } else {
-        remove_owned_receipt(&windows_receipt_path()?, &root)?;
-        report_preserved(media_has_user_content(&media)?.then_some(media));
-    }
-
-    println!("honk300: uninstalled.");
-    Ok(())
+    schedule_windows_deferred_uninstall(deferred_source, purge, &current_exe)
 }
 
 #[cfg(target_os = "linux")]
@@ -366,6 +360,7 @@ pub fn uninstall(purge: bool) -> Result<(), DynError> {
         &[InstallSource::ManualLocal, InstallSource::Shell],
         &receipt,
     )?;
+    let _lifecycle_lease = LifecycleLease::acquire()?;
     let media = linux_media_root()?;
     ensure_external_media_root(&media)?;
     migrate_legacy_user_media(
@@ -417,6 +412,8 @@ pub fn uninstall(purge: bool) -> Result<(), DynError> {
         .into());
     }
     let receipt = macos_receipt_path()?;
+    preflight_owned_macos_receipt(&receipt, &app_dir)?;
+    let _lifecycle_lease = LifecycleLease::acquire()?;
     let media = macos_media_root()?;
     ensure_external_media_root(&media)?;
     migrate_legacy_user_media(
@@ -1624,11 +1621,41 @@ fn command_executable_path(command: &str) -> Option<PathBuf> {
 }
 
 #[cfg(any(test, windows))]
-fn windows_post_exit_helper_invocation(
-    current_pid: u32,
+const WINDOWS_RESTART_MANAGER_PROBE: &str = r#"
+if (-not ('Honk300RestartManagerProbe' -as [type])) {
+  Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class Honk300RestartManagerProbe {
+  private const int ErrorMoreData = 234;
+  [DllImport("rstrtmgr.dll", CharSet=CharSet.Unicode)] private static extern int RmStartSession(out uint handle, int flags, StringBuilder key);
+  [DllImport("rstrtmgr.dll", CharSet=CharSet.Unicode)] private static extern int RmRegisterResources(uint handle, uint fileCount, string[] files, uint applicationCount, IntPtr applications, uint serviceCount, string[] services);
+  [DllImport("rstrtmgr.dll")] private static extern int RmGetList(uint handle, out uint needed, ref uint count, IntPtr info, ref uint reasons);
+  [DllImport("rstrtmgr.dll")] private static extern int RmEndSession(uint handle);
+  public static void AssertUnlocked(string path) {
+    if (!File.Exists(path)) return;
+    uint handle; var key=new StringBuilder(64); int result=RmStartSession(out handle,0,key);
+    if (result != 0) throw new Win32Exception(result,"Restart Manager session failed");
+    try {
+      result=RmRegisterResources(handle,1,new[] { path },0,IntPtr.Zero,0,null);
+      if (result != 0) throw new Win32Exception(result,"Restart Manager registration failed");
+      uint needed=0,count=0,reasons=0; result=RmGetList(handle,out needed,ref count,IntPtr.Zero,ref reasons);
+      if (result != 0 && result != ErrorMoreData) throw new Win32Exception(result,"Restart Manager lock query failed");
+      if (needed != 0) throw new InvalidOperationException("another Windows session is using " + path);
+    } finally { RmEndSession(handle); }
+  }
+}
+'@
+}
+"#;
+
+#[cfg(any(test, windows))]
+fn windows_managed_uninstall_invocation(
     plan: &WindowsManagedUninstall,
-    receipt: Option<&Path>,
-    _install_root: &Path,
+    installed_executable: &Path,
     system_msiexec: &Path,
 ) -> WindowsPostExitInvocation {
     let (file, arguments, elevated) = match plan {
@@ -1653,14 +1680,10 @@ fn windows_post_exit_helper_invocation(
         ),
     };
     let elevation = if elevated { " -Verb RunAs" } else { "" };
-    let receipt_cleanup = receipt.map_or_else(String::new, |path| {
-        format!(
-            "; Remove-Item -LiteralPath '{}' -Force -ErrorAction SilentlyContinue",
-            powershell_literal(&path.to_string_lossy())
-        )
-    });
+    let installed = powershell_literal(&installed_executable.to_string_lossy());
+    let restart_manager_probe = WINDOWS_RESTART_MANAGER_PROBE;
     let script = format!(
-        "$ErrorActionPreference='Stop'; Wait-Process -Id {current_pid} -ErrorAction SilentlyContinue; $process = Start-Process -FilePath '{}' -ArgumentList {arguments} -WindowStyle Hidden -Wait -PassThru{elevation}; if ($process.ExitCode -notin @(0,1605,1641,3010)) {{ exit $process.ExitCode }}{receipt_cleanup}",
+        "$ErrorActionPreference='Stop'; {restart_manager_probe}; $installedBin=[IO.Path]::GetDirectoryName('{installed}'); foreach ($candidate in @((Join-Path $installedBin 'honk300.exe'),(Join-Path $installedBin 'honk.exe'),(Join-Path $installedBin 'goose.exe'))) {{ [Honk300RestartManagerProbe]::AssertUnlocked($candidate) }}; $process = Start-Process -FilePath '{}' -ArgumentList {arguments} -WindowStyle Hidden -Wait -PassThru{elevation}; if ($process.ExitCode -notin @(0,1605)) {{ exit $process.ExitCode }}",
         powershell_literal(&file)
     );
     WindowsPostExitInvocation {
@@ -1683,18 +1706,311 @@ fn powershell_literal(value: &str) -> String {
 }
 
 #[cfg(windows)]
-fn uninstall_windows_managed(source: InstallSource, purge: bool) -> Result<(), DynError> {
+const WINDOWS_DEFERRED_UNINSTALL_READY: &str = "HONK300_INTERNAL_WINDOWS_UNINSTALL_READY";
+
+#[cfg(windows)]
+struct DeferredUninstallChild {
+    child: Option<std::process::Child>,
+}
+
+#[cfg(windows)]
+impl DeferredUninstallChild {
+    fn new(child: std::process::Child) -> Self {
+        Self { child: Some(child) }
+    }
+
+    fn try_wait(&mut self) -> io::Result<Option<std::process::ExitStatus>> {
+        self.child
+            .as_mut()
+            .expect("deferred uninstall helper is armed")
+            .try_wait()
+    }
+
+    fn disarm(mut self) {
+        let _ = self.child.take();
+    }
+}
+
+#[cfg(windows)]
+impl Drop for DeferredUninstallChild {
+    fn drop(&mut self) {
+        let Some(child) = self.child.as_mut() else {
+            return;
+        };
+        if !matches!(child.try_wait(), Ok(Some(_))) {
+            let _ = child.kill();
+        }
+        let _ = child.wait();
+    }
+}
+
+#[cfg(windows)]
+fn schedule_windows_deferred_uninstall(
+    source: InstallSource,
+    purge: bool,
+    current_exe: &Path,
+) -> Result<(), DynError> {
+    use std::os::windows::process::CommandExt;
+    use std::process::Stdio;
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let metadata = fs::symlink_metadata(current_exe)?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err("honk300 uninstall: the running executable is not a regular owned file".into());
+    }
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let helper_root =
+        std::env::temp_dir().join(format!("honk300-uninstall-{}-{nonce}", std::process::id()));
+    fs::create_dir(&helper_root)?;
+    let helper = helper_root.join("honk300-uninstall-helper.exe");
+    let ready = helper_root.join("ready");
+    let log = helper_root.join("uninstall.log");
+    let scheduled = (|| -> Result<(), DynError> {
+        fs::copy(current_exe, &helper)?;
+        let stdout = fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&log)?;
+        let stderr = stdout.try_clone()?;
+        let child = std::process::Command::new(&helper)
+            .env("HONK300_INTERNAL_WINDOWS_UNINSTALL", "1")
+            .env(
+                "HONK300_INTERNAL_WINDOWS_UNINSTALL_SOURCE",
+                source.marker_value(),
+            )
+            .env(
+                "HONK300_INTERNAL_WINDOWS_UNINSTALL_PURGE",
+                if purge { "1" } else { "0" },
+            )
+            .env(
+                "HONK300_INTERNAL_WINDOWS_UNINSTALL_PARENT_PID",
+                std::process::id().to_string(),
+            )
+            .env(
+                "HONK300_INTERNAL_WINDOWS_UNINSTALL_ORIGINAL_EXE",
+                current_exe,
+            )
+            .env("HONK300_INTERNAL_WINDOWS_UNINSTALL_ROOT", &helper_root)
+            .env("HONK300_INTERNAL_WINDOWS_UNINSTALL_READY_PATH", &ready)
+            .current_dir(&helper_root)
+            .stdin(Stdio::null())
+            .stdout(Stdio::from(stdout))
+            .stderr(Stdio::from(stderr))
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()?;
+        let mut child = DeferredUninstallChild::new(child);
+        let deadline = Instant::now() + Duration::from_secs(35);
+        loop {
+            match fs::read_to_string(&ready) {
+                Ok(value) if value == WINDOWS_DEFERRED_UNINSTALL_READY => {
+                    if child.try_wait()?.is_some() {
+                        return Err("honk300 uninstall: deferred helper exited after its ownership handshake".into());
+                    }
+                    child.disarm();
+                    break;
+                }
+                Ok(value) if !value.is_empty() => {
+                    return Err(
+                        "honk300 uninstall: deferred helper wrote an invalid ownership handshake"
+                            .into(),
+                    );
+                }
+                Ok(_) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+            if let Some(status) = child.try_wait()? {
+                let detail = fs::read_to_string(&log).unwrap_or_default();
+                return Err(format!(
+                    "honk300 uninstall: deferred helper could not acquire lifecycle ownership (exit {}): {}",
+                    status.code().unwrap_or(-1),
+                    detail.trim()
+                )
+                .into());
+            }
+            if Instant::now() >= deadline {
+                return Err("honk300 uninstall: timed out acquiring exclusive lifecycle ownership; no managed files were touched".into());
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        Ok(())
+    })();
+    if let Err(error) = scheduled {
+        let _ = fs::remove_dir_all(&helper_root);
+        return Err(error);
+    }
+    println!(
+        "honk300: exclusive Windows uninstall handoff acquired; removal begins after this process exits."
+    );
+    Ok(())
+}
+
+#[cfg(windows)]
+pub(crate) fn run_windows_deferred_uninstall() -> Result<(), DynError> {
+    use std::io::Write as _;
+
+    let source =
+        InstallSource::from_marker(&std::env::var("HONK300_INTERNAL_WINDOWS_UNINSTALL_SOURCE")?);
+    let purge = match std::env::var("HONK300_INTERNAL_WINDOWS_UNINSTALL_PURGE")?.as_str() {
+        "0" => false,
+        "1" => true,
+        _ => return Err("invalid deferred Windows uninstall purge marker".into()),
+    };
+    let parent_pid =
+        std::env::var("HONK300_INTERNAL_WINDOWS_UNINSTALL_PARENT_PID")?.parse::<u32>()?;
+    let original_exe = PathBuf::from(
+        std::env::var_os("HONK300_INTERNAL_WINDOWS_UNINSTALL_ORIGINAL_EXE")
+            .ok_or("missing deferred Windows uninstall original executable")?,
+    );
+    let helper_root = PathBuf::from(
+        std::env::var_os("HONK300_INTERNAL_WINDOWS_UNINSTALL_ROOT")
+            .ok_or("missing deferred Windows uninstall helper root")?,
+    );
+    let ready = PathBuf::from(
+        std::env::var_os("HONK300_INTERNAL_WINDOWS_UNINSTALL_READY_PATH")
+            .ok_or("missing deferred Windows uninstall ready path")?,
+    );
+    let current_exe = std::env::current_exe()?;
+    if current_exe.parent() != Some(helper_root.as_path())
+        || ready.parent() != Some(helper_root.as_path())
+        || !current_exe
+            .file_name()
+            .is_some_and(|name| name.eq_ignore_ascii_case("honk300-uninstall-helper.exe"))
+    {
+        return Err("invalid deferred Windows uninstall helper identity".into());
+    }
+    let _lease = LifecycleLease::acquire()?;
+    fs::write(&ready, WINDOWS_DEFERRED_UNINSTALL_READY)?;
+    std::io::stdout().flush()?;
+    wait_for_windows_parent_exit(parent_pid)?;
+
+    let result = if matches!(
+        source,
+        InstallSource::MsiGlobal
+            | InstallSource::MsiCorporate
+            | InstallSource::ExeGlobal
+            | InstallSource::ExeCorporate
+    ) {
+        uninstall_windows_managed_under_lease(source, purge, &original_exe)
+    } else if source == InstallSource::ManualLocal {
+        uninstall_windows_manual_under_lease(purge)
+    } else {
+        Err("deferred Windows uninstall source is not managed by honk300".into())
+    };
+    if result.is_ok() {
+        schedule_windows_helper_cleanup(&helper_root)?;
+    }
+    result
+}
+
+#[cfg(windows)]
+fn wait_for_windows_parent_exit(parent_pid: u32) -> io::Result<()> {
     use std::os::windows::process::CommandExt;
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let current_exe = std::env::current_exe()?;
-    let Some((plan, install_root)) = find_windows_managed_uninstall(source, &current_exe)? else {
+    let script = format!(
+        "$process = Get-Process -Id {parent_pid} -ErrorAction SilentlyContinue; if ($null -ne $process) {{ $process.WaitForExit() }}"
+    );
+    let status = std::process::Command::new(system_windows_powershell_path()?)
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &script,
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other(
+            "Windows deferred uninstall could not wait for the invoking process to exit",
+        ))
+    }
+}
+
+#[cfg(windows)]
+fn schedule_windows_helper_cleanup(helper_root: &Path) -> io::Result<()> {
+    use std::os::windows::process::CommandExt;
+    use std::process::Stdio;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let root = powershell_literal(&helper_root.to_string_lossy());
+    let script = format!(
+        "$process = Get-Process -Id {} -ErrorAction SilentlyContinue; if ($null -ne $process) {{ $process.WaitForExit() }}; $item = Get-Item -LiteralPath '{root}' -Force -ErrorAction SilentlyContinue; if ($null -ne $item -and $item.PSIsContainer -and (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0)) {{ Remove-Item -LiteralPath '{root}' -Recurse -Force }}",
+        std::process::id()
+    );
+    std::process::Command::new(system_windows_powershell_path()?)
+        .args([
+            "-NoProfile",
+            "-WindowStyle",
+            "Hidden",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &script,
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn uninstall_windows_manual_under_lease(purge: bool) -> Result<(), DynError> {
+    let root = windows_user_install_root()?;
+    let bin_dir = root.join("bin");
+    ensure_owned_install_root(&root, &[InstallSource::ManualLocal])?;
+    let media = windows_media_root()?;
+    ensure_external_media_root(&media)?;
+    migrate_legacy_user_media(&bin_dir.join("Assets"), &media, LegacyMigrationMode::Move)?;
+    let backup = if purge {
+        backup_user_content(&media, &windows_backup_root()?)?
+    } else {
+        None
+    };
+
+    set_windows_autostart(None)?;
+    remove_windows_start_menu_shortcut()?;
+    remove_windows_user_path(&bin_dir)?;
+    remove_windows_install_source_marker()?;
+    remove_dir_if_exists(&root)?;
+
+    if purge {
+        purge_config_state_preserving_foreign_receipt(&windows_config_state_root()?, &root)?;
+        report_backup(backup);
+    } else {
+        remove_owned_receipt(&windows_receipt_path()?, &root)?;
+        report_preserved(media_has_user_content(&media)?.then_some(media));
+    }
+
+    println!("honk300: uninstalled.");
+    Ok(())
+}
+
+#[cfg(windows)]
+fn uninstall_windows_managed_under_lease(
+    source: InstallSource,
+    purge: bool,
+    original_exe: &Path,
+) -> Result<(), DynError> {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let Some((plan, install_root)) = find_windows_managed_uninstall(source, original_exe)? else {
         return Err("honk300 uninstall: the Windows installer identity could not be proven, so no installed files were touched. Uninstall Honk300 from Windows Installed Apps instead.".into());
     };
 
     let media = windows_media_root()?;
     ensure_external_media_root(&media)?;
-    if let Some(bin_dir) = current_exe.parent() {
+    if let Some(bin_dir) = original_exe.parent() {
         migrate_legacy_user_media(&bin_dir.join("Assets"), &media, LegacyMigrationMode::Copy)?;
     }
     let backup = if purge {
@@ -1704,6 +2020,35 @@ fn uninstall_windows_managed(source: InstallSource, purge: bool) -> Result<(), D
     };
     let receipt = windows_receipt_path()?;
     let owned_receipt = receipt_is_owned(&receipt, &install_root)?;
+    let system_msiexec = system_windows_msiexec_path()?;
+    let invocation = windows_managed_uninstall_invocation(&plan, original_exe, &system_msiexec);
+    let status = std::process::Command::new(system_windows_powershell_path()?)
+        .args(&invocation.args)
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()?;
+    if !status.success() {
+        return Err(format!(
+            "honk300 uninstall: verified Windows installer exited with code {}",
+            status.code().unwrap_or(-1)
+        )
+        .into());
+    }
+    let installed_bin = original_exe
+        .parent()
+        .ok_or("honk300 uninstall: installed executable has no parent directory")?;
+    for name in ["honk300.exe", "honk.exe", "goose.exe"] {
+        match fs::symlink_metadata(installed_bin.join(name)) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+            Ok(_) => {
+                return Err(format!(
+                    "honk300 uninstall: Windows reported success but {name} is still installed; refusing pending cleanup"
+                )
+                .into())
+            }
+        }
+    }
+
     if purge {
         purge_config_state_preserving_foreign_receipt(
             &windows_config_state_root()?,
@@ -1711,26 +2056,12 @@ fn uninstall_windows_managed(source: InstallSource, purge: bool) -> Result<(), D
         )?;
         report_backup(backup);
     } else {
+        if owned_receipt {
+            remove_owned_receipt(&receipt, &install_root)?;
+        }
         report_preserved(media_has_user_content(&media)?.then_some(media));
     }
-
-    let receipt_for_helper = (!purge && owned_receipt).then_some(receipt.as_path());
-    let system_msiexec = system_windows_msiexec_path()?;
-    let invocation = windows_post_exit_helper_invocation(
-        std::process::id(),
-        &plan,
-        receipt_for_helper,
-        &install_root,
-        &system_msiexec,
-    );
-    std::process::Command::new(system_windows_powershell_path()?)
-        .args(&invocation.args)
-        .creation_flags(CREATE_NO_WINDOW)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()?;
-    println!("honk300: verified Windows installer uninstall will begin after this process exits.");
+    println!("honk300: uninstalled through the verified Windows installer.");
     Ok(())
 }
 
@@ -2552,6 +2883,8 @@ fn xml_escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
+    use std::rc::Rc;
 
     #[test]
     fn install_source_markers_are_stable() {
@@ -2569,6 +2902,52 @@ mod tests {
             assert_eq!(source.marker_value(), marker);
         }
         assert_eq!(InstallSource::from_marker("cargo"), InstallSource::Unknown);
+    }
+
+    #[test]
+    fn lifecycle_lease_is_held_for_the_entire_mutation() {
+        struct Lease(Rc<Cell<bool>>);
+        impl Drop for Lease {
+            fn drop(&mut self) {
+                self.0.set(true);
+            }
+        }
+
+        let dropped = Rc::new(Cell::new(false));
+        mutate_with_lifecycle_lease(
+            || Ok(Lease(Rc::clone(&dropped))),
+            || {
+                assert!(!dropped.get(), "singleton lease dropped before mutation");
+                Ok(())
+            },
+        )
+        .expect("mutation under lifecycle lease");
+        assert!(
+            dropped.get(),
+            "singleton lease should release after mutation"
+        );
+    }
+
+    #[test]
+    fn lifecycle_lease_failure_leaves_files_untouched() {
+        let root = test_dir("quiesce-before-mutation");
+        let marker = root.join("mutation-started");
+        let result = mutate_with_lifecycle_lease(
+            || {
+                Err::<(), _>(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "singleton still held",
+                ))
+            },
+            || {
+                fs::create_dir_all(&root)?;
+                fs::write(&marker, b"mutated")
+            },
+        );
+
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::TimedOut);
+        assert!(!root.exists());
+        assert!(!marker.exists());
     }
 
     #[test]
@@ -3095,28 +3474,33 @@ mod tests {
     }
 
     #[test]
-    fn windows_post_exit_helper_is_hidden_waits_and_never_deletes_install_root() {
+    fn windows_managed_uninstall_helper_is_hidden_and_never_deletes_install_root() {
         let plan = WindowsManagedUninstall::Msi {
             product_code: "{01234567-89AB-CDEF-0123-456789ABCDEF}".into(),
             elevated: true,
         };
-        let invocation = windows_post_exit_helper_invocation(
-            4242,
+        let invocation = windows_managed_uninstall_invocation(
             &plan,
-            None,
-            Path::new(r"C:\Program Files\honk300"),
+            Path::new(r"C:\Program Files\honk300\bin\honk300.exe"),
             Path::new(r"C:\Windows\System32\msiexec.exe"),
         );
         assert!(invocation
             .args
             .windows(2)
             .any(|args| args == ["-WindowStyle", "Hidden"]));
-        assert!(invocation.script.contains("Wait-Process -Id 4242"));
+        assert!(!invocation.script.contains("Wait-Process"));
+        assert!(invocation.script.contains("rstrtmgr.dll"));
+        assert!(invocation
+            .script
+            .contains("[Honk300RestartManagerProbe]::AssertUnlocked"));
         assert!(invocation
             .script
             .contains(r"C:\Windows\System32\msiexec.exe"));
         assert!(!invocation.script.contains("-FilePath 'msiexec.exe'"));
         assert!(invocation.script.contains("/x"));
+        assert!(invocation.script.contains("@(0,1605)"));
+        assert!(!invocation.script.contains("1641"));
+        assert!(!invocation.script.contains("3010"));
         assert!(!invocation.script.contains("Remove-Item -Recurse"));
     }
 

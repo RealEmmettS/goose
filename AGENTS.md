@@ -40,7 +40,15 @@ platform/IPC hardening, Global MSI as the Windows default, an exact-tag transact
 installer for macOS/Linux, and one atomic immutable release workflow. v0.3.3/ADR 0020 adds the
 first native macOS qualification, Developer ID signing/notarization, a per-user graphical DMG,
 and shared gait refinement. ADR 0022 adds managed one-prompt-per-update Accessibility onboarding,
-a calm safe-edge wait, and same-process grant/revocation transitions. The current release gate is
+a calm safe-edge wait, and same-process grant/revocation transitions. v0.3.3 also adds shared
+exposed-edge locomotion (continuous monitor seams, occasional hidden wrap, fully offscreen
+startup/graceful exit) and the user-only 30% collect-close annoyed reaction with a separately gated
+bounded nab. Independent review closed the final-clear, gapped-topology, state-latch/deadline,
+typed-close, Windows-provenance, and reaction-visibility regressions with focused tests. Retained
+lifecycle ownership now pins verified Windows artifacts through execution, removes ambient lease
+bypasses, rolls Unix signals back explicitly, checks machine-wide Windows paths across sessions,
+and kills every unaccepted deferred helper. Exact-candidate Mac evidence and native Windows/Linux
+execution remain release gates. The current release gate is
 `docs/readiness/v0.3.3-readiness.md` and task `#m20q`. Stable/latest remains v0.3.2 until that
 checklist is complete and the immutable v0.3.3 release is independently verified.
 
@@ -122,8 +130,22 @@ checklist is complete and the immutable v0.3.3 release is independently verified
 - macOS transparent presentation uses reusable premultiplied-RGBA AppKit image views in the
   ordinary window backing store. Keep canvas/bitmap capacity bounded after transiently large
   damage so screen capture stays alpha-correct and normal walking does not redraw stale space.
-  Keep the Device RGB bitmap and overlay-window color spaces aligned; final display-profile
-  composition belongs to WindowServer, not a per-frame application-side ICC conversion.
+  The alpha-last bitmap is Device RGB, the overlay window has a stable standard-sRGB destination,
+  and final display-profile composition belongs to WindowServer rather than a per-frame
+  application-side Device-RGB-to-Display-P3 conversion.
+- Startup and graceful shutdown are locomotion states: stage the goose fully beyond a real exposed
+  edge, walk in, and keep ticking/presenting on stop until the full pose has walked out. Shared
+  monitor seams are continuous; only genuinely exposed edges may use the occasional 20% hidden
+  wrap, and deliberate puddle/prank errands never wrap.
+- A user—not program cleanup—closing a spawned note or meme gets an independent 30% annoyed
+  reaction roll. The reaction may chain only the existing bounded cursor nab and only after live
+  capability, permission/pointer, configuration, and manners checks. Linux collect windows remain
+  unsupported and therefore produce no native close trigger.
+- Install/update/uninstall retain the real runtime singleton for the whole mutation. Unix signals
+  roll back with explicit nonzero status. Windows payloads remain pinned from same-stream
+  size/hash verification through execution; generated bootstrap delegation must reacquire without
+  an ambient bypass, machine-wide paths are checked across sessions, reboot-deferred MSI results
+  fail closed, and every pre-READY helper error kills and waits for the child.
 - Starting, stopping, and configuration are **CLI/TUI-only over local IPC**. There is no system
   tray and no global quit key.
 - Terminal windows are protected: the goose may visually overlay them, but must never move,
@@ -212,6 +234,8 @@ family's local gate:
 - `cargo clippy --all-targets --workspace -- -D warnings`
 - `cargo test --workspace`  ·  single test: `cargo test -p honk-engine <name>`
 - `cargo build --release`
+- Windows host only: `pwsh -File script/smoke_windows_overlay.ps1 -Binary target/release/honk300.exe -EvidenceDirectory target/windows-overlay-evidence`
+- Linux host only: `HONK300_BIN="$PWD/target/release/honk300" bash script/smoke_m17_m18_linux.sh`
 - `dist plan --tag=v0.3.3`
 - `cargo audit --version 0.22.2`
 

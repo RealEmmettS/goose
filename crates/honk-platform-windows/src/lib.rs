@@ -15,7 +15,8 @@
 #![cfg(windows)]
 
 use honk_engine::collect_window::{
-    CollectWindowId, CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot,
+    CollectWindowCloseOrigin, CollectWindowId, CollectWindowKind, CollectWindowRequestId,
+    CollectWindowSnapshot,
 };
 use honk_engine::math::Rect;
 use honk_engine::{ForeignWindowId, ForeignWindowSnapshot, PresenceSnapshot};
@@ -168,9 +169,35 @@ struct RawMoveEvent {
 }
 
 static MOVE_EVENTS: OnceLock<Mutex<VecDeque<RawMoveEvent>>> = OnceLock::new();
+static IMAGE_USER_CLOSES: OnceLock<Mutex<VecDeque<isize>>> = OnceLock::new();
 
 fn move_events() -> &'static Mutex<VecDeque<RawMoveEvent>> {
     MOVE_EVENTS.get_or_init(|| Mutex::new(VecDeque::new()))
+}
+
+fn image_user_closes() -> &'static Mutex<VecDeque<isize>> {
+    IMAGE_USER_CLOSES.get_or_init(|| Mutex::new(VecDeque::new()))
+}
+
+fn record_image_user_close(hwnd: HWND) {
+    if let Ok(mut closes) = image_user_closes().lock() {
+        let key = hwnd_key(hwnd);
+        if !closes.contains(&key) {
+            closes.push_back(key);
+        }
+    }
+}
+
+fn take_image_user_close(hwnd: HWND) -> bool {
+    let Ok(mut closes) = image_user_closes().lock() else {
+        return false;
+    };
+    let key = hwnd_key(hwnd);
+    let Some(index) = closes.iter().position(|candidate| *candidate == key) else {
+        return false;
+    };
+    closes.remove(index);
+    true
 }
 
 fn hwnd_key(hwnd: HWND) -> isize {
@@ -429,6 +456,8 @@ enum NotepadState {
     },
     /// The window exists and has been moved to the spawn anchor.
     Ready { hwnd: HWND },
+    /// The HWND disappeared; wait briefly for a normal child-process exit before classifying it.
+    Closing { give_up_at: Instant },
 }
 
 /// Deferred typing request: text queued by `TypeNote`, sent once the window is confirmed
@@ -443,7 +472,15 @@ struct PendingType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NotepadPoll {
     Alive,
-    Dead,
+    Dead(CollectWindowCloseOrigin),
+}
+
+fn normal_exit_origin(success: bool) -> CollectWindowCloseOrigin {
+    if success {
+        CollectWindowCloseOrigin::User
+    } else {
+        CollectWindowCloseOrigin::Program
+    }
 }
 
 struct NotepadWindow {
@@ -479,7 +516,7 @@ impl NotepadWindow {
     fn hwnd(&self) -> Option<HWND> {
         match self.state {
             NotepadState::Ready { hwnd } => Some(hwnd),
-            NotepadState::Pending { .. } => None,
+            NotepadState::Pending { .. } | NotepadState::Closing { .. } => None,
         }
     }
 
@@ -505,27 +542,38 @@ impl NotepadWindow {
                 }
                 if now >= give_up_at {
                     self.force_kill();
-                    NotepadPoll::Dead
+                    NotepadPoll::Dead(CollectWindowCloseOrigin::Program)
                 } else {
                     NotepadPoll::Alive
                 }
             }
             NotepadState::Ready { hwnd } => {
                 if unsafe { !IsWindow(hwnd).as_bool() } {
-                    // The user closed our Notepad (or it exited); reap the tracked child.
-                    self.force_kill();
-                    return NotepadPoll::Dead;
+                    // A vanished HWND alone is not user-close evidence: a crash or system
+                    // teardown looks the same. Wait non-blockingly for a successful process exit.
+                    self.state = NotepadState::Closing {
+                        give_up_at: now + NOTEPAD_CLOSE_GRACE,
+                    };
+                    return NotepadPoll::Alive;
                 }
                 self.service_pending_type(hwnd, now);
                 NotepadPoll::Alive
             }
+            NotepadState::Closing { give_up_at } => match self.child.try_wait() {
+                Ok(Some(status)) => NotepadPoll::Dead(normal_exit_origin(status.success())),
+                Ok(None) if now < give_up_at => NotepadPoll::Alive,
+                Ok(None) | Err(_) => {
+                    self.force_kill();
+                    NotepadPoll::Dead(CollectWindowCloseOrigin::Program)
+                }
+            },
         }
     }
 
     fn move_to(&self, top_left: Vec2) -> Result<()> {
         match self.state {
             NotepadState::Ready { hwnd } => move_hwnd(hwnd, top_left),
-            NotepadState::Pending { .. } => Ok(()),
+            NotepadState::Pending { .. } | NotepadState::Closing { .. } => Ok(()),
         }
     }
 
@@ -678,10 +726,28 @@ impl Drop for ImageWindow {
     }
 }
 
+fn preferred_collect_window_id(
+    active: Option<(CollectWindowRequestId, CollectWindowKind)>,
+    candidates: impl IntoIterator<Item = (CollectWindowId, CollectWindowRequestId, CollectWindowKind)>,
+) -> Option<CollectWindowId> {
+    // A lingering note or meme may outlive the engine task that created it. Prefer the currently
+    // spawned typed request so HashMap iteration order cannot starve a newer task.
+    let mut fallback = None;
+    for (id, request, kind) in candidates {
+        if active == Some((request, kind)) {
+            return Some(id);
+        }
+        fallback.get_or_insert(id);
+    }
+    fallback
+}
+
 /// Applies M9 collect-window commands through Win32 without exposing HWNDs to `honk-engine`.
 pub struct CollectWindowController {
     next_id: u64,
     windows: HashMap<CollectWindowId, ControlledWindow>,
+    last_rects: HashMap<CollectWindowId, Rect>,
+    active_request: Option<(CollectWindowRequestId, CollectWindowKind)>,
     spawn_top_left: Vec2,
 }
 
@@ -690,12 +756,15 @@ impl CollectWindowController {
         Self {
             next_id: 1,
             windows: HashMap::new(),
+            last_rects: HashMap::new(),
+            active_request: None,
             spawn_top_left: Vec2::new(bounds.min.x + 40.0, bounds.min.y + 80.0),
         }
     }
 
     pub fn spawn_note(&mut self, request: CollectWindowRequestId) -> Result<CollectWindowId> {
-        if let Some(id) = self.find_request(request) {
+        if let Some(id) = self.find_request(request, CollectWindowKind::Note) {
+            self.active_request = Some((request, CollectWindowKind::Note));
             return Ok(id);
         }
         // Launch immediately and hand back an id; the window is discovered and positioned by the
@@ -703,6 +772,7 @@ impl CollectWindowController {
         let window = NotepadWindow::spawn(request, self.spawn_top_left)?;
         let id = self.alloc_id();
         self.windows.insert(id, ControlledWindow::Notepad(window));
+        self.active_request = Some((request, CollectWindowKind::Note));
         Ok(id)
     }
 
@@ -712,12 +782,14 @@ impl CollectWindowController {
         title: &str,
         pixmap: &Pixmap,
     ) -> Result<CollectWindowId> {
-        if let Some(id) = self.find_request(request) {
+        if let Some(id) = self.find_request(request, CollectWindowKind::Meme) {
+            self.active_request = Some((request, CollectWindowKind::Meme));
             return Ok(id);
         }
         let id = self.alloc_id();
         let window = ImageWindow::new(request, title, pixmap, self.spawn_top_left)?;
         self.windows.insert(id, ControlledWindow::Image(window));
+        self.active_request = Some((request, CollectWindowKind::Meme));
         Ok(id)
     }
 
@@ -759,43 +831,84 @@ impl CollectWindowController {
     pub fn close(&mut self, id: CollectWindowId) {
         // Dropping the entry runs `NotepadWindow`/`ImageWindow` `Drop`, which closes/kills the
         // window we own. Only ever the meme (Image) window in normal flow — notes linger.
-        self.windows.remove(&id);
+        if let Some(window) = self.windows.remove(&id) {
+            if self.active_request == Some((window.request(), window.kind())) {
+                self.active_request = None;
+            }
+        }
+        self.last_rects.remove(&id);
     }
 
     pub fn snapshot(&mut self) -> Option<CollectWindowSnapshot> {
         // Drive the per-window state machines (spawn discovery + deferred typing) and cull any
-        // window that has died, then report the first live, ready window's geometry. A Notepad
-        // still in its `Pending` phase reports no HWND yet, so it simply produces no snapshot —
-        // which the engine's `WaitForSpawn` tolerates until its own deadline.
+        // window that has died, then report the active typed request's geometry. A Notepad still
+        // in its `Pending` phase reports no HWND yet, so it simply produces no matching snapshot
+        // until ready; the engine's `WaitForSpawn` tolerates that until its own deadline.
         let now = Instant::now();
         let mut dead = Vec::new();
         for (id, window) in self.windows.iter_mut() {
-            let alive = match window {
-                ControlledWindow::Notepad(np) => np.poll(now) == NotepadPoll::Alive,
-                ControlledWindow::Image(img) => unsafe { IsWindow(img.hwnd).as_bool() },
+            let close_origin = match window {
+                ControlledWindow::Notepad(np) => match np.poll(now) {
+                    NotepadPoll::Alive => None,
+                    NotepadPoll::Dead(origin) => Some(origin),
+                },
+                ControlledWindow::Image(img) => unsafe {
+                    (!IsWindow(img.hwnd).as_bool()).then(|| {
+                        if take_image_user_close(img.hwnd) {
+                            CollectWindowCloseOrigin::User
+                        } else {
+                            CollectWindowCloseOrigin::Program
+                        }
+                    })
+                },
             };
-            if !alive {
-                dead.push(*id);
+            if let Some(origin) = close_origin {
+                dead.push((*id, origin));
             }
         }
-        for id in &dead {
-            self.windows.remove(id);
+        if let Some((id, close_origin)) = dead.first().copied() {
+            let window = self.windows.remove(&id).expect("dead window id");
+            if self.active_request == Some((window.request(), window.kind())) {
+                self.active_request = None;
+            }
+            let rect = self
+                .last_rects
+                .remove(&id)
+                .unwrap_or_else(|| Rect::new(Vec2::ZERO, Vec2::ZERO));
+            return Some(CollectWindowSnapshot {
+                id,
+                request: window.request(),
+                kind: window.kind(),
+                rect,
+                alive: false,
+                close_origin: Some(close_origin),
+            });
         }
+        let mut live = Vec::new();
         for (id, window) in self.windows.iter() {
             let Some(hwnd) = window.hwnd() else {
                 continue;
             };
             if let Ok(rect) = window_rect(hwnd) {
-                return Some(CollectWindowSnapshot {
-                    id: *id,
-                    request: window.request(),
-                    kind: window.kind(),
-                    rect,
-                    alive: true,
-                });
+                self.last_rects.insert(*id, rect);
+                live.push((*id, window.request(), window.kind(), rect));
             }
         }
-        None
+        let id = preferred_collect_window_id(
+            self.active_request,
+            live.iter()
+                .map(|(id, request, kind, _)| (*id, *request, *kind)),
+        )?;
+        live.into_iter()
+            .find(|(candidate, _, _, _)| *candidate == id)
+            .map(|(id, request, kind, rect)| CollectWindowSnapshot {
+                id,
+                request,
+                kind,
+                rect,
+                alive: true,
+                close_origin: None,
+            })
     }
 
     fn alloc_id(&mut self) -> CollectWindowId {
@@ -804,10 +917,14 @@ impl CollectWindowController {
         id
     }
 
-    fn find_request(&self, request: CollectWindowRequestId) -> Option<CollectWindowId> {
-        self.windows
-            .iter()
-            .find_map(|(id, window)| (window.request() == request).then_some(*id))
+    fn find_request(
+        &self,
+        request: CollectWindowRequestId,
+        kind: CollectWindowKind,
+    ) -> Option<CollectWindowId> {
+        self.windows.iter().find_map(|(id, window)| {
+            (window.request() == request && window.kind() == kind).then_some(*id)
+        })
     }
 }
 
@@ -1495,6 +1612,12 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
 extern "system" fn image_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     unsafe {
         match msg {
+            WM_CLOSE => {
+                // Unlike controller cleanup (which calls DestroyWindow directly), WM_CLOSE is
+                // positive evidence that the native/user close path was invoked.
+                record_image_user_close(hwnd);
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
             WM_DESTROY => LRESULT(0),
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
@@ -1513,6 +1636,46 @@ mod tests {
         copy_premultiplied_rgba_to_bgra(&rgba, &mut bgra);
 
         assert_eq!(bgra, [149, 83, 17, 211, 203, 61, 7, 0]);
+    }
+
+    #[test]
+    fn only_normal_process_exit_and_native_close_signal_count_as_user_close() {
+        assert_eq!(normal_exit_origin(true), CollectWindowCloseOrigin::User);
+        assert_eq!(normal_exit_origin(false), CollectWindowCloseOrigin::Program);
+
+        let hwnd = HWND(std::ptr::dangling_mut::<c_void>());
+        assert!(!take_image_user_close(hwnd));
+        record_image_user_close(hwnd);
+        record_image_user_close(hwnd);
+        assert!(take_image_user_close(hwnd));
+        assert!(
+            !take_image_user_close(hwnd),
+            "native close evidence is one-shot"
+        );
+    }
+
+    #[test]
+    fn collect_controller_prefers_the_active_typed_request_over_a_lingering_window() {
+        let lingering = (
+            CollectWindowId(1),
+            CollectWindowRequestId(100),
+            CollectWindowKind::Note,
+        );
+        let active = (
+            CollectWindowId(2),
+            CollectWindowRequestId(200),
+            CollectWindowKind::Meme,
+        );
+        let same_request_wrong_kind = (CollectWindowId(3), active.1, CollectWindowKind::Note);
+
+        assert_eq!(
+            preferred_collect_window_id(
+                Some((active.1, active.2)),
+                [lingering, same_request_wrong_kind, active],
+            ),
+            Some(active.0),
+            "an older lingering prop must not starve the currently active typed request"
+        );
     }
 
     #[test]

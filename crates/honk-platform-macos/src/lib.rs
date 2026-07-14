@@ -124,7 +124,8 @@ mod platform {
         is_protected_terminal_app, AppKitFrame, DragClassifier,
     };
     use honk_engine::collect_window::{
-        CollectWindowId, CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot,
+        CollectWindowCloseOrigin, CollectWindowId, CollectWindowKind, CollectWindowRequestId,
+        CollectWindowSnapshot,
     };
     use honk_engine::{
         ForeignWindowId, ForeignWindowSnapshot, LocalTime, PresenceSnapshot, Rect, Vec2,
@@ -521,6 +522,10 @@ mod platform {
         !interactive
     }
 
+    fn overlay_window_color_space() -> Retained<NSColorSpace> {
+        NSColorSpace::sRGBColorSpace()
+    }
+
     impl DisplayWindow {
         fn new(
             mtm: MainThreadMarker,
@@ -542,10 +547,11 @@ mod platform {
             };
             window.setOpaque(false);
             window.setBackgroundColor(Some(&NSColor::clearColor()));
-            // The reusable bitmap is explicitly Device RGB. Match the window backing store so
-            // AppKit does not run a Device RGB -> display-profile ICC/vImage conversion on every
-            // frame; WindowServer still performs the final display composition for each screen.
-            window.setColorSpace(Some(&NSColorSpace::deviceRGBColorSpace()));
+            // Use a stable standard-RGB destination instead of inheriting the physical screen's
+            // wide-gamut profile. AppKit can preserve transparent backing-store capture while
+            // avoiding a fresh Device RGB -> Display P3 transform on every presented frame;
+            // WindowServer still performs final per-display composition.
+            window.setColorSpace(Some(&overlay_window_color_space()));
             window.setHasShadow(false);
             unsafe {
                 window.setReleasedWhenClosed(false);
@@ -1140,49 +1146,96 @@ mod platform {
         NSColor::labelColor()
     }
 
+    fn preferred_collect_window_id(
+        active: Option<(CollectWindowRequestId, CollectWindowKind)>,
+        candidates: impl IntoIterator<
+            Item = (CollectWindowId, CollectWindowRequestId, CollectWindowKind),
+        >,
+    ) -> Option<CollectWindowId> {
+        // A lingering note or meme may outlive the engine task that created it. Prefer the
+        // currently spawned typed request so HashMap iteration order cannot starve a newer task.
+        let mut fallback = None;
+        for (id, request, kind) in candidates {
+            if active == Some((request, kind)) {
+                return Some(id);
+            }
+            fallback.get_or_insert(id);
+        }
+        fallback
+    }
+
     pub struct CollectWindowController {
         mtm: Option<MainThreadMarker>,
         next_id: u64,
         windows: HashMap<CollectWindowId, ControlledWindow>,
+        active_request: Option<(CollectWindowRequestId, CollectWindowKind)>,
         spawn_top_left: Vec2,
         coordinate_space: Rect,
     }
 
     impl CollectWindowController {
-        pub fn new(primary_bounds: Rect, coordinate_space: Rect) -> Self {
+        pub fn new(primary_bounds: Rect, virtual_desktop_bounds: Rect) -> Self {
             Self {
                 mtm: MainThreadMarker::new(),
                 next_id: 1,
                 windows: HashMap::new(),
+                active_request: None,
                 spawn_top_left: Vec2::new(primary_bounds.min.x + 40.0, primary_bounds.min.y + 80.0),
-                coordinate_space,
+                coordinate_space: appkit_coordinate_space(primary_bounds, virtual_desktop_bounds),
             }
         }
 
-        pub fn update_display_bounds(&mut self, primary_bounds: Rect, coordinate_space: Rect) {
+        pub fn update_display_bounds(
+            &mut self,
+            primary_bounds: Rect,
+            virtual_desktop_bounds: Rect,
+        ) {
             self.spawn_top_left =
                 Vec2::new(primary_bounds.min.x + 40.0, primary_bounds.min.y + 80.0);
-            self.coordinate_space = coordinate_space;
+            self.coordinate_space = appkit_coordinate_space(primary_bounds, virtual_desktop_bounds);
         }
 
-        pub fn snapshot(&self) -> Option<CollectWindowSnapshot> {
-            self.windows
-                .iter()
-                .find(|(_, window)| window.window().isVisible())
-                .map(|(id, window)| CollectWindowSnapshot {
-                    id: *id,
+        pub fn snapshot(&mut self) -> Option<CollectWindowSnapshot> {
+            if let Some(id) = self.windows.iter().find_map(|(id, window)| {
+                let window = window.window();
+                (!window.isVisible() && !window.isMiniaturized()).then_some(*id)
+            }) {
+                let window = self.windows.remove(&id).expect("closed window id");
+                if self.active_request == Some((window.request(), window.kind())) {
+                    self.active_request = None;
+                }
+                return Some(CollectWindowSnapshot {
+                    id,
                     request: window.request(),
                     kind: window.kind(),
                     rect: window.frame(self.coordinate_space),
-                    alive: true,
-                })
+                    alive: false,
+                    close_origin: Some(CollectWindowCloseOrigin::User),
+                });
+            }
+            let id = preferred_collect_window_id(
+                self.active_request,
+                self.windows
+                    .iter()
+                    .filter(|(_, window)| window.window().isVisible())
+                    .map(|(id, window)| (*id, window.request(), window.kind())),
+            )?;
+            self.windows.get(&id).map(|window| CollectWindowSnapshot {
+                id,
+                request: window.request(),
+                kind: window.kind(),
+                rect: window.frame(self.coordinate_space),
+                alive: true,
+                close_origin: None,
+            })
         }
 
         pub fn spawn_note(
             &mut self,
             request: CollectWindowRequestId,
         ) -> io::Result<CollectWindowId> {
-            if let Some(id) = self.find_request(request) {
+            if let Some(id) = self.find_request(request, CollectWindowKind::Note) {
+                self.active_request = Some((request, CollectWindowKind::Note));
                 return Ok(id);
             }
             let mtm = self
@@ -1221,6 +1274,7 @@ mod platform {
                     label,
                 }),
             );
+            self.active_request = Some((request, CollectWindowKind::Note));
             Ok(id)
         }
 
@@ -1230,7 +1284,8 @@ mod platform {
             title: &str,
             pixmap: &Pixmap,
         ) -> io::Result<CollectWindowId> {
-            if let Some(id) = self.find_request(request) {
+            if let Some(id) = self.find_request(request, CollectWindowKind::Meme) {
+                self.active_request = Some((request, CollectWindowKind::Meme));
                 return Ok(id);
             }
             let mtm = self
@@ -1264,6 +1319,7 @@ mod platform {
                     _image: image,
                 }),
             );
+            self.active_request = Some((request, CollectWindowKind::Meme));
             Ok(id)
         }
 
@@ -1301,6 +1357,9 @@ mod platform {
 
         pub fn close(&mut self, id: CollectWindowId) {
             if let Some(window) = self.windows.remove(&id) {
+                if self.active_request == Some((window.request(), window.kind())) {
+                    self.active_request = None;
+                }
                 window.window().orderOut(None);
             }
         }
@@ -1311,10 +1370,14 @@ mod platform {
             id
         }
 
-        fn find_request(&self, request: CollectWindowRequestId) -> Option<CollectWindowId> {
-            self.windows
-                .iter()
-                .find_map(|(id, window)| (window.request() == request).then_some(*id))
+        fn find_request(
+            &self,
+            request: CollectWindowRequestId,
+            kind: CollectWindowKind,
+        ) -> Option<CollectWindowId> {
+            self.windows.iter().find_map(|(id, window)| {
+                (window.request() == request && window.kind() == kind).then_some(*id)
+            })
         }
     }
 
@@ -1495,6 +1558,35 @@ mod platform {
         }
 
         #[test]
+        fn collect_controller_prefers_the_active_typed_request_over_a_lingering_window() {
+            let lingering = (
+                CollectWindowId(1),
+                CollectWindowRequestId(100),
+                CollectWindowKind::Note,
+            );
+            let active = (
+                CollectWindowId(2),
+                CollectWindowRequestId(200),
+                CollectWindowKind::Meme,
+            );
+            let same_request_wrong_kind = (CollectWindowId(3), active.1, CollectWindowKind::Note);
+
+            assert_eq!(
+                preferred_collect_window_id(
+                    Some((active.1, active.2)),
+                    [lingering, same_request_wrong_kind, active],
+                ),
+                Some(active.0),
+                "an older lingering prop must not starve the currently active typed request"
+            );
+        }
+
+        #[test]
+        fn overlay_window_uses_a_stable_srgb_destination() {
+            assert!(overlay_window_color_space().isEqual(Some(&NSColorSpace::sRGBColorSpace())));
+        }
+
+        #[test]
         fn appkit_interprets_tiny_skia_rgba_without_channel_or_alpha_swaps() {
             let rgba = [17_u8, 83, 149, 211];
             let image = image_from_rgba(&rgba, 1, 1).expect("create one-pixel AppKit image");
@@ -1622,6 +1714,26 @@ mod tests {
         assert_eq!(
             appkit_frame_for_world_rect(rect_on_display_below_main, coordinate_space).y,
             -200.0
+        );
+    }
+
+    #[test]
+    fn collect_window_space_handles_negative_and_below_main_monitors() {
+        let main_display = Rect::new(Vec2::ZERO, Vec2::new(1440.0, 900.0));
+        let virtual_desktop = Rect::new(Vec2::new(-1280.0, -600.0), Vec2::new(3360.0, 1800.0));
+        let coordinate_space = appkit_coordinate_space(main_display, virtual_desktop);
+        let world = Rect::new(Vec2::new(-900.0, 1050.0), Vec2::new(-560.0, 1230.0));
+        let appkit = appkit_frame_for_world_rect(world, coordinate_space);
+
+        assert_eq!(appkit.x, -900.0);
+        assert_eq!(appkit.y, -330.0);
+        assert_eq!(
+            appkit_point_to_world((appkit.x, appkit.y + appkit.height), coordinate_space,),
+            world.min
+        );
+        assert_eq!(
+            appkit_point_to_world((appkit.x + appkit.width, appkit.y), coordinate_space),
+            world.max
         );
     }
 

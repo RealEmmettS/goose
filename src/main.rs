@@ -21,12 +21,42 @@ use honk_config::{reset_to_defaults, Config, ConfigError, ConfigLoadState};
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use honk_control::CommandServer;
 use honk_control::{
-    send_command, wait_for_shutdown, ControlCommand, ControlResponse, RuntimeStatus, Singleton,
+    send_command, wait_for_shutdown, ControlCommand, ControlResponse, LifecycleLease,
+    RuntimeStatus, Singleton,
 };
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use runtime::RuntimeOptions;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(windows)]
+    if std::env::var_os("HONK300_INTERNAL_WINDOWS_UNINSTALL").as_deref()
+        == Some(std::ffi::OsStr::new("1"))
+    {
+        install::run_windows_deferred_uninstall()?;
+        return Ok(());
+    }
+    // Internal managed-installer protocol. The child retains the singleton until its stdin closes,
+    // so a Unix FIFO or Windows redirected pipe gives the installer exclusive lifecycle ownership
+    // across the complete swap. EOF is kernel-delivered if the parent dies, preventing an orphaned
+    // lease. Keep this before clap so it stays private and exact-tag installer compatible.
+    if std::env::var_os("HONK300_INTERNAL_HOLD_LIFECYCLE_LEASE").as_deref()
+        == Some(std::ffi::OsStr::new("1"))
+    {
+        let _lease = LifecycleLease::acquire()?;
+        use std::io::Write as _;
+        println!("HONK300_INTERNAL_LIFECYCLE_LEASE_READY");
+        std::io::stdout().flush()?;
+        std::io::copy(&mut std::io::stdin().lock(), &mut std::io::sink())?;
+        return Ok(());
+    }
+    // Internal exact-tag installer probe: unlike `status`, this acquires the real singleton and
+    // therefore closes the socket-not-yet-ready startup race before an on-disk replacement.
+    if std::env::var_os("HONK300_INTERNAL_WAIT_FOR_SHUTDOWN").as_deref()
+        == Some(std::ffi::OsStr::new("1"))
+    {
+        wait_for_shutdown()?;
+        return Ok(());
+    }
     let cli = Cli::parse_normalized();
 
     if cli.is_client_command() {

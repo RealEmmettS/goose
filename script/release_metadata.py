@@ -221,10 +221,19 @@ def render_installers(
         "SHA_LINUX_ARM64_MUSL": "honk300-aarch64-unknown-linux-musl.tar.xz",
         "SHA_WINDOWS_X64_MSI": "honk300-x86_64-pc-windows-msvc.msi",
         "SHA_WINDOWS_ARM64_MSI": "honk300-aarch64-pc-windows-msvc.msi",
+        "SHA_WINDOWS_X64_PORTABLE": "honk300-x86_64-pc-windows-msvc.zip",
+        "SHA_WINDOWS_ARM64_PORTABLE": "honk300-aarch64-pc-windows-msvc.zip",
     }
     replacements = {"TAG": tag, "VERSION": version, "COMMIT": _validated_commit(commit)}
     replacements.update(
         {token: _sha256(_regular_file(root, name)) for token, name in payloads.items()}
+    )
+    replacements.update(
+        {
+            token.replace("SHA_", "SIZE_", 1): str(_regular_file(root, name).stat().st_size)
+            for token, name in payloads.items()
+            if token.startswith("SHA_WINDOWS_")
+        }
     )
 
     shell = render_template(shell_template.read_text(encoding="utf-8"), replacements)

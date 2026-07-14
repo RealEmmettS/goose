@@ -25,10 +25,11 @@ compatibility.
 
 ### macOS
 
-The signed and notarized universal DMG is the recommended install for both Apple Silicon and
-Intel Macs:
+Starting with the published v0.3.3 release, the signed and notarized universal DMG is the
+recommended install for both Apple Silicon and Intel Macs. Until that immutable release is live,
+the version-bound link below intentionally does not replace the current stable install path:
 
-- [Download Honk300 for macOS](https://github.com/RealEmmettS/goose/releases/download/v0.3.3/honk300-universal2.dmg)
+- [Download the v0.3.3 Honk300 DMG after publication](https://github.com/RealEmmettS/goose/releases/download/v0.3.3/honk300-universal2.dmg)
 
 Open the disk image and run **Install Honk300**. The universal Intel/Apple Silicon helper verifies
 the adjacent app's Developer ID team and bundle identity, installs it without `sudo` into
@@ -85,6 +86,15 @@ honk300 stop                  Stop the running goose
 Friendly aliases include `goose plz`, `honk bad`, `goose no honk`, `goose quit`, and
 `goose do mud`. Run `honk300 help` for the complete grammar.
 
+Honk300 enters by walking in from a real exposed screen edge and leaves the same way on a normal
+stop. During ordinary roaming, touching monitors remain one continuous desktop; occasionally the
+goose can walk completely beyond an exposed edge and, only while fully hidden, return from the
+opposite exposed edge. Its deliberate puddle and prank errands always return through their own
+departure edge instead. If you personally close a note or meme it opened, there is a roughly 30%
+chance it gets visibly annoyed and then tries its existing bounded mouse-steal prank. That second
+step still obeys your settings, quiet/fullscreen manners, live permission, and platform support;
+program cleanup never triggers it, and Linux currently has no collect windows to close.
+
 First run materializes schema-current configuration. Existing malformed files and files from a
 newer schema are never replaced automatically. To intentionally reset one, use
 `honk300 setup --reset`; the previous bytes are backed up first.
@@ -134,7 +144,14 @@ state. Autostart is opt-in and off by default.
 Linux collect-window behavior is unsupported and reported honestly. Exact signed-app macOS
 Accessibility evidence for first denial, non-nagging relaunch, live grant, and live revocation
 remains tracked in the readiness docs; hosted bundle and permission-adapter tests are release
-gates.
+gates. Native release gates also hold exact Windows/Linux binaries unchanged while capturing the
+composed desktop, so body/wing/beak/legs, asymmetric color channels, and transparency are checked
+after each platform's real presentation bridge rather than only in renderer goldens.
+
+On macOS, tiny-skia's premultiplied RGBA bytes are copied into an alpha-last Device-RGB bitmap;
+the transparent overlay window uses a stable standard-sRGB destination, and WindowServer performs
+the final conversion for each physical display. This keeps screen capture, wide-gamut monitors,
+and the on-screen palette on one explicit, regression-tested path.
 
 ## Build and verify
 

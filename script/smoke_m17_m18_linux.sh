@@ -7,8 +7,23 @@ if [ "$(uname -s)" != "Linux" ]; then
 fi
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-BIN="${ROOT}/target/debug/honk300"
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/honk300-linux-smoke.XXXXXX")"
+ANALYZER="${ROOT}/script/analyze_linux_overlay_capture.py"
+if [ -n "${HONK300_BIN:-}" ]; then
+  BIN="${HONK300_BIN}"
+  BUILD_BIN=0
+else
+  BIN="${ROOT}/target/debug/honk300"
+  BUILD_BIN=1
+fi
+EVIDENCE_DIR="${HONK300_EVIDENCE_DIR:-}"
+if [ -n "${EVIDENCE_DIR}" ]; then
+  mkdir -p "${EVIDENCE_DIR}"
+  WORK="${EVIDENCE_DIR}/run"
+  rm -rf "${WORK}"
+  mkdir -p "${WORK}"
+else
+  WORK="$(mktemp -d "${TMPDIR:-/tmp}/honk300-linux-smoke.XXXXXX")"
+fi
 CONFIG="${WORK}/config.toml"
 STATUS="${WORK}/status.txt"
 NAB="${WORK}/nab.txt"
@@ -17,8 +32,15 @@ XVFB_PID=""
 OPENBOX_PID=""
 XCOMPMGR_PID=""
 SWAY_PID=""
+RUNTIME_PAUSED=0
+WAYLAND_FIRST_OUTPUT=""
+WAYLAND_SECOND_OUTPUT=""
 
 cleanup() {
+  if [ "${RUNTIME_PAUSED}" -eq 1 ] && [ -n "${PID}" ]; then
+    kill -CONT "${PID}" >/dev/null 2>&1 || true
+    RUNTIME_PAUSED=0
+  fi
   "${BIN}" stop >/dev/null 2>&1 || true
   if [ -n "${PID}" ]; then
     wait "${PID}" 2>/dev/null || true
@@ -35,7 +57,11 @@ cleanup() {
   if [ -n "${SWAY_PID}" ]; then
     kill "${SWAY_PID}" >/dev/null 2>&1 || true
   fi
-  rm -rf "${WORK}"
+  if [ -n "${EVIDENCE_DIR}" ]; then
+    rm -rf "${WORK}/runtime"
+  else
+    rm -rf "${WORK}"
+  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -44,6 +70,25 @@ need_cmd() {
     echo "smoke_m17_m18_linux: missing required command: $1" >&2
     exit 1
   fi
+}
+
+file_sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    shasum -a 256 "$1" | awk '{print $1}'
+  fi
+}
+
+pause_runtime() {
+  kill -STOP "${PID}"
+  RUNTIME_PAUSED=1
+  sleep 0.25
+}
+
+resume_runtime() {
+  kill -CONT "${PID}"
+  RUNTIME_PAUSED=0
 }
 
 wait_for_status() {
@@ -181,83 +226,63 @@ PY
   exit 1
 }
 
-wait_for_x11_screenshot() {
-  shot="$1"
-  for _ in $(seq 1 40); do
-    if import -window root "PNG32:${shot}" >/dev/null 2>&1 && python3 - "${shot}" <<'PY'
-import struct
-import sys
-import zlib
-
-path = sys.argv[1]
-data = open(path, "rb").read()
-if not data.startswith(b"\x89PNG\r\n\x1a\n"):
-    raise SystemExit(2)
-
-pos = 8
-width = height = color = None
-idat = bytearray()
-while pos + 8 <= len(data):
-    length = struct.unpack(">I", data[pos:pos + 4])[0]
-    kind = data[pos + 4:pos + 8]
-    payload = data[pos + 8:pos + 8 + length]
-    pos += 12 + length
-    if kind == b"IHDR":
-        width, height, bit_depth, color, _comp, _filter, _interlace = struct.unpack(">IIBBBBB", payload)
-        if bit_depth != 8 or color != 6:
-            raise SystemExit(3)
-    elif kind == b"IDAT":
-        idat.extend(payload)
-    elif kind == b"IEND":
-        break
-
-raw = zlib.decompress(bytes(idat))
-bpp = 4
-stride = width * bpp
-prev = bytearray(stride)
-idx = 0
-background = 0
-goose = 0
-for _y in range(height):
-    f = raw[idx]
-    idx += 1
-    row = bytearray(raw[idx:idx + stride])
-    idx += stride
-    for i, value in enumerate(row):
-        left = row[i - bpp] if i >= bpp else 0
-        up = prev[i]
-        up_left = prev[i - bpp] if i >= bpp else 0
-        if f == 1:
-            row[i] = (value + left) & 0xff
-        elif f == 2:
-            row[i] = (value + up) & 0xff
-        elif f == 3:
-            row[i] = (value + ((left + up) // 2)) & 0xff
-        elif f == 4:
-            p = left + up - up_left
-            pa = abs(p - left)
-            pb = abs(p - up)
-            pc = abs(p - up_left)
-            row[i] = (value + (left if pa <= pb and pa <= pc else up if pb <= pc else up_left)) & 0xff
-        elif f != 0:
-            raise SystemExit(4)
-    for r, g, b, a in zip(row[0::4], row[1::4], row[2::4], row[3::4]):
-        if a and abs(r - 0x20) <= 2 and abs(g - 0x30) <= 2 and abs(b - 0x40) <= 2:
-            background += 1
-        if a and ((r > 215 and g > 215 and b > 215) or (r > 180 and 70 < g < 180 and b < 80)):
-            goose += 1
-    prev = row
-
-print(f"x11 screenshot background pixels: {background}; goose-like pixels: {goose}")
-if goose < 50:
-    raise SystemExit(6)
-PY
-    then
+capture_x11_background_pairs() {
+  for _ in $(seq 1 24); do
+    pause_runtime
+    xsetroot -solid "#203040"
+    sleep 0.20
+    import -window root "PNG32:${WORK}/x11-dark.png" >/dev/null 2>&1 || true
+    xsetroot -solid "#d8e6f4"
+    sleep 0.20
+    import -window root "PNG32:${WORK}/x11-light.png" >/dev/null 2>&1 || true
+    set +e
+    python3 "${ANALYZER}" \
+      --pair x11 "${WORK}/x11-dark.png" "${WORK}/x11-light.png" \
+      --require-goose-each \
+      --output "${WORK}/x11-analysis.json" >"${WORK}/x11-analysis.log" 2>&1
+    analysis_status=$?
+    set -e
+    resume_runtime
+    if [ "${analysis_status}" -eq 0 ]; then
+      cat "${WORK}/x11-analysis.log"
       return 0
     fi
     sleep 0.25
   done
-  echo "smoke_m17_m18_linux: no valid X11 root screenshot at ${shot}" >&2
+  cat "${WORK}/x11-analysis.log" >&2 || true
+  echo "smoke_m17_m18_linux: paired X11 compositor capture did not validate" >&2
+  exit 1
+}
+
+capture_wayland_background_pairs() {
+  for _ in $(seq 1 24); do
+    pause_runtime
+    swaymsg output "*" bg "#203040" solid_color >/dev/null
+    sleep 0.20
+    grim -o "${WAYLAND_FIRST_OUTPUT}" "${WORK}/wayland-first-dark.png" >/dev/null 2>&1 || true
+    grim -o "${WAYLAND_SECOND_OUTPUT}" "${WORK}/wayland-second-dark.png" >/dev/null 2>&1 || true
+    swaymsg output "*" bg "#d8e6f4" solid_color >/dev/null
+    sleep 0.20
+    grim -o "${WAYLAND_FIRST_OUTPUT}" "${WORK}/wayland-first-light.png" >/dev/null 2>&1 || true
+    grim -o "${WAYLAND_SECOND_OUTPUT}" "${WORK}/wayland-second-light.png" >/dev/null 2>&1 || true
+    set +e
+    python3 "${ANALYZER}" \
+      --pair "${WAYLAND_FIRST_OUTPUT}" "${WORK}/wayland-first-dark.png" "${WORK}/wayland-first-light.png" \
+      --pair "${WAYLAND_SECOND_OUTPUT}" "${WORK}/wayland-second-dark.png" "${WORK}/wayland-second-light.png" \
+      --require-goose-any \
+      --output "${WORK}/wayland-analysis.json" >"${WORK}/wayland-analysis.log" 2>&1
+    analysis_status=$?
+    set -e
+    resume_runtime
+    if [ "${analysis_status}" -eq 0 ]; then
+      cat "${WORK}/wayland-analysis.log"
+      return 0
+    fi
+    sleep 0.25
+  done
+  cat "${WORK}/wayland-analysis.log" >&2 || true
+  cat "${WORK}/sway.log" >&2 || true
+  echo "smoke_m17_m18_linux: paired per-output Wayland compositor captures did not validate" >&2
   exit 1
 }
 
@@ -288,6 +313,7 @@ start_x11_server() {
 start_sway_headless() {
   need_cmd sway
   need_cmd swaymsg
+  need_cmd grim
   export XDG_RUNTIME_DIR="${WORK}/runtime"
   mkdir -p "${XDG_RUNTIME_DIR}"
   chmod 700 "${XDG_RUNTIME_DIR}"
@@ -353,8 +379,11 @@ start_sway_headless() {
   fi
   first_output="$1"
   second_output="$2"
+  WAYLAND_FIRST_OUTPUT="${first_output}"
+  WAYLAND_SECOND_OUTPUT="${second_output}"
   swaymsg output "${first_output}" scale 1.5 pos 0 0 >/dev/null
   swaymsg output "${second_output}" scale 2 pos 1280 0 >/dev/null
+  swaymsg output "*" bg "#203040" solid_color >/dev/null
   swaymsg -r -t get_outputs | python3 -c '
 import json
 import sys
@@ -387,8 +416,25 @@ exercise_mode() {
   "${BIN}" reload
 }
 
-echo "smoke_m17_m18_linux: building debug binary"
-cargo build --manifest-path "${ROOT}/Cargo.toml"
+if [ "${BUILD_BIN}" -eq 1 ]; then
+  echo "smoke_m17_m18_linux: building debug binary"
+  cargo build --manifest-path "${ROOT}/Cargo.toml"
+else
+  echo "smoke_m17_m18_linux: testing exact HONK300_BIN=${BIN} without rebuilding"
+fi
+if [ ! -x "${BIN}" ]; then
+  echo "smoke_m17_m18_linux: binary is not executable: ${BIN}" >&2
+  exit 1
+fi
+if [ ! -f "${ANALYZER}" ]; then
+  echo "smoke_m17_m18_linux: capture analyzer is missing: ${ANALYZER}" >&2
+  exit 1
+fi
+{
+  echo "binary=${BIN}"
+  echo "sha256=$(file_sha256 "${BIN}")"
+  echo "uname=$(uname -a)"
+} >"${WORK}/binary-identity.txt"
 
 echo "smoke_m17_m18_linux: preparing config"
 "${BIN}" setup --config "${CONFIG}"
@@ -401,7 +447,7 @@ exercise_mode "X11 visible overlay" "${WORK}/x11-frame.png" "${WORK}/x11-runtime
 grep -q "overlay mode is X11" "${WORK}/x11-runtime.log"
 grep -q "cursor: supported" "${STATUS}"
 grep -q "window: supported" "${STATUS}"
-wait_for_x11_screenshot "${WORK}/x11-root.png"
+capture_x11_background_pairs
 "${BIN}" do nab >"${WORK}/x11-nab.txt" 2>&1 || {
   cat "${WORK}/x11-nab.txt" >&2
   exit 1
@@ -417,6 +463,7 @@ grep -q "overlay mode is Wayland" "${WORK}/wayland-runtime.log"
 grep -Eq "cursor: (unsupported|failed)" "${STATUS}"
 grep -Eq "window: (unsupported|failed)" "${STATUS}"
 grep -Eq "collect: (unsupported|failed)" "${STATUS}"
+capture_wayland_background_pairs
 if "${BIN}" do nab >"${NAB}" 2>&1; then
   echo "smoke_m17_m18_linux: nab unexpectedly succeeded in Wayland reduced mode" >&2
   cat "${NAB}" >&2
@@ -427,4 +474,5 @@ grep -q "UNSUPPORTED" "${NAB}"
 wait "${PID}" 2>/dev/null || true
 PID=""
 
-echo "smoke_m17_m18_linux: visible X11 and reduced Wayland smoke passed"
+echo "passed" >"${WORK}/result.txt"
+echo "smoke_m17_m18_linux: compositor-visible X11 and reduced Wayland smoke passed"

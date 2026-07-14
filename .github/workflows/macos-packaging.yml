@@ -146,16 +146,30 @@ jobs:
             -s \
             -k "$MACOS_KEYCHAIN_PASSWORD" \
             "$keychain"
-          login_keychain="$(security default-keychain -d user | tr -d '"')"
-          security list-keychains -d user -s "$keychain" "$login_keychain"
-          identity="$(security find-identity -v -p codesigning "$keychain" \
-            | awk -F'"' '/Developer ID Application:.*\(M9D5379H93\)/ { print $2; exit }')"
-          test -n "$identity" || { echo 'team M9D5379H93 Developer ID identity is unavailable' >&2; exit 1; }
-          count="$(security find-identity -v -p codesigning "$keychain" \
-            | grep -c 'Developer ID Application:.*(M9D5379H93)' || true)"
-          test "$count" -eq 1 || { echo "expected one team Developer ID identity, found $count" >&2; exit 1; }
+          security list-keychains -d user -s "$keychain"
+          expected_identity='739B04530883FF9B665C66BD464F98C622971B32'
+          identities="$(security find-identity -v -p codesigning "$keychain")"
+          count="$(printf '%s\n' "$identities" | grep -c "$expected_identity" || true)"
+          test "$count" -eq 1 || { echo "expected exact G2 Developer ID identity once, found $count" >&2; exit 1; }
+          identity_name="$(printf '%s\n' "$identities" \
+            | awk -F'"' -v fingerprint="$expected_identity" '$0 ~ fingerprint { print $2; exit }')"
+          test "$identity_name" = 'Developer ID Application: ES Development LLC (M9D5379H93)' || {
+            echo "exact Developer ID leaf has unexpected subject" >&2
+            exit 1
+          }
+          leaf_certificate="$RUNNER_TEMP/honk300-developer-id-leaf.pem"
+          security find-certificate -c "$identity_name" -p "$keychain" > "$leaf_certificate"
+          leaf_fingerprint="$(openssl x509 -in "$leaf_certificate" -noout -fingerprint -sha1 \
+            | sed 's/.*=//; s/://g' | tr '[:lower:]' '[:upper:]')"
+          test "$leaf_fingerprint" = "$expected_identity" || {
+            echo "imported Developer ID leaf fingerprint mismatch" >&2
+            exit 1
+          }
+          issuer="$(openssl x509 -in "$leaf_certificate" -noout -issuer -nameopt RFC2253)"
+          printf '%s\n' "$issuer" | grep -F 'CN=Developer ID Certification Authority'
+          printf '%s\n' "$issuer" | grep -F 'OU=G2'
           {
-            echo "identity=$identity"
+            echo "identity=$expected_identity"
             echo "keychain=$keychain"
             echo "certificate=$certificate"
             echo "notary_key=$notary_key"
@@ -167,9 +181,11 @@ jobs:
           HONK300_TAG: ${{ inputs.tag }}
           HONK300_COMMIT: ${{ inputs.commit }}
           MACOS_SIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+          MACOS_SIGN_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
         shell: bash
         run: |
           set -euo pipefail
+          certificate_check_index=0
           verify_developer_id() {
             target="$1"
             expected_identifier="$2"
@@ -182,6 +198,14 @@ jobs:
             printf '%s\n' "$requirement" | grep -F "identifier \"$expected_identifier\""
             printf '%s\n' "$requirement" | grep -F 'anchor apple generic'
             printf '%s\n' "$requirement" | grep -F 'certificate leaf[subject.OU] = M9D5379H93'
+            certificate_check_index=$((certificate_check_index + 1))
+            certificate_prefix="$RUNNER_TEMP/honk300-sealed-certificate-$certificate_check_index-"
+            codesign -d --extract-certificates="$certificate_prefix" "$target" >/dev/null 2>&1
+            test -s "${certificate_prefix}0"
+            sealed_fingerprint="$(openssl x509 -inform DER -in "${certificate_prefix}0" \
+              -noout -fingerprint -sha1 | sed 's/.*=//; s/://g' | tr '[:lower:]' '[:upper:]')"
+            test "$sealed_fingerprint" = '739B04530883FF9B665C66BD464F98C622971B32'
+            rm -f "${certificate_prefix}"*
           }
           bash script/package_macos_app.sh
           bash script/package_macos_installer_helper.sh
@@ -243,11 +267,27 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             "$app" "$output/honk300-universal2.app.zip"
           unzip -t "$output/honk300-universal2.app.zip"
+          extracted="$RUNNER_TEMP/final-app-zip-verification"
+          rm -rf "$extracted"
+          mkdir -p "$extracted"
+          ditto -x -k "$output/honk300-universal2.app.zip" "$extracted"
+          test -d "$extracted/Honk300.app"
+          codesign --verify --strict --verbose=4 "$extracted/Honk300.app"
+          xcrun stapler validate "$extracted/Honk300.app"
+          spctl --assess --type execute --verbose=4 "$extracted/Honk300.app"
+          zip_certificate_prefix="$RUNNER_TEMP/honk300-final-zip-certificate-"
+          codesign -d --extract-certificates="$zip_certificate_prefix" \
+            "$extracted/Honk300.app" >/dev/null 2>&1
+          zip_fingerprint="$(openssl x509 -inform DER -in "${zip_certificate_prefix}0" \
+            -noout -fingerprint -sha1 | sed 's/.*=//; s/://g' | tr '[:lower:]' '[:upper:]')"
+          test "$zip_fingerprint" = '739B04530883FF9B665C66BD464F98C622971B32'
+          rm -f "${zip_certificate_prefix}"*
 
       - name: Build, sign, notarize, staple, and validate the DMG
         shell: bash
         env:
           MACOS_SIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+          MACOS_SIGN_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
           APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
           APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
           NOTARY_KEY: ${{ steps.signing.outputs.notary_key }}
@@ -282,12 +322,18 @@ jobs:
           test "$(find "$mount" -mindepth 1 -maxdepth 1 ! -name '.Trashes' | wc -l | tr -d ' ')" -eq 3
           hdiutil detach "$mount"
           trap - EXIT
-          codesign --force --timestamp --sign "$MACOS_SIGN_IDENTITY" "$dmg"
+          codesign --keychain "$MACOS_SIGN_KEYCHAIN" --force --timestamp --sign "$MACOS_SIGN_IDENTITY" "$dmg"
           codesign --verify --strict --verbose=4 "$dmg"
           dmg_details="$(codesign -dv --verbose=4 "$dmg" 2>&1)"
           printf '%s\n' "$dmg_details" | grep -F 'Authority=Developer ID Application: ES Development LLC (M9D5379H93)'
           printf '%s\n' "$dmg_details" | grep -F 'TeamIdentifier=M9D5379H93'
           printf '%s\n' "$dmg_details" | grep -E '^Timestamp='
+          dmg_certificate_prefix="$RUNNER_TEMP/honk300-dmg-certificate-"
+          codesign -d --extract-certificates="$dmg_certificate_prefix" "$dmg" >/dev/null 2>&1
+          dmg_fingerprint="$(openssl x509 -inform DER -in "${dmg_certificate_prefix}0" \
+            -noout -fingerprint -sha1 | sed 's/.*=//; s/://g' | tr '[:lower:]' '[:upper:]')"
+          test "$dmg_fingerprint" = '739B04530883FF9B665C66BD464F98C622971B32'
+          rm -f "${dmg_certificate_prefix}"*
           xcrun notarytool submit "$dmg" \
             --key "$NOTARY_KEY" \
             --key-id "$APPLE_NOTARY_KEY_ID" \
@@ -314,13 +360,32 @@ jobs:
           hdiutil detach "$mount"
           trap - EXIT
 
+      - name: Require complete notarization evidence
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for evidence in \
+            target/notarization-evidence/app-submit.json \
+            target/notarization-evidence/app-log.json \
+            target/notarization-evidence/dmg-submit.json \
+            target/notarization-evidence/dmg-log.json
+          do
+            test -s "$evidence"
+            jq -e 'type == "object"' "$evidence" >/dev/null
+          done
+          jq -e '.status == "Accepted" and (.id | length > 0)' \
+            target/notarization-evidence/app-submit.json >/dev/null
+          jq -e '.status == "Accepted" and (.id | length > 0)' \
+            target/notarization-evidence/dmg-submit.json >/dev/null
+
       - name: Preserve notarization evidence for this workflow run
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
         with:
           name: internal-macos-notarization-evidence
           path: target/notarization-evidence/*.json
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
 
       - name: Upload platform artifacts to the release orchestrator
@@ -340,7 +405,13 @@ jobs:
           NOTARY_KEY: ${{ runner.temp }}/AuthKey.p8
         run: |
           set -euo pipefail
-          rm -f "${CERTIFICATE:-}" "${NOTARY_KEY:-}"
+          rm -f \
+            "${CERTIFICATE:-}" \
+            "${NOTARY_KEY:-}" \
+            "$RUNNER_TEMP/honk300-developer-id-leaf.pem" \
+            "$RUNNER_TEMP"/honk300-sealed-certificate-* \
+            "$RUNNER_TEMP"/honk300-final-zip-certificate-* \
+            "$RUNNER_TEMP"/honk300-dmg-certificate-*
           if [ -n "${KEYCHAIN:-}" ]; then
             security delete-keychain "$KEYCHAIN" || true
           fi

@@ -20,11 +20,12 @@ WINDOWS_SMOKE = source("script/smoke_released_windows.ps1")
 class PostReleaseSmokeTests(unittest.TestCase):
     def test_workflow_executes_live_smoke_on_every_primary_host_architecture(self) -> None:
         for runner in (
-            "ubuntu-latest",
-            "ubuntu-24.04-arm",
+            "ubuntu-22.04",
+            "ubuntu-22.04-arm",
             "macos-15",
             "macos-15-intel",
             "windows-2022",
+            "windows-11-arm",
         ):
             self.assertIn(runner, WORKFLOW)
         self.assertIn("smoke_released_unix.sh", WORKFLOW)
@@ -62,6 +63,20 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn("failed upgrade did not restore", WINDOWS_SMOKE)
         self.assertIn("Downgrade unexpectedly succeeded", WINDOWS_SMOKE)
         self.assertIn("administrative extraction", WINDOWS_SMOKE)
+        self.assertIn("aarch64-pc-windows-msvc", WINDOWS_SMOKE)
+        self.assertIn("0xAA64", WINDOWS_SMOKE)
+        self.assertIn("0x8664", WINDOWS_SMOKE)
+        self.assertIn("MSI-extracted binary does not match the exact qualified build", WINDOWS_SMOKE)
+        self.assertIn("installed binary does not match", WINDOWS_SMOKE)
+
+    def test_linux_post_release_smokes_exact_installed_binary_with_persistent_evidence(self) -> None:
+        self.assertIn('HONK300_BIN="$BINARY"', UNIX_SMOKE)
+        self.assertIn("smoke_m17_m18_linux.sh", UNIX_SMOKE)
+        self.assertIn("installed-binary-identity.txt", UNIX_SMOKE)
+        self.assertIn("HONK300_RUN_LINUX_OVERLAY_SMOKE", WORKFLOW)
+        self.assertIn("Install Linux compositor qualification packages", WORKFLOW)
+        self.assertIn("post-release-linux-overlay-${{ matrix.slug }}", WORKFLOW)
+        self.assertIn("if-no-files-found: error", WORKFLOW)
 
 
 if __name__ == "__main__":

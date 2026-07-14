@@ -20,3 +20,6 @@ __pycache__/
 
 # Playwright MCP session artifacts — never committed
 /.playwright-mcp/
+
+# Local release credentials — one-time Apple keys and other private signing inputs
+/.private-release/

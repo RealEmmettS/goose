@@ -21,7 +21,8 @@ display observations.
   platform-neutral calm safe-edge wait, one-second permission polling, same-process FirstUX
   resume after grant, safe re-entry after revocation, and non-prompting unmanaged launches.
 - M16 macOS implementation is in-tree: `honk-platform-macos`, macOS runtime wiring, AppKit
-  overlay surfaces, Accessibility-gated cursor/window behavior, macOS collect windows,
+  overlay surfaces with an alpha-last Device-RGB bitmap and stable standard-sRGB window
+  destination, Accessibility-gated cursor/window behavior, macOS collect windows,
   `honk300 status`, TUI Status, bundle-aware assets/start, and `script/package_macos_app.sh`.
 - M17 Linux X11 implementation is in-tree: X11/XWayland session selection, visible transparent
   overlay, XShape/XFixes input-region shaping, Xinerama/root bounds, pointer sampling, cursor
@@ -51,8 +52,9 @@ display observations.
     `dev.emmetts.honk300`, `LSUIElement=true`, `plutil`, `codesign`, and `lipo`.
   - Optional macOS Accessibility gate on `[self-hosted, macOS, ARM64, honk300-a11y]` when
     `HONK300_RUN_A11Y_SMOKE=true`: `script/smoke_m16_macos_accessibility.sh`.
-  - Linux hosted gate on `ubuntu-latest` and `ubuntu-24.04-arm`: workspace tests,
-    `script/smoke_m17_m18_linux.sh`, GNU target checks, and musl target checks.
+  - Linux hosted gate on `ubuntu-latest` and `ubuntu-24.04-arm`: workspace tests, one exact
+    prebuilt `HONK300_BIN` through `script/smoke_m17_m18_linux.sh`, X11 root and Sway `grim`
+    compositor captures, GNU target checks, and musl target checks.
 - GitHub-hosted runner labels used here match GitHub's current runner table for
   `windows-latest`, `macos-15`, `macos-15-intel`, `ubuntu-latest`, and `ubuntu-24.04-arm`.
 - The self-hosted Accessibility job uses cumulative labels so it only runs on a runner with all
@@ -68,13 +70,15 @@ display observations.
   same-process grant, live revocation back to denied wait, unchanged signed-binary/marker
   fingerprints, operator-observed UI state, and opt-in scoped cleanup. The exact candidate still
   needs that four-state native run.
-- `script/smoke_m17_m18_linux.sh` builds the Linux binary, runs a visible X11 overlay under
-  Xvfb/openbox/xcompmgr, checks status, captures an internal PNG smoke frame, verifies non-zero
-  alpha pixels, captures the actual X11 root window, verifies the known background color remains
-  visible outside the overlay, exercises honk/mud/wander/nab/reload/stop IPC, then starts
-  headless sway with two virtual outputs at 1.5x and 2x scale and verifies native Wayland reduced
-  mode renders while mischief remains unsupported. Sway is intentional here because the runtime
-  requires the wlr layer-shell protocol; Weston does not provide that protocol.
+- `script/smoke_m17_m18_linux.sh` accepts an exact `HONK300_BIN` and does not rebuild it. It runs
+  a visible X11 overlay under Xvfb/openbox/xcompmgr, checks status, rejects any direct visual whose
+  byte order, masks, shifts, bpp, or scanline layout is not the expected little-endian ARGB8888
+  ZPixmap contract, captures the actual root window, and proves the controlled background remains
+  visible outside the overlay. It exercises honk/mud/wander/nab/reload/stop IPC, then starts
+  headless Sway with two virtual outputs at 1.5x and 2x scale. `grim` captures the real composed
+  Wayland desktop and requires recognizable body, wing, asymmetric warm beak/legs, and background
+  while unsupported mischief remains explicit. Sway is intentional because the runtime requires
+  wlr layer-shell; Weston does not provide it.
 
 ## Readiness Evidence State
 
@@ -87,12 +91,15 @@ display observations.
   terminal negatives. The native run requires explicit operator confirmations for prompt/no-
   prompt state, timed transitions, the same signed binary digest throughout, and opt-in cleanup.
   Record that evidence here before closing `#m16r`.
-- `#m17r` is closed. Linux x64 and ARM hosted X11 visible smoke passed, including
+- `#m17r` is closed from its original readiness scope. Linux x64 and ARM hosted X11 visible smoke passed, including
   internal frame proof, root screenshot proof, IPC status/reload/stop/poke, terminal-filter
-  fixture coverage, and GNU/musl target checks.
-- `#m18r` is closed. Linux x64 and ARM hosted Wayland reduced-mode smoke passed under
+  fixture coverage, and GNU/musl target checks. v0.3.3 adds a stricter exact-binary visual-layout
+  gate whose first x64/ARM64 candidate executions are still pending and must not be inferred from
+  the older closure.
+- `#m18r` is closed from its original readiness scope. Linux x64 and ARM hosted Wayland reduced-mode smoke passed under
   headless sway, including visible frame proof, IPC status/reload/stop/poke, and explicit
-  unsupported mischief status.
+  unsupported mischief status. The new semantic `grim` compositor assertion likewise remains a
+  v0.3.3 native-candidate gate until both hosted architectures run it.
 
 ## Physical M2 macOS Evidence (2026-07-12)
 
@@ -106,6 +113,9 @@ display observations.
   found during that run then passed 60 immediate stop/start cycles on a freshly resealed app.
 - Real Dark appearance note captures now show appearance-aware, high-contrast text. Real light
   and dark overlay captures show the complete opaque body, outline, wing, beak, legs, and shadow.
+- A later standard-sRGB window diagnostic measured 5.55% median CPU, 29.52 MiB maximum RSS,
+  negative 9.89 MiB growth, zero leaks, and 20 clean compositor captures. It validates the local
+  direction but does not replace the byte-exact signed-candidate capture/profile.
 - This Mac has one attached display. Live multi-monitor/hot-plug behavior is therefore explicitly
   hardware-waived; signed-coordinate, topology, per-display-window, and hot-plug reconciliation
   tests remain mandatory and pass. No claim of live multi-monitor validation is made.
@@ -142,6 +152,15 @@ foreach ($target in $targets) {
 
 ## CI Evidence Log
 
+- 2026-07-14 - Mac stopping-tree gate passed all 389 workspace tests, 22 native Mac platform
+  tests, strict clippy, both Apple release builds, 71 packaging/workflow contracts, actionlint,
+  shell/PowerShell validation, cargo-dist planning, cargo-audit, and cross-target checks. The host
+  is clean/uninstalled. No candidate was dispatched, so ADR 0022's four-state exact-candidate,
+  terminal, capture, profile, and lifecycle evidence remains open and `#m16r` stays Active.
+- 2026-07-13 - strengthened the Linux x64/ARM64 smoke contracts so one exact binary is retained,
+  X11 byte layout fails closed, and `grim` checks the real two-output fractional-scale Sway
+  composition for body/wing/asymmetric warm pixels. Focused local contracts pass; first hosted
+  execution of this stronger v0.3.3 gate remains pending.
 - 2026-07-13 - focused automated onboarding gates passed: five engine permission-wait tests,
   thirteen managed-install/marker/transition tests, all 17 macOS platform tests (including bundle
   metadata, prompt-thread, Settings failure, and hot-plug interactivity contracts), and five

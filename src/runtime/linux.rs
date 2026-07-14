@@ -117,7 +117,7 @@ pub fn run(
                 ControlCommand::Stop => {
                     println!("honk300: stop command received.");
                     request.respond(ControlResponse::Ok);
-                    return Ok(());
+                    RuntimeCore::begin_graceful_stop(&mut world);
                 }
                 ControlCommand::Reload => {
                     let response = match Config::load_existing(&options.config_path) {
@@ -288,6 +288,12 @@ pub fn run(
             render_hearts(&mut canvas, world.hearts(), world.now(), origin);
             render_sleepies(&mut canvas, world.sleepies(), world.now(), origin);
             overlay.present(dirty, &canvas)?;
+            core.acknowledge_present();
+        }
+
+        if core.graceful_stop_complete(&world) {
+            println!("honk300: goose walked home; stopping.");
+            return Ok(());
         }
 
         std::thread::sleep(std::time::Duration::from_millis(2));

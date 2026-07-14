@@ -5,15 +5,17 @@
 Honk300 is a Rust 1.95, cross-platform procedural desktop goose for Windows, macOS, X11, and
 native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. The active
 v0.3.3 effort is the first complete native macOS qualification: fix AppKit pixel presentation,
-refine shared walking, meet runtime budgets, prove denied/granted Accessibility, ship a
-Developer ID-signed/notarized per-user DMG, publish atomically, and only then make that DMG the
+refine shared walking and exposed-edge lifecycle, add the safely gated user-close reaction, meet
+runtime budgets, prove denied/granted Accessibility, ship a Developer ID-signed/notarized
+per-user DMG, publish atomically, and only then make that DMG the
 recommended macOS download at thegoose.app.
 
 ## Status
 
 - Active branch/worktree: `codex/macos-v0.3.3` in `.worktrees/macos-v0.3.3`.
 - Stable public release remains v0.3.2 until the v0.3.3 readiness checklist is complete.
-- Active board card: `#m20q`; live shared task board is tracked under `.tasks/`.
+- Active board cards: `#m20q` and exact-candidate Mac evidence card `#m16r`; the live shared task
+  board is tracked under `.tasks/`.
 - Version: 0.3.3 in source.
 - Renderer: AppKit/CoreGraphics RGBA regressions pass. The reusable AppKit image-view presenter
   now produces opaque, black-rectangle-free WindowServer captures in normal motion and readable
@@ -21,20 +23,34 @@ recommended macOS download at thegoose.app.
 - Shared gait: releases planted feet at four pixels, preserves the weighted normal/moderate
   cadence, caps visible lag at 16 px for Walk and 26 px for Run/Charge, and passes cadence guards,
   eight-direction tests, and seven goldens without overcorrecting ordinary walking.
+- Movement/lifecycle: continuous monitor seams, one-in-five hidden wrapping, non-wrapping errands,
+  fully offscreen entry/exit, and the user-only 30% annoyed reaction with separately gated nab pass
+  their independent focused review. Final transparent clearing, gapped-monitor staging,
+  permission/hot-plug and Stop ordering, typed close correlation, positive Windows provenance,
+  bounded exit ownership, and offscreen reaction deferral are pinned by regressions. Exact native
+  candidate observations remain open; Linux still has no collect trigger.
 - Performance: bounded capture-safe surfaces reduced the post-transient regression from 40.45%
-  to 12.00% median CPU during unlocked visible motion, with 18.17 MiB maximum RSS and negative
-  growth. Sampling found the remaining release-gate miss in AppKit's redundant Device RGB to
-  Display P3 conversion, so the bitmap/window color spaces are now aligned for an exact signed
-  reprofile; the hard median CPU limit remains 10%.
+  to 12.00% median CPU during unlocked visible motion. The Device-RGB alpha-last bitmap now feeds
+  a stable standard-sRGB window destination, leaving final display-profile composition to
+  WindowServer. A subsequent active diagnostic measured 5.55% median CPU, 29.52 MiB maximum RSS,
+  negative 9.89 MiB growth, zero leaks, and 20 clean compositor captures. This clears the local
+  envelope diagnostically; the same profile remains mandatory on the exact signed candidate.
 - Lifecycle: mounted-bundle copy, aliases, autostart, release-bound receipt, preservation, purge
-  backup, rollback structure, and isolated-home cleanup are implemented and tested.
+  backup, rollback, and isolated-home cleanup are implemented. Lifecycle mutation retains the
+  singleton; Unix signals carry explicit rollback statuses; Windows verifies from pinned streams,
+  has no ambient lease bypass, checks machine-wide paths across sessions, rejects reboot-deferred
+  MSI completion, and reaps every deferred helper that has not completed its exact READY handoff.
+  Native candidate lifecycle execution remains open.
 - Packaging: a universal x86_64/arm64 installer helper targeting macOS 11.0 in both slices and a
   fail-closed signing/notarization workflow are in-tree. The current universal app and helper pass
   current G2 Developer ID chain, team, hardened-runtime, timestamp, designated-requirement, and
-  slice checks; no App Store Connect API key is configured.
+  slice checks. The selected App Store Connect API key authenticates with `notarytool`; all six
+  signing/notarization GitHub secrets are configured. Candidate notarization has not run yet.
 - Release/site: the site progressive-disclosure implementation and local tests are complete, but
   candidate notarization, native qualification, release publication, and live-manifest validation
-  remain deliberate prerequisites to preview/production deployment.
+  remain deliberate prerequisites to production deployment. Exact site SHA
+  `85954409a54d88019f29c1209102586cfd497bff` is pushed and has a protected Vercel preview; it
+  intentionally fails closed against the still-live v0.3.2 manifest.
 
 ## Goals
 
@@ -46,6 +62,10 @@ recommended macOS download at thegoose.app.
 6. Publish immutable, complete, machine-verifiable releases with no crates.io distribution.
 7. Make the signed, notarized, stapled universal DMG the primary macOS download only after a
    fresh published artifact passes independent checks.
+8. Keep multi-monitor seams natural and permit any edge relocation only while the full pose is
+   outside real monitor pixels; enter and exit through locomotion rather than visible pops.
+9. Treat a user-close annoyed reaction as character only: program cleanup is excluded and any
+   cursor nab remains bounded by existing settings, manners, permission, and capability.
 
 ## Architecture
 
@@ -77,7 +97,7 @@ recommended macOS download at thegoose.app.
 
 ## Current Workspace Tree
 
-Generated 2026-07-13. Build output, Git internals, worktree internals, Python bytecode caches, and
+Generated 2026-07-14. Build output, Git internals, worktree internals, Python bytecode caches, and
 Finder metadata are excluded; every project source/document/configuration path is included.
 
 ```text
@@ -316,7 +336,8 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   └── README.md
 │   ├── agents
 │   │   └── handoff
-│   │       └── 2026-07-13-001-macos-v0-3-3-qualification-release.md
+│   │       ├── 2026-07-13-001-macos-v0-3-3-qualification-release.md
+│   │       └── 2026-07-14-001-macos-v0-3-3-alienware-resume.md
 │   ├── art-reference
 │   │   ├── goose-side-alt.svg
 │   │   ├── goose-side-head-left.svg
@@ -353,6 +374,8 @@ Finder metadata are excluded; every project source/document/configuration path i
 │           └── main.swift
 ├── rust-toolchain.toml
 ├── script
+│   ├── analyze_linux_overlay_capture.py
+│   ├── analyze_windows_overlay_capture.py
 │   ├── honk300-installer.ps1.in
 │   ├── honk300-installer.sh.in
 │   ├── package_macos_app.sh
@@ -363,13 +386,18 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   ├── smoke_m17_m18_linux.sh
 │   ├── smoke_released_unix.sh
 │   ├── smoke_released_windows.ps1
+│   ├── smoke_windows_overlay.ps1
+│   ├── verify_binary_architecture.py
 │   └── tests
 │       ├── test_installer_templates.py
+│       ├── test_linux_overlay_smoke.py
 │       ├── test_macos_packaging.py
 │       ├── test_macos_smoke_contract.py
 │       ├── test_post_release_smoke.py
 │       ├── test_release_metadata.py
 │       ├── test_release_workflows.py
+│       ├── test_verify_binary_architecture.py
+│       ├── test_windows_overlay_smoke.py
 │       └── test_windows_packaging.py
 ├── security-audit
 │   └── 2026-07-10-1635-diff-review.md

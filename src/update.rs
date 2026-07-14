@@ -99,11 +99,64 @@ struct WindowsUpdateHelperRequest<'a> {
     artifact: &'a Path,
     expected_hash: &'a str,
     expected_size: u64,
+    lifecycle_archive: &'a Path,
+    lifecycle_expected_hash: &'a str,
+    lifecycle_expected_size: u64,
     installed_executable: &'a Path,
     expected_version: &'a str,
     system_msiexec: &'a Path,
     system_powershell: &'a Path,
 }
+
+#[cfg(any(test, windows))]
+const WINDOWS_PINNED_FILE_HELPER: &str = r#"
+function Open-HonkPinnedFile([string] $Path, [int64] $ExpectedSize, [string] $ExpectedHash, [string] $Label) {
+  $item=Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+  if ($item.PSIsContainer -or (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { throw "$Label is not a regular file" }
+  $stream=[IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+  try {
+    if ($stream.Length -ne $ExpectedSize) { throw "$Label size changed" }
+    $sha=[Security.Cryptography.SHA256]::Create()
+    try { $stream.Position=0; $digest=$sha.ComputeHash($stream) } finally { $sha.Dispose() }
+    $actual=[BitConverter]::ToString($digest).Replace('-','').ToLowerInvariant()
+    if ($actual -ne $ExpectedHash) { throw "$Label hash changed" }
+    $stream.Position=0
+    return $stream
+  } catch { $stream.Dispose(); throw }
+}
+"#;
+
+#[cfg(any(test, windows))]
+const WINDOWS_RESTART_MANAGER_PROBE: &str = r#"
+if (-not ('Honk300RestartManagerProbe' -as [type])) {
+  Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class Honk300RestartManagerProbe {
+  private const int ErrorMoreData = 234;
+  [DllImport("rstrtmgr.dll", CharSet=CharSet.Unicode)] private static extern int RmStartSession(out uint handle, int flags, StringBuilder key);
+  [DllImport("rstrtmgr.dll", CharSet=CharSet.Unicode)] private static extern int RmRegisterResources(uint handle, uint fileCount, string[] files, uint applicationCount, IntPtr applications, uint serviceCount, string[] services);
+  [DllImport("rstrtmgr.dll")] private static extern int RmGetList(uint handle, out uint needed, ref uint count, IntPtr info, ref uint reasons);
+  [DllImport("rstrtmgr.dll")] private static extern int RmEndSession(uint handle);
+  public static void AssertUnlocked(string path) {
+    if (!File.Exists(path)) return;
+    uint handle; var key=new StringBuilder(64); int result=RmStartSession(out handle,0,key);
+    if (result != 0) throw new Win32Exception(result,"Restart Manager session failed");
+    try {
+      result=RmRegisterResources(handle,1,new[] { path },0,IntPtr.Zero,0,null);
+      if (result != 0) throw new Win32Exception(result,"Restart Manager registration failed");
+      uint needed=0,count=0,reasons=0; result=RmGetList(handle,out needed,ref count,IntPtr.Zero,ref reasons);
+      if (result != 0 && result != ErrorMoreData) throw new Win32Exception(result,"Restart Manager lock query failed");
+      if (needed != 0) throw new InvalidOperationException("another Windows session is using " + path);
+    } finally { RmEndSession(handle); }
+  }
+}
+'@
+}
+"#;
 
 #[cfg(any(test, windows))]
 fn windows_strategy_executable(
@@ -200,12 +253,16 @@ fn windows_update_helper_invocation(
         artifact,
         expected_hash,
         expected_size,
+        lifecycle_archive,
+        lifecycle_expected_hash,
+        lifecycle_expected_size,
         installed_executable,
         expected_version,
         system_msiexec,
         system_powershell,
     } = request;
     let artifact_literal = powershell_literal(&artifact.to_string_lossy());
+    let lifecycle_archive_literal = powershell_literal(&lifecycle_archive.to_string_lossy());
     let artifact_argument_literal =
         powershell_literal(&format!("\"{}\"", artifact.to_string_lossy()));
     let installed_literal = powershell_literal(&installed_executable.to_string_lossy());
@@ -246,9 +303,61 @@ fn windows_update_helper_invocation(
     let elevation = if elevated { " -Verb RunAs" } else { "" };
     let installer_literal = powershell_literal(&installer);
     let expected_hash = powershell_literal(&expected_hash.to_ascii_lowercase());
+    let lifecycle_expected_hash = powershell_literal(&lifecycle_expected_hash.to_ascii_lowercase());
     let expected_version = powershell_literal(strip_prerelease_metadata(expected_version));
+    let delegate_reacquires = if strategy == UpdateStrategy::PowerShell {
+        "$true"
+    } else {
+        "$false"
+    };
+    let pinned_file_helper = WINDOWS_PINNED_FILE_HELPER;
+    let restart_manager_probe = WINDOWS_RESTART_MANAGER_PROBE;
     let script = format!(
-        "$ErrorActionPreference='Stop'; $artifact='{artifact_literal}'; $expectedHash='{expected_hash}'; $expectedSize=[int64]{expected_size}; $owned=$false; Wait-Process -Id {current_pid} -ErrorAction SilentlyContinue; try {{ $item=Get-Item -LiteralPath $artifact -Force -ErrorAction Stop; if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $item.Length -ne $expectedSize) {{ throw 'verified update artifact identity changed' }}; $actualHash=(Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant(); if ($actualHash -ne $expectedHash) {{ throw 'verified update artifact hash changed' }}; $owned=$true; $process=Start-Process -FilePath '{installer_literal}' -ArgumentList {arguments} -WindowStyle Hidden -Wait -PassThru{elevation}; if ($process.ExitCode -notin @(0,1641,3010)) {{ throw \"installer exited with code $($process.ExitCode)\" }}; if (-not (Test-Path -LiteralPath '{installed_literal}' -PathType Leaf)) {{ throw 'installed honk300 executable is missing' }}; $versionOutput=(& '{installed_literal}' --version | Select-Object -Last 1); if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($versionOutput)) {{ throw 'installed honk300 version check failed' }}; $reported=($versionOutput.Trim().Split()[-1] -replace '[+-].*$',''); if ($reported -ne '{expected_version}') {{ throw \"installed honk300 version $reported does not match {expected_version}\" }} }} finally {{ if ($owned -and (Test-Path -LiteralPath $artifact -PathType Leaf)) {{ $cleanup=Get-Item -LiteralPath $artifact -Force; if (($cleanup.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and $cleanup.Length -eq $expectedSize -and (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant() -eq $expectedHash) {{ Remove-Item -LiteralPath $artifact -Force }} }} }}"
+        "$ErrorActionPreference='Stop'; \
+         {pinned_file_helper} \
+         $artifact='{artifact_literal}'; $expectedHash='{expected_hash}'; $expectedSize=[int64]{expected_size}; \
+         $lifecycleArchive='{lifecycle_archive_literal}'; $lifecycleExpectedHash='{lifecycle_expected_hash}'; $lifecycleExpectedSize=[int64]{lifecycle_expected_size}; \
+         $artifactOwned=$false; $lifecycleOwned=$false; $artifactStream=$null; $lifecycleStream=$null; $lease=$null; $leaseRoot=$null; $delegateReacquires={delegate_reacquires}; \
+         try {{ \
+           $artifactStream=Open-HonkPinnedFile $artifact $expectedSize $expectedHash 'verified update artifact'; \
+           $artifactOwned=$true; \
+           $lifecycleStream=Open-HonkPinnedFile $lifecycleArchive $lifecycleExpectedSize $lifecycleExpectedHash 'verified lifecycle archive'; \
+           $lifecycleOwned=$true; \
+           $leaseRoot=Join-Path ([IO.Path]::GetTempPath()) ('honk300-update-lease-' + [guid]::NewGuid().ToString('N')); \
+           New-Item -ItemType Directory -Path $leaseRoot -ErrorAction Stop | Out-Null; \
+           Add-Type -AssemblyName System.IO.Compression; \
+           Add-Type -AssemblyName System.IO.Compression.FileSystem; \
+           $zip=[IO.Compression.ZipArchive]::new($lifecycleStream,[IO.Compression.ZipArchiveMode]::Read,$true); \
+           try {{ $entries=@($zip.Entries | Where-Object {{ $_.Name -ieq 'honk300.exe' }}); if ($entries.Count -ne 1) {{ throw \"portable lifecycle archive must contain exactly one honk300.exe; found $($entries.Count)\" }}; $entry=$entries[0]; $segments=@($entry.FullName.Replace('\','/').Split('/') | Where-Object {{ $_ -ne '' }}); if ($entry.FullName.Contains('\') -or $entry.FullName.Contains(':') -or $segments.Count -eq 0 -or $segments -contains '.' -or $segments -contains '..') {{ throw 'portable lifecycle archive contains an unsafe executable path' }}; $leaseBinary=Join-Path $leaseRoot 'lifecycle-honk300.exe'; [IO.Compression.ZipFileExtensions]::ExtractToFile($entry,$leaseBinary,$false) }} finally {{ $zip.Dispose() }}; \
+           $start=[Diagnostics.ProcessStartInfo]::new(); $start.FileName=$leaseBinary; $start.UseShellExecute=$false; $start.CreateNoWindow=$true; $start.RedirectStandardInput=$true; $start.RedirectStandardOutput=$true; $start.RedirectStandardError=$true; $start.EnvironmentVariables['HONK300_INTERNAL_HOLD_LIFECYCLE_LEASE']='1'; \
+           $lease=[Diagnostics.Process]::new(); $lease.StartInfo=$start; if (-not $lease.Start()) {{ throw 'failed to start verified lifecycle lease holder' }}; \
+           $ready=$lease.StandardOutput.ReadLine(); if ($ready -ne 'HONK300_INTERNAL_LIFECYCLE_LEASE_READY') {{ $failure=$lease.StandardError.ReadToEnd().Trim(); throw \"verified lifecycle helper could not acquire exclusive runtime ownership: $failure\" }}; \
+           Wait-Process -Id {current_pid} -ErrorAction SilentlyContinue; \
+           if ($delegateReacquires) {{ \
+             $lease.StandardInput.Close(); \
+             if (-not $lease.WaitForExit(10000)) {{ $lease.Kill(); $lease.WaitForExit(); $lease.Dispose(); $lease=$null; throw 'outer lifecycle helper did not release before delegated bootstrap' }}; \
+             $leaseExit=$lease.ExitCode; $lease.Dispose(); $lease=$null; \
+             if ($leaseExit -ne 0) {{ throw \"outer lifecycle helper exited with code $leaseExit before delegated bootstrap\" }} \
+           }} else {{ \
+             {restart_manager_probe} \
+             $installedBin=[IO.Path]::GetDirectoryName('{installed_literal}'); \
+             foreach ($candidate in @((Join-Path $installedBin 'honk300.exe'),(Join-Path $installedBin 'honk.exe'),(Join-Path $installedBin 'goose.exe'))) {{ [Honk300RestartManagerProbe]::AssertUnlocked($candidate) }} \
+           }}; \
+           $process=Start-Process -FilePath '{installer_literal}' -ArgumentList {arguments} -WindowStyle Hidden -Wait -PassThru{elevation}; \
+           if ($process.ExitCode -ne 0) {{ throw \"installer exited with code $($process.ExitCode); pending or reboot-deferred replacement is not accepted\" }}; \
+           if (-not (Test-Path -LiteralPath '{installed_literal}' -PathType Leaf)) {{ throw 'installed honk300 executable is missing' }}; \
+           $versionOutput=(& '{installed_literal}' --version | Select-Object -Last 1); \
+           if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($versionOutput)) {{ throw 'installed honk300 version check failed' }}; \
+           $reported=($versionOutput.Trim().Split()[-1] -replace '[+-].*$',''); \
+           if ($reported -ne '{expected_version}') {{ throw \"installed honk300 version $reported does not match {expected_version}\" }} \
+         }} finally {{ \
+           if ($null -ne $lease) {{ try {{ $lease.StandardInput.Close(); if (-not $lease.WaitForExit(10000)) {{ $lease.Kill(); $lease.WaitForExit() }} }} finally {{ $lease.Dispose() }} }}; \
+           if ($null -ne $lifecycleStream) {{ $lifecycleStream.Dispose() }}; \
+           if ($null -ne $artifactStream) {{ $artifactStream.Dispose() }}; \
+           if ($null -ne $leaseRoot -and (Test-Path -LiteralPath $leaseRoot -PathType Container)) {{ Remove-Item -LiteralPath $leaseRoot -Recurse -Force }}; \
+           if ($artifactOwned -and (Test-Path -LiteralPath $artifact -PathType Leaf)) {{ $cleanup=Get-Item -LiteralPath $artifact -Force; if (($cleanup.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and $cleanup.Length -eq $expectedSize -and (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant() -eq $expectedHash) {{ Remove-Item -LiteralPath $artifact -Force }} }}; \
+           if ($lifecycleOwned -and (Test-Path -LiteralPath $lifecycleArchive -PathType Leaf)) {{ $cleanup=Get-Item -LiteralPath $lifecycleArchive -Force; if (($cleanup.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and $cleanup.Length -eq $lifecycleExpectedSize -and (Get-FileHash -LiteralPath $lifecycleArchive -Algorithm SHA256).Hash.ToLowerInvariant() -eq $lifecycleExpectedHash) {{ Remove-Item -LiteralPath $lifecycleArchive -Force }} }} \
+         }}"
     );
     WindowsUpdateHelperInvocation {
         args: vec![
@@ -468,10 +577,18 @@ pub fn run() -> Result<(), DynError> {
 
     #[cfg(windows)]
     {
+        let lifecycle_artifact = windows_lifecycle_artifact(&manifest, target)?;
+        let lifecycle_url = artifact_url_for_tag(&manifest.tag, &lifecycle_artifact.name)?;
+        let lifecycle_temp_path = temp_artifact_path(&latest, &lifecycle_artifact.name);
+        prepare_temp_artifact_path(&lifecycle_temp_path)?;
+        download_to_file(&lifecycle_url, &lifecycle_temp_path)?;
+        verify_manifest_artifact(&lifecycle_temp_path, lifecycle_artifact)?;
         schedule_windows_update(
             plan.strategy,
             &temp_path,
             artifact,
+            &lifecycle_temp_path,
+            lifecycle_artifact,
             &installed_executable,
             &latest,
         )?;
@@ -604,6 +721,8 @@ fn schedule_windows_update(
     strategy: UpdateStrategy,
     artifact_path: &Path,
     artifact: &ReleaseArtifact,
+    lifecycle_archive_path: &Path,
+    lifecycle_artifact: &ReleaseArtifact,
     installed_executable: &Path,
     expected_version: &str,
 ) -> Result<(), DynError> {
@@ -618,6 +737,9 @@ fn schedule_windows_update(
         artifact: artifact_path,
         expected_hash: &artifact.sha256,
         expected_size: artifact.size,
+        lifecycle_archive: lifecycle_archive_path,
+        lifecycle_expected_hash: &lifecycle_artifact.sha256,
+        lifecycle_expected_size: lifecycle_artifact.size,
         installed_executable,
         expected_version,
         system_msiexec: &msiexec,
@@ -795,6 +917,30 @@ fn manifest_artifact<'a>(
             "release artifact {} targets {}, not {}",
             artifact.name,
             artifact.target,
+            target.triple()
+        ));
+    }
+    Ok(artifact)
+}
+
+#[cfg(any(test, windows))]
+fn windows_lifecycle_artifact(
+    manifest: &ReleaseManifest,
+    target: ReleaseTarget,
+) -> Result<&ReleaseArtifact, String> {
+    if !target.is_windows() {
+        return Err("lifecycle portable helper is only valid for Windows updates".into());
+    }
+    let name = format!("honk300-{}.zip", target.triple());
+    let artifact = manifest
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.name == name)
+        .ok_or_else(|| format!("release manifest does not contain {name}"))?;
+    if artifact.target != target.triple() || artifact.kind != "portable" {
+        return Err(format!(
+            "lifecycle helper {} must be the portable artifact for {}",
+            artifact.name,
             target.triple()
         ));
     }
@@ -1102,6 +1248,14 @@ mod tests {
                 "sha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
                 "size": 1234,
                 "checksum": "honk300-x86_64-pc-windows-msvc.msi.sha256"
+            },
+            {
+                "name": "honk300-x86_64-pc-windows-msvc.zip",
+                "target": "x86_64-pc-windows-msvc",
+                "kind": "portable",
+                "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "size": 4321,
+                "checksum": "honk300-x86_64-pc-windows-msvc.zip.sha256"
             }
         ]
     }"#;
@@ -1111,8 +1265,14 @@ mod tests {
         let manifest = parse_release_manifest(VALID_MANIFEST, "v0.3.0").unwrap();
         assert_eq!(manifest.version, "0.3.0");
         assert_eq!(manifest.tag, "v0.3.0");
-        assert_eq!(manifest.artifacts.len(), 1);
+        assert_eq!(manifest.artifacts.len(), 2);
         assert_eq!(manifest.artifacts[0].kind, "msi-global");
+        assert_eq!(
+            windows_lifecycle_artifact(&manifest, ReleaseTarget::WindowsX64)
+                .unwrap()
+                .kind,
+            "portable"
+        );
     }
 
     #[test]
@@ -1288,6 +1448,8 @@ mod tests {
     #[test]
     fn windows_update_handoff_is_hidden_waits_reverifies_and_cleans_only_owned_temp() {
         let artifact = Path::new(r"C:\Users\goose\AppData\Local\Temp\honk300-update.msi");
+        let lifecycle_archive =
+            Path::new(r"C:\Users\goose\AppData\Local\Temp\honk300-portable.zip");
         let installed = Path::new(r"C:\Program Files\honk300\bin\honk300.exe");
         let hash = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
         let invocation = windows_update_helper_invocation(WindowsUpdateHelperRequest {
@@ -1296,6 +1458,9 @@ mod tests {
             artifact,
             expected_hash: hash,
             expected_size: 1234,
+            lifecycle_archive,
+            lifecycle_expected_hash: hash,
+            lifecycle_expected_size: 4321,
             installed_executable: installed,
             expected_version: "0.3.0",
             system_msiexec: Path::new(r"C:\Windows\System32\msiexec.exe"),
@@ -1309,6 +1474,34 @@ mod tests {
             .windows(2)
             .any(|args| args == ["-WindowStyle", "Hidden"]));
         assert!(invocation.script.contains("Wait-Process -Id 4242"));
+        assert!(invocation
+            .script
+            .contains("HONK300_INTERNAL_HOLD_LIFECYCLE_LEASE"));
+        assert!(invocation
+            .script
+            .contains("HONK300_INTERNAL_LIFECYCLE_LEASE_READY"));
+        assert!(invocation.script.contains("RedirectStandardInput"));
+        assert!(invocation.script.contains("[IO.FileShare]::Read"));
+        assert!(invocation.script.contains("$sha.ComputeHash($stream)"));
+        assert!(invocation
+            .script
+            .contains("[IO.Compression.ZipArchive]::new($lifecycleStream"));
+        assert!(invocation.script.contains("rstrtmgr.dll"));
+        assert!(invocation
+            .script
+            .contains("[Honk300RestartManagerProbe]::AssertUnlocked"));
+        assert!(invocation.script.contains("$delegateReacquires=$false"));
+        assert!(!invocation.script.contains("3010"));
+        assert!(!invocation
+            .script
+            .contains("HONK300_INTERNAL_LIFECYCLE_LEASE_HELD"));
+        assert!(invocation
+            .script
+            .contains(&lifecycle_archive.to_string_lossy()[..]));
+        assert!(
+            invocation.script.find("$lease.Start()").unwrap()
+                < invocation.script.find("Wait-Process -Id 4242").unwrap()
+        );
         assert!(invocation.script.contains("Get-FileHash"));
         assert!(invocation.script.contains(hash));
         assert!(invocation
@@ -1319,10 +1512,87 @@ mod tests {
         assert!(invocation.script.contains(&installed.to_string_lossy()[..]));
         assert!(invocation.script.contains("--version"));
         assert!(invocation.script.contains("Remove-Item -LiteralPath"));
-        assert!(!invocation.script.contains("Remove-Item -Recurse"));
+        assert!(invocation
+            .script
+            .contains("Remove-Item -LiteralPath $leaseRoot -Recurse -Force"));
         assert!(!invocation
             .script
             .contains(r"Remove-Item -LiteralPath 'C:\Program Files"));
+        assert!(
+            invocation.script.find("Start-Process -FilePath").unwrap()
+                < invocation
+                    .script
+                    .rfind("$artifactStream.Dispose()")
+                    .unwrap()
+        );
+
+        let delegated = windows_update_helper_invocation(WindowsUpdateHelperRequest {
+            current_pid: 4242,
+            strategy: UpdateStrategy::PowerShell,
+            artifact,
+            expected_hash: hash,
+            expected_size: 1234,
+            lifecycle_archive,
+            lifecycle_expected_hash: hash,
+            lifecycle_expected_size: 4321,
+            installed_executable: installed,
+            expected_version: "0.3.0",
+            system_msiexec: Path::new(r"C:\Windows\System32\msiexec.exe"),
+            system_powershell: Path::new(
+                r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            ),
+        });
+        assert!(delegated.script.contains("$delegateReacquires=$true"));
+        assert!(!delegated
+            .script
+            .contains("HONK300_INTERNAL_LIFECYCLE_LEASE_HELD"));
+        let release = delegated
+            .script
+            .find("$lease.StandardInput.Close()")
+            .unwrap();
+        let dispose = delegated
+            .script
+            .find("$leaseExit=$lease.ExitCode; $lease.Dispose(); $lease=$null")
+            .unwrap();
+        let invoke = delegated
+            .script
+            .find("$process=Start-Process -FilePath")
+            .unwrap();
+        assert!(release < dispose && dispose < invoke);
+
+        // PowerShell is available on Windows CI and on the macOS qualification host. Keep the
+        // assertions above portable, but syntax-check the fully rendered one-line handoff whenever
+        // either supported executable is present.
+        for shell in ["pwsh", "powershell"] {
+            use std::io::Write as _;
+            use std::process::Stdio;
+
+            let parser = "$source=[Console]::In.ReadToEnd(); $tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$errors) > $null; if ($errors.Count) { $errors | ForEach-Object { [Console]::Error.WriteLine($_.Message) }; exit 1 }";
+            let mut child = match Command::new(shell)
+                .args(["-NoProfile", "-Command", parser])
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::piped())
+                .spawn()
+            {
+                Ok(child) => child,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+                Err(error) => panic!("failed to start {shell} syntax parser: {error}"),
+            };
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(invocation.script.as_bytes())
+                .unwrap();
+            let output = child.wait_with_output().unwrap();
+            assert!(
+                output.status.success(),
+                "generated Windows update helper is invalid PowerShell: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            break;
+        }
     }
 
     #[test]

@@ -17,7 +17,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > controls. Mac support and the Linux desktop paths are now in the codebase, with repeatable
 > CI smoke proof for hosted Mac bundle checks and Linux desktop behavior. The installed Mac app
 > now has a calm, non-nagging permission handoff, while its denied, repeat-denied, granted, and
-> revoked behavior still needs one final unchanged signed-app run. The Windows/Linux installer
+> revoked behavior still needs one final unchanged signed-app run. Every desktop now stages the
+> Goose's arrival and departure beyond a real screen edge, and a person closing its note or meme
+> can provoke a safely bounded annoyed reaction. The Windows/Linux installer
 > and update
 > work now has release artifact proof, including Windows installers for both regular x64 and ARM64
 > machines.
@@ -55,6 +57,30 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - **Every desktop now guards its final color handoff.** Windows and both Linux display paths now
   test deliberately different color and transparency values too. That makes the same washed-out,
   transparent, or color-swapped failure much harder to reintroduce anywhere.
+- **Linux checks now inspect what the desktop really shows.** The test keeps one exact Goose
+  build unchanged and captures both Linux display paths after they have finished drawing. It
+  requires the pale body, dark wing, and distinctly orange beak and feet to remain recognizable,
+  and refuses an unfamiliar screen color layout instead of risking swapped or transparent
+  colors. This makes Linux release proof match the real view people will see.
+- **Windows checks now inspect the real transparent desktop Goose.** The test keeps one exact
+  Windows build unchanged, holds the same walking pose over dark and light desktops, and checks
+  the body, shading, outline, wing, beak, two legs, soft shadow, transparency, and correct orange
+  colors. It also proves start, status, reload, stop, and an immediate restart, then keeps the
+  pictures and logs when anything fails. The release gate runs this on both regular Windows PCs
+  and native Windows-on-ARM hardware, using the same ARM file headed into its installer, then
+  repeats it for the published regular-PC installer. This catches visual handoff bugs and everyday
+  control problems before release.
+- **The Goose can now take the scenic route around real screen edges.** Screens that touch still
+  behave like one continuous desktop. Every so often the Goose may walk completely beyond a truly
+  exposed edge and come back from the other side, but the switch happens only while every part of
+  it is hidden. Trips to fetch mud or return with a prank still come back through the same edge.
+  Starting and stopping also happen as visible walks from or into an edge, so the Goose does not
+  simply pop into or out of existence. This behavior is shared by every desktop version.
+- **Closing one of the Goose's notes or memes can offend it.** When you personally close a window
+  it opened, there is about a three-in-ten chance it gets visibly annoyed and then tries the same
+  short, bounded mouse-stealing prank it already knows. Cleanup does not provoke it, and the mouse
+  part still respects your settings, quiet/fullscreen manners, permission, and platform support.
+  Linux does not currently open those windows, so it has no close reaction there.
 
 ### Improved
 - **Walking looks less stretchy everywhere without becoming frantic.** Planted feet release a
@@ -65,9 +91,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   the Mac app reuses native images, remembers screen geometry, and limits display updates without
   slowing the simulation. After a temporarily large note or meme interaction, its drawing space
   returns to a sensible size instead of making every later walking frame process a mostly empty
-  screen-sized image. The Mac window and the pixels it receives now also agree on color handling,
-  avoiding a repeated conversion on every frame. This saves processor and battery work without
-  changing the Goose's colors, motion, or update rate.
+  screen-sized image. The incoming pixels keep their explicit drawing color format, while the Mac
+  window uses a stable standard screen-color destination and lets the operating system handle the
+  final physical display profile. This avoids a repeated conversion on every frame and passed a
+  clean low-processor diagnostic, though the final signed release still has to repeat it. It saves
+  processor and battery work without changing the Goose's colors, motion, or update rate.
 - **A mounted disk image can use the normal safe installer.** The Goose can now copy its own
   verified app bundle into the user's Applications folder while preserving aliases, autostart,
   user media, updates, removal, and rollback. Automated release checks can interrupt the swap on
@@ -80,6 +108,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   Accessibility checks happen without rebuilding the app between them.
 
 ### Fixed
+- **An older Goose note or meme no longer blocks the next one.** Mac and Windows now keep track of
+  which new window the Goose is actively fetching, even when an earlier note stays open. Closing
+  an older window is still noticed once, but it cannot hide the current window and make the new
+  behavior give up.
 - **The Mac release checklist now matches the download people will actually use.** It starts with
   the signed and Apple-approved disk image and keeps one unchanged Goose through permission,
   window-safety, appearance, performance, update, cleanup, and fresh-download checks. It also
@@ -103,8 +135,17 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   warnings.
 - **Stop now means fully stopped.** Starting again immediately after a stop could occasionally
   catch the old Goose halfway out, refuse the new launch, and then leave no Goose running. Stop,
-  exit, and quit now wait briefly for shutdown to finish on every desktop, which makes quick
-  restarts dependable while still reporting a genuinely stuck exit.
+  exit, and quit now let it run to a real screen edge, walk fully out of view, and only then finish
+  a bounded shutdown on every desktop. Quick restarts stay dependable while a genuinely stuck
+  exit is still reported.
+- **Installing, updating, or removing the Goose can no longer race a new launch.** Every desktop
+  now keeps exclusive ownership from the moment the running Goose finishes walking out until all
+  owned files are safely changed. The Windows updater uses the exact verified portable download
+  to hold that ownership and keeps downloaded files locked against replacement while they run.
+  Windows also checks for other signed-in sessions using the shared installation, rejects updates
+  that Windows wants to postpone until a reboot, and stops any temporary removal helper that has
+  not safely taken ownership. Mac and Linux installers now roll back on interruption instead of
+  accepting a half-finished change. If shutdown or ownership cannot be proven, nothing is changed.
 - **Two old performance follow-ups are now formally closed.** The three desktop versions already
   share the same timing rules, and Windows redraws only the small changed area on each affected
   monitor. Fresh checks confirmed both designs, which reduces release risk and keeps the board
@@ -115,6 +156,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   mode truthful while turning vague “full support” into clear, testable choices.
 
 ### Security
+- **Private release credentials cannot be added to Git by accident.** The local folder used for
+  one-time Apple signing and approval files is ignored and kept owner-only, while automation gets
+  its copy through encrypted repository secrets. This keeps release keys out of source history.
 - **The graphical installer is tightly bound to the official app beside it.** It refuses a
   different app, mismatched developer, unsafe link, foreign command alias, or unowned receipt
   before changing anything. The install record also remembers the exact release and source
