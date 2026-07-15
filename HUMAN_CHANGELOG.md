@@ -135,6 +135,16 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   Accessibility checks happen without rebuilding the app between them.
 
 ### Fixed
+- **Release checks now recognize a real top-down Goose without excusing broken pictures.** One
+  Linux rehearsal showed a clearly visible body and wing with a smaller orange beak-and-feet
+  footprint than a side view, so the check now accepts that genuine pose while keeping every
+  background, transparency, and solid-rectangle safeguard. A separate hosted Windows-on-ARM
+  machine acknowledged two colored test windows but returned the same wallpaper for both
+  screenshots. Only that exact hosted limitation can use the pixels the real Goose successfully
+  handed to its visible window, and those pixels must still prove correct transparency, color,
+  body parts, shadow, and the matching live window. Regular Windows and real ARM machines still
+  need the full two-background desktop pictures. This keeps the release gate honest without
+  confusing a test-machine limitation for a product failure or calling it proof that was not seen.
 - **The hosted desktop checks now use safe temporary paths on Linux and read Windows line endings
   correctly.** The first major-release rehearsal successfully photographed the new Linux test
   background and proved matching Windows screen geometry, then stopped because Linux's socket

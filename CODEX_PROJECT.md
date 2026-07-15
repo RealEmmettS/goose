@@ -70,15 +70,25 @@ thegoose.app.
   portable pairs, ARM64 Windows installers, and every repaired X11 compositor half. It failed
   closed because evidence-derived Wayland socket paths exceeded Linux's 108-byte AF_UNIX limit
   and the Windows x64 controller treated a matching CRLF geometry document as one line. Current
-  source uses a short cleaned Wayland runtime directory and exact CRLF/LF line parsing; every
-  native semantic threshold stays unchanged and another exact candidate is required.
+  source uses a short cleaned Wayland runtime directory and exact CRLF/LF line parsing. Candidate
+  `29387569722` at `5d0237fdf23df0abaafaaef74d43cc6acfcd870d` then passed the trusted Mac
+  producer, every Apple/Windows portable job, Windows x64 paired-DWM compositor/lifecycle, native
+  ARM64 PE/MSI lifecycle, and X11 plus dual-output Wayland on three of four Linux variants. Its
+  two remaining blockers were evidence-specific: one valid top-down x64 GNU X11 pose had 13 warm
+  pixels against a side-view floor of 20, and GitHub's hosted ARM64 capture API returned one
+  byte-identical static wallpaper for both acknowledged visible-window colors. Current source
+  sets the Linux warm floor to 10 while retaining all body/wing/background/transparency checks.
+  ADR 0026 restricts the ARM64 fallback to the exact GitHub-hosted wallpaper signature and records
+  the cropped premultiplied-BGRA DIB only after a successful native present, bound to the frozen
+  visible HWND/rectangle; local/self-hosted ARM64 and x64 still require paired DWM. Another exact
+  candidate is required; no release assembly or publication has occurred.
 - Integrated final-source gate: formatting, strict workspace clippy, 432 Rust tests including all
-  seven renderer goldens, release and both Apple builds, cargo-dist planning, 88 Python contracts,
+  seven renderer goldens, release and both Apple builds, cargo-dist planning, 95 Python contracts,
   actionlint, shell/PowerShell syntax, pinned cargo-audit over 374 dependencies and 1,160
   advisories, Windows x64/ARM64 strict cross-clippy, Linux x64/ARM64 GNU/musl engine/backend
   checks, and diff validation pass. Hosted native candidate gates remain open.
 - v1.0.0 retarget gate: the affected identity paths also pass 107 root tests, 22 native Mac
-  platform tests, a release binary reporting 1.0.0, cargo-dist v1.0.0 planning, 88 packaging/
+  platform tests, a release binary reporting 1.0.0, cargo-dist v1.0.0 planning, 95 packaging/
   workflow contracts, workflow and script syntax, local link/tree validation, and the live board
   check. The exact candidate rebuilds the complete native matrix on the frozen SHA.
 - Debian/update: deterministic `honk300-amd64.deb` and `honk300-arm64.deb` packaging reuses the
@@ -89,12 +99,14 @@ thegoose.app.
   GitHub for every release but Mac CLI updates consume the exact-tag app ZIP through the pinned
   bootstrap.
 - Release/site: the stable-latest DMG and native Debian progressive-disclosure refinement is
-  retargeted to v1.0.0 and pushed at exact site SHA `d195aeaf35943b45aa50cff462a94c41a332875b`.
-  Local dependency, 22 unit/lint/build/budget, and 10 browser/axe/keyboard/responsive/visual checks
-  pass; hosted native snapshot refresh run `29386864800` is the final pre-preview site check. The
-  protected preview still correctly rejects the live v0.3.2 manifest. Final app candidate
-  qualification, release publication, live-v1.0.0 validation, and production promotion remain
-  deliberate gates.
+  retargeted to v1.0.0 and pushed at exact site SHA
+  `a8f5c5dee24c5715e875dddbc4c1cc528afb9ebb`. Local dependency, 22 unit/lint/build/budget, and
+  10 browser/axe/keyboard/responsive/visual checks pass; native snapshot refresh run
+  `29386864800` and final hosted Windows/Linux site CI run `29387702663` are green. Vercel built
+  the exact protected preview at
+  `https://desktop-goose-site-n20ue4aen-realemmetts.vercel.app`; it remains protected and the live
+  manifest remains v0.3.2 by design. Final app candidate qualification, release publication,
+  authenticated live-v1.0.0 preview validation, and production promotion remain deliberate gates.
 
 ## Goals
 
@@ -138,7 +150,8 @@ thegoose.app.
 - `docs/adr`: durable decisions. ADR 0020 is current for macOS distribution; ADR 0018 remains
   current for atomic publication, ADR 0023 governs rolling latest and Debian lifecycle, and ADR
   0024 governs the macOS-only menu-bar bridge. ADR 0025 records the first stable v1.0.0 identity
-  and post-release Alienware verification boundary.
+  and post-release Alienware verification boundary. ADR 0026 defines the narrow GitHub-hosted
+  Windows ARM64 presenter-evidence path without claiming full DWM composition.
 
 ## Verification Source Of Truth
 
@@ -391,6 +404,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── 0023-rolling-latest-artifacts-and-debian-lifecycle.md
 │   │   ├── 0024-macos-menu-bar-control.md
 │   │   ├── 0025-first-stable-v1-release.md
+│   │   ├── 0026-hosted-windows-arm64-compositor-evidence.md
 │   │   └── README.md
 │   ├── agents
 │   │   └── handoff
@@ -516,5 +530,5 @@ Finder metadata are excluded; every project source/document/configuration path i
     ├── corporate.wxs
     └── install-source-msi-corporate.txt
 
-78 directories, 281 files
+78 directories, 282 files
 ```

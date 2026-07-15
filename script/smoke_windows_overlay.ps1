@@ -226,6 +226,7 @@ function Start-ControlledBackground {
             "thread_pmv2=$threadPmv2"
             "virtual_screen=$($screen.X),$($screen.Y),$($screen.Width),$($screen.Height)"
             "window_hwnd=0x$windowHandle"
+            "window_visible=$($form.Visible.ToString().ToLowerInvariant())"
             "window_dpi=$windowDpi"
             "window_bounds=$($bounds.X),$($bounds.Y),$($bounds.Width),$($bounds.Height)"
         ) -join [Environment]::NewLine)
@@ -564,7 +565,7 @@ function Save-ScreenRect {
     }
 }
 
-function Assert-ControlledBackgroundCapture {
+function Measure-ControlledBackgroundCapture {
     param(
         [Parameter(Mandatory = $true)] [string] $Path,
         [Parameter(Mandatory = $true)] [string] $ExpectedHex
@@ -592,22 +593,50 @@ function Assert-ControlledBackgroundCapture {
         $bitmap.Dispose()
     }
 
-    $coverage = [double]$matching / $total
-    if ($coverage -lt 0.95) {
-        throw "controlled background proof for #$ExpectedHex covered only $matching/$total pixels ($coverage)"
+    return [pscustomobject]@{
+        Coverage = [double]$matching / $total
+        Matching = $matching
+        Total = $total
     }
-    return $coverage
 }
 
 function Start-ExactRuntime {
     param([string] $Label)
     $stdout = Join-Path $evidence "$Label-runtime.stdout.log"
     $stderr = Join-Path $evidence "$Label-runtime.stderr.log"
-    $process = Start-Process -FilePath $resolvedBinary `
-        -ArgumentList @('start', '--config', "`"$config`"", '--no-sound', '--no-mouse-steal', '--no-window-ride') `
-        -RedirectStandardOutput $stdout `
-        -RedirectStandardError $stderr `
-        -PassThru
+    $previousSmokePresent = [Environment]::GetEnvironmentVariable(
+        'HONK300_WINDOWS_SMOKE_PRESENT',
+        'Process'
+    )
+    try {
+        if ($captureMode -eq 'hosted-arm64-presenter-surface') {
+            [Environment]::SetEnvironmentVariable(
+                'HONK300_WINDOWS_SMOKE_PRESENT',
+                $rendererPresentPath,
+                'Process'
+            )
+        }
+        else {
+            # Paired-DWM evidence must not activate a diagnostic hook inherited from the caller.
+            [Environment]::SetEnvironmentVariable(
+                'HONK300_WINDOWS_SMOKE_PRESENT',
+                $null,
+                'Process'
+            )
+        }
+        $process = Start-Process -FilePath $resolvedBinary `
+            -ArgumentList @('start', '--config', "`"$config`"", '--no-sound', '--no-mouse-steal', '--no-window-ride') `
+            -RedirectStandardOutput $stdout `
+            -RedirectStandardError $stderr `
+            -PassThru
+    }
+    finally {
+        [Environment]::SetEnvironmentVariable(
+            'HONK300_WINDOWS_SMOKE_PRESENT',
+            $previousSmokePresent,
+            'Process'
+        )
+    }
     Start-Sleep -Milliseconds 100
     $actualPath = (Get-Process -Id $process.Id).Path
     if ([System.IO.Path]::GetFullPath($actualPath) -ne [System.IO.Path]::GetFullPath($resolvedBinary)) {
@@ -621,6 +650,8 @@ $runtime = $null
 $runtimeSuspended = $false
 $firstPid = $null
 $visualPassed = $false
+$captureMode = 'paired-dwm'
+$rendererPresentPath = Join-Path $work 'renderer-present.bgra'
 $initialHash = (Get-FileHash -LiteralPath $resolvedBinary -Algorithm SHA256).Hash.ToLowerInvariant()
 Set-Content -LiteralPath (Join-Path $evidence 'exact-binary.sha256.txt') `
     -Value "$initialHash  $resolvedBinary" -Encoding ascii
@@ -658,6 +689,9 @@ try {
     if ($backgroundDiagnosticLines -notcontains $expectedVirtualScreen) {
         throw "controller/background virtual-screen mismatch: expected '$expectedVirtualScreen', got '$backgroundDiagnostics'"
     }
+    if ($backgroundDiagnosticLines -notcontains 'window_visible=true') {
+        throw "controlled background HWND is not visible: '$backgroundDiagnostics'"
+    }
     Copy-Item -LiteralPath $backgroundDiagnosticsPath `
         -Destination (Join-Path $evidence 'background-diagnostics.txt') -Force
 
@@ -680,20 +714,46 @@ try {
     finally {
         Set-ControlledBackground -Hex $darkHex
     }
-    $darkCoverage = Assert-ControlledBackgroundCapture -Path $darkProofCapture -ExpectedHex $darkHex
-    $lightCoverage = Assert-ControlledBackgroundCapture -Path $lightProofCapture -ExpectedHex $lightHex
     $darkProofHash = (Get-FileHash -LiteralPath $darkProofCapture -Algorithm SHA256).Hash.ToLowerInvariant()
     $lightProofHash = (Get-FileHash -LiteralPath $lightProofCapture -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($darkProofHash -eq $lightProofHash) {
-        throw 'controlled background dark/light proof captures are byte-identical'
+    $darkProof = Measure-ControlledBackgroundCapture -Path $darkProofCapture -ExpectedHex $darkHex
+    $lightProof = Measure-ControlledBackgroundCapture -Path $lightProofCapture -ExpectedHex $lightHex
+    $pairedBackgroundVisible = (
+        $darkProof.Coverage -ge 0.95 -and
+        $lightProof.Coverage -ge 0.95 -and
+        $darkProofHash -ne $lightProofHash
+    )
+    $hostedArm64WallpaperCapture = (
+        $env:GITHUB_ACTIONS -eq 'true' -and
+        $env:RUNNER_ENVIRONMENT -eq 'github-hosted' -and
+        $env:RUNNER_OS -eq 'Windows' -and
+        $env:RUNNER_ARCH -eq 'ARM64' -and
+        $env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -and
+        $darkProof.Coverage -le 0.01 -and
+        $lightProof.Coverage -le 0.01 -and
+        $darkProofHash -eq $lightProofHash
+    )
+    if ($pairedBackgroundVisible) {
+        $captureMode = 'paired-dwm'
+    }
+    elseif ($hostedArm64WallpaperCapture) {
+        # GitHub's public-preview ARM64 hosted display currently returns the same static
+        # wallpaper from GetDC(NULL)+BitBlt while ordinary HWNDs remain visible and repaint.
+        # Keep this exception exact and auditable: only that hosted ARM64 signature may use the
+        # real process's post-success layered-presenter bytes plus visible-HWND evidence below.
+        $captureMode = 'hosted-arm64-presenter-surface'
+    }
+    else {
+        throw "controlled background proof failed: dark=$($darkProof.Matching)/$($darkProof.Total) ($($darkProof.Coverage)); light=$($lightProof.Matching)/$($lightProof.Total) ($($lightProof.Coverage)); identical=$($darkProofHash -eq $lightProofHash)"
     }
     Set-Content -LiteralPath (Join-Path $evidence 'background-proof.txt') -Encoding utf8NoBOM -Value @"
+capture_mode=$captureMode
 rect=$($proofRect.X),$($proofRect.Y),$($proofRect.Width),$($proofRect.Height)
 dark_hex=$darkHex
-dark_coverage=$($darkCoverage.ToString('F6', [System.Globalization.CultureInfo]::InvariantCulture))
+dark_coverage=$($darkProof.Coverage.ToString('F6', [System.Globalization.CultureInfo]::InvariantCulture))
 dark_sha256=$darkProofHash
 light_hex=$lightHex
-light_coverage=$($lightCoverage.ToString('F6', [System.Globalization.CultureInfo]::InvariantCulture))
+light_coverage=$($lightProof.Coverage.ToString('F6', [System.Globalization.CultureInfo]::InvariantCulture))
 light_sha256=$lightProofHash
 "@
 
@@ -719,20 +779,50 @@ light_sha256=$lightProofHash
         throw "second start did not prove single-instance enforcement: $duplicate"
     }
 
-    # Each wander picks a fresh target. Retry until the live compositor exposes a side
-    # pose (beak plus the two-tone legs), never substituting a generated/golden frame.
+    # Each wander picks a fresh target. Retry until the exact running binary exposes a side pose
+    # (beak plus two-tone legs). Normal hosts must prove the frozen DWM composition over paired
+    # backgrounds. Only the exact GitHub-hosted ARM wallpaper signature may instead analyze the
+    # premultiplied BGRA DIB accepted by its successful visible layered-window present.
     for ($attempt = 1; $attempt -le 12 -and -not $visualPassed; $attempt += 1) {
         Invoke-ExactBinary -Arguments @('do', 'wander') | Out-Null
         Start-Sleep -Milliseconds 900
 
+        if ($captureMode -eq 'hosted-arm64-presenter-surface') {
+            # Request only after the pose delay. The backend atomically records the next exact DIB
+            # after UpdateLayeredWindow succeeds, so the evidence cannot be an early stale frame.
+            if (Test-Path -LiteralPath $rendererPresentPath) {
+                Remove-Item -LiteralPath $rendererPresentPath -Force -ErrorAction Stop
+            }
+            if (Test-Path -LiteralPath $rendererPresentPath) {
+                throw 'could not clear the previous presenter record before requesting a fresh one'
+            }
+            for ($surfaceAttempt = 0; $surfaceAttempt -lt 40; $surfaceAttempt += 1) {
+                if (Test-Path -LiteralPath $rendererPresentPath -PathType Leaf) { break }
+                Start-Sleep -Milliseconds 50
+            }
+            if (-not (Test-Path -LiteralPath $rendererPresentPath -PathType Leaf)) {
+                continue
+            }
+            # Freeze immediately after the completed atomic record appears. Its embedded HWND and
+            # rectangle must still equal the frozen native window below or this attempt is stale.
+            [Honk300OverlaySmokeNative]::Suspend($runtime.Id)
+            $runtimeSuspended = $true
+        }
+
         $rect = [Honk300OverlaySmokeNative]::FindLargestVisibleOverlay($runtime.Id)
         if ($null -eq $rect) {
+            if ($runtimeSuspended) {
+                [Honk300OverlaySmokeNative]::Resume($runtime.Id)
+                $runtimeSuspended = $false
+            }
             Start-Sleep -Milliseconds 350
             continue
         }
 
-        [Honk300OverlaySmokeNative]::Suspend($runtime.Id)
-        $runtimeSuspended = $true
+        if (-not $runtimeSuspended) {
+            [Honk300OverlaySmokeNative]::Suspend($runtime.Id)
+            $runtimeSuspended = $true
+        }
         try {
             # Freeze first, then re-read the rect so a presentation between the
             # discovery probe and NtSuspendProcess cannot offset the capture crop.
@@ -741,29 +831,41 @@ light_sha256=$lightProofHash
             if ($rect.Dpi -eq 0) { throw 'GetDpiForWindow returned zero for the frozen overlay' }
             $overlayHandle = $rect.Hwnd.ToString('X')
             Add-Content -LiteralPath $captureDiagnosticsPath -Encoding utf8NoBOM -Value `
-                "attempt=$attempt overlay_hwnd=0x$overlayHandle overlay_rect=$($rect.X),$($rect.Y),$($rect.Width),$($rect.Height) overlay_dpi=$($rect.Dpi)"
+                "attempt=$attempt capture_mode=$captureMode overlay_hwnd=0x$overlayHandle overlay_rect=$($rect.X),$($rect.Y),$($rect.Width),$($rect.Height) overlay_dpi=$($rect.Dpi)"
             $darkCapture = Join-Path $evidence "overlay-attempt-$attempt-dark.png"
             $lightCapture = Join-Path $evidence "overlay-attempt-$attempt-light.png"
+            $surfaceCapture = Join-Path $evidence "overlay-attempt-$attempt-present.bgra"
             $analysis = Join-Path $evidence "overlay-attempt-$attempt-analysis.json"
-            Set-ControlledBackground -Hex $darkHex
-            Save-ScreenRect -Rect $rect -Path $darkCapture
-            Set-ControlledBackground -Hex $lightHex
-            Save-ScreenRect -Rect $rect -Path $lightCapture
+            if ($captureMode -eq 'paired-dwm') {
+                Set-ControlledBackground -Hex $darkHex
+                Save-ScreenRect -Rect $rect -Path $darkCapture
+                Set-ControlledBackground -Hex $lightHex
+                Save-ScreenRect -Rect $rect -Path $lightCapture
+                $analysisArguments = @(
+                    '--dark', $darkCapture,
+                    '--light', $lightCapture,
+                    '--dark-bg', $darkHex,
+                    '--light-bg', $lightHex,
+                    '--output', $analysis
+                )
+            }
+            elseif ($captureMode -eq 'hosted-arm64-presenter-surface') {
+                Copy-Item -LiteralPath $rendererPresentPath -Destination $surfaceCapture -Force
+                $analysisArguments = @('--surface', $surfaceCapture, '--output', $analysis)
+            }
+            else {
+                throw "unknown Windows overlay capture mode: $captureMode"
+            }
 
             # A failed semantic pose is a retry, not a skipped assertion. The final
-            # attempt still fails the job if no live side-view compositor proof exists.
+            # attempt still fails the job if no exact side-view surface proof exists.
             $oldNativePreference = $null
             if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
                 $oldNativePreference = $PSNativeCommandUseErrorActionPreference
                 $PSNativeCommandUseErrorActionPreference = $false
             }
             try {
-                & $python $analyzer `
-                    --dark $darkCapture `
-                    --light $lightCapture `
-                    --dark-bg $darkHex `
-                    --light-bg $lightHex `
-                    --output $analysis
+                & $python $analyzer @analysisArguments
                 $analysisExit = $LASTEXITCODE
             }
             finally {
@@ -771,9 +873,32 @@ light_sha256=$lightProofHash
                     $PSNativeCommandUseErrorActionPreference = $oldNativePreference
                 }
             }
+            if ($analysisExit -eq 0 -and $captureMode -eq 'hosted-arm64-presenter-surface') {
+                $analysisDocument = Get-Content -LiteralPath $analysis -Raw | ConvertFrom-Json
+                $expectedHwnd = "0x$overlayHandle"
+                $expectedRect = "$($rect.X),$($rect.Y),$($rect.Width),$($rect.Height)"
+                $actualHwnd = [string]$analysisDocument.present.hwnd
+                $actualRect = @($analysisDocument.present.rect) -join ','
+                if (
+                    $actualHwnd -cne $expectedHwnd -or
+                    $actualRect -cne $expectedRect
+                ) {
+                    Add-Content -LiteralPath $captureDiagnosticsPath -Encoding utf8NoBOM -Value `
+                        "attempt=$attempt stale_present_record expected_hwnd=$expectedHwnd actual_hwnd=$actualHwnd expected_rect=$expectedRect actual_rect=$actualRect"
+                    $analysisExit = 3
+                }
+            }
             if ($analysisExit -eq 0) {
-                Copy-Item -LiteralPath $darkCapture -Destination (Join-Path $evidence 'overlay-dark.png') -Force
-                Copy-Item -LiteralPath $lightCapture -Destination (Join-Path $evidence 'overlay-light.png') -Force
+                if ($captureMode -eq 'paired-dwm') {
+                    Copy-Item -LiteralPath $darkCapture -Destination (Join-Path $evidence 'overlay-dark.png') -Force
+                    Copy-Item -LiteralPath $lightCapture -Destination (Join-Path $evidence 'overlay-light.png') -Force
+                }
+                elseif ($captureMode -eq 'hosted-arm64-presenter-surface') {
+                    Copy-Item -LiteralPath $surfaceCapture -Destination (Join-Path $evidence 'overlay-present.bgra') -Force
+                }
+                else {
+                    throw "unknown Windows overlay evidence mode: $captureMode"
+                }
                 Copy-Item -LiteralPath $analysis -Destination (Join-Path $evidence 'overlay-analysis.json') -Force
                 $visualPassed = $true
             }
@@ -784,7 +909,7 @@ light_sha256=$lightProofHash
         }
     }
     if (-not $visualPassed) {
-        throw 'no live captured pose proved body, shade, outline, wing, asymmetric beak/legs, shadow, and per-pixel alpha'
+        throw "no exact $captureMode pose proved body, shade, outline, wing, asymmetric beak/legs, shadow, and per-pixel alpha"
     }
 
     $document = Get-Content -LiteralPath $config -Raw
@@ -823,10 +948,10 @@ light_sha256=$lightProofHash
 exact_binary=$resolvedBinary
 sha256=$initialHash
 first_pid=$firstPid
-visual_capture=passed
+visual_capture=$captureMode
 lifecycle=start,status,single-instance,reload,stop,immediate-restart,status,stop
 "@
-    Write-Output "Windows layered-overlay compositor and lifecycle smoke passed for $resolvedBinary ($initialHash)"
+    Write-Output "Windows layered-overlay $captureMode and lifecycle smoke passed for $resolvedBinary ($initialHash)"
 }
 finally {
     if ($runtimeSuspended -and $null -ne $runtime -and -not $runtime.HasExited) {

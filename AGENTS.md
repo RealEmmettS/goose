@@ -67,10 +67,21 @@ installer producer, and all four repaired X11 compositor halves. It failed close
 evidence-derived Wayland socket paths exceeded Linux's 108-byte AF_UNIX limit and the Windows x64
 controller treated matching native CRLF diagnostics as one line. Current source gives Wayland a
 short owner-only cleaned runtime directory and parses exact CRLF/LF diagnostic lines; neither fix
-weakens a product behavior or capture threshold. Exact signed-app collect proof remains a release
-blocker. A final exact-SHA candidate rerun and exact-candidate Mac evidence remain required. The current release
-gate is `docs/readiness/v1.0.0-readiness.md` and task `#m20q`. Stable/latest remains v0.3.2 until
-that checklist is complete and the immutable v1.0.0 release is independently verified.
+weakens product behavior. Candidate `29387569722` at `5d0237f` then passed the complete trusted
+Mac producer, all Apple/Windows portable jobs, Windows x64's full paired-DWM compositor/lifecycle
+gate, native ARM64 PE/MSI lifecycle, and X11 plus dual-output Wayland on three of four Linux
+variants. It failed only because one valid top-down x64 GNU X11 pose had 13 warm pixels against a
+side-view-derived floor of 20, and GitHub's hosted ARM64 screen API returned the same static
+wallpaper for two acknowledged visible-window colors. Current source calibrates the Linux warm
+floor to 10 while retaining body/wing/transparency checks. ADR 0026 permits an ARM64 fallback only
+for the exact GitHub-hosted wallpaper signature: the native process must expose a visible HWND and
+atomically record the cropped premultiplied-BGRA DIB only after `UpdateLayeredWindow` succeeds;
+raw alpha/channel, opaque-surface, articulation, shadow, and frozen HWND/rectangle checks remain
+fail closed. Local/self-hosted ARM64 and all ordinary x64 runs still require paired DWM capture.
+Exact signed-app collect proof, one fresh exact-SHA candidate, and exact-candidate Mac evidence
+remain release blockers. The current release gate is `docs/readiness/v1.0.0-readiness.md` and task
+`#m20q`. Stable/latest remains v0.3.2 until that checklist is complete and the immutable v1.0.0
+release is independently verified.
 
 ## Read these first (source-of-truth pointers)
 
@@ -113,7 +124,8 @@ that checklist is complete and the immutable v1.0.0 release is independently ver
   0023 defines every-release cross-platform production, stable latest names, exact update
   identity, and Debian package lifecycle ownership; ADR 0024 defines the macOS-only menu-bar
   bridge to the existing configuration TUI and graceful shutdown; ADR 0025 records the first
-  stable v1.0.0 identity and post-release hardware-verification boundary.
+  stable v1.0.0 identity and post-release hardware-verification boundary; ADR 0026 records the
+  strict hosted Windows ARM64 compositor-evidence boundary without claiming a DWM screenshot.
 
 ## Big-picture architecture (original → planned port)
 
@@ -227,6 +239,8 @@ that checklist is complete and the immutable v1.0.0 release is independently ver
   `docs/adr/0024-macos-menu-bar-control.md`.
 - The first stable v1.0.0 identity and post-release Alienware verification boundary live in
   `docs/adr/0025-first-stable-v1-release.md`.
+- The GitHub-hosted Windows ARM64 wallpaper-capture exception and exact post-success presenter-DIB
+  evidence boundary live in `docs/adr/0026-hosted-windows-arm64-compositor-evidence.md`.
 
 ## Task management system
 

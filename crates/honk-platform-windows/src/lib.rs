@@ -25,8 +25,9 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::ffi::{c_void, OsString};
 use std::fs;
+use std::io::Write;
 use std::os::windows::ffi::OsStringExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -1291,6 +1292,14 @@ impl OverlayWindow {
             intersection.min.x as i32,
             intersection.min.y as i32,
         )?;
+        if let Some(dib) = self.dib.as_ref() {
+            maybe_write_presented_smoke_frame(
+                self.hwnd,
+                dib,
+                intersection.min.x as i32,
+                intersection.min.y as i32,
+            );
+        }
         if !self.visible {
             unsafe {
                 let _ = ShowWindow(self.hwnd, SW_SHOWNOACTIVATE);
@@ -1493,6 +1502,62 @@ impl Overlay {
         }
         Ok(())
     }
+}
+
+/// Preserve the exact premultiplied-BGRA DIB accepted by `UpdateLayeredWindow` when a native
+/// smoke requests it.
+///
+/// This is called only after the real per-monitor crop, RGBA-to-BGRA bridge, and successful native
+/// present. The path is intentionally write-once: the harness removes the completed record only
+/// after its pose delay, and the next successful present writes through a sibling temporary before
+/// renaming. The custom record retains the raw DIB bytes plus the exact HWND/rectangle instead of
+/// passing through PNG's straight-alpha conversion.
+fn maybe_write_presented_smoke_frame(hwnd: HWND, dib: &Dib, dest_x: i32, dest_y: i32) {
+    let Ok(path) = std::env::var("HONK300_WINDOWS_SMOKE_PRESENT") else {
+        return;
+    };
+    let path = Path::new(path.trim());
+    if path.as_os_str().is_empty() || path.exists() {
+        return;
+    }
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    let _ = fs::remove_file(&temporary);
+    if write_presented_smoke_frame(&temporary, hwnd, dib, dest_x, dest_y)
+        .and_then(|()| fs::rename(&temporary, path))
+        .is_err()
+    {
+        let _ = fs::remove_file(&temporary);
+    }
+}
+
+fn write_presented_smoke_frame(
+    path: &Path,
+    hwnd: HWND,
+    dib: &Dib,
+    dest_x: i32,
+    dest_y: i32,
+) -> std::io::Result<()> {
+    let width = usize::try_from(dib.width).map_err(std::io::Error::other)?;
+    let height = usize::try_from(dib.height).map_err(std::io::Error::other)?;
+    let byte_count = width
+        .checked_mul(height)
+        .and_then(|pixels| pixels.checked_mul(4))
+        .ok_or_else(|| std::io::Error::other("presented surface is too large"))?;
+    // SAFETY: `Dib::new` allocates exactly width * height * four bytes and keeps that allocation
+    // alive until `dib` is dropped. This read occurs synchronously while the immutable borrow is
+    // live, after UpdateLayeredWindow has accepted the same selected DIB.
+    let bytes = unsafe { std::slice::from_raw_parts(dib.bits, byte_count) };
+    let header = format!(
+        "HONK300_LAYERED_BGRA_V1\nhwnd=0x{:X}\nx={dest_x}\ny={dest_y}\nwidth={}\nheight={}\nstride={}\nbytes={byte_count}\n\n",
+        hwnd_key(hwnd),
+        dib.width,
+        dib.height,
+        width * 4,
+    );
+    let mut file = fs::File::create(path)?;
+    file.write_all(header.as_bytes())?;
+    file.write_all(bytes)?;
+    file.sync_all()
 }
 
 fn crop_pixmap(pixmap: &Pixmap, src_x: u32, src_y: u32, width: u32, height: u32) -> Option<Pixmap> {

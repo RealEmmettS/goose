@@ -22,7 +22,7 @@
   - [x] Pin an exact Linux binary and add compositor-visible X11/Wayland color evidence.
   - [x] Add exact-binary Windows layered-compositor and lifecycle evidence to CI, candidate, and published-MSI gates.
   - [ ] Run the new exact-candidate compositor gates natively on Windows x64/ARM64 and Linux x64/ARM64.
-    > Candidate 29386819926 passed all four repaired X11 halves and proved matching Windows x64 geometry, then failed closed on overlong Wayland AF_UNIX paths and CRLF-only parsing. Short private Wayland runtime paths and exact CRLF/LF lines now pass focused contracts; the changed SHA must rerun unchanged.
+    > Candidate 29387569722 passed Windows x64 paired-DWM composition/lifecycle, native ARM64 PE/MSI lifecycle, and X11 plus dual-output Wayland on three of four Linux variants. One valid top-down x64 GNU X11 pose missed a side-view warm-pixel floor; GitHub-hosted ARM64 returned one static wallpaper for two acknowledged colors. The calibrated Linux oracle and ADR 0026's post-success presenter-DIB path pass focused/adversarial contracts; the changed SHA must rerun unchanged and no ARM64 DWM claim is made.
   - [ ] Optimize and profile the macOS runtime; repeat active-motion capture and the 10+60 second profile on the fixed exact candidate.
   - [x] Implement the approved first-run Accessibility prompt and calm permission-wait behavior.
   - [x] Add a macOS-only menu-bar control with accessible Configure and graceful Quit actions.
@@ -42,7 +42,7 @@
   - [x] Add deterministic native amd64/arm64 Debian packages with real package-manager-owned aliases, platform-isolated CLI updates, preserve-on-uninstall, and backup-on-purge.
   - [ ] Prove both Debian packages on native amd64/arm64 candidate and published-release hosts, including exact-vs-latest bytes, compositor output, all three update aliases, uninstall, and purge.
   - [x] Run the complete integrated local Rust, universal-Apple, packaging, workflow, audit, shell, cross-target, and diff gate on the Mac stopping commit.
-    > Repeated after the menu, X11/Windows capture, status-pipe, and collect fixes: 432 Rust tests, 88 Python contracts, all seven goldens, strict native/cross clippy, release/Apple builds, dist plan, audit, actionlint, syntax, and diff checks pass.
+    > Repeated after the menu, X11/Windows capture, status-pipe, and collect fixes: 432 Rust tests, 95 Python contracts, all seven goldens, strict native/cross clippy, release/Apple builds, dist plan, audit, actionlint, syntax, and diff checks pass.
   - [ ] Capture and inspect the exact Mac candidate across light/dark output, eight headings, animation/secondary motion, mud/prank states, entry/wrap/exit, and a real user-close reaction.
   - [ ] Repeat exact-candidate CLI/TUI/IPC/audio/terminal behavior, including ordinary-window positives and protected-terminal negatives.
   - [ ] Prove helper install, autostart, stop/start, v0.3.2→v1.0.0 update, rollback injection, foreign-file preservation, uninstall/purge, and final host cleanup.

@@ -43,6 +43,8 @@ PALETTE_MINIMUMS = {
     "outline": 10,
 }
 
+PRESENTER_MAGIC = b"HONK300_LAYERED_BGRA_V1"
+
 
 def _paeth(a: int, b: int, c: int) -> int:
     p = a + b - c
@@ -362,10 +364,208 @@ def analyze_files(
     )
 
 
+def analyze_surface(
+    width: int,
+    height: int,
+    pixels: Sequence[tuple[int, int, int, int]],
+    present: dict | None = None,
+) -> dict:
+    """Validate exact premultiplied RGBA values recovered from a presented BGRA DIB.
+
+    This is not a replacement for paired DWM capture. It is the strict fallback for GitHub's
+    hosted ARM64 runner when that runner demonstrably returns the same static wallpaper for two
+    acknowledged ordinary-window colors. The real ARM64 process must still expose its visible
+    layered HWND. The record is emitted only after a successful `UpdateLayeredWindow`, retains
+    that HWND and rectangle, and bypasses PNG so alpha is never silently demultiplied.
+    """
+
+    if len(pixels) != width * height:
+        raise ValueError("surface dimensions and pixel count disagree")
+
+    tolerance = 8
+    palette_counts = dict.fromkeys(PALETTE, 0)
+    transparent_pixels = 0
+    semi_transparent_pixels = 0
+    invalid_premultiplied_pixels = 0
+    opaque_goose_pixels: list[int] = []
+    shadow_candidates: list[int] = []
+    orange_mask = [False] * (width * height)
+    opaque_near_black_mask = [False] * (width * height)
+
+    for index, (red, green, blue, alpha) in enumerate(pixels):
+        if any(channel > alpha for channel in (red, green, blue)):
+            invalid_premultiplied_pixels += 1
+        if alpha <= 3:
+            transparent_pixels += 1
+        if 4 <= alpha <= 244:
+            semi_transparent_pixels += 1
+        if alpha >= 245 and max(red, green, blue) <= 12:
+            opaque_near_black_mask[index] = True
+
+        straight = (
+            tuple(min(255, round(channel * 255 / alpha)) for channel in (red, green, blue))
+            if alpha
+            else (0, 0, 0)
+        )
+
+        matches: list[tuple[float, str]] = []
+        if alpha >= 245:
+            for name, expected in PALETTE.items():
+                if _close(straight, expected, tolerance):
+                    distance = sum(
+                        (actual - target) ** 2
+                        for actual, target in zip(straight, expected)
+                    )
+                    matches.append((distance, name))
+        if matches:
+            _distance, owner = min(matches)
+            palette_counts[owner] += 1
+            if owner in {"body", "shade", "wing", "outline"}:
+                opaque_goose_pixels.append(index)
+            if owner in {"orange", "orange_dark"}:
+                orange_mask[index] = True
+
+        if (
+            8 <= alpha <= 100
+            and all(12 <= channel <= 55 for channel in straight)
+            and max(straight) - min(straight) <= 20
+        ):
+            shadow_candidates.append(index)
+
+    orange_components = _components(orange_mask, width, height, minimum_size=3)
+    opaque_near_black_components = _components(
+        opaque_near_black_mask,
+        width,
+        height,
+        minimum_size=4,
+    )
+    opaque_goose_bottom = max(
+        (index // width for index in opaque_goose_pixels),
+        default=height,
+    )
+    shadow_pixels = sum(
+        1 for index in shadow_candidates if index // width > opaque_goose_bottom
+    )
+    total = width * height
+    largest_opaque_near_black_component = max(
+        (component["pixels"] for component in opaque_near_black_components),
+        default=0,
+    )
+    checks = {
+        "premultiplied_channel_bounds": invalid_premultiplied_pixels == 0,
+        "transparent_surface_margin": transparent_pixels >= max(25, total * 4 // 5),
+        "no_opaque_black_surface": (
+            largest_opaque_near_black_component <= max(25, total // 100)
+        ),
+        "visible_body": palette_counts["body"] >= PALETTE_MINIMUMS["body"],
+        "visible_shade": palette_counts["shade"] >= PALETTE_MINIMUMS["shade"],
+        "visible_wing": palette_counts["wing"] >= PALETTE_MINIMUMS["wing"],
+        "visible_outline": palette_counts["outline"] >= PALETTE_MINIMUMS["outline"],
+        "asymmetric_orange_channels": (
+            palette_counts["orange"] >= PALETTE_MINIMUMS["orange"]
+            and palette_counts["orange_dark"] >= PALETTE_MINIMUMS["orange_dark"]
+        ),
+        "visible_beak_and_two_legs": (
+            len(orange_components) >= 2
+            and max(component["centroid"][1] for component in orange_components)
+            - min(component["centroid"][1] for component in orange_components)
+            >= 15.0
+        ),
+        "semi_transparent_edges": semi_transparent_pixels >= 20,
+        "semi_transparent_shadow": shadow_pixels >= 5,
+    }
+    return {
+        "passed": all(checks.values()),
+        "mode": "exact-layered-presenter-surface",
+        "dimensions": [width, height],
+        "present": present,
+        "checks": checks,
+        "counts": {
+            "transparent": transparent_pixels,
+            "semi_transparent": semi_transparent_pixels,
+            "invalid_premultiplied": invalid_premultiplied_pixels,
+            "shadow": shadow_pixels,
+            "largest_opaque_near_black_component": largest_opaque_near_black_component,
+            "palette": palette_counts,
+        },
+        "orange_components": orange_components,
+        "opaque_near_black_components": opaque_near_black_components,
+    }
+
+
+def read_presented_surface(
+    path: Path,
+) -> tuple[int, int, list[tuple[int, int, int, int]], dict]:
+    data = path.read_bytes()
+    try:
+        header, payload = data.split(b"\n\n", 1)
+    except ValueError as error:
+        raise ValueError(f"{path} has no presenter-record header boundary") from error
+    lines = header.splitlines()
+    if not lines or lines[0] != PRESENTER_MAGIC:
+        raise ValueError(f"{path} has an unknown presenter-record magic")
+
+    fields: dict[str, str] = {}
+    for raw_line in lines[1:]:
+        try:
+            raw_key, raw_value = raw_line.split(b"=", 1)
+            key = raw_key.decode("ascii")
+            value = raw_value.decode("ascii")
+        except (ValueError, UnicodeDecodeError) as error:
+            raise ValueError(f"{path} has an invalid presenter-record field") from error
+        if key in fields:
+            raise ValueError(f"{path} repeats presenter-record field {key}")
+        fields[key] = value
+
+    required = {"hwnd", "x", "y", "width", "height", "stride", "bytes"}
+    if set(fields) != required:
+        raise ValueError(
+            f"{path} presenter fields differ: missing={sorted(required - set(fields))}, "
+            f"unexpected={sorted(set(fields) - required)}"
+        )
+    try:
+        hwnd = int(fields["hwnd"], 16)
+        x = int(fields["x"])
+        y = int(fields["y"])
+        width = int(fields["width"])
+        height = int(fields["height"])
+        stride = int(fields["stride"])
+        declared_bytes = int(fields["bytes"])
+    except ValueError as error:
+        raise ValueError(f"{path} has a non-numeric presenter-record field") from error
+    if hwnd <= 0 or width <= 0 or height <= 0:
+        raise ValueError(f"{path} has an invalid HWND or dimensions")
+    expected_bytes = width * height * 4
+    if stride != width * 4 or declared_bytes != expected_bytes or len(payload) != expected_bytes:
+        raise ValueError(
+            f"{path} presenter byte layout differs: stride={stride}, "
+            f"declared={declared_bytes}, actual={len(payload)}, expected={expected_bytes}"
+        )
+
+    # The selected top-down DIB is premultiplied BGRA. Reorder only; do not demultiply.
+    pixels = [
+        (red, green, blue, alpha)
+        for blue, green, red, alpha in struct.iter_unpack("<BBBB", payload)
+    ]
+    present = {
+        "hwnd": f"0x{hwnd:X}",
+        "rect": [x, y, width, height],
+        "stride": stride,
+        "bytes": declared_bytes,
+    }
+    return width, height, pixels, present
+
+
+def analyze_surface_file(path: Path) -> dict:
+    width, height, pixels, present = read_presented_surface(path)
+    return analyze_surface(width, height, pixels, present)
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dark", type=Path, required=True)
-    parser.add_argument("--light", type=Path, required=True)
+    parser.add_argument("--dark", type=Path)
+    parser.add_argument("--light", type=Path)
+    parser.add_argument("--surface", type=Path)
     parser.add_argument("--dark-bg", default="203040")
     parser.add_argument("--light-bg", default="f4ede4")
     parser.add_argument("--output", type=Path)
@@ -373,14 +573,22 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Iterable[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    parser = _parser()
+    args = parser.parse_args(argv)
     try:
-        result = analyze_files(
-            args.dark,
-            args.light,
-            parse_rgb(args.dark_bg),
-            parse_rgb(args.light_bg),
-        )
+        if args.surface is not None:
+            if args.dark is not None or args.light is not None:
+                parser.error("--surface cannot be combined with --dark/--light")
+            result = analyze_surface_file(args.surface)
+        else:
+            if args.dark is None or args.light is None:
+                parser.error("paired capture analysis requires --dark and --light")
+            result = analyze_files(
+                args.dark,
+                args.light,
+                parse_rgb(args.dark_bg),
+                parse_rgb(args.light_bg),
+            )
     except (OSError, ValueError, zlib.error) as error:
         print(f"Windows overlay capture analysis failed: {error}", file=sys.stderr)
         return 2

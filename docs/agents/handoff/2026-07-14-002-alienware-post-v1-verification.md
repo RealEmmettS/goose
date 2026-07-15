@@ -58,6 +58,10 @@ installers, both Debian packages, the universal app ZIP, and `honk300-universal2
 
 ### 3. Real compositor and DPI behavior
 
+- The Alienware is a real x64 host and must pass the full paired dark/light DWM capture. ADR 0026's
+  presenter-DIB path is only for GitHub's exact `github-hosted` native ARM64 static-wallpaper
+  signature; do not set its diagnostic environment variable, imitate runner variables, or treat
+  raw presenter bytes as a substitute on this machine.
 - Run at 100%, 125%, 150%, and one mixed-DPI multi-monitor layout if available.
 - Capture light and dark desktops while the goose is moving. Require transparent margins,
   articulated opaque body, outline, wing, orange beak, two-tone legs, and soft shadow with no
@@ -99,6 +103,24 @@ installers, both Debian packages, the universal app ZIP, and `honk300-universal2
   DMG is a fresh graphical installer, not the in-place update transport.
 - Confirm both Debian packages own the expected architecture-specific executable and stable
   aliases, while user media is outside package ownership.
+
+### 7. Hosted Windows ARM64 evidence boundary
+
+- Candidate rehearsal showed GitHub's public ARM64 runner acknowledge two visible ordinary-window
+  colors while its screen-capture API returned the same static wallpaper for both. ADR 0026 does
+  not call that a DWM screenshot.
+- Only the conjunction of GitHub Actions, `RUNNER_ENVIRONMENT=github-hosted`, Windows ARM64 runner
+  identity, native ARM64 process identity, at-most-one-percent controlled-color coverage for both
+  captures, and byte-identical hashes enables the fallback. Local/self-hosted ARM64 failures stay
+  fatal and any hosted runner that exposes the colors automatically returns to paired DWM.
+- The fallback still requires the real process's visible layered HWND and exact PE/MSI/lifecycle
+  identity. After a successful native present, it atomically records the cropped premultiplied-
+  BGRA DIB with the HWND and physical rectangle; the frozen native window must match that record.
+  PNG, renderer goldens, stale records, straight alpha, double premultiplication, swapped channels,
+  mostly opaque-black surfaces, missing articulation, or unknown capture modes all fail.
+- Preserve this narrow boundary in patches. The Alienware's full paired-DWM results are additional
+  physical evidence; they do not justify deleting ARM64 lifecycle/architecture checks or claiming
+  ARM64 desktop composition that was not observed.
 
 ## Mac-specific guardrails for any patch
 

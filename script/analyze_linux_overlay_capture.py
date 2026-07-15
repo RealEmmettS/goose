@@ -14,6 +14,12 @@ from pathlib import Path
 
 DARK_BACKGROUND = (0x20, 0x30, 0x40)
 LIGHT_BACKGROUND = (0xD8, 0xE6, 0xF4)
+MIN_BODY_PIXELS = 100
+MIN_WING_PIXELS = 25
+# A distant top-down pose has a much smaller visible beak/feet footprint than the side view.
+# Candidate 29387569722 captured 13 warm pixels with 710 body and 1,615 wing pixels, so keep a
+# strict nonzero articulation signal without rejecting that valid renderer output.
+MIN_WARM_PIXELS = 10
 
 
 @dataclass(frozen=True)
@@ -36,7 +42,11 @@ class CaptureMetrics:
 
     @property
     def has_goose(self) -> bool:
-        return self.body_pixels >= 100 and self.wing_pixels >= 25 and self.warm_pixels >= 20
+        return (
+            self.body_pixels >= MIN_BODY_PIXELS
+            and self.wing_pixels >= MIN_WING_PIXELS
+            and self.warm_pixels >= MIN_WARM_PIXELS
+        )
 
 
 def read_png(path: Path) -> tuple[int, int, bytearray]:

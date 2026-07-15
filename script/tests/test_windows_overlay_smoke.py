@@ -52,11 +52,34 @@ def write_rgba_png(path, width, height, pixels):
     )
 
 
+def premultiply_rgba(pixels):
+    return [
+        tuple((channel * alpha + 127) // 255 for channel in (red, green, blue)) + (alpha,)
+        for red, green, blue, alpha in pixels
+    ]
+
+
+def write_presented_bgra(path, width, height, pixels, hwnd=0x1234, x=-17, y=29):
+    payload = b"".join(bytes((blue, green, red, alpha)) for red, green, blue, alpha in pixels)
+    header = (
+        "HONK300_LAYERED_BGRA_V1\n"
+        f"hwnd=0x{hwnd:X}\n"
+        f"x={x}\n"
+        f"y={y}\n"
+        f"width={width}\n"
+        f"height={height}\n"
+        f"stride={width * 4}\n"
+        f"bytes={len(payload)}\n\n"
+    ).encode("ascii")
+    path.write_bytes(header + payload)
+
+
 class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         golden = ROOT / "crates" / "honk-engine" / "tests" / "golden" / "side_mid_stride.png"
         cls.width, cls.height, cls.source = ANALYZER.read_png_rgba(golden)
+        cls.presented = premultiply_rgba(cls.source)
         cls.dark_background = (0x20, 0x30, 0x40)
         cls.light_background = (0xF4, 0xED, 0xE4)
 
@@ -78,6 +101,50 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
         self.assertTrue(result["passed"], result)
         self.assertGreaterEqual(len(result["orange_components"]), 2)
         self.assertTrue(result["checks"]["semi_transparent_shadow"])
+
+    def test_committed_side_golden_proves_exact_layered_presenter_surface(self):
+        result = ANALYZER.analyze_surface(self.width, self.height, self.presented)
+        self.assertTrue(result["passed"], result)
+        self.assertEqual(result["mode"], "exact-layered-presenter-surface")
+        self.assertTrue(result["checks"]["premultiplied_channel_bounds"])
+        self.assertTrue(result["checks"]["transparent_surface_margin"])
+        self.assertTrue(result["checks"]["no_opaque_black_surface"])
+        self.assertTrue(result["checks"]["visible_beak_and_two_legs"])
+        self.assertTrue(result["checks"]["semi_transparent_shadow"])
+
+    def test_layered_presenter_surface_rejects_straight_opaque_or_channel_swapped_output(self):
+        straight_result = ANALYZER.analyze_surface(self.width, self.height, self.source)
+        self.assertFalse(straight_result["passed"], straight_result)
+        self.assertFalse(straight_result["checks"]["premultiplied_channel_bounds"])
+
+        opaque = [(red, green, blue, 255) for red, green, blue, _alpha in self.source]
+        opaque_result = ANALYZER.analyze_surface(self.width, self.height, opaque)
+        self.assertFalse(opaque_result["passed"], opaque_result)
+        self.assertFalse(opaque_result["checks"]["transparent_surface_margin"])
+
+        swapped = [(blue, green, red, alpha) for red, green, blue, alpha in self.presented]
+        swapped_result = ANALYZER.analyze_surface(self.width, self.height, swapped)
+        self.assertFalse(swapped_result["passed"], swapped_result)
+        self.assertFalse(swapped_result["checks"]["asymmetric_orange_channels"])
+
+    def test_layered_presenter_surface_rejects_double_premultiplication(self):
+        doubled = premultiply_rgba(self.presented)
+        result = ANALYZER.analyze_surface(self.width, self.height, doubled)
+        self.assertFalse(result["passed"], result)
+        self.assertFalse(result["checks"]["semi_transparent_shadow"])
+
+    def test_layered_presenter_surface_rejects_mostly_opaque_black_margin(self):
+        damaged = list(self.presented)
+        transparent = [
+            index for index, (_red, _green, _blue, alpha) in enumerate(damaged) if alpha == 0
+        ]
+        keep = self.width * self.height * 5 // 100
+        for index in transparent[keep:]:
+            damaged[index] = (0, 0, 0, 255)
+        result = ANALYZER.analyze_surface(self.width, self.height, damaged)
+        self.assertFalse(result["passed"], result)
+        self.assertFalse(result["checks"]["transparent_surface_margin"])
+        self.assertFalse(result["checks"]["no_opaque_black_surface"])
 
     def test_red_blue_swap_fails_asymmetric_palette_check(self):
         swapped = [(blue, green, red, alpha) for red, green, blue, alpha in self.source]
@@ -175,6 +242,16 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
             )
         self.assertTrue(result["passed"], result)
 
+    def test_raw_presenter_record_round_trip_preserves_bgra_alpha_and_window_binding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "present.bgra"
+            write_presented_bgra(path, self.width, self.height, self.presented)
+            result = ANALYZER.analyze_surface_file(path)
+        self.assertTrue(result["passed"], result)
+        self.assertEqual(result["present"]["hwnd"], "0x1234")
+        self.assertEqual(result["present"]["rect"], [-17, 29, self.width, self.height])
+        self.assertEqual(result["counts"]["invalid_premultiplied"], 0)
+
 
 class WindowsOverlaySmokeContractTests(unittest.TestCase):
     def test_controller_and_background_enter_pmv2_before_winforms(self):
@@ -219,7 +296,7 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
             "background-proof-dark.png",
             "background-proof-light.png",
             "background-proof.txt",
-            "Assert-ControlledBackgroundCapture",
+            "Measure-ControlledBackgroundCapture",
             "overlay_hwnd=0x",
             "overlay_dpi=",
             "virtual_screen=",
@@ -228,6 +305,58 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
         self.assertLess(
             smoke.index("$darkProofCapture ="),
             smoke.index("$runtime = Start-ExactRuntime -Label 'first'"),
+        )
+
+    def test_hosted_arm64_wallpaper_capture_uses_a_strict_presenter_surface_fallback(self):
+        smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
+        windows_backend = (
+            ROOT / "crates" / "honk-platform-windows" / "src" / "lib.rs"
+        ).read_text(encoding="utf-8")
+        for required in (
+            "$env:GITHUB_ACTIONS -eq 'true'",
+            "$env:RUNNER_ENVIRONMENT -eq 'github-hosted'",
+            "$env:RUNNER_OS -eq 'Windows'",
+            "$env:RUNNER_ARCH -eq 'ARM64'",
+            "$env:PROCESSOR_ARCHITECTURE -eq 'ARM64'",
+            "$darkProof.Coverage -le 0.01",
+            "$lightProof.Coverage -le 0.01",
+            "$darkProofHash -eq $lightProofHash",
+            "hosted-arm64-presenter-surface",
+            "HONK300_WINDOWS_SMOKE_PRESENT",
+            "--surface",
+            "overlay-present.bgra",
+            "window_visible=true",
+            "$analysisDocument.present.hwnd",
+            "$analysisDocument.present.rect",
+            "Remove-Item -LiteralPath $rendererPresentPath -Force -ErrorAction Stop",
+            "could not clear the previous presenter record",
+            "unknown Windows overlay capture mode",
+            "unknown Windows overlay evidence mode",
+        ):
+            self.assertIn(required, smoke)
+        self.assertNotIn("$env:RUNNER_ENVIRONMENT -ne 'self-hosted'", smoke)
+        self.assertIn('std::env::var("HONK300_WINDOWS_SMOKE_PRESENT")', windows_backend)
+        self.assertIn("HONK300_LAYERED_BGRA_V1", windows_backend)
+        self.assertIn("file.write_all(bytes)", windows_backend)
+        self.assertIn("fs::rename(&temporary, path)", windows_backend)
+        self.assertNotIn("pixmap.save_png", windows_backend)
+        self.assertIn("$captureMode = 'paired-dwm'", smoke)
+        self.assertIn(
+            "'HONK300_WINDOWS_SMOKE_PRESENT',\n                $null,",
+            smoke,
+        )
+
+        overlay_window = windows_backend[windows_backend.index("impl OverlayWindow") :]
+        overlay_present = overlay_window[: overlay_window.index("fn hide(&mut self)")]
+        self.assertLess(
+            overlay_present.index("present_layered("),
+            overlay_present.index("maybe_write_presented_smoke_frame("),
+        )
+
+        visual_loop = smoke[smoke.index("for ($attempt = 1;") : smoke.index("if (-not $visualPassed)")]
+        self.assertLess(
+            visual_loop.index("Start-Sleep -Milliseconds 900"),
+            visual_loop.index("Remove-Item -LiteralPath $rendererPresentPath"),
         )
 
     def test_background_geometry_parser_accepts_windows_crlf_diagnostics(self):

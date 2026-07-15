@@ -59,6 +59,22 @@ def valid_pair(width: int = 200, height: int = 160) -> tuple[list[tuple[int, int
 
 
 class LinuxOverlayAnalyzerTests(unittest.TestCase):
+    def test_accepts_proven_small_top_down_pose_but_still_requires_warm_articulation(self) -> None:
+        common = {
+            "label": "candidate-top-down",
+            "width": 1280,
+            "height": 720,
+            "dark_background_pixels": 918_768,
+            "light_background_pixels": 918_704,
+            "background_transition_pixels": 918_689,
+            "body_pixels": 710,
+            "wing_pixels": 1_615,
+            "largest_near_black_component": 0,
+            "largest_unchanged_component": 991,
+        }
+        self.assertTrue(ANALYZER.CaptureMetrics(warm_pixels=13, **common).has_goose)
+        self.assertFalse(ANALYZER.CaptureMetrics(warm_pixels=9, **common).has_goose)
+
     def test_committed_goose_golden_passes_paired_compositor_analysis(self) -> None:
         golden = ROOT / "crates" / "honk-engine" / "tests" / "golden" / "side_mid_stride.png"
         width, height, source = ANALYZER.read_png(golden)

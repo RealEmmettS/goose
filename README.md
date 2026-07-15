@@ -169,9 +169,13 @@ approval; per-user macOS/Linux installs do not use `sudo`. Autostart is opt-in a
 Linux collect-window behavior is unsupported and reported honestly. Exact signed-app macOS
 Accessibility evidence for first denial, non-nagging relaunch, live grant, and live revocation
 remains tracked in the readiness docs; hosted bundle and permission-adapter tests are release
-gates. Native release gates also hold exact Windows/Linux binaries unchanged while capturing the
-composed desktop, so body/wing/beak/legs, asymmetric color channels, and transparency are checked
-after each platform's real presentation bridge rather than only in renderer goldens.
+gates. Native release gates hold exact Windows/Linux binaries unchanged while checking
+body/wing/beak/legs, asymmetric color channels, and transparency after each platform's real
+presentation bridge rather than only in renderer goldens. Windows x64 and any host whose capture
+API exposes ordinary windows must pass paired composed-desktop captures. GitHub's hosted ARM64
+runner may use the narrowly identified ADR 0026 path: a real visible layered HWND plus the exact
+cropped premultiplied-BGRA DIB recorded only after a successful native present. That runner-limited
+evidence is not described as an ARM64 DWM screenshot; local and self-hosted ARM64 remain strict.
 
 On macOS, tiny-skia's premultiplied RGBA bytes are copied into an alpha-last Device-RGB bitmap;
 the transparent overlay window uses a stable standard-sRGB destination, and WindowServer performs
@@ -199,7 +203,8 @@ macOS Accessibility first-run, non-nagging wait, and live grant/revocation bound
 defines stable latest links, exact-tag platform-isolated updates, every-release Mac packaging,
 and native Debian lifecycle ownership; ADR 0024 defines the macOS-only menu-bar bridge to the
 existing terminal TUI and graceful shutdown; ADR 0025 records the first stable v1.0.0 identity
-and the post-release Alienware verification boundary.
+and the post-release Alienware verification boundary; ADR 0026 defines the narrow GitHub-hosted
+Windows ARM64 compositor-evidence exception without weakening normal paired-DWM proof.
 [`docs/readiness/v1.0.0-readiness.md`](docs/readiness/v1.0.0-readiness.md) is the release checklist.
 
 ## License and assets

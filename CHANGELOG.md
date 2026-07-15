@@ -157,6 +157,19 @@ All notable changes to this project are documented here. Format based on
   allowing denied and granted Accessibility evidence on one unchanged signed identity.
 
 ### Fixed
+- **Candidate-native evidence calibration (2026-07-14, ADR 0026)** - candidate `29387569722`
+  passed the trusted Mac producer, Windows x64 paired-DWM compositor/lifecycle proof, native
+  Windows ARM64 PE/MSI lifecycle, and X11 plus dual-output Wayland on three of four Linux
+  variants. Its remaining Linux x64 GNU capture was a valid top-down goose with 710 body, 1,615
+  wing, and 13 warm articulation pixels, so the Linux warm floor is now 10 while all body, wing,
+  background-transition, transparency, and opaque-surface checks remain unchanged. GitHub's
+  hosted ARM64 runner separately returned one byte-identical wallpaper for two visible ordinary-
+  window colors. Only that exact GitHub-hosted signature may now use the real process's cropped
+  premultiplied-BGRA DIB, atomically recorded after successful `UpdateLayeredWindow` and bound to
+  the frozen visible HWND/rectangle. Raw checks reject straight alpha, double premultiplication,
+  swapped channels, mostly opaque-black surfaces, missing articulation, and stale metadata.
+  Windows x64 plus local/self-hosted ARM64 still require paired live DWM captures; the hosted ARM64
+  result is never described as desktop-composition proof.
 - **Portable native-smoke runtime paths and Windows diagnostics (2026-07-14)** - the first
   v1.0.0 candidate proved all four repaired X11 compositor paths and matching Windows controller/
   background geometry, then failed closed before product capture. Sway's AF_UNIX sockets now use
