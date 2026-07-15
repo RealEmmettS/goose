@@ -162,10 +162,13 @@ All notable changes to this project are documented here. Format based on
   Ordinary main CI then exposed a non-hermetic difference: installing Ubuntu's recommended Sway
   packages loaded `/etc/sway/config`, its wallpaper, and its bar on `HEADLESS-1`; Honk300's
   transparent layer correctly revealed that distro background while `HEADLESS-2` showed the
-  requested solid. The smoke now starts Sway with an owner-written minimal config, addresses both
-  outputs explicitly, requires `swaybg`, and proves paired goose-free solid baselines on both
-  fractional-scale outputs before launching Honk300. No product background, renderer behavior,
-  or semantic threshold changed.
+  requested solid. A first private config still contained its own wildcard background, and the
+  exact setters still used `solid_color`. Ubuntu 24.04's `swaybg` represents that color as a
+  one-pixel protocol buffer; linear filtering on the 1.5-scale pixman output sampled its outside
+  edge and produced a deterministic gradient before Honk300 even launched. The smoke now starts
+  with no background rule, creates constant opaque PNG tiles, addresses both discovered outputs
+  only by exact name, and proves paired goose-free baselines before launching Honk300. Fractional
+  filtering stays enabled. No product background, renderer behavior, or semantic threshold changed.
 - **Candidate-native evidence calibration (2026-07-14, ADR 0026)** - candidate `29387569722`
   passed the trusted Mac producer, Windows x64 paired-DWM compositor/lifecycle proof, native
   Windows ARM64 PE/MSI lifecycle, and X11 plus dual-output Wayland on three of four Linux

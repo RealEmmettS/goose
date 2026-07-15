@@ -38,6 +38,8 @@ WAYLAND_RUNTIME_DIR=""
 RUNTIME_PAUSED=0
 WAYLAND_FIRST_OUTPUT=""
 WAYLAND_SECOND_OUTPUT=""
+WAYLAND_BG_DARK=""
+WAYLAND_BG_LIGHT=""
 
 cleanup() {
   if [ "${RUNTIME_PAUSED}" -eq 1 ] && [ -n "${PID}" ]; then
@@ -351,11 +353,20 @@ capture_wayland_background_pairs() {
 
 set_wayland_background() {
   color="$1"
-  # Use exact output rules. An inherited system Sway config can leave an existing wallpaper/swaybg
-  # surface alive on one output after a later wildcard update. This smoke owns its compositor, so
-  # each output must receive the same explicit background before capture.
-  swaymsg output "${WAYLAND_FIRST_OUTPUT}" bg "${color}" solid_color >/dev/null
-  swaymsg output "${WAYLAND_SECOND_OUTPUT}" bg "${color}" solid_color >/dev/null
+  case "${color}" in
+    "#203040") image="${WAYLAND_BG_DARK}" ;;
+    "#d8e6f4") image="${WAYLAND_BG_LIGHT}" ;;
+    *)
+      echo "smoke_m17_m18_linux: unsupported Wayland background color: ${color}" >&2
+      exit 1
+      ;;
+  esac
+  # Noble's swaybg solid-color path stretches a one-pixel protocol buffer. Linear filtering on a
+  # 1.5-scale pixman output can sample transparent outside edges and produce a false gradient.
+  # A constant opaque PNG tiled by exact output name keeps the fractional filter under test while
+  # forcing swaybg's ordinary image-buffer path.
+  swaymsg output "${WAYLAND_FIRST_OUTPUT}" bg "${image}" tile >/dev/null
+  swaymsg output "${WAYLAND_SECOND_OUTPUT}" bg "${image}" tile >/dev/null
   sleep 0.20
 }
 
@@ -415,6 +426,7 @@ start_sway_headless() {
   need_cmd swaybg
   need_cmd swaymsg
   need_cmd grim
+  need_cmd convert
   # AF_UNIX paths are limited to 108 bytes on Linux. Candidate evidence paths include the full
   # target triple and can push sway's generated wayland-N / sway-ipc socket names past that
   # limit, so runtime sockets always live in a short owner-only temporary directory. Logs and
@@ -422,11 +434,19 @@ start_sway_headless() {
   WAYLAND_RUNTIME_DIR="$(mktemp -d /tmp/honk300-wl.XXXXXX)"
   export XDG_RUNTIME_DIR="${WAYLAND_RUNTIME_DIR}"
   chmod 700 "${XDG_RUNTIME_DIR}"
+  WAYLAND_BG_DARK="${WAYLAND_RUNTIME_DIR}/wayland-bg-dark.png"
+  WAYLAND_BG_LIGHT="${WAYLAND_RUNTIME_DIR}/wayland-bg-light.png"
+  convert -size 32x32 'xc:#203040' "PNG24:${WAYLAND_BG_DARK}"
+  convert -size 32x32 'xc:#d8e6f4' "PNG24:${WAYLAND_BG_LIGHT}"
+  chmod 600 "${WAYLAND_BG_DARK}" "${WAYLAND_BG_LIGHT}"
   export WAYLAND_DISPLAY="${HONK300_WAYLAND_DISPLAY:-honk300-wayland-smoke}"
   # Never inherit the runner's distro wallpaper, bar, includes, or output-specific rules. The
   # native smoke compositor has one purpose: expose controlled pixels beneath Honk300's own
   # transparent layer surfaces.
-  printf '%s\n' 'output * bg #203040 solid_color' >"${WORK}/sway-smoke.conf"
+  # Keep the startup config free of every output/background rule. Once both generated output names
+  # are known below, the smoke creates only exact-name tiled-image background rules.
+  printf '%s\n' '# Honk300 owned compositor; exact output rules are applied over IPC.' \
+    >"${WORK}/sway-smoke.conf"
   chmod 600 "${WORK}/sway-smoke.conf"
   WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 \
     sway -c "${WORK}/sway-smoke.conf" -d >"${WORK}/sway.log" 2>&1 &

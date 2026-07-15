@@ -98,8 +98,12 @@ thegoose.app.
   one headless output. Honk300 remained transparent and exposed that backdrop while the wildcard
   update left the other output correctly solid. Current source gives the smoke an isolated minimal
   Sway config, exact per-output colors, an explicit `swaybg` dependency, and paired goose-free
-  baselines before launch. A changed-SHA candidate and ordinary CI repeat remain required; the tag
-  and public release are still untouched.
+  baselines before launch. Candidate `29391420738` passed that complete release path, but its
+  same-SHA Ubuntu 24.04 main run proved Noble's one-pixel swaybg solid-color buffer was linearly
+  filtered into a gradient on the 1.5-scale pixman output before Honk300 launched. Current source
+  starts with no background rule and tiles constant opaque PNGs only on discovered exact output
+  names, preserving fractional filtering. A changed-SHA candidate and ordinary CI repeat remain
+  required; the tag and public release are still untouched.
 - Integrated final-source gate: formatting, strict workspace clippy, 432 Rust tests including all
   seven renderer goldens, release and both Apple builds, cargo-dist planning, 95 Python contracts,
   actionlint, shell/PowerShell syntax, pinned cargo-audit over 374 dependencies and 1,160

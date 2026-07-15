@@ -22,7 +22,7 @@
   - [x] Pin an exact Linux binary and add compositor-visible X11/Wayland color evidence.
   - [x] Add exact-binary Windows layered-compositor and lifecycle evidence to CI, candidate, and published-MSI gates.
   - [ ] Run the new exact-candidate compositor gates natively on Windows x64/ARM64 and Linux x64/ARM64.
-    > Candidate 29389882143 passed every Windows/Linux native gate and final assembly. Same-SHA main CI then inherited Ubuntu's default Sway wallpaper/bar on one headless output while Honk300 remained transparent. The smoke now owns a minimal config, exact per-output backgrounds, and pre-launch baselines; the changed SHA must rerun and no product background or ARM64 DWM claim is made.
+    > Candidate 29391420738 passed every native/release gate and final assembly. Main CI then proved Ubuntu 24.04's one-pixel swaybg solid-color buffer becomes a gradient through the 1.5x linear pixman filter before Honk300 launches. The private config now has no background rule; discovered output names receive tiled opaque PNGs before the paired baseline. The changed SHA must rerun; no product background or ARM64 DWM claim is made.
   - [ ] Optimize and profile the macOS runtime; repeat active-motion capture and the 10+60 second profile on the fixed exact candidate.
   - [x] Implement the approved first-run Accessibility prompt and calm permission-wait behavior.
   - [x] Add a macOS-only menu-bar control with accessible Configure and graceful Quit actions.

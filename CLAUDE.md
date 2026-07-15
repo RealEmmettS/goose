@@ -91,9 +91,12 @@ checks remain fail closed. Local/self-hosted ARM64 and all ordinary x64 runs sti
 DWM capture. Exact candidate `29389882143` at `c44b89d` passed the complete Mac producer, every
 portable/native Windows and Linux gate, both Debian packages, and final assembly. Same-SHA main CI
 then exposed only fixture contamination on Ubuntu 24.04: inherited `/etc/sway/config` wallpaper/bar
-remained visible through Honk300's transparent layer on one headless output. Current source starts
-Sway with a minimal private config, applies exact per-output backgrounds, and proves both outputs
-before launching the goose; it does not add a product background or weaken the analyzer. Exact
+remained visible through Honk300's transparent layer on one headless output. A follow-up private
+config still carried its own wildcard while exact setters used swaybg's one-pixel solid-color path;
+Noble's 1.5-scale linear pixman filter turned that buffer into a pre-launch gradient. Current source
+starts Sway with no background rule, tiles opaque PNGs only on discovered exact output names, and
+proves both outputs while preserving fractional filtering before launching the goose; it does not
+add a product background or weaken the analyzer. Exact
 signed-app collect/Accessibility evidence plus the changed-SHA candidate/main gates remain release
 blockers. The current release gate is `docs/readiness/v1.0.0-readiness.md` and task `#m20q`.
 Stable/latest remains v0.3.2 until that checklist is complete and the immutable v1.0.0 release is

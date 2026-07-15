@@ -139,9 +139,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   rehearsal passed, but the ordinary follow-up check installed a fuller desktop package whose
   default wallpaper and top bar stayed on one virtual monitor. The Goose was correctly
   transparent and revealed that system picture; it was not adding a background of its own. The
-  check now starts a tiny private desktop configuration, controls each virtual monitor directly,
-  and photographs both colors before the Goose launches. This prevents a runner's decoration
-  from being mistaken for app output while keeping every transparency and body-part requirement.
+  check now starts a tiny private desktop configuration with no catch-all wallpaper, paints each
+  virtual monitor with a small fully opaque color tile that cannot fade under fractional scaling,
+  and photographs both colors before the Goose launches. This prevents either a runner decoration
+  or a distorted test color from being mistaken for app output while keeping every transparency
+  and body-part requirement.
 - **Release checks now recognize a real top-down Goose without excusing broken pictures.** One
   Linux rehearsal showed a clearly visible body and wing with a smaller orange beak-and-feet
   footprint than a side view, so the check now accepts that genuine pose while keeping every

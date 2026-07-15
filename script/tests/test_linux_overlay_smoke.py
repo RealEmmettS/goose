@@ -180,12 +180,17 @@ class LinuxOverlaySmokeContractTests(unittest.TestCase):
         smoke = (ROOT / "script" / "smoke_m17_m18_linux.sh").read_text(encoding="utf-8")
         for required in (
             "need_cmd swaybg",
+            "need_cmd convert",
             "sway-smoke.conf",
-            "output * bg #203040 solid_color",
+            "# Honk300 owned compositor; exact output rules are applied over IPC.",
             'sway -c "${WORK}/sway-smoke.conf" -d',
+            "wayland-bg-dark.png",
+            "wayland-bg-light.png",
+            "convert -size 32x32 'xc:#203040'",
+            'case "${color}" in',
             "set_wayland_background",
-            'swaymsg output "${WAYLAND_FIRST_OUTPUT}" bg "${color}" solid_color',
-            'swaymsg output "${WAYLAND_SECOND_OUTPUT}" bg "${color}" solid_color',
+            'swaymsg output "${WAYLAND_FIRST_OUTPUT}" bg "${image}" tile',
+            'swaymsg output "${WAYLAND_SECOND_OUTPUT}" bg "${image}" tile',
             "validate_wayland_capture_baseline",
             "wayland-baseline-first-dark.png",
             "wayland-baseline-second-light.png",
@@ -193,6 +198,8 @@ class LinuxOverlaySmokeContractTests(unittest.TestCase):
             "--require-no-goose",
         ):
             self.assertIn(required, smoke)
+        self.assertNotIn("output * bg", smoke)
+        self.assertNotIn('bg "${color}" solid_color', smoke)
         self.assertNotIn("WLR_LIBINPUT_NO_DEVICES=1 sway -d", smoke)
 
     def test_x11_background_is_a_disposable_lowered_client_not_an_app_surface(self) -> None:
