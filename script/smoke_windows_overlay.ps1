@@ -651,6 +651,7 @@ $runtimeSuspended = $false
 $firstPid = $null
 $visualPassed = $false
 $captureMode = 'paired-dwm'
+$presenterRectTolerancePixels = 3
 $rendererPresentPath = Join-Path $work 'renderer-present.bgra'
 $initialHash = (Get-FileHash -LiteralPath $resolvedBinary -Algorithm SHA256).Hash.ToLowerInvariant()
 Set-Content -LiteralPath (Join-Path $evidence 'exact-binary.sha256.txt') `
@@ -796,15 +797,17 @@ light_sha256=$lightProofHash
             if (Test-Path -LiteralPath $rendererPresentPath) {
                 throw 'could not clear the previous presenter record before requesting a fresh one'
             }
-            for ($surfaceAttempt = 0; $surfaceAttempt -lt 40; $surfaceAttempt += 1) {
+            for ($surfaceAttempt = 0; $surfaceAttempt -lt 400; $surfaceAttempt += 1) {
                 if (Test-Path -LiteralPath $rendererPresentPath -PathType Leaf) { break }
-                Start-Sleep -Milliseconds 50
+                Start-Sleep -Milliseconds 5
             }
             if (-not (Test-Path -LiteralPath $rendererPresentPath -PathType Leaf)) {
                 continue
             }
-            # Freeze immediately after the completed atomic record appears. Its embedded HWND and
-            # rectangle must still equal the frozen native window below or this attempt is stale.
+            # Freeze immediately after the completed atomic record appears. Its embedded HWND must
+            # still equal the frozen native window below. The observed race advances one
+            # presentation interval between the atomic rename and NtSuspendProcess, so geometry
+            # may agree within the tightly bounded physical-pixel tolerance; larger drift retries.
             [Honk300OverlaySmokeNative]::Suspend($runtime.Id)
             $runtimeSuspended = $true
         }
@@ -878,13 +881,29 @@ light_sha256=$lightProofHash
                 $expectedHwnd = "0x$overlayHandle"
                 $expectedRect = "$($rect.X),$($rect.Y),$($rect.Width),$($rect.Height)"
                 $actualHwnd = [string]$analysisDocument.present.hwnd
-                $actualRect = @($analysisDocument.present.rect) -join ','
+                $actualRectValues = @($analysisDocument.present.rect)
+                $actualRect = $actualRectValues -join ','
+                $rectAgreement = $false
+                $rectDeltas = 'unavailable'
+                if ($actualRectValues.Count -eq 4) {
+                    $deltaX = [Math]::Abs([long]$actualRectValues[0] - [long]$rect.X)
+                    $deltaY = [Math]::Abs([long]$actualRectValues[1] - [long]$rect.Y)
+                    $deltaWidth = [Math]::Abs([long]$actualRectValues[2] - [long]$rect.Width)
+                    $deltaHeight = [Math]::Abs([long]$actualRectValues[3] - [long]$rect.Height)
+                    $rectDeltas = "$deltaX,$deltaY,$deltaWidth,$deltaHeight"
+                    $rectAgreement = (
+                        $deltaX -le $presenterRectTolerancePixels -and
+                        $deltaY -le $presenterRectTolerancePixels -and
+                        $deltaWidth -le $presenterRectTolerancePixels -and
+                        $deltaHeight -le $presenterRectTolerancePixels
+                    )
+                }
                 if (
                     $actualHwnd -cne $expectedHwnd -or
-                    $actualRect -cne $expectedRect
+                    -not $rectAgreement
                 ) {
                     Add-Content -LiteralPath $captureDiagnosticsPath -Encoding utf8NoBOM -Value `
-                        "attempt=$attempt stale_present_record expected_hwnd=$expectedHwnd actual_hwnd=$actualHwnd expected_rect=$expectedRect actual_rect=$actualRect"
+                        "attempt=$attempt stale_present_record expected_hwnd=$expectedHwnd actual_hwnd=$actualHwnd expected_rect=$expectedRect actual_rect=$actualRect rect_deltas=$rectDeltas tolerance=$presenterRectTolerancePixels"
                     $analysisExit = 3
                 }
             }

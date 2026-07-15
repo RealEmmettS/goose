@@ -169,7 +169,14 @@ All notable changes to this project are documented here. Format based on
   the frozen visible HWND/rectangle. Raw checks reject straight alpha, double premultiplication,
   swapped channels, mostly opaque-black surfaces, missing articulation, and stale metadata.
   Windows x64 plus local/self-hosted ARM64 still require paired live DWM captures; the hosted ARM64
-  result is never described as desktop-composition proof.
+  result is never described as desktop-composition proof. Candidate `29389046641` then passed the
+  complete Mac producer, every Linux compositor job, both Debian package jobs, and Windows x64;
+  both hosted ARM64 jobs also produced multiple surfaces that passed every raw semantic check but
+  rejected them because the moving overlay advanced one or two pixels between the atomic record
+  and controller suspension. The binding now keeps exact HWND identity, polls at five
+  milliseconds, and permits only a three-physical-pixel origin/dimension delta covering the
+  observed single-interval drift; larger movement retries. No pixel, alpha, articulation,
+  runner-identity, or paired-DWM requirement changed.
 - **Portable native-smoke runtime paths and Windows diagnostics (2026-07-14)** - the first
   v1.0.0 candidate proved all four repaired X11 compositor paths and matching Windows controller/
   background geometry, then failed closed before product capture. Sway's AF_UNIX sockets now use

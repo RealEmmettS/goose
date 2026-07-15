@@ -42,8 +42,11 @@ retain meaningful native proof without pretending it is DWM screen evidence.
   crop, premultiplied RGBA-to-BGRA conversion, and a successful `UpdateLayeredWindow`, its Windows
   backend may atomically record the exact selected DIB bytes plus that present's HWND and physical
   rectangle. The smoke requests the record only after its pose delay, freezes the process as soon
-  as the completed record appears, and rejects stale metadata that does not equal the frozen HWND
-  and rectangle.
+  as the completed record appears, and rejects stale metadata unless it names the exact same HWND
+  and its recorded origin and dimensions remain within three physical pixels of the independently
+  queried frozen rectangle. That bound covers the observed one-presentation-interval, one-to-two-
+  pixel drift between the atomic rename and `NtSuspendProcess`; larger drift retries and remains
+  fatal if no bounded fresh record passes. It does not relax any surface-pixel assertion.
 - The raw premultiplied BGRA record must independently prove channel values bounded by alpha, at
   least 80-percent transparent margin, no connected opaque-black surface, body, shade, outline,
   wing, asymmetric near/far orange, spatially separated beak/legs, antialiased pixels, and a
@@ -78,6 +81,7 @@ retain meaningful native proof without pretending it is DWM screen evidence.
 - Windows x64 candidate evidence still contains distinct 100-percent controlled-background
   proofs and paired live overlay captures.
 - Hosted ARM64 evidence records both identical wallpaper hashes, zero controlled-color coverage,
-  visible background and overlay HWND metadata, `hosted-arm64-presenter-surface`, exact surface
-  analysis, native PE/MSI identity, and lifecycle results.
+  visible background and overlay HWND metadata, the exact HWND plus bounded rectangle deltas,
+  `hosted-arm64-presenter-surface`, exact surface analysis, native PE/MSI identity, and lifecycle
+  results.
 - Cross-compilation checks both Windows targets after the backend handoff changes.

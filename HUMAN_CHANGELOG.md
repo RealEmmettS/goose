@@ -144,7 +144,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   handed to its visible window, and those pixels must still prove correct transparency, color,
   body parts, shadow, and the matching live window. Regular Windows and real ARM machines still
   need the full two-background desktop pictures. This keeps the release gate honest without
-  confusing a test-machine limitation for a product failure or calling it proof that was not seen.
+  confusing a test-machine limitation for a product failure or calling it proof that was not
+  seen. The next rehearsal produced several completely valid Goose surfaces there, but the
+  moving window shifted slightly between the app recording its successful draw and the test
+  freezing it. The check now accepts only that tightly bounded single-frame shift on the exact
+  same window; all picture, transparency, body-part, machine-identity, and regular desktop-picture
+  requirements remain unchanged. This fixes a timing race without making a broken picture pass.
 - **The hosted desktop checks now use safe temporary paths on Linux and read Windows line endings
   correctly.** The first major-release rehearsal successfully photographed the new Linux test
   background and proved matching Windows screen geometry, then stopped because Linux's socket

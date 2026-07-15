@@ -328,6 +328,13 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
             "window_visible=true",
             "$analysisDocument.present.hwnd",
             "$analysisDocument.present.rect",
+            "$presenterRectTolerancePixels = 3",
+            "$actualHwnd -cne $expectedHwnd",
+            "$deltaX -le $presenterRectTolerancePixels",
+            "$deltaY -le $presenterRectTolerancePixels",
+            "$deltaWidth -le $presenterRectTolerancePixels",
+            "$deltaHeight -le $presenterRectTolerancePixels",
+            "rect_deltas=$rectDeltas tolerance=$presenterRectTolerancePixels",
             "Remove-Item -LiteralPath $rendererPresentPath -Force -ErrorAction Stop",
             "could not clear the previous presenter record",
             "unknown Windows overlay capture mode",
@@ -345,6 +352,8 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
             "'HONK300_WINDOWS_SMOKE_PRESENT',\n                $null,",
             smoke,
         )
+        self.assertNotIn("$actualRect -cne $expectedRect", smoke)
+        self.assertIn("Start-Sleep -Milliseconds 5", smoke)
 
         overlay_window = windows_backend[windows_backend.index("impl OverlayWindow") :]
         overlay_present = overlay_window[: overlay_window.index("fn hide(&mut self)")]

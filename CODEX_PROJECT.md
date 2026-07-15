@@ -80,8 +80,16 @@ thegoose.app.
   sets the Linux warm floor to 10 while retaining all body/wing/background/transparency checks.
   ADR 0026 restricts the ARM64 fallback to the exact GitHub-hosted wallpaper signature and records
   the cropped premultiplied-BGRA DIB only after a successful native present, bound to the frozen
-  visible HWND/rectangle; local/self-hosted ARM64 and x64 still require paired DWM. Another exact
-  candidate is required; no release assembly or publication has occurred.
+  visible HWND/rectangle; local/self-hosted ARM64 and x64 still require paired DWM. Candidate
+  `29389046641` at `414c447077910d8fd05ccdb7c5a5e7cea530c087` passed the complete trusted Mac
+  producer, all four Linux X11/Wayland qualifications, both Debian native-package jobs, every
+  portable producer, and Windows x64 paired-DWM/lifecycle. Both hosted ARM64 jobs produced several
+  exact presenter surfaces that passed every alpha, palette, articulation, and shadow assertion,
+  but exact rectangle-string comparison rejected them after the goose advanced one or two pixels
+  between atomic record completion and suspension. Current source retains exact HWND binding and
+  all semantic checks, polls at five milliseconds, and allows only a three-physical-pixel
+  origin/dimension delta for that one presentation interval. Another exact candidate is required;
+  no release assembly or publication has occurred.
 - Integrated final-source gate: formatting, strict workspace clippy, 432 Rust tests including all
   seven renderer goldens, release and both Apple builds, cargo-dist planning, 95 Python contracts,
   actionlint, shell/PowerShell syntax, pinned cargo-audit over 374 dependencies and 1,160

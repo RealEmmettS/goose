@@ -22,7 +22,7 @@
   - [x] Pin an exact Linux binary and add compositor-visible X11/Wayland color evidence.
   - [x] Add exact-binary Windows layered-compositor and lifecycle evidence to CI, candidate, and published-MSI gates.
   - [ ] Run the new exact-candidate compositor gates natively on Windows x64/ARM64 and Linux x64/ARM64.
-    > Candidate 29387569722 passed Windows x64 paired-DWM composition/lifecycle, native ARM64 PE/MSI lifecycle, and X11 plus dual-output Wayland on three of four Linux variants. One valid top-down x64 GNU X11 pose missed a side-view warm-pixel floor; GitHub-hosted ARM64 returned one static wallpaper for two acknowledged colors. The calibrated Linux oracle and ADR 0026's post-success presenter-DIB path pass focused/adversarial contracts; the changed SHA must rerun unchanged and no ARM64 DWM claim is made.
+    > Candidate 29389046641 passed Windows x64 paired-DWM/lifecycle and every X11 plus dual-output Wayland variant. Both hosted ARM64 jobs produced multiple semantically complete exact presenter surfaces but rejected them after the same HWND moved 1-2 px between record and suspension. Exact HWND plus a three-pixel single-frame geometry bound is now pinned; the changed SHA must rerun unchanged and no ARM64 DWM claim is made.
   - [ ] Optimize and profile the macOS runtime; repeat active-motion capture and the 10+60 second profile on the fixed exact candidate.
   - [x] Implement the approved first-run Accessibility prompt and calm permission-wait behavior.
   - [x] Add a macOS-only menu-bar control with accessible Configure and graceful Quit actions.
