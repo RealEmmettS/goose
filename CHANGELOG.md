@@ -5,9 +5,10 @@ All notable changes to this project are documented here. Format based on
 [Semantic Versioning](https://semver.org/).
 
 > **Project stage: first stable release.** Milestones M0-M19 are implemented in-tree. The
-> managed macOS Accessibility first run is implemented and automated tests are green; M16.1
-> readiness remains gated on exact signed-candidate denied, non-nagging relaunch, live-grant, and
-> live-revocation evidence. The goose now renders, walks, leaves mud, plays sounds, reacts to the
+> managed macOS Accessibility first run is implemented and one unchanged signed executable has
+> passed denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2; exact-
+> final-SHA and unavailable-hardware/tooling limitations are retained as explicit forward-
+> verification waivers. The goose now renders, walks, leaves mud, plays sounds, reacts to the
 > cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
 > Notepad/meme windows on Windows. It now enters/leaves through real exposed edges, occasionally
@@ -24,7 +25,7 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-07-15
+## [1.0.1] - 2026-07-15
 
 ### Added
 - **macOS menu-bar Configure and graceful Quit (2026-07-14, ADR 0024)** - the running
@@ -38,7 +39,7 @@ All notable changes to this project are documented here. Format based on
   contracts require the executable launcher before signing and in the final app ZIP and both DMG
   validation passes. A local packaged universal app exposed all items through macOS accessibility
   inspection, opened/restored the full TUI in Terminal, and completed animated Quit in four
-  seconds; exact final signed-candidate interaction evidence remains open.
+  seconds; exact-final-SHA interaction repetition is tracked as post-release forward verification.
 - **Managed macOS Accessibility first run (2026-07-13, ADR 0022)** - only the exact receipted app
   at `~/Applications/Honk300.app` can open automatic permission UI. Before calling the native
   consent request and opening Accessibility settings, the runtime atomically creates an
@@ -48,9 +49,10 @@ All notable changes to this project are documented here. Format based on
   pranks except honk while preserving status/reload/stop. One-second polling restores capability
   state and starts FirstUX after a live grant, or abandons permission-bound work and returns to
   the non-nagging wait after revocation. Focused engine, eligibility/marker, native bridge, and
-  smoke-contract tests pass; the exact signed-candidate denied/non-nag/grant/revoke smoke remains
-  a release gate.
-- **Developer ID macOS distribution (v1.0.0, ADR 0020)** - the universal app now carries exact
+  smoke-contract tests pass. One unchanged signed executable completed denied, non-nag relaunch,
+  same-process grant, and same-process revoke on the physical M2; exact-final-SHA repetition is an
+  explicit source-equivalent forward-verification waiver rather than a stronger claimed run.
+- **Developer ID macOS distribution (v1.0.1, ADR 0020)** - the universal app now carries exact
   version/tag/commit metadata, and the DMG contains `Honk300.app`, a separately signed native
   `Install Honk300.app`, and concise per-user instructions without an `/Applications` symlink.
   The helper verifies the target bundle id, signature, and matching nonempty Developer ID team,
@@ -92,9 +94,11 @@ All notable changes to this project are documented here. Format based on
   rather than accepting an independent rebuild as equivalent. Each smoke freezes a real
   `UpdateLayeredWindow` surface and captures that unchanged articulated pose over controlled dark
   and light desktops. A dependency-free analyzer assigns every pixel to one nearest palette color
-  and fails closed unless the captures independently prove transparent margins, semi-transparent
-  edges and shadow, body/shade/outline/wing, spatially separated beak and two-tone legs, and the
-  asymmetric orange channel order; screenshots, analysis, logs, and the executable hash are
+  and fails closed unless the captures independently prove transparent margins, reconstructed
+  semantic edge colors, body/shade/outline/wing, the asymmetric orange channel order, and one
+  complete renderer view. Side view additionally requires spatially separated beak/two-tone legs
+  plus shadow; top-down requires its compact beak, complete wing/body geometry, low shade share,
+  and intentional lack of legs/shadow. Screenshots, analysis, logs, and the executable hash are
   retained even on failure.
 - **Cross-platform exposed-edge traversal and animated lifecycle** - `DesktopLayout` now derives
   real exposed edges by subtracting touching monitor seams. Four wander entries plus one
@@ -111,12 +115,13 @@ All notable changes to this project are documented here. Format based on
   Program cleanup never rolls; Linux remains explicitly collect-unsupported and has no trigger.
 
 ### Changed
-- **First stable major release (2026-07-14, ADR 0025)** - the prospective unpublished v0.3.3
-  milestone is released as v1.0.0. Package, app-bundle, receipt, manifest, installer, updater,
-  readiness, and website identities advance together; v0.3.2-to-v1.0.0 is an explicitly tested
-  normal upgrade. Earlier v0.3.3 candidate runs remain diagnostic only. Additional Alienware
-  hands-on verification happens after publication and any findings ship in forward patch releases
-  without rewriting the immutable v1.0.0 tag or assets.
+- **First public stable major release (2026-07-15, ADRs 0025 and 0027)** - the prospective
+  unpublished v0.3.3 milestone ships as v1.0.1. The immutable v1.0.0 tag failed closed before a
+  draft or public asset existed and remains unchanged under the atomic-release fix-forward rule.
+  Package, app-bundle, receipt, manifest, installer, updater, readiness, and website identities
+  advance together; v0.3.2-to-v1.0.1 is an explicitly tested normal upgrade. Additional Alienware
+  hands-on verification happens after publication and any findings ship in later forward patches
+  without rewriting the immutable v1.0.1 tag or assets.
 - **Complete rolling-latest release channel (2026-07-14, ADR 0023)** - every general tag now
   requires the complete cross-platform producer matrix, including a fresh GitHub-macOS-built,
   Developer ID-signed/notarized/stapled app and DMG plus both Debian packages regardless of the
@@ -144,7 +149,8 @@ All notable changes to this project are documented here. Format based on
   destination, avoiding a redundant per-frame Device-RGB-to-Display-P3 ICC/vImage conversion and
   leaving final per-display-profile composition to WindowServer. The active diagnostic measured
   5.55% median CPU, 29.52 MiB maximum RSS, negative 9.89 MiB growth, zero leaks, and 20 clean
-  compositor captures; exact signed-candidate repetition remains required.
+  compositor captures. Exact-final-SHA repetition is retained as post-release hardware
+  verification under the accepted source-equivalent waiver.
 - **Mounted-bundle lifecycle transaction** - `honk300 install` can copy its enclosing mounted
   source app into `~/Applications/Honk300.app` after validating bundle id, stamped release
   identity, strict signature, and both architectures. It preserves the shared aliases/media/
@@ -157,6 +163,15 @@ All notable changes to this project are documented here. Format based on
   allowing denied and granted Accessibility evidence on one unchanged signed identity.
 
 ### Fixed
+- **Pose-complete Windows release qualification (2026-07-15, ADR 0027)** - release run
+  `29398343807` at exact candidate/default-branch SHA `9c5692b` failed atomically before draft
+  creation because ten valid top-down entrance captures were judged by a side-only legs/shadow
+  oracle. The paired-DWM and hosted-ARM64 raw-presenter analyzers now share strict side and
+  top-down profiles plus reconstructed mid-alpha color proof. Red/blue swaps, straight alpha,
+  double premultiplication, opaque/black surfaces, missing warm articulation, damaged side
+  fallthrough, and partial/cropped top-down frames remain fatal. Retained replay accepts only
+  complete attempts 6–12 and rejects partial attempts 3–5. No renderer, engine, presenter, gait,
+  or user-visible behavior changed; v1.0.1 rebuilds and requalifies the entire matrix.
 - **Hermetic Wayland compositor evidence (2026-07-15)** - exact candidate `29389882143` passed
   every release producer, native compositor/package job, and final assembly at commit `c44b89d`.
   Ordinary main CI then exposed a non-hermetic difference: installing Ubuntu's recommended Sway
@@ -215,15 +230,16 @@ All notable changes to this project are documented here. Format based on
   distance from the neck-height beak. Locomotion now recomputes the body target from current beak
   geometry each tick, keeping the beak-distance arrival gate authoritative. A realistic 120 Hz
   world regression reaches passthrough/grab and note typing within 15 seconds without teleporting
-  the beak, and the complete integrated local gate passes. An exact signed-app live collect remains
-  a release blocker and is not yet accepted as final native evidence.
+  the beak, and the complete integrated local gate passes. A product-equivalent signed app spawned
+  and typed a readable native note; exact visual beak-contact capture remains post-release
+  verification and is not overstated as completed native evidence.
 - **Lingering collect windows cannot starve a newer request** - the macOS and Windows native
   controllers now prefer the most recently spawned typed request over older notes or memes that
   remain open. Dead-window events are still drained first, matched by request id and kind, and
   removed exactly once, so delayed user-close reactions remain truthful without making a newer
   collect task time out behind arbitrary map iteration order.
 - **Current macOS hands-on release runbook** - replaced the historical ad-hoc, unnotarized,
-  terminal-first checklist with the exact v1.0.0 Developer ID/notarized/stapled DMG-first flow.
+  terminal-first checklist with the exact v1.0.1 Developer ID/notarized/stapled DMG-first flow.
   The runbook now preserves one candidate identity across four Accessibility states, native
   terminal protection, renderer and performance evidence, lifecycle rollback, the one-display
   waiver, immutable publication, and fresh-download verification. The README now links the exact
@@ -242,8 +258,8 @@ All notable changes to this project are documented here. Format based on
   and screen sharing now receive the same transparent pixels as the physical display instead of
   omitting the goose or turning unused surface capacity into black rectangles. Capacity-shrink
   regressions prevent a large transient frame from making later normal walking redraw and color-
-  convert an oversized image; exact signed active-motion capture and profiling remain release
-  gates.
+  convert an oversized image. Product-equivalent active-motion capture and profiling clear the
+  budget; exact-final-SHA repetition remains explicit post-release verification.
 - **macOS lint debt** - removed the obsolete world-bounds path and corrected the three remaining
   target-specific warning failures so workspace clippy can run with `-D warnings` on macOS.
 - **Stop/start singleton race** - a successful `stop`, including the `exit` and `quit` aliases,

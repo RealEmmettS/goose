@@ -388,8 +388,8 @@ mod tests {
                 state_root.join("install-receipt.json"),
                 serde_json::to_vec_pretty(&json!({
                     "schema": "honk300.install.v1",
-                    "version": "1.0.0",
-                    "tag": "v1.0.0",
+                    "version": "1.0.1",
+                    "tag": "v1.0.1",
                     "commit": SHA,
                     "install_root": app.to_string_lossy(),
                 }))
@@ -402,8 +402,8 @@ mod tests {
                 executable,
                 metadata: MacBundleReleaseMetadata {
                     bundle_id: "dev.emmetts.honk300".into(),
-                    version: "1.0.0".into(),
-                    tag: "v1.0.0".into(),
+                    version: "1.0.1".into(),
+                    tag: "v1.0.1".into(),
                     commit: SHA.into(),
                 },
             }
@@ -593,9 +593,9 @@ mod tests {
         let fixture = ManagedFixture::new();
         let marker = fixture
             .home()
-            .join("Library/Application Support/honk300/state/accessibility-prompt-v1/1.0.0");
+            .join("Library/Application Support/honk300/state/accessibility-prompt-v1/1.0.1");
         fs::create_dir_all(marker.parent().expect("marker parent")).expect("marker dirs");
-        fs::write(&marker, b"1.0.0\n").expect("marker");
+        fs::write(&marker, b"1.0.1\n").expect("marker");
 
         let onboarding =
             AccessibilityOnboarding::detect(fixture.home(), &fixture.executable, &fixture.metadata)
@@ -638,7 +638,7 @@ mod tests {
         assert!(onboarding.should_prompt(AccessibilityState::Denied));
         assert!(onboarding.mark_prompted().is_err());
         assert!(!outside
-            .join("Application Support/honk300/state/accessibility-prompt-v1/1.0.0")
+            .join("Application Support/honk300/state/accessibility-prompt-v1/1.0.1")
             .exists());
     }
 
@@ -653,7 +653,7 @@ mod tests {
         assert!(onboarding.mark_prompted().is_err());
         assert!(!fixture
             .home()
-            .join("Library/Application Support/honk300/state/accessibility-prompt-v1/1.0.0")
+            .join("Library/Application Support/honk300/state/accessibility-prompt-v1/1.0.1")
             .exists());
     }
 
@@ -671,7 +671,7 @@ mod tests {
             AccessibilityOnboarding::detect(fixture.home(), &fixture.executable, &fixture.metadata)
                 .expect("detect managed app");
         assert!(onboarding.mark_prompted().is_err());
-        assert!(!state.join("accessibility-prompt-v1/1.0.0").exists());
+        assert!(!state.join("accessibility-prompt-v1/1.0.1").exists());
     }
 
     #[test]

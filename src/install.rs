@@ -3104,16 +3104,16 @@ mod tests {
     fn macos_dmg_receipt_is_updater_compatible_and_release_bound() {
         let root = Path::new("/Users/goose/Applications/Honk300.app");
         let metadata = MacosBundleMetadata {
-            version: "1.0.0".into(),
-            tag: "v1.0.0".into(),
+            version: "1.0.1".into(),
+            tag: "v1.0.1".into(),
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
         };
         let receipt = macos_install_receipt(&metadata, root, false);
 
         assert_eq!(receipt["schema"], OWNERSHIP_MARKER);
         assert_eq!(receipt["install_root"], root.to_string_lossy().as_ref());
-        assert_eq!(receipt["version"], "1.0.0");
-        assert_eq!(receipt["tag"], "v1.0.0");
+        assert_eq!(receipt["version"], "1.0.1");
+        assert_eq!(receipt["tag"], "v1.0.1");
         assert_eq!(
             receipt["commit"],
             "0123456789abcdef0123456789abcdef01234567"
@@ -3195,8 +3195,8 @@ mod tests {
             .join(format!(".install-receipt.{}.tmp", std::process::id()));
         fs::write(&stale, b"collision").unwrap();
         let metadata = MacosBundleMetadata {
-            version: "1.0.0".into(),
-            tag: "v1.0.0".into(),
+            version: "1.0.1".into(),
+            tag: "v1.0.1".into(),
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
         };
 
@@ -3276,8 +3276,8 @@ mod tests {
         fs::create_dir_all(receipt.parent().unwrap()).unwrap();
         std::os::unix::fs::symlink(&foreign_target, &receipt).unwrap();
         let metadata = MacosBundleMetadata {
-            version: "1.0.0".into(),
-            tag: "v1.0.0".into(),
+            version: "1.0.1".into(),
+            tag: "v1.0.1".into(),
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
         };
 

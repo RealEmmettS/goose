@@ -1,8 +1,8 @@
 # macOS Native Qualification And Release Checklist
 
-Use this runbook on a real Mac to qualify the exact v1.0.0 release candidate and then verify the
+Use this runbook on a real Mac to qualify the exact v1.0.1 release candidate and then verify the
 published artifacts. It supplies the native evidence required by `#m16r` and the macOS portions
-of `#m20q`; `docs/readiness/v1.0.0-readiness.md` remains the release source of truth. ADR 0020
+of `#m20q`; `docs/readiness/v1.0.1-readiness.md` remains the release source of truth. ADR 0020
 defines the Developer ID/notarized DMG, and ADR 0022 defines managed Accessibility onboarding.
 
 The public macOS deliverable is a Developer ID-signed, Apple-notarized, stapled universal DMG.
@@ -13,7 +13,7 @@ signing. Do not use a locally ad-hoc-signed or unnotarized artifact as release e
 ## 0. Evidence discipline and prerequisites
 
 - Use a macOS 11+ host. Record Mac model, architecture, macOS version, and display count.
-- Start from the full 40-character candidate commit selected for v1.0.0. Candidate mode must
+- Start from the full 40-character candidate commit selected for v1.0.1. Candidate mode must
   complete signing, notarization, packaging, assembly, smoke, and rollback gates for that SHA
   without publishing or creating the tag.
 - Obtain the candidate's final `honk300-universal2.dmg`, `honk300-universal2.app.zip`,
@@ -85,7 +85,7 @@ Confirm the installed state:
 - `~/Applications/Honk300.app` is a real bundle, not a symlink;
 - `~/.local/bin/{honk300,honk,goose}` point into its `Contents/MacOS/honk300`;
 - `~/Library/Application Support/honk300/install-receipt.json` uses schema
-  `honk300.install.v1`, channel `dmg`, layout `mac-app`, and the exact v1.0.0 tag and full
+  `honk300.install.v1`, channel `dmg`, layout `mac-app`, and the exact v1.0.1 tag and full
   candidate commit;
 - strict signature, Team ID, designated requirement, hardened runtime, timestamp, stapled ticket,
   Gatekeeper assessment, and both architecture slices still pass after installation; and
@@ -108,7 +108,7 @@ codesign --verify --strict "$APP"
 ```
 
 Run the interactive live smoke from the candidate checkout. The reset flags are deliberate,
-scoped opt-ins: they remove only the v1.0.0 Honk300 prompt marker and reset only bundle id
+scoped opt-ins: they remove only the v1.0.1 Honk300 prompt marker and reset only bundle id
 `dev.emmetts.honk300` in the Accessibility database. Use `HONK300_FINAL_CLEANUP=keep` until the
 remaining native tests and profile are complete.
 
@@ -220,7 +220,7 @@ Use isolated homes/fixtures where the scripts support them, and keep the real us
 for native UI observations. On the exact candidate package, prove:
 
 - graphical install, opt-in autostart, stop/start, normal uninstall, and purge;
-- a receipted published v0.3.2 app updates to v1.0.0 through `honk300 update`;
+- a receipted published v0.3.2 app updates to v1.0.1 through `honk300 update`;
 - injected failure restores the previous app, receipt, aliases, LaunchAgent, and user content;
 - normal uninstall preserves foreign files and user media; purge backs media up before removal;
   and
@@ -257,22 +257,22 @@ hot-plug recovery.
 Only after the exact commit passes the pre-tag release checklist:
 
 1. advance the default branch to the candidate-proven SHA and wait for ordinary CI on that SHA;
-2. create and push the single immutable `v1.0.0` tag;
+2. create and push the single immutable `v1.0.1` tag;
 3. wait for atomic publication and post-release smoke; and
 4. confirm the GitHub release is latest, complete, and bound to the intended commit.
 
 Fresh-download the public app ZIP, DMG, manifest, and sidecars instead of reusing candidate files.
 Independently repeat hashes, Developer ID team/chain, designated requirement, hardened runtime,
-notarization, stapling, Gatekeeper, DMG layout, graphical install, and the live v0.3.2-to-v1.0.0
+notarization, stapling, Gatekeeper, DMG layout, graphical install, and the live v0.3.2-to-v1.0.1
 update. The app inside the final ZIP must already carry its stapled ticket.
 
 Only after those checks may the website promote the signed/notarized universal DMG above the
-secondary terminal install. Verify the production macOS link returns the real immutable v1.0.0
+secondary terminal install. Verify the production macOS link returns the real immutable v1.0.1
 DMG and that release-manifest validation fails closed if it is absent.
 
 ## 10. Record and close
 
-Append a dated evidence entry to `docs/readiness/v1.0.0-readiness.md` and the granted native
+Append a dated evidence entry to `docs/readiness/v1.0.1-readiness.md` and the granted native
 evidence to `docs/readiness/m16-m18-readiness.md`. Include:
 
 - exact tag, full commit, workflow run, artifact and binary hashes;

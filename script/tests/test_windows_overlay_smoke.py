@@ -80,6 +80,13 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
         golden = ROOT / "crates" / "honk-engine" / "tests" / "golden" / "side_mid_stride.png"
         cls.width, cls.height, cls.source = ANALYZER.read_png_rgba(golden)
         cls.presented = premultiply_rgba(cls.source)
+        top_down_golden = (
+            ROOT / "crates" / "honk-engine" / "tests" / "golden" / "top_down.png"
+        )
+        cls.top_down_width, cls.top_down_height, cls.top_down_source = (
+            ANALYZER.read_png_rgba(top_down_golden)
+        )
+        cls.top_down_presented = premultiply_rgba(cls.top_down_source)
         cls.dark_background = (0x20, 0x30, 0x40)
         cls.light_background = (0xF4, 0xED, 0xE4)
 
@@ -99,8 +106,9 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
             composite(self.source, self.light_background),
         )
         self.assertTrue(result["passed"], result)
+        self.assertEqual(result["pose_kind"], "side")
         self.assertGreaterEqual(len(result["orange_components"]), 2)
-        self.assertTrue(result["checks"]["semi_transparent_shadow"])
+        self.assertTrue(result["pose_checks"]["side"]["semi_transparent_shadow"])
 
     def test_committed_side_golden_proves_exact_layered_presenter_surface(self):
         result = ANALYZER.analyze_surface(self.width, self.height, self.presented)
@@ -109,8 +117,150 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
         self.assertTrue(result["checks"]["premultiplied_channel_bounds"])
         self.assertTrue(result["checks"]["transparent_surface_margin"])
         self.assertTrue(result["checks"]["no_opaque_black_surface"])
-        self.assertTrue(result["checks"]["visible_beak_and_two_legs"])
-        self.assertTrue(result["checks"]["semi_transparent_shadow"])
+        self.assertEqual(result["pose_kind"], "side")
+        self.assertTrue(result["pose_checks"]["side"]["visible_beak_and_two_legs"])
+        self.assertTrue(result["pose_checks"]["side"]["semi_transparent_shadow"])
+
+    def test_committed_top_down_golden_proves_articulated_alpha_composition(self):
+        result = ANALYZER.analyze_captures(
+            self.top_down_width,
+            self.top_down_height,
+            composite(self.top_down_source, self.dark_background),
+            composite(self.top_down_source, self.light_background),
+            self.dark_background,
+            self.light_background,
+        )
+        self.assertTrue(result["passed"], result)
+        self.assertEqual(result["pose_kind"], "top-down")
+        self.assertTrue(result["checks"]["asymmetric_orange_channels"])
+        self.assertTrue(result["checks"]["semantic_edge_colors"])
+        self.assertTrue(result["pose_checks"]["top_down"]["single_compact_beak"])
+        self.assertTrue(result["pose_checks"]["top_down"]["no_ground_shadow"])
+        self.assertFalse(result["pose_checks"]["side"]["visible_beak_and_two_legs"])
+
+    def test_committed_top_down_golden_proves_exact_layered_presenter_surface(self):
+        result = ANALYZER.analyze_surface(
+            self.top_down_width,
+            self.top_down_height,
+            self.top_down_presented,
+        )
+        self.assertTrue(result["passed"], result)
+        self.assertEqual(result["pose_kind"], "top-down")
+        self.assertTrue(result["checks"]["premultiplied_channel_bounds"])
+        self.assertTrue(result["checks"]["asymmetric_orange_channels"])
+        self.assertTrue(result["checks"]["semantic_edge_colors"])
+        self.assertTrue(result["pose_checks"]["top_down"]["single_compact_beak"])
+
+    def test_top_down_rejects_double_premultiplication_in_both_evidence_paths(self):
+        doubled_straight = premultiply_rgba(self.top_down_source)
+        paired_result = ANALYZER.analyze_captures(
+            self.top_down_width,
+            self.top_down_height,
+            composite(doubled_straight, self.dark_background),
+            composite(doubled_straight, self.light_background),
+            self.dark_background,
+            self.light_background,
+        )
+        self.assertFalse(paired_result["passed"], paired_result)
+        self.assertFalse(paired_result["checks"]["semantic_edge_colors"])
+
+        doubled_surface = premultiply_rgba(self.top_down_presented)
+        surface_result = ANALYZER.analyze_surface(
+            self.top_down_width,
+            self.top_down_height,
+            doubled_surface,
+        )
+        self.assertFalse(surface_result["passed"], surface_result)
+        self.assertFalse(surface_result["checks"]["semantic_edge_colors"])
+
+    def test_top_down_requires_warm_beak_and_rejects_red_blue_swap(self):
+        without_warm = [
+            (red, green, blue, 0)
+            if (red, green, blue) == ANALYZER.PALETTE["orange"]
+            else (red, green, blue, alpha)
+            for red, green, blue, alpha in self.top_down_source
+        ]
+        without_warm_result = ANALYZER.analyze_captures(
+            self.top_down_width,
+            self.top_down_height,
+            composite(without_warm, self.dark_background),
+            composite(without_warm, self.light_background),
+            self.dark_background,
+            self.light_background,
+        )
+        self.assertFalse(without_warm_result["passed"], without_warm_result)
+        self.assertFalse(
+            without_warm_result["checks"]["asymmetric_orange_channels"]
+        )
+
+        swapped = [
+            (blue, green, red, alpha)
+            for red, green, blue, alpha in self.top_down_source
+        ]
+        swapped_result = ANALYZER.analyze_captures(
+            self.top_down_width,
+            self.top_down_height,
+            composite(swapped, self.dark_background),
+            composite(swapped, self.light_background),
+            self.dark_background,
+            self.light_background,
+        )
+        self.assertFalse(swapped_result["passed"], swapped_result)
+        self.assertFalse(swapped_result["checks"]["asymmetric_orange_channels"])
+
+    def test_damaged_side_view_cannot_fall_through_top_down_profile(self):
+        damaged = []
+        for red, green, blue, alpha in self.source:
+            if (red, green, blue) == ANALYZER.PALETTE["orange_dark"]:
+                alpha = 0
+            if alpha <= 100 and max(red, green, blue) <= 55:
+                alpha = 0
+            damaged.append((red, green, blue, alpha))
+
+        result = self.analyze(
+            composite(damaged, self.dark_background),
+            composite(damaged, self.light_background),
+        )
+        self.assertFalse(result["passed"], result)
+        self.assertEqual(result["pose_kind"], "unknown")
+        self.assertFalse(result["pose_checks"]["side"]["two_tone_orange"])
+        self.assertFalse(
+            result["pose_checks"]["top_down"]["top_down_wing_body_ratio"]
+        )
+
+    def test_bottom_cropped_side_view_cannot_fall_through_top_down_profile(self):
+        first_removed_row = self.height - 73
+        cropped = [
+            pixel if index // self.width < first_removed_row else (0, 0, 0, 0)
+            for index, pixel in enumerate(self.source)
+        ]
+        result = self.analyze(
+            composite(cropped, self.dark_background),
+            composite(cropped, self.light_background),
+        )
+        self.assertFalse(result["passed"], result)
+        self.assertEqual(result["pose_kind"], "unknown")
+        self.assertFalse(result["pose_checks"]["side"]["two_tone_orange"])
+        self.assertFalse(
+            result["pose_checks"]["top_down"]["top_down_beak_body_ratio"]
+        )
+
+    def test_half_cropped_top_down_view_is_not_complete_evidence(self):
+        first_removed_column = 90
+        cropped = [
+            pixel if index % self.top_down_width < first_removed_column else (0, 0, 0, 0)
+            for index, pixel in enumerate(self.top_down_source)
+        ]
+        result = ANALYZER.analyze_surface(
+            self.top_down_width,
+            self.top_down_height,
+            premultiply_rgba(cropped),
+        )
+        self.assertFalse(result["passed"], result)
+        self.assertEqual(result["pose_kind"], "unknown")
+        self.assertFalse(
+            result["pose_checks"]["top_down"]["complete_top_down_palette"]
+        )
 
     def test_layered_presenter_surface_rejects_straight_opaque_or_channel_swapped_output(self):
         straight_result = ANALYZER.analyze_surface(self.width, self.height, self.source)
@@ -131,7 +281,7 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
         doubled = premultiply_rgba(self.presented)
         result = ANALYZER.analyze_surface(self.width, self.height, doubled)
         self.assertFalse(result["passed"], result)
-        self.assertFalse(result["checks"]["semi_transparent_shadow"])
+        self.assertFalse(result["pose_checks"]["side"]["semi_transparent_shadow"])
 
     def test_layered_presenter_surface_rejects_mostly_opaque_black_margin(self):
         damaged = list(self.presented)
@@ -192,7 +342,7 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
             composite(double_premultiplied, self.light_background),
         )
         self.assertFalse(result["passed"])
-        self.assertFalse(result["checks"]["semi_transparent_shadow"])
+        self.assertFalse(result["pose_checks"]["side"]["semi_transparent_shadow"])
 
     def test_opaque_flattening_fails_alpha_and_background_checks(self):
         flattened = [(red, green, blue, 255) for red, green, blue, _alpha in self.source]
@@ -200,7 +350,7 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
         result = self.analyze(dark, dark)
         self.assertFalse(result["passed"])
         self.assertFalse(result["checks"]["controlled_transparent_background"])
-        self.assertFalse(result["checks"]["semi_transparent_shadow"])
+        self.assertFalse(result["pose_checks"]["side"]["semi_transparent_shadow"])
 
     def test_large_opaque_black_margin_cannot_hide_behind_valid_goose_pixels(self):
         dark = composite(self.source, self.dark_background)

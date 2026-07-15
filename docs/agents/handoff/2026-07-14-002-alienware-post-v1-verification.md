@@ -1,5 +1,9 @@
 # Handoff: Alienware post-v1.0.0 verification passes
 
+> Superseded before publication: v1.0.0 failed closed before draft creation. Use
+> `2026-07-15-001-alienware-post-v1.0.1-verification.md` for the current verification-only
+> handoff. This file remains as historical planning evidence.
+
 **Prepared:** 2026-07-14
 **Scope:** Windows-host verification after the stable v1.0.0 release
 **Board:** `#m20q`

@@ -105,9 +105,10 @@ the sealed application bundle.
   `honk300-universal2.dmg`; GitHub's `/releases/latest/download/` pointer advances only when the
   complete release publishes, while every tagged DMG remains immutable. ADR 0023 defines this
   rolling-latest and exact-update boundary for all platforms.
-- The website may recommend the DMG only after the immutable v1.0.0 release is live and a fresh
-  download independently passes checksum, signature, team, notarization, stapling, Gatekeeper,
-  install, and update checks.
+- The website may recommend a release's DMG only after that immutable complete release is live
+  and a fresh download independently passes checksum, signature, team, notarization, stapling,
+  Gatekeeper, install, and update checks. ADR 0027 makes v1.0.1 the first release eligible for
+  this promotion after v1.0.0 failed before draft creation.
 - Live multi-monitor testing may be recorded as hardware-waived on a one-display Mac only after
   automated signed-coordinate and topology coverage passes; it must not be claimed as live proof.
 

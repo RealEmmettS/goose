@@ -16,8 +16,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > seasonal Autumn leaves. It now supports Windows multi-monitor chasing and fuller appearance
 > controls. Mac support and the Linux desktop paths are now in the codebase, with repeatable
 > CI smoke proof for hosted Mac bundle checks and Linux desktop behavior. The installed Mac app
-> now has a calm, non-nagging permission handoff, while its denied, repeat-denied, granted, and
-> revoked behavior still needs one final unchanged signed-app run. While running, the Mac app also
+> now has a calm, non-nagging permission handoff. One unchanged signed copy passed denied,
+> repeat-denied, granted, and revoked behavior on the physical Mac; a later fresh-release repeat
+> remains visible follow-up work. While running, the Mac app also
 > has a Honk menu that opens the same terminal settings screen or starts its animated goodbye.
 > Every desktop now stages the
 > Goose's arrival and departure beyond a real screen edge, and a person closing its note or meme
@@ -37,16 +38,17 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   second preferences window, a running Dock control, or a tray to Windows and Linux. This makes a
   graphical Mac install easier to control without splitting settings or bypassing the animated
   goodbye. A local packaged app opened and restored the full settings screen and walked fully out
-  when Quit was chosen; the final signed release still has to repeat both actions.
+  when Quit was chosen; a later fresh-release repeat remains visible follow-up work.
 - **Mac permission setup is now a calm, one-time handoff.** The officially installed Goose asks
   once for each installed update, opens the right Mac privacy page, and waits visibly near a safe
   screen edge instead of wandering off or attempting pranks. Honk, status, reload, and stop still
   work while it waits, and another denied launch does not reopen the page. Granting permission
   lets the same running Goose begin its normal introduction; taking permission away sends it
   safely back to the wait. Developer and test copies do not open permission pages on their own,
-  which avoids surprise prompts and repeated nagging. The behind-the-scenes checks pass, but the
-  release still needs one unchanged signed copy to prove denial, a second denial, permission
-  granted, and permission removed.
+  which avoids surprise prompts and repeated nagging. The behind-the-scenes checks pass, and one
+  unchanged signed copy also proved denial, a second denial, permission granted, and permission
+  removed on the physical Mac. A fresh-release repeat is still tracked without pretending it has
+  already happened.
 - **Mac now has a real graphical installer path.** The disk image includes the Goose, a small
   “Install Honk300” app, and short instructions. The helper confirms both apps came from the same
   fixed Developer ID application certificate, installs only for the signed-in user without an administrator password,
@@ -78,9 +80,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   and refuses an unfamiliar screen color layout instead of risking swapped or transparent
   colors. This makes Linux release proof match the real view people will see.
 - **Windows checks now inspect the real transparent desktop Goose.** The test keeps one exact
-  Windows build unchanged, holds the same walking pose over dark and light desktops, and checks
-  the body, shading, outline, wing, beak, two legs, soft shadow, transparency, and correct orange
-  colors. It also proves start, status, reload, stop, and an immediate restart, then keeps the
+  Windows build unchanged, holds the same pose over dark and light desktops, and checks the body,
+  shading, outline, wing, transparency, correct orange colors, and softly blended edges. A side
+  pose must also show its beak, two legs, and soft shadow; a top-down pose must show its compact
+  beak and complete overhead body-and-wing shape without pretending it has visible legs. It also
+  proves start, status, reload, stop, and an immediate restart, then keeps the
   pictures and logs when anything fails. The release gate runs this on both regular Windows PCs
   and native Windows-on-ARM hardware, using the same ARM file headed into its installer, then
   repeats it for the published regular-PC installer. This catches visual handoff bugs and everyday
@@ -100,9 +104,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ### Improved
 - **This is now the first stable Honk300 release.** Every download, installer, update record, and
   website check moves to the same stable baseline, including upgrades from the previous public
-  build. Extra hands-on Windows checks will continue afterward, and anything they find will be
-  repaired in a new update instead of silently replacing already published files. This makes the
-  release identity clear and keeps downloads reproducible.
+  build. The first publication attempt stopped safely before making any download public, so the
+  corrected release moves forward as a new patch instead of reusing that frozen tag. Extra
+  hands-on Windows checks will continue afterward, and anything they find will be repaired in a
+  new update instead of silently replacing already published files. This makes the release
+  identity clear and keeps downloads reproducible.
 - **One stable download address now follows every complete release.** The familiar Mac disk
   image, Windows installers, Linux packages, and terminal installers keep the same latest links,
   while every older release and its files stay frozen. A release started from any computer still
@@ -121,7 +127,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   screen-sized image. The incoming pixels keep their explicit drawing color format, while the Mac
   window uses a stable standard screen-color destination and lets the operating system handle the
   final physical display profile. This avoids a repeated conversion on every frame and passed a
-  clean low-processor diagnostic, though the final signed release still has to repeat it. It saves
+  clean low-processor diagnostic; a fresh-release repeat remains follow-up verification. It saves
   processor and battery work without changing the Goose's colors, motion, or update rate.
 - **A mounted disk image can use the normal safe installer.** The Goose can now copy its own
   verified app bundle into the user's Applications folder while preserving aliases, autostart,
@@ -135,6 +141,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   Accessibility checks happen without rebuilding the app between them.
 
 ### Fixed
+- **A valid overhead Goose no longer blocks an otherwise healthy release.** The first publication
+  attempt happened to photograph only complete top-down poses, while the Windows checker demanded
+  side-view legs and a ground shadow. The checker now recognizes either full drawing view and
+  still reconstructs softly blended edge colors so washed-out, double-faded, swapped, clipped, or
+  black-background pictures fail. Incomplete entrance frames still do not count. This removes
+  random pose timing from publication without changing how the Goose looks or moves.
 - **The Linux screen test no longer inherits a test machine's wallpaper.** The complete release
   rehearsal passed, but the ordinary follow-up check installed a fuller desktop package whose
   default wallpaper and top bar stayed on one virtual monitor. The Goose was correctly
@@ -180,8 +192,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   body could reach the center of a note while its beak—the part that actually has to grab it—was
   still too far away, leaving the behavior stuck. The Goose now adjusts where its body is headed
   as its beak moves, and a lifelike timed check walks all the way through grabbing and typing
-  without moving the beak by hand. The full local test set passes. A real signed-app fetch still
-  has to pass before release, so final native proof remains honestly open.
+  without moving the beak by hand. The full local test set passes, and a signed copy created and
+  typed a readable note. A fresh-release picture of exact beak contact remains follow-up evidence.
 - **An older Goose note or meme no longer blocks the next one.** Mac and Windows now keep track of
   which new window the Goose is actively fetching, even when an earlier note stays open. Closing
   an older window is still noticed once, but it cannot hide the current window and make the new

@@ -43,6 +43,9 @@ PALETTE_MINIMUMS = {
     "outline": 10,
 }
 
+TOP_DOWN_ORANGE_MINIMUM = 5
+TOP_DOWN_ORANGE_MAXIMUM = 20
+
 PRESENTER_MAGIC = b"HONK300_LAYERED_BGRA_V1"
 
 
@@ -183,6 +186,101 @@ def _components(mask: Sequence[bool], width: int, height: int, minimum_size: int
     return sorted(result, key=lambda component: component["pixels"], reverse=True)
 
 
+def _mask_bounds(mask: Sequence[bool], width: int) -> list[int] | None:
+    members = [index for index, enabled in enumerate(mask) if enabled]
+    if not members:
+        return None
+    xs = [index % width for index in members]
+    ys = [index // width for index in members]
+    return [min(xs), min(ys), max(xs) + 1, max(ys) + 1]
+
+
+def _has_complete_margin(bounds: Sequence[int] | None, width: int, height: int) -> bool:
+    return bool(
+        bounds
+        and bounds[0] > 0
+        and bounds[1] > 0
+        and bounds[2] < width
+        and bounds[3] < height
+    )
+
+
+def _classify_pose(
+    palette_counts: dict[str, int],
+    orange_components: Sequence[dict],
+    shadow_pixels: int,
+) -> tuple[str, dict[str, dict[str, bool]]]:
+    """Prove either renderer view without treating a valid top-down pose as damaged.
+
+    Side view intentionally exposes a separated beak/two-tone leg assembly and a
+    stippled ground shadow. Top-down view intentionally has a single compact beak,
+    no visible legs or ground shadow, a larger wing-to-body ratio, and much less
+    shade. Requiring the full view-specific signature prevents a damaged side view
+    from falling through to the top-down acceptance path.
+    """
+
+    orange_y_span = (
+        max(component["centroid"][1] for component in orange_components)
+        - min(component["centroid"][1] for component in orange_components)
+        if orange_components
+        else 0.0
+    )
+    side_checks = {
+        "two_tone_orange": (
+            palette_counts["orange"] >= PALETTE_MINIMUMS["orange"]
+            and palette_counts["orange_dark"] >= PALETTE_MINIMUMS["orange_dark"]
+        ),
+        "visible_beak_and_two_legs": (
+            len(orange_components) >= 2 and orange_y_span >= 15.0
+        ),
+        "semi_transparent_shadow": shadow_pixels >= 5,
+    }
+    top_down_checks = {
+        "single_compact_beak": (
+            len(orange_components) == 1
+            and TOP_DOWN_ORANGE_MINIMUM
+            <= palette_counts["orange"]
+            <= TOP_DOWN_ORANGE_MAXIMUM
+        ),
+        "no_dark_orange_legs": (
+            palette_counts["orange_dark"] < PALETTE_MINIMUMS["orange_dark"]
+        ),
+        "complete_top_down_palette": (
+            palette_counts["body"] >= 400
+            and palette_counts["wing"] >= 280
+            and palette_counts["outline"] >= 25
+        ),
+        # The committed top-down view dedicates at least 60% as many opaque
+        # palette pixels to its wing as its body. Every committed side view is
+        # below that ratio, even mid-stride.
+        "top_down_wing_body_ratio": (
+            palette_counts["wing"] * 5 >= palette_counts["body"] * 3
+        ),
+        # Top-down uses only a small neck/body shade. Side view has materially
+        # more shade, so this is a second independent view discriminator.
+        "top_down_shade_ratio": (
+            palette_counts["shade"] * 20 <= palette_counts["body"]
+        ),
+        # Removing the lower leg/shadow area from a side frame can otherwise
+        # leave one orange component. Top-down keeps a much smaller beak and
+        # outline share than that damaged side silhouette.
+        "top_down_beak_body_ratio": (
+            palette_counts["orange"] * 40 <= palette_counts["body"]
+        ),
+        "top_down_outline_body_ratio": (
+            palette_counts["outline"] * 8 <= palette_counts["body"]
+        ),
+        "no_ground_shadow": shadow_pixels < 5,
+    }
+    if all(side_checks.values()):
+        pose_kind = "side"
+    elif all(top_down_checks.values()):
+        pose_kind = "top-down"
+    else:
+        pose_kind = "unknown"
+    return pose_kind, {"side": side_checks, "top_down": top_down_checks}
+
+
 def analyze_captures(
     width: int,
     height: int,
@@ -198,10 +296,13 @@ def analyze_captures(
     palette_counts = dict.fromkeys(PALETTE, 0)
     transparent_pixels = 0
     semi_transparent_pixels = 0
+    semantic_edge_candidates = 0
+    semantic_edge_pixels = 0
     shadow_candidates: list[int] = []
     goose_palette_pixels: list[int] = []
     orange_mask = [False] * (width * height)
     unchanged_near_black_mask = [False] * (width * height)
+    content_mask = [False] * (width * height)
 
     background_delta = [light_background[i] - dark_background[i] for i in range(3)]
     if any(abs(delta) < 64 for delta in background_delta):
@@ -242,9 +343,11 @@ def analyze_captures(
             continue
         transmittance = sum(channel_transmittance) / 3.0
         alpha = 1.0 - transmittance
+        if alpha >= 0.02:
+            content_mask[index] = True
         if 0.08 <= alpha <= 0.92:
             semi_transparent_pixels += 1
-        if not 0.08 <= alpha <= 0.35:
+        if not 0.08 <= alpha <= 0.92:
             continue
 
         reconstructed = []
@@ -256,6 +359,12 @@ def analyze_captures(
                 light[channel] - (1.0 - alpha) * light_background[channel]
             ) / alpha
             reconstructed.append((from_dark + from_light) / 2.0)
+        if 0.15 <= alpha <= 0.85:
+            semantic_edge_candidates += 1
+            if any(_close(reconstructed, expected, 20) for expected in PALETTE.values()):
+                semantic_edge_pixels += 1
+        if alpha > 0.35:
+            continue
         if (
             # The stipple source is straight #202020 at alpha 42/255. A second
             # accidental premultiplication reconstructs near #050505 and must fail;
@@ -282,6 +391,12 @@ def analyze_captures(
     shadow_pixels = sum(
         1 for index in shadow_candidates if index // width > opaque_goose_bottom
     )
+    content_bounds = _mask_bounds(content_mask, width)
+    pose_kind, pose_checks = _classify_pose(
+        palette_counts,
+        orange_components,
+        shadow_pixels,
+    )
     total = width * height
     largest_near_black_component = max(
         (component["pixels"] for component in unchanged_near_black_components),
@@ -298,45 +413,45 @@ def analyze_captures(
         # The controlled backgrounds contain no near-black patch, so fail closed on
         # any connected unchanged block larger than one percent of the crop.
         "no_opaque_black_surface": largest_near_black_component <= max(25, total // 100),
+        "complete_content_margin": _has_complete_margin(content_bounds, width, height),
         "visible_body": palette_counts["body"] >= PALETTE_MINIMUMS["body"],
         "visible_shade": palette_counts["shade"] >= PALETTE_MINIMUMS["shade"],
         "visible_wing": palette_counts["wing"] >= PALETTE_MINIMUMS["wing"],
         "visible_outline": palette_counts["outline"] >= PALETTE_MINIMUMS["outline"],
+        # Both views contain deliberately asymmetric true-orange pixels, so an
+        # R/B bridge swap still fails even though top-down intentionally omits the
+        # dark-orange legs used by the side-view proof.
         "asymmetric_orange_channels": (
-            palette_counts["orange"] >= PALETTE_MINIMUMS["orange"]
-            and palette_counts["orange_dark"] >= PALETTE_MINIMUMS["orange_dark"]
-        ),
-        # The side renderer produces a beak component spatially separated from a
-        # two-tone leg/foot assembly (near orange + far dark orange). The top-down
-        # renderer has only the beak, so this also guarantees CI observed an
-        # articulated side-view pose. The feet can overlap mid-stride, which is why
-        # the two leg tones are checked separately instead of demanding three blobs.
-        "visible_beak_and_two_legs": (
-            len(orange_components) >= 2
-            and max(component["centroid"][1] for component in orange_components)
-            - min(component["centroid"][1] for component in orange_components)
-            >= 15.0
-            and palette_counts["orange_dark"] >= PALETTE_MINIMUMS["orange_dark"]
+            palette_counts["orange"] >= TOP_DOWN_ORANGE_MINIMUM
         ),
         "semi_transparent_edges": semi_transparent_pixels >= 20,
-        "semi_transparent_shadow": shadow_pixels >= 5,
+        "semantic_edge_colors": (
+            semantic_edge_pixels >= 50
+            and semantic_edge_pixels * 2 >= semantic_edge_candidates
+        ),
+        "view_appropriate_articulation": pose_kind != "unknown",
     }
     return {
         "passed": all(checks.values()),
+        "pose_kind": pose_kind,
         "dimensions": [width, height],
         "backgrounds": {
             "dark": list(dark_background),
             "light": list(light_background),
         },
         "checks": checks,
+        "pose_checks": pose_checks,
         "counts": {
             "transparent": transparent_pixels,
             "semi_transparent": semi_transparent_pixels,
+            "semantic_edge_candidates": semantic_edge_candidates,
+            "semantic_edge_colors": semantic_edge_pixels,
             "shadow": shadow_pixels,
             "largest_unchanged_near_black_component": largest_near_black_component,
             "palette": palette_counts,
         },
         "orange_components": orange_components,
+        "content_bounds": content_bounds,
         "unchanged_near_black_components": unchanged_near_black_components,
     }
 
@@ -386,17 +501,22 @@ def analyze_surface(
     palette_counts = dict.fromkeys(PALETTE, 0)
     transparent_pixels = 0
     semi_transparent_pixels = 0
+    semantic_edge_candidates = 0
+    semantic_edge_pixels = 0
     invalid_premultiplied_pixels = 0
     opaque_goose_pixels: list[int] = []
     shadow_candidates: list[int] = []
     orange_mask = [False] * (width * height)
     opaque_near_black_mask = [False] * (width * height)
+    content_mask = [False] * (width * height)
 
     for index, (red, green, blue, alpha) in enumerate(pixels):
         if any(channel > alpha for channel in (red, green, blue)):
             invalid_premultiplied_pixels += 1
         if alpha <= 3:
             transparent_pixels += 1
+        else:
+            content_mask[index] = True
         if 4 <= alpha <= 244:
             semi_transparent_pixels += 1
         if alpha >= 245 and max(red, green, blue) <= 12:
@@ -407,6 +527,10 @@ def analyze_surface(
             if alpha
             else (0, 0, 0)
         )
+        if 38 <= alpha <= 217:
+            semantic_edge_candidates += 1
+            if any(_close(straight, expected, 20) for expected in PALETTE.values()):
+                semantic_edge_pixels += 1
 
         matches: list[tuple[float, str]] = []
         if alpha >= 245:
@@ -446,6 +570,12 @@ def analyze_surface(
     shadow_pixels = sum(
         1 for index in shadow_candidates if index // width > opaque_goose_bottom
     )
+    content_bounds = _mask_bounds(content_mask, width)
+    pose_kind, pose_checks = _classify_pose(
+        palette_counts,
+        orange_components,
+        shadow_pixels,
+    )
     total = width * height
     largest_opaque_near_black_component = max(
         (component["pixels"] for component in opaque_near_black_components),
@@ -457,38 +587,41 @@ def analyze_surface(
         "no_opaque_black_surface": (
             largest_opaque_near_black_component <= max(25, total // 100)
         ),
+        "complete_content_margin": _has_complete_margin(content_bounds, width, height),
         "visible_body": palette_counts["body"] >= PALETTE_MINIMUMS["body"],
         "visible_shade": palette_counts["shade"] >= PALETTE_MINIMUMS["shade"],
         "visible_wing": palette_counts["wing"] >= PALETTE_MINIMUMS["wing"],
         "visible_outline": palette_counts["outline"] >= PALETTE_MINIMUMS["outline"],
         "asymmetric_orange_channels": (
-            palette_counts["orange"] >= PALETTE_MINIMUMS["orange"]
-            and palette_counts["orange_dark"] >= PALETTE_MINIMUMS["orange_dark"]
-        ),
-        "visible_beak_and_two_legs": (
-            len(orange_components) >= 2
-            and max(component["centroid"][1] for component in orange_components)
-            - min(component["centroid"][1] for component in orange_components)
-            >= 15.0
+            palette_counts["orange"] >= TOP_DOWN_ORANGE_MINIMUM
         ),
         "semi_transparent_edges": semi_transparent_pixels >= 20,
-        "semi_transparent_shadow": shadow_pixels >= 5,
+        "semantic_edge_colors": (
+            semantic_edge_pixels >= 50
+            and semantic_edge_pixels * 2 >= semantic_edge_candidates
+        ),
+        "view_appropriate_articulation": pose_kind != "unknown",
     }
     return {
         "passed": all(checks.values()),
         "mode": "exact-layered-presenter-surface",
+        "pose_kind": pose_kind,
         "dimensions": [width, height],
         "present": present,
         "checks": checks,
+        "pose_checks": pose_checks,
         "counts": {
             "transparent": transparent_pixels,
             "semi_transparent": semi_transparent_pixels,
+            "semantic_edge_candidates": semantic_edge_candidates,
+            "semantic_edge_colors": semantic_edge_pixels,
             "invalid_premultiplied": invalid_premultiplied_pixels,
             "shadow": shadow_pixels,
             "largest_opaque_near_black_component": largest_opaque_near_black_component,
             "palette": palette_counts,
         },
         "orange_components": orange_components,
+        "content_bounds": content_bounds,
         "opaque_near_black_components": opaque_near_black_components,
     }
 

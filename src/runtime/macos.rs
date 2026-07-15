@@ -823,8 +823,8 @@ mod tests {
             state_root.join("install-receipt.json"),
             serde_json::to_vec(&json!({
                 "schema": "honk300.install.v1",
-                "version": "1.0.0",
-                "tag": "v1.0.0",
+                "version": "1.0.1",
+                "tag": "v1.0.1",
                 "commit": TEST_SHA,
                 "install_root": app.to_string_lossy(),
             }))
@@ -833,15 +833,15 @@ mod tests {
         .expect("receipt");
         let metadata = MacBundleReleaseMetadata {
             bundle_id: "dev.emmetts.honk300".into(),
-            version: "1.0.0".into(),
-            tag: "v1.0.0".into(),
+            version: "1.0.1".into(),
+            tag: "v1.0.1".into(),
             commit: TEST_SHA.into(),
         };
         let onboarding = AccessibilityOnboarding::detect(home.path(), &executable, &metadata)
             .expect("managed onboarding");
         let marker = home
             .path()
-            .join("Library/Application Support/honk300/state/accessibility-prompt-v1/1.0.0");
+            .join("Library/Application Support/honk300/state/accessibility-prompt-v1/1.0.1");
         (home, onboarding, marker)
     }
 

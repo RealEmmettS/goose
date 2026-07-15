@@ -1,6 +1,9 @@
 # ADR 0026 — Hosted Windows ARM64 Compositor Evidence Boundary
 
 - Status: Accepted (2026-07-14)
+- Superseded in part: ADR 0027 replaces only the side-view-only semantic-pose assumption with
+  strict side-or-top-down evidence. The hosted-ARM64 predicate, HWND/rectangle binding, raw
+  premultiplication proof, and all real-machine requirements remain accepted.
 - Relates to: ADR 0012 (CI-proven backend readiness), ADR 0015 (Windows layered-overlay safety),
   ADR 0018 (candidate-first publication), and ADR 0025 (v1.0.0 release gate).
 - Supersedes: only the assumption that GitHub's `windows-11-arm` public-preview runner can always

@@ -1,6 +1,6 @@
 # M16.1-M18.1 Backend Readiness
 
-Last updated: 2026-07-13
+Last updated: 2026-07-15
 
 ## Status
 
@@ -8,11 +8,11 @@ M16-M18 implementation is in-tree. M16.1-M18.1 readiness is a CI-plus-native-evi
 cross-target claim. GitHub-hosted runners provide Linux X11/Wayland evidence for `#m17r` and
 `#m18r`; hosted Intel and Apple Silicon runners provide the ordinary macOS bundle gate. Managed
 macOS Accessibility first-run onboarding is implemented and its focused automated tests pass. On
-2026-07-12, one unchanged Developer ID-signed app on a physical M2 also passed the earlier denied
-and operator-granted command/status smoke. `#m16r` remains open until the exact signed release
-candidate records the new first-denied prompt/wait, non-nagging denied relaunch, live grant, and
-live revocation sequence against one recorded binary digest, plus the remaining terminal/one-
-display observations.
+2026-07-15, one unchanged Developer ID-signed app on a physical M2 passed first-denied safe wait,
+non-nagging denied relaunch, same-process live grant, and same-process live revocation against one
+recorded binary digest. `#m16r` is closed with explicit source-equivalent, terminal-tooling, absent-
+Ghostty, and one-display waivers below; no byte-exact-final-Mac, live Ghostty, or live multi-monitor
+claim is made.
 
 ## Implemented Evidence
 
@@ -68,8 +68,8 @@ display observations.
   live, and pre-granted phases. Its live phase verifies the owner-only marker, calm denied status,
   reload/honk plus `BUSY` prank rejection, a second denied launch without marker rewrite,
   same-process grant, live revocation back to denied wait, unchanged signed-binary/marker
-  fingerprints, operator-observed UI state, and opt-in scoped cleanup. The exact candidate still
-  needs that four-state native run.
+  fingerprints, operator-observed UI state, and opt-in scoped cleanup. The product-equivalent
+  signed candidate passed that four-state native run; exact final-SHA repetition is waived below.
 - `script/smoke_m17_m18_linux.sh` accepts an exact `HONK300_BIN` and does not rebuild it. It runs
   a visible X11 overlay under Xvfb/openbox/xcompmgr, checks status, rejects any direct visual whose
   byte order, masks, shifts, bpp, or scanline layout is not the expected little-endian ARGB8888
@@ -82,24 +82,20 @@ display observations.
 
 ## Readiness Evidence State
 
-- `#m16r` remains open. Hosted macOS bundle/status smoke passed on both arm64 and Intel hosted
-  runners, but hosted jobs cannot grant durable Accessibility permission or prove native prompt
-  behavior. The onboarding engine, eligibility, secure marker, native bridge, transition, and
-  smoke-script contracts are green. The remaining gap is the exact signed candidate's first
-  denied prompt and safe-edge observation, non-nagging denied relaunch, live grant without
-  restart, live revocation back to the wait, ordinary-window positive behavior, and protected-
-  terminal negatives. The native run requires explicit operator confirmations for prompt/no-
-  prompt state, timed transitions, the same signed binary digest throughout, and opt-in cleanup.
-  Record that evidence here before closing `#m16r`.
+- `#m16r` is closed. Hosted macOS bundle/status smoke passed on arm64 and Intel, automated
+  onboarding/classifier/topology contracts are green, and the physical M2 four-state run below
+  proved the managed native transition path. The exact-final-SHA repeat and physical ordinary/
+  terminal manipulation matrix are accepted source-equivalent/tooling waivers under the
+  operator's explicit stable-now/forward-patch direction. Ghostty and multiple displays were not
+  present; neither is claimed live.
 - `#m17r` is closed from its original readiness scope. Linux x64 and ARM hosted X11 visible smoke passed, including
   internal frame proof, root screenshot proof, IPC status/reload/stop/poke, terminal-filter
-  fixture coverage, and GNU/musl target checks. v1.0.0 adds a stricter exact-binary visual-layout
-  gate whose first x64/ARM64 candidate executions are still pending and must not be inferred from
-  the older closure.
+  fixture coverage, and GNU/musl target checks. The stricter exact-binary visual-layout gate passed
+  candidate `29392439475` on x64/ARM64 GNU/musl and repeats in every release candidate.
 - `#m18r` is closed from its original readiness scope. Linux x64 and ARM hosted Wayland reduced-mode smoke passed under
   headless sway, including visible frame proof, IPC status/reload/stop/poke, and explicit
-  unsupported mischief status. The new semantic `grim` compositor assertion likewise remains a
-  v1.0.0 native-candidate gate until both hosted architectures run it.
+  unsupported mischief status. The semantic `grim` compositor assertion passed candidate
+  `29392439475` on both hosted architectures and repeats in every release candidate.
 
 ## Physical M2 macOS Evidence (2026-07-12)
 
@@ -126,6 +122,45 @@ display observations.
 - This preliminary run predates ADR 0022's managed first-run flow. It does not prove the native
   prompt appeared once, the second denied launch did not nag, FirstUX resumed from the wait, or a
   live revocation returned the goose to that wait.
+
+## Physical M2 managed-onboarding closure (2026-07-15)
+
+- Candidate `29391420738` produced the signed/notarized/stapled app whose product code is
+  `ba483811176ec5144971c0676cfed54d11d5abe7`. The unchanged signed executable had SHA-256
+  `55893d07eae1040096cd97e5cddc0c5a7fb5adf18734eeb3360060c129d74c4f` and stayed process
+  `42476` through both live transitions. The later exact release
+  source `9c5692b32bb256d3008308c83d76ddebd7fb44df` changed Linux smoke/documentation plus stamped
+  commit metadata, not Mac product behavior or designated requirement. Exact `9c5692b` app/DMG
+  artifacts separately passed universal slices, Developer ID team `M9D5379H93`, hardened runtime,
+  secure timestamp, stable designated requirement, notarization, stapling, and Gatekeeper.
+- First denied launch displayed the managed consent/Settings handoff once, created the owner-only
+  marker, parked at the safe edge, reported denied cursor/window capability, allowed status,
+  reload, honk, and stop, and returned `BUSY` for permission-bound controls. Relaunching the same
+  denied app preserved marker/binary identity and did not reopen consent or Settings.
+- Enabling the visible Honk300 row changed that same running process to supported Accessibility,
+  cursor, and window capability in 102 ms and resumed FirstUX. Disabling only that row returned the
+  same process to denied capability/safe wait in 127 ms, cancelled permission-bound work, did not
+  reopen Settings, and retained the allowed controls. The official smoke transcript exited zero
+  under ignored qualification evidence.
+- Granted collect spawned and typed a real note reading “i cause problems on purpose and then bill
+  them as features.” The note remained readable in Dark appearance. The native endpoint plus the
+  fixed 120 Hz beak-offset regression proves task progress; a decisive visual beak-contact frame
+  is deferred hardware verification rather than claimed.
+- Terminal.app, Codex, and Visual Studio Code identities are covered by the fail-closed native
+  classifier and prior development observations. The desktop-control driver could not physically
+  move even the positive TextEdit fixture during this closure pass, so the exact ordinary-window
+  positive and terminal-negative manipulation matrix is tooling-waived to those automated/prior
+  checks. Ghostty was absent and is software-waived. No live manipulation claim is added.
+- This Mac had one display. Live multi-monitor/hot-plug remains hardware-waived while signed-
+  coordinate, topology, gapped-layout, per-monitor-window, and hot-plug reconciliation tests pass.
+  No live multi-display claim is made.
+- Scoped cleanup removed the app, aliases, LaunchAgent/service, receipt/state/media/backups,
+  process, socket/runtime directories, mounts, and test fixtures. With fresh action-time approval,
+  only Honk300's Accessibility row was switched off; no other privacy entry changed.
+- Closure decision: exact-final-SHA live repetition and the manipulation matrix are explicit
+  verification waivers, not silent passes. The operator directed stable publication now and
+  later Alienware/native checks as forward-patch input. These waivers do not authorize weakening
+  any Mac pixel, Accessibility, signing, lifecycle, terminal-protection, or cleanup contract.
 
 ## Local Verification Commands
 

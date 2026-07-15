@@ -1,6 +1,9 @@
 # ADR 0025 — First Stable v1 Release And Post-Release Hardware Verification
 
 - Status: Accepted (2026-07-14)
+- Superseded in part: ADR 0027 replaces only the prospective `v1.0.0` public tag after that
+  immutable tag failed closed before draft creation. `v1.0.1` is the first public stable target;
+  the release and post-release hardware-verification contracts below remain accepted.
 - Relates to: ADR 0018 (candidate-first atomic publication), ADR 0020 (Developer ID macOS
   distribution), ADR 0022 (macOS Accessibility evidence), ADR 0023 (complete rolling releases),
   and ADR 0024 (macOS menu-bar control).

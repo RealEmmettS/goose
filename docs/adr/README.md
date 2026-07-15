@@ -37,3 +37,4 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0024 — macOS Menu-Bar Control](./0024-macos-menu-bar-control.md)
 - [0025 — First Stable v1 Release And Post-Release Hardware Verification](./0025-first-stable-v1-release.md)
 - [0026 — Hosted Windows ARM64 Compositor Evidence Boundary](./0026-hosted-windows-arm64-compositor-evidence.md)
+- [0027 — v1.0.1 Fix-Forward And Windows Pose-Complete Evidence](./0027-v1-0-1-fix-forward-and-windows-pose-evidence.md)

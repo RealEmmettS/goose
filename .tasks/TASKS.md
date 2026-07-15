@@ -3,13 +3,19 @@
 ## Backlog
 
 ## To-Do
+- [ ] **Post-v1 Alienware and supplemental native verification** - fresh-download the published stable artifacts, repeat Windows hardware and deferred Mac/Linux checks, and fix any finding only in a forward patch without mutating published tags or weakening Mac/platform contracts (owner next-agent) #v1a
+  - [ ] Verify published SHA, manifest, hashes, stable latest aliases, and all Windows x64 install/update/uninstall paths on the Alienware.
+  - [ ] Run the exact Windows layered-overlay lifecycle smoke and visually inspect side/top-down, movement, reactions, notes/memes, audio, terminal protection, and multi-monitor behavior.
+  - [ ] When Mac hardware is next available, repeat the deferred exact-SHA live profile, menu, beak-contact, lifecycle/update/rollback, terminal matrix, and any available multi-monitor/Ghostty checks.
+  - [ ] Record Linux real-hardware observations where available without overstating native Wayland reduced-mode capabilities.
+  - [ ] Ship findings only as reviewed forward patch releases; never move or replace v1.0.0/v1.0.1 tags or assets.
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
 - [ ] **Portable Wayland observation and portal spike** - probe staging toplevel identity plus explicit XDG Remote Desktop/libei cursor capability without claiming geometry/move parity; terminal protection and revocation are hard gates (needs #a6e) #wlp
 - [ ] **KDE native Wayland companion** - prototype a user-enabled KWin script and authenticated same-user bridge for exact window geometry, move-state, bounded movement, topology, and terminal-negative enforcement (needs #a6e) #wlk
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## Active
-- [ ] **v1.0.0 first stable release — native qualification, signed distribution, and DMG-first site** - fix the AppKit renderer bridge, qualify all native functionality, publish the first stable major Developer ID-signed and notarized release, then promote its DMG on the website (owner codex) #m20q
+- [ ] **v1.0.1 first public stable release — native qualification, signed distribution, and DMG-first site** - preserve the immutable failed-before-draft v1.0.0 tag, fix its pose-only Windows qualifier, publish the first public stable major Developer ID-signed and notarized release, then promote its DMG on the website (owner codex) #m20q
   - [x] Repair and visually verify the macOS renderer bridge.
   - [x] Fix dark-mode Mac note contrast and audit equivalent Windows/Linux presentation paths.
   - [x] Refine cross-platform planted-foot timing and cap visible leg stretch.
@@ -17,17 +23,19 @@
     > Final-clear, gapped-monitor staging, permission-wait hot-plug, stop-transition, and bounded-deadline regressions pass independent review.
   - [x] Finish the user-only 30% note/meme-close annoyed reaction with separately gated bounded mouse nab.
     > Typed request correlation, lingering-window routing, Windows close provenance, onscreen deferral, and exact-once behavior pass independent review.
-  - [ ] Repair and re-qualify collect-window locomotion so the beak reaches the spawned prop.
-    > Live macOS qualification exposed a body-center target versus beak-distance completion deadlock. The per-tick beak-offset target and realistic 120 Hz grab/type regression now pass; exact signed-app grab/release/type proof remains required.
+  - [~] Repair and re-qualify collect-window locomotion so the beak reaches the spawned prop.
+    > The per-tick beak-offset target and realistic 120 Hz grab/type regression pass. A product-equivalent signed app spawned and typed a readable native note; exact visual beak-contact capture is deferred verification, not claimed (waived 2026-07-15 — agent: codex).
   - [x] Pin an exact Linux binary and add compositor-visible X11/Wayland color evidence.
   - [x] Add exact-binary Windows layered-compositor and lifecycle evidence to CI, candidate, and published-MSI gates.
   - [ ] Run the new exact-candidate compositor gates natively on Windows x64/ARM64 and Linux x64/ARM64.
-    > Candidate 29391420738 passed every native/release gate and final assembly. Main CI then proved Ubuntu 24.04's one-pixel swaybg solid-color buffer becomes a gradient through the 1.5x linear pixman filter before Honk300 launches. The private config now has no background rule; discovered output names receive tiled opaque PNGs before the paired baseline. The changed SHA must rerun; no product background or ARM64 DWM claim is made.
-  - [ ] Optimize and profile the macOS runtime; repeat active-motion capture and the 10+60 second profile on the fixed exact candidate.
+    > v1.0.0 candidate 29392439475 and same-SHA CI 29392827146 passed every native compositor/release gate at 9c5692b after the private Sway background repair. Its later release failed only the side-only Windows pose oracle; v1.0.1 must freshly repeat the full matrix with the strict side/top-down analyzer. No product background or ARM64 DWM claim is made.
+  - [~] Optimize and profile the macOS runtime; repeat active-motion capture and the 10+60 second profile on the fixed exact candidate.
+    > Active diagnostic passed at 5.55% median CPU, 29.52 MiB max RSS, -9.89 MiB growth, zero leaks, and 20 clean captures. Exact-final-SHA repeat is source-equivalent-waived for stable publication and remains Alienware/Mac forward verification (waived 2026-07-15 — agent: codex).
   - [x] Implement the approved first-run Accessibility prompt and calm permission-wait behavior.
   - [x] Add a macOS-only menu-bar control with accessible Configure and graceful Quit actions.
-    > Local packaged-app smoke exposed the Honk/Configure/Quit controls, launched the full existing TUI in Terminal, restored it cleanly, and completed animated Quit in four seconds. Exact final-candidate repetition remains a release verification gate; Windows and Linux remain unchanged.
-  - [ ] Complete denied and granted Accessibility qualification.
+    > Local packaged-app smoke exposed the Honk/Configure/Quit controls, launched the full existing TUI in Terminal, restored it cleanly, and completed animated Quit in four seconds. Exact-final-SHA repetition moves to #v1a; Windows and Linux remain unchanged.
+  - [x] Complete denied and granted Accessibility qualification.
+    > One unchanged signed executable passed first denied, non-nag denied relaunch, 102 ms same-process grant, and 127 ms same-process revoke. Exact-SHA/terminal-driver/Ghostty/one-display limitations are recorded `[~]` under closed #m16r.
   - [x] Verify CLI, TUI, IPC, and preliminary lifecycle behavior; repeat terminal/lifecycle checks on the exact candidate.
   - [x] Add the per-user graphical DMG installer.
   - [x] Quiesce the running managed app before shell update, mounted-DMG replacement, or uninstall; fail closed before mutation and verify release metadata before writing a receipt.
@@ -43,28 +51,30 @@
   - [ ] Prove both Debian packages on native amd64/arm64 candidate and published-release hosts, including exact-vs-latest bytes, compositor output, all three update aliases, uninstall, and purge.
   - [x] Run the complete integrated local Rust, universal-Apple, packaging, workflow, audit, shell, cross-target, and diff gate on the Mac stopping commit.
     > Repeated after the menu, X11/Windows capture, status-pipe, and collect fixes: 432 Rust tests, 95 Python contracts, all seven goldens, strict native/cross clippy, release/Apple builds, dist plan, audit, actionlint, syntax, and diff checks pass.
-  - [ ] Capture and inspect the exact Mac candidate across light/dark output, eight headings, animation/secondary motion, mud/prank states, entry/wrap/exit, and a real user-close reaction.
-  - [ ] Repeat exact-candidate CLI/TUI/IPC/audio/terminal behavior, including ordinary-window positives and protected-terminal negatives.
-  - [ ] Prove helper install, autostart, stop/start, v0.3.2→v1.0.0 update, rollback injection, foreign-file preservation, uninstall/purge, and final host cleanup.
-  - [ ] Add Developer ID signing, notarization, and packaging evidence.
+  - [~] Capture and inspect the exact Mac candidate across light/dark output, eight headings, animation/secondary motion, mud/prank states, entry/wrap/exit, and a real user-close reaction.
+    > Product-equivalent light/dark/note evidence plus automated eight-heading/secondary-motion/mud/prank/edge/reaction contracts pass. The complete exact live capture sheet moves to #v1a without a stronger claim (waived 2026-07-15 — agent: codex).
+  - [~] Repeat exact-candidate CLI/TUI/IPC/audio/terminal behavior, including ordinary-window positives and protected-terminal negatives.
+    > Exact final source passed aliases, grammar, status/help/version/broken-pipe and 80×24 TUI; product-equivalent native actions/audio passed. The manipulation matrix is tooling-waived under #m16r and moves to #v1a (waived 2026-07-15 — agent: codex).
+  - [~] Prove helper install, autostart, stop/start, v0.3.2→v1.0.1 update, rollback injection, foreign-file preservation, uninstall/purge, and final host cleanup.
+    > Candidate-equivalent install/update/rollback/foreign-file/purge paths and final real-host cleanup pass. Fresh published v0.3.2→v1.0.1 update and injected rollback repetition move to verification card #v1a (waived 2026-07-15 — agent: codex).
+  - [x] Add Developer ID signing, notarization, and packaging evidence.
+    > Exact v1.0.0 candidate/release jobs produced and independently validated the G2-signed/notarized/stapled app and DMG before atomic publication failed elsewhere; v1.0.1 candidate/release must freshly repeat the same fail-closed producer.
   - [ ] Pass candidate and default-branch CI on the same exact SHA before creating the immutable tag.
-  - [ ] Cut the immutable v1.0.0 release and pass atomic publication plus post-release smoke tests.
-  - [ ] Fresh-download the published app ZIP and DMG and independently recheck hashes, trust, install, and v0.3.2→v1.0.0 update.
+  - [ ] Cut the immutable v1.0.1 release and pass atomic publication plus post-release smoke tests.
+    > Immutable v1.0.0 failed before draft creation on a top-down/side-only test mismatch and remains untouched under ADR 0027.
+  - [ ] Fresh-download the published app ZIP and DMG and independently recheck hashes, trust, install, and v0.3.2→v1.0.1 update.
   - [x] Finish and push the accessible progressive-disclosure site with stable latest DMG/Debian links, strict manifest checks, local/browser tests, hosted Windows/Linux CI, and a protected preview.
-  - [ ] Validate the website preview against the live v1.0.0 manifest, then promote and verify the DMG-first production deployment.
+  - [ ] Validate the website preview against the live v1.0.1 manifest, then promote and verify the DMG-first production deployment.
   - [ ] Synchronize ADRs, README, both changelogs, readiness evidence, CODEX_PROJECT, guidance, task activity, and the Alienware handoff; commit and push the completed board.
-- [ ] **M16.1 — exact-candidate macOS host readiness** - one unchanged signed candidate through first-denied, non-nagging relaunch, live grant/revocation, terminal protection, and ordinary-window evidence #m16r
-  - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
-    > Latest checked successful run `29131779321` passed Intel and Apple Silicon bundle smoke and still skipped the optional pre-granted Accessibility job.
-  - [x] Run the preliminary denied/granted smoke on one unchanged Developer ID-signed app on the physical M2.
-    > The exact v1.0.0 candidate still needs ADR 0022's first-denied, non-nagging relaunch, live-grant, and live-revocation sequence.
-  - [x] Record the preliminary Accessibility-granted evidence in `docs/readiness/m16-m18-readiness.md`.
-  - [ ] Run ADR 0022's exact-candidate first-denied, denied non-nag relaunch, live-grant, and live-revocation sequence on one recorded binary digest.
-  - [ ] Record exact-candidate protected-terminal negatives and one ordinary-window positive.
-  - [~] Live multi-monitor/hot-plug is hardware-waived on this one-display Mac; automated signed-coordinate/topology/hot-plug tests pass, and no live claim is made.
-  - [ ] Verify or waive every `#m16r` verification item before moving the card to Done.
-
 ## Done
+- [x] **M16.1 — exact-candidate macOS host readiness** - one unchanged signed candidate completed first-denied, non-nagging relaunch, live grant/revocation, with explicit exact-final-SHA, terminal-driver, absent-Ghostty, and one-display waivers recorded in readiness evidence (done 2026-07-15) #m16r
+  - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
+  - [x] Run the preliminary denied/granted smoke on one unchanged Developer ID-signed app on the physical M2.
+  - [x] Record the preliminary Accessibility-granted evidence in `docs/readiness/m16-m18-readiness.md`.
+  - [~] ADR 0022's four-state sequence passed on the product-equivalent signed candidate; exact-final-SHA live repetition is source-equivalent-waived under the stable-now/forward-patch direction.
+  - [~] Protected-terminal and ordinary-window manipulation are tooling-waived after the desktop driver failed even the positive TextEdit control; automated classifiers and prior native evidence remain green, and Ghostty was absent.
+  - [~] Live multi-monitor/hot-plug is hardware-waived on this one-display Mac; automated signed-coordinate/topology/hot-plug tests pass, and no live claim is made.
+  - [x] Verify or waive every `#m16r` verification item before moving the card to Done.
 - [x] **Name interchangeability + site usage clarity** - verified `honk300`/`honk`/`goose` are fully interchangeable across every command (install aliases all three → same binary; `normalize_args` never branches on arg0; only internal `honk300 --version` self-call in update.rs). Locked in with `all_three_names_are_fully_interchangeable` test (13 CLI tests green). Site usage section reworked: consistent `honk300` display (no more honk300↔goose switching), natural order (start/stop → configure → install/autostart → pokes → flags), goose-speak kept as "Also:" notes, interchangeability banner (done 2026-07-08) #names
 - [x] **v0.2.1 release — side-view neck refinement** - version bump + changelog cut (commit eb40260); tag `v0.2.1` drove cargo-dist Release → chained macOS Packaging + Windows Installers; wrap-up email sent (done 2026-07-08) #v021
   - [x] Release + macOS Packaging + Windows Installers workflows green; full 40-asset set verified (universal2 DMG + darwin tarballs + Windows MSI/EXE ×2 arch); v0.2.1 is latest, latest/download serves real bytes.

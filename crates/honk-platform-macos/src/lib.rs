@@ -1666,8 +1666,8 @@ mod platform {
         fn bundle_release_metadata_rejects_missing_or_non_string_values() {
             let complete = bundle_release_metadata_from_values(|key| match key {
                 "CFBundleIdentifier" => Some(BundleInfoValue::String("dev.emmetts.honk300".into())),
-                "CFBundleShortVersionString" => Some(BundleInfoValue::String("1.0.0".into())),
-                "Honk300ReleaseTag" => Some(BundleInfoValue::String("v1.0.0".into())),
+                "CFBundleShortVersionString" => Some(BundleInfoValue::String("1.0.1".into())),
+                "Honk300ReleaseTag" => Some(BundleInfoValue::String("v1.0.1".into())),
                 "Honk300ReleaseCommit" => Some(BundleInfoValue::String("abc123".into())),
                 _ => None,
             });
@@ -1675,15 +1675,15 @@ mod platform {
                 complete,
                 Some(MacBundleReleaseMetadata {
                     bundle_id: "dev.emmetts.honk300".into(),
-                    version: "1.0.0".into(),
-                    tag: "v1.0.0".into(),
+                    version: "1.0.1".into(),
+                    tag: "v1.0.1".into(),
                     commit: "abc123".into(),
                 })
             );
 
             let missing = bundle_release_metadata_from_values(|key| match key {
                 "CFBundleIdentifier" => Some(BundleInfoValue::String("dev.emmetts.honk300".into())),
-                "CFBundleShortVersionString" => Some(BundleInfoValue::String("1.0.0".into())),
+                "CFBundleShortVersionString" => Some(BundleInfoValue::String("1.0.1".into())),
                 "Honk300ReleaseTag" => None,
                 "Honk300ReleaseCommit" => Some(BundleInfoValue::String("abc123".into())),
                 _ => None,
@@ -1692,8 +1692,8 @@ mod platform {
 
             let non_string = bundle_release_metadata_from_values(|key| match key {
                 "CFBundleIdentifier" => Some(BundleInfoValue::String("dev.emmetts.honk300".into())),
-                "CFBundleShortVersionString" => Some(BundleInfoValue::String("1.0.0".into())),
-                "Honk300ReleaseTag" => Some(BundleInfoValue::String("v1.0.0".into())),
+                "CFBundleShortVersionString" => Some(BundleInfoValue::String("1.0.1".into())),
+                "Honk300ReleaseTag" => Some(BundleInfoValue::String("v1.0.1".into())),
                 "Honk300ReleaseCommit" => Some(BundleInfoValue::NonString),
                 _ => None,
             });

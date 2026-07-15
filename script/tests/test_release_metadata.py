@@ -64,7 +64,7 @@ class ReleaseMetadataTests(unittest.TestCase):
                 (root / name).write_bytes(name.encode())
             release_metadata.write_sha256_sidecars(root)
             manifest = release_metadata.build_manifest(
-                str(root), "v1.0.0", "0123456789abcdef0123456789abcdef01234567"
+                str(root), "v1.0.1", "0123456789abcdef0123456789abcdef01234567"
             )
             artifacts = {artifact["name"]: artifact for artifact in manifest["artifacts"]}
             self.assertEqual(artifacts["honk300-amd64.deb"]["kind"], "deb")

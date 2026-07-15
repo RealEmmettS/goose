@@ -8,10 +8,11 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.0.0 first-stable release qualification.** M0-M19 are implemented in-tree. M16.1 macOS
-Accessibility onboarding is implemented and automated tests are green, while readiness remains
-gated on exact signed-candidate denied, non-nagging relaunch, live-grant, and live-revocation
-evidence. The repo now has a Cargo workspace, a platform-free
+**Current stage: v1.0.1 first-public-stable fix-forward qualification.** M0-M19 are implemented
+in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
+passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
+Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
+explicit forward-verification waivers rather than stronger native claims. The repo now has a Cargo workspace, a platform-free
 `honk-engine`, shared `honk-control`, versioned TOML `honk-config`, the `honk-config-tui`
 terminal UI, Windows, macOS, and Linux platform crates, the `honk300` binary, the approved
 built-in media catalog, canonical planning docs, and ADRs under `docs/adr/`. M13's dynamic moods and
@@ -24,8 +25,9 @@ Linux X11 visible overlay path with input shaping, pointer sampling/warp, termin
 foreign-window snapshots, and Unix IPC control. M18 adds native Wayland reduced mode with
 layer-shell rendering, IPC control, and explicit unsupported reporting for blocked mischief.
 Linux collect-window support remains unsupported and is reported honestly.
-`docs/readiness/m16-m18-readiness.md` records the local gate, CI smoke gates, and pending macOS
-Accessibility evidence log. M19 adds real `install`, `uninstall --purge`, and `update` code paths
+`docs/readiness/m16-m18-readiness.md` records the local gate, CI smoke gates, completed managed
+macOS Accessibility evidence, and its honest hardware/tooling waivers. M19 adds real `install`,
+`uninstall --purge`, and `update` code paths
 plus cargo-dist shell/PowerShell installers, Linux archives, and Windows x64/ARM64
 Global/Corporate MSI and EXE installers with sha256 sidecars; `#a8d` is closed from release
 artifact evidence. Post-M19 rounds R1/R2 (ADRs 0014–0016) add the cross-platform reliability
@@ -37,10 +39,10 @@ off-screen errands with prank returns) plus `exit`/`quit` stop synonyms.
 R5/v0.3.1 (ADRs 0018–0019) is the distribution-readiness stabilization: config schema v2,
 region-aware desktop layouts, bounded damage and shared runtime ordering, Concept C renderer,
 platform/IPC hardening, Global MSI as the Windows default, an exact-tag transactional shell
-installer for macOS/Linux, and one atomic immutable release workflow. v1.0.0/ADR 0020 adds the
+installer for macOS/Linux, and one atomic immutable release workflow. R6/v1.0.1 and ADR 0020 add the
 first native macOS qualification, Developer ID signing/notarization, a per-user graphical DMG,
 and shared gait refinement. ADR 0022 adds managed one-prompt-per-update Accessibility onboarding,
-a calm safe-edge wait, and same-process grant/revocation transitions. v1.0.0 also adds shared
+a calm safe-edge wait, and same-process grant/revocation transitions. R6 also adds shared
 exposed-edge locomotion (continuous monitor seams, occasional hidden wrap, fully offscreen
 startup/graceful exit) and the user-only 30% collect-close annoyed reaction with a separately gated
 bounded nab. Independent review closed the final-clear, gapped-topology, state-latch/deadline,
@@ -51,9 +53,11 @@ and kills every unaccepted deferred helper. ADR 0023 adds stable rolling-latest 
 platform/provenance-isolated updates, and native amd64/arm64 Debian package ownership. ADR 0024
 adds one macOS-only status item whose Configure action launches the existing terminal TUI and
 whose Quit action enters the shared graceful walk-off; it adds no native settings model or
-Windows/Linux tray. ADR 0025 retargets the unpublished prospective v0.3.3 milestone to the first
-stable v1.0.0 release and makes later Alienware hands-on checks post-release input to forward
-patches. Candidate `29384134561` proved the complete signed/notarized/stapled Mac
+Windows/Linux tray. ADR 0025 established the first stable v1 release and makes later Alienware
+hands-on checks post-release input to forward patches. ADR 0027 keeps the failed unpublished
+`v1.0.0` tag immutable, makes `v1.0.1` the first public target, and permits either complete
+renderer view in Windows qualification without weakening channel/alpha checks. Candidate
+`29384134561` proved the complete signed/notarized/stapled Mac
 producer and Windows x64 compositor/lifecycle path at commit `3908794`, then failed closed on the
 X11 compositor's cached gray root tile and on Windows ARM64 DPI/capture coordination. The current
 tree replaces the Linux qualification background with a persistent test-only X11 client, makes
@@ -86,11 +90,14 @@ config still carried its own wildcard while exact setters used swaybg's one-pixe
 Noble's 1.5-scale linear pixman filter turned that buffer into a pre-launch gradient. Current source
 starts Sway with no background rule, tiles opaque PNGs only on discovered exact output names, and
 proves both outputs while preserving fractional filtering before launching the goose; it does not
-add a product background or weaken the analyzer. Exact
-signed-app collect/Accessibility evidence plus the changed-SHA candidate/main gates remain release
-blockers. The current release gate is `docs/readiness/v1.0.0-readiness.md` and task `#m20q`.
-Stable/latest remains v0.3.2 until that checklist is complete and the immutable v1.0.0 release is
-independently verified.
+add a product background or weaken the analyzer. Exact candidate `29392439475` and same-SHA main
+CI `29392827146` passed at `9c5692b`. The immutable `v1.0.0` release then failed before draft
+creation only because Windows x64 sampled valid top-down frames against a side-only oracle; all
+other producers, including signed/notarized Mac and native Debian, passed. The strict ADR 0027
+side-or-top-down analyzer now rejects partial/cropped, channel-swapped, opaque, straight-alpha,
+and double-premultiplied evidence. The current release gate is
+`docs/readiness/v1.0.1-readiness.md` and task `#m20q`. Stable/latest remains v0.3.2 until the
+immutable v1.0.1 release is independently verified.
 
 ## Read these first (source-of-truth pointers)
 
@@ -133,8 +140,9 @@ independently verified.
   0023 defines every-release cross-platform production, stable latest names, exact update
   identity, and Debian package lifecycle ownership; ADR 0024 defines the macOS-only menu-bar
   bridge to the existing configuration TUI and graceful shutdown; ADR 0025 records the first
-  stable v1.0.0 identity and post-release hardware-verification boundary; ADR 0026 records the
-  strict hosted Windows ARM64 compositor-evidence boundary without claiming a DWM screenshot.
+  stable v1 intent and post-release hardware-verification boundary; ADR 0026 records the strict
+  hosted Windows ARM64 compositor-evidence boundary without claiming a DWM screenshot; ADR 0027
+  records the immutable v1.0.0 failure, v1.0.1 fix-forward, and pose-complete Windows oracle.
 
 ## Big-picture architecture (original → planned port)
 
@@ -246,10 +254,12 @@ independently verified.
   `docs/adr/0023-rolling-latest-artifacts-and-debian-lifecycle.md`.
 - The macOS-only status item, terminal-TUI launcher, and graceful menu Quit live in
   `docs/adr/0024-macos-menu-bar-control.md`.
-- The first stable v1.0.0 identity and post-release Alienware verification boundary live in
+- The first stable v1 intent and post-release Alienware verification boundary live in
   `docs/adr/0025-first-stable-v1-release.md`.
 - The GitHub-hosted Windows ARM64 wallpaper-capture exception and exact post-success presenter-DIB
   evidence boundary live in `docs/adr/0026-hosted-windows-arm64-compositor-evidence.md`.
+- The immutable v1.0.0 failure, v1.0.1 fix-forward, and complete side/top-down Windows evidence
+  live in `docs/adr/0027-v1-0-1-fix-forward-and-windows-pose-evidence.md`.
 
 ## Task management system
 
@@ -304,7 +314,7 @@ family's local gate:
 - `cargo build --release`
 - Windows host only: `pwsh -File script/smoke_windows_overlay.ps1 -Binary target/release/honk300.exe -EvidenceDirectory target/windows-overlay-evidence`
 - Linux host only: `HONK300_BIN="$PWD/target/release/honk300" bash script/smoke_m17_m18_linux.sh`
-- `dist plan --tag=v1.0.0`
+- `dist plan --tag=v1.0.1`
 - `cargo audit --version 0.22.2`
 
 Release packaging uses **cargo-dist** for portable archives plus project-owned atomic release,

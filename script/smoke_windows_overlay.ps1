@@ -780,10 +780,11 @@ light_sha256=$lightProofHash
         throw "second start did not prove single-instance enforcement: $duplicate"
     }
 
-    # Each wander picks a fresh target. Retry until the exact running binary exposes a side pose
-    # (beak plus two-tone legs). Normal hosts must prove the frozen DWM composition over paired
-    # backgrounds. Only the exact GitHub-hosted ARM wallpaper signature may instead analyze the
-    # premultiplied BGRA DIB accepted by its successful visible layered-window present.
+    # Each wander picks a fresh target. Retry until the exact running binary exposes one complete
+    # renderer view: side (beak, two-tone legs, shadow) or top-down (compact beak and complete
+    # view-specific body/wing geometry). Normal hosts must prove the frozen DWM composition over
+    # paired backgrounds. Only the exact GitHub-hosted ARM wallpaper signature may instead analyze
+    # the premultiplied BGRA DIB accepted by its successful visible layered-window present.
     for ($attempt = 1; $attempt -le 12 -and -not $visualPassed; $attempt += 1) {
         Invoke-ExactBinary -Arguments @('do', 'wander') | Out-Null
         Start-Sleep -Milliseconds 900
@@ -860,8 +861,8 @@ light_sha256=$lightProofHash
                 throw "unknown Windows overlay capture mode: $captureMode"
             }
 
-            # A failed semantic pose is a retry, not a skipped assertion. The final
-            # attempt still fails the job if no exact side-view surface proof exists.
+            # A failed or incomplete semantic pose is a retry, not a skipped assertion. The final
+            # attempt still fails the job if neither exact renderer-view proof exists.
             $oldNativePreference = $null
             if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
                 $oldNativePreference = $PSNativeCommandUseErrorActionPreference
@@ -928,7 +929,7 @@ light_sha256=$lightProofHash
         }
     }
     if (-not $visualPassed) {
-        throw "no exact $captureMode pose proved body, shade, outline, wing, asymmetric beak/legs, shadow, and per-pixel alpha"
+        throw "no exact $captureMode pose proved a complete side or top-down body, shade, outline, wing, warm articulation, and per-pixel alpha"
     }
 
     $document = Get-Content -LiteralPath $config -Raw

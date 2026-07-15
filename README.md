@@ -191,7 +191,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.0.0
+dist plan --tag=v1.0.1
 cargo audit --version 0.22.2
 ```
 
@@ -202,10 +202,11 @@ graphical DMG; ADR 0021 defines native Wayland capability strata; ADR 0022 defin
 macOS Accessibility first-run, non-nagging wait, and live grant/revocation boundary; ADR 0023
 defines stable latest links, exact-tag platform-isolated updates, every-release Mac packaging,
 and native Debian lifecycle ownership; ADR 0024 defines the macOS-only menu-bar bridge to the
-existing terminal TUI and graceful shutdown; ADR 0025 records the first stable v1.0.0 identity
-and the post-release Alienware verification boundary; ADR 0026 defines the narrow GitHub-hosted
-Windows ARM64 compositor-evidence exception without weakening normal paired-DWM proof.
-[`docs/readiness/v1.0.0-readiness.md`](docs/readiness/v1.0.0-readiness.md) is the release checklist.
+existing terminal TUI and graceful shutdown; ADR 0025 records the first stable v1 release and
+post-release Alienware verification boundary; ADR 0026 defines the narrow GitHub-hosted Windows
+ARM64 compositor-evidence exception without weakening normal paired-DWM proof; and ADR 0027
+records the immutable-tag fix-forward to the public v1.0.1 identity.
+[`docs/readiness/v1.0.1-readiness.md`](docs/readiness/v1.0.1-readiness.md) is the release checklist.
 
 ## License and assets
 
