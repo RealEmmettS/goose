@@ -131,13 +131,15 @@ mod platform {
         ForeignWindowId, ForeignWindowSnapshot, LocalTime, PresenceSnapshot, Rect, Vec2,
     };
     use objc2::rc::{autoreleasepool, Retained};
+    use objc2::runtime::{AnyObject, NSObjectProtocol};
     use objc2::MainThreadMarker;
-    use objc2::{AnyThread, MainThreadOnly};
+    use objc2::{define_class, msg_send, sel, AnyThread, DefinedClass, MainThreadOnly};
     use objc2_app_kit::{
         NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSBitmapFormat,
         NSBitmapImageRep, NSColor, NSColorSpace, NSDeviceRGBColorSpace, NSEvent, NSEventMask,
         NSImage, NSImageAlignment, NSImageCacheMode, NSImageRep, NSImageScaling, NSImageView,
-        NSRunningApplication, NSScreenSaverWindowLevel, NSTextField, NSView, NSWindow,
+        NSMenu, NSMenuItem, NSRunningApplication, NSScreenSaverWindowLevel, NSStatusBar,
+        NSStatusItem, NSTextField, NSVariableStatusItemLength, NSView, NSWindow,
         NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
     };
     use objc2_application_services::{
@@ -154,8 +156,10 @@ mod platform {
         CGMouseButton, CGWarpMouseCursorPosition,
     };
     use objc2_foundation::{
-        NSBundle, NSDate, NSDefaultRunLoopMode, NSInteger, NSPoint, NSRect, NSSize, NSString, NSURL,
+        NSBundle, NSDate, NSDefaultRunLoopMode, NSInteger, NSObject, NSPoint, NSRect, NSSize,
+        NSString, NSURL,
     };
+    use std::cell::Cell;
     use std::collections::HashMap;
     use std::ffi::c_void;
     use std::io;
@@ -172,6 +176,137 @@ mod platform {
     pub enum AccessibilityState {
         Trusted,
         Denied,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum StatusMenuCommand {
+        Configure,
+        Quit,
+    }
+
+    #[derive(Debug, Default)]
+    struct StatusMenuTargetIvars {
+        configure_requested: Cell<bool>,
+        quit_requested: Cell<bool>,
+    }
+
+    define_class!(
+        // SAFETY: NSObject has no additional subclassing invariants, the class is confined to
+        // AppKit's main thread, and its ivars contain no Objective-C references.
+        #[unsafe(super = NSObject)]
+        #[thread_kind = MainThreadOnly]
+        #[ivars = StatusMenuTargetIvars]
+        struct StatusMenuTarget;
+
+        // SAFETY: NSObjectProtocol has no additional implementation requirements.
+        unsafe impl NSObjectProtocol for StatusMenuTarget {}
+
+        impl StatusMenuTarget {
+            // SAFETY: This selector is installed only on an NSMenuItem action and the sender is
+            // passed as an Objective-C object.
+            #[unsafe(method(configureHonk300:))]
+            fn configure_honk300(&self, _sender: Option<&AnyObject>) {
+                self.ivars().configure_requested.set(true);
+            }
+
+            // SAFETY: This selector is installed only on an NSMenuItem action and the sender is
+            // passed as an Objective-C object.
+            #[unsafe(method(quitHonk300:))]
+            fn quit_honk300(&self, _sender: Option<&AnyObject>) {
+                self.ivars().quit_requested.set(true);
+            }
+        }
+    );
+
+    impl StatusMenuTarget {
+        fn new(mtm: MainThreadMarker) -> Retained<Self> {
+            let this = Self::alloc(mtm).set_ivars(StatusMenuTargetIvars::default());
+            // SAFETY: NSObject's init selector has the declared no-argument signature.
+            unsafe { msg_send![super(this), init] }
+        }
+
+        fn take_command(&self) -> Option<StatusMenuCommand> {
+            if self.ivars().quit_requested.replace(false) {
+                self.ivars().configure_requested.set(false);
+                Some(StatusMenuCommand::Quit)
+            } else if self.ivars().configure_requested.replace(false) {
+                Some(StatusMenuCommand::Configure)
+            } else {
+                None
+            }
+        }
+    }
+
+    struct StatusMenu {
+        status_bar: Retained<NSStatusBar>,
+        status_item: Retained<NSStatusItem>,
+        _menu: Retained<NSMenu>,
+        target: Retained<StatusMenuTarget>,
+    }
+
+    impl StatusMenu {
+        fn new(mtm: MainThreadMarker) -> io::Result<Self> {
+            let status_bar = NSStatusBar::systemStatusBar();
+            let status_item = status_bar.statusItemWithLength(NSVariableStatusItemLength);
+            let button = status_item
+                .button(mtm)
+                .ok_or_else(|| io::Error::other("macOS did not provide a status-item button"))?;
+            button.setTitle(&NSString::from_str("Honk"));
+            button.setToolTip(Some(&NSString::from_str("Honk300 controls")));
+
+            let target = StatusMenuTarget::new(mtm);
+            let menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), &NSString::from_str("Honk300"));
+            let configure = unsafe {
+                NSMenuItem::initWithTitle_action_keyEquivalent(
+                    NSMenuItem::alloc(mtm),
+                    &NSString::from_str("Configure Honk300…"),
+                    Some(sel!(configureHonk300:)),
+                    &NSString::from_str(""),
+                )
+            };
+            configure.setToolTip(Some(&NSString::from_str(
+                "Open the Honk300 terminal settings interface",
+            )));
+            // SAFETY: NSMenuItem does not retain its target, so StatusMenu retains `target` for
+            // strictly longer than the item remains installed in the status bar.
+            unsafe { configure.setTarget(Some(&target)) };
+            menu.addItem(&configure);
+            menu.addItem(&NSMenuItem::separatorItem(mtm));
+
+            let quit = unsafe {
+                NSMenuItem::initWithTitle_action_keyEquivalent(
+                    NSMenuItem::alloc(mtm),
+                    &NSString::from_str("Quit Honk300"),
+                    Some(sel!(quitHonk300:)),
+                    &NSString::from_str("q"),
+                )
+            };
+            quit.setToolTip(Some(&NSString::from_str(
+                "Send the goose walking safely off screen and quit",
+            )));
+            // SAFETY: See the retained-target invariant above.
+            unsafe { quit.setTarget(Some(&target)) };
+            menu.addItem(&quit);
+            status_item.setMenu(Some(&menu));
+
+            Ok(Self {
+                status_bar,
+                status_item,
+                _menu: menu,
+                target,
+            })
+        }
+
+        fn take_command(&self) -> Option<StatusMenuCommand> {
+            self.target.take_command()
+        }
+    }
+
+    impl Drop for StatusMenu {
+        fn drop(&mut self) {
+            self.status_item.setMenu(None);
+            self.status_bar.removeStatusItem(&self.status_item);
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -275,6 +410,34 @@ mod platform {
         })
     }
 
+    pub fn open_configuration_tui() -> io::Result<()> {
+        let _main_thread = MainThreadMarker::new().ok_or_else(|| {
+            io::Error::other("the Honk300 configuration menu must run on the main thread")
+        })?;
+        autoreleasepool(|_| {
+            let bundle = NSBundle::mainBundle();
+            let launcher = bundle
+                .URLForResource_withExtension(
+                    Some(&NSString::from_str("Configure Honk300")),
+                    Some(&NSString::from_str("command")),
+                )
+                .filter(|url| url.isFileURL())
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::NotFound,
+                        "the signed app bundle is missing Configure Honk300.command; reinstall Honk300.app",
+                    )
+                })?;
+            if NSWorkspace::sharedWorkspace().openURL(&launcher) {
+                Ok(())
+            } else {
+                Err(io::Error::other(
+                    "macOS could not open the Honk300 terminal settings interface",
+                ))
+            }
+        })
+    }
+
     pub fn local_time() -> LocalTime {
         unsafe {
             let now = libc::time(ptr::null_mut());
@@ -329,6 +492,7 @@ mod platform {
 
     pub struct Overlay {
         app: Retained<NSApplication>,
+        status_menu: StatusMenu,
         displays: Vec<DisplayWindow>,
         primary_bounds: Rect,
         virtual_bounds: Rect,
@@ -346,6 +510,7 @@ mod platform {
             let app = NSApplication::sharedApplication(mtm);
             let _ = app.setActivationPolicy(NSApplicationActivationPolicy::Accessory);
             app.finishLaunching();
+            let status_menu = StatusMenu::new(mtm)?;
 
             let display_infos = display_list()?;
             let primary_bounds = primary_bounds(&display_infos);
@@ -357,6 +522,7 @@ mod platform {
             }
             Ok(Self {
                 app,
+                status_menu,
                 displays,
                 primary_bounds,
                 virtual_bounds,
@@ -369,6 +535,10 @@ mod platform {
 
         pub fn pump(&mut self) -> bool {
             autoreleasepool(|_| self.pump_inner())
+        }
+
+        pub fn take_status_menu_command(&self) -> Option<StatusMenuCommand> {
+            self.status_menu.take_command()
         }
 
         fn pump_inner(&mut self) -> bool {
@@ -1496,8 +1666,8 @@ mod platform {
         fn bundle_release_metadata_rejects_missing_or_non_string_values() {
             let complete = bundle_release_metadata_from_values(|key| match key {
                 "CFBundleIdentifier" => Some(BundleInfoValue::String("dev.emmetts.honk300".into())),
-                "CFBundleShortVersionString" => Some(BundleInfoValue::String("0.3.3".into())),
-                "Honk300ReleaseTag" => Some(BundleInfoValue::String("v0.3.3".into())),
+                "CFBundleShortVersionString" => Some(BundleInfoValue::String("1.0.0".into())),
+                "Honk300ReleaseTag" => Some(BundleInfoValue::String("v1.0.0".into())),
                 "Honk300ReleaseCommit" => Some(BundleInfoValue::String("abc123".into())),
                 _ => None,
             });
@@ -1505,15 +1675,15 @@ mod platform {
                 complete,
                 Some(MacBundleReleaseMetadata {
                     bundle_id: "dev.emmetts.honk300".into(),
-                    version: "0.3.3".into(),
-                    tag: "v0.3.3".into(),
+                    version: "1.0.0".into(),
+                    tag: "v1.0.0".into(),
                     commit: "abc123".into(),
                 })
             );
 
             let missing = bundle_release_metadata_from_values(|key| match key {
                 "CFBundleIdentifier" => Some(BundleInfoValue::String("dev.emmetts.honk300".into())),
-                "CFBundleShortVersionString" => Some(BundleInfoValue::String("0.3.3".into())),
+                "CFBundleShortVersionString" => Some(BundleInfoValue::String("1.0.0".into())),
                 "Honk300ReleaseTag" => None,
                 "Honk300ReleaseCommit" => Some(BundleInfoValue::String("abc123".into())),
                 _ => None,
@@ -1522,8 +1692,8 @@ mod platform {
 
             let non_string = bundle_release_metadata_from_values(|key| match key {
                 "CFBundleIdentifier" => Some(BundleInfoValue::String("dev.emmetts.honk300".into())),
-                "CFBundleShortVersionString" => Some(BundleInfoValue::String("0.3.3".into())),
-                "Honk300ReleaseTag" => Some(BundleInfoValue::String("v0.3.3".into())),
+                "CFBundleShortVersionString" => Some(BundleInfoValue::String("1.0.0".into())),
+                "Honk300ReleaseTag" => Some(BundleInfoValue::String("v1.0.0".into())),
                 "Honk300ReleaseCommit" => Some(BundleInfoValue::NonString),
                 _ => None,
             });
@@ -1694,8 +1864,9 @@ mod platform {
 #[cfg(target_os = "macos")]
 pub use platform::{
     accessibility_state, local_time, main_bundle_release_metadata, open_accessibility_settings,
-    presence_state, request_accessibility_prompt, warp_cursor, AccessibilityState,
-    CollectWindowController, ForeignWindowWatcher, MacBundleReleaseMetadata, Overlay,
+    open_configuration_tui, presence_state, request_accessibility_prompt, warp_cursor,
+    AccessibilityState, CollectWindowController, ForeignWindowWatcher, MacBundleReleaseMetadata,
+    Overlay, StatusMenuCommand,
 };
 
 #[cfg(test)]

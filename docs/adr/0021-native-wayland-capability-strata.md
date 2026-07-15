@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Extends ADR 0011's reduced-mode contract without changing v0.3.3 runtime behavior.
+Accepted. Extends ADR 0011's reduced-mode contract without changing v1.0.0 runtime behavior.
 
 ## Context
 
@@ -39,7 +39,7 @@ extensions. No one layer supplies all Honk300 capabilities everywhere.
 - The existing reduced mode remains correct and can improve incrementally without false claims.
 - Near parity is feasible on selected desktops only with explicit companion integration.
 - Linux packaging and support claims must identify the exact compositor/adapter and tested version.
-- This decision adds no v0.3.3 dependency, setting, permission prompt, or release artifact.
+- This decision adds no v1.0.0 dependency, setting, permission prompt, or release artifact.
 
 ## Verification
 

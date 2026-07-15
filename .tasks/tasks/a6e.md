@@ -3,7 +3,7 @@ TT;DR: Full native Wayland parity is not portable; retain reduced mode and add e
 ## Status
 
 Done on 2026-07-12. ADR 0021 and the linked research report record the conclusion and integration
-path. No v0.3.3 runtime behavior was expanded.
+path. No v1.0.0 runtime behavior was expanded.
 
 ## Evidence
 

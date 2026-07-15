@@ -36,6 +36,13 @@ the adjacent app's Developer ID team and bundle identity, installs it without `s
 `~/Library/Application Support/honk300`; all three command aliases live under `~/.local/bin`.
 Desktop pranks require Accessibility permission.
 
+Launch the installed app by double-clicking `~/Applications/Honk300.app`, or keep that app in
+the Dock as a launcher. While Honk300 is running, the accessible **Honk** menu-bar item offers
+**Configure Honk300…**, which opens the existing terminal settings screen, and **Quit Honk300**,
+which sends the goose walking fully offscreen before the app exits. The item exists only while
+the Mac app is running. Honk300 remains an agent app with no native settings window or running
+Dock control surface; Windows and Linux do not gain a tray from this macOS convenience.
+
 When the exact managed app starts without Accessibility permission, it records a secure
 per-update prompt marker before asking macOS for consent and opening Privacy & Security >
 Accessibility. The goose walks to a calm lower-right screen-edge perch while permission is
@@ -155,7 +162,7 @@ approval; per-user macOS/Linux installs do not use `sudo`. Autostart is opt-in a
 | Platform | Architectures | Desktop path |
 | --- | --- | --- |
 | Windows | x64, ARM64 | PMv2 layered overlays, one per monitor |
-| macOS 11+ | Intel, Apple Silicon | Universal LSUIElement app; capture-safe AppKit RGBA overlays, one per display |
+| macOS 11+ | Intel, Apple Silicon | Universal LSUIElement app; capture-safe AppKit RGBA overlays, one per display; Configure/Quit menu-bar item |
 | Linux X11/XWayland | x64/ARM64, GNU/musl | Full overlay and supported mischief |
 | Linux native Wayland | x64/ARM64, GNU/musl | Opt-in reduced overlay mode |
 
@@ -180,7 +187,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v0.3.3
+dist plan --tag=v1.0.0
 cargo audit --version 0.22.2
 ```
 
@@ -190,8 +197,10 @@ stabilization contracts; ADR 0020 defines Developer ID signing, notarization, an
 graphical DMG; ADR 0021 defines native Wayland capability strata; ADR 0022 defines the managed
 macOS Accessibility first-run, non-nagging wait, and live grant/revocation boundary; ADR 0023
 defines stable latest links, exact-tag platform-isolated updates, every-release Mac packaging,
-and native Debian lifecycle ownership.
-[`docs/readiness/v0.3.3-readiness.md`](docs/readiness/v0.3.3-readiness.md) is the release checklist.
+and native Debian lifecycle ownership; ADR 0024 defines the macOS-only menu-bar bridge to the
+existing terminal TUI and graceful shutdown; ADR 0025 records the first stable v1.0.0 identity
+and the post-release Alienware verification boundary.
+[`docs/readiness/v1.0.0-readiness.md`](docs/readiness/v1.0.0-readiness.md) is the release checklist.
 
 ## License and assets
 

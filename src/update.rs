@@ -1443,8 +1443,8 @@ mod tests {
             assert_eq!(plan.strategy, UpdateStrategy::Deb);
             assert_eq!(plan.artifact, artifact);
             let manifest = ReleaseManifest {
-                version: "0.3.3".into(),
-                tag: "v0.3.3".into(),
+                version: "1.0.0".into(),
+                tag: "v1.0.0".into(),
                 commit: "0".repeat(40),
                 artifacts: vec![ReleaseArtifact {
                     name: artifact.into(),
@@ -1560,6 +1560,7 @@ mod tests {
         assert!(is_newer("0.0.0", "0.0.1"));
         assert!(is_newer("0.0.1-rc.1", "0.0.1"));
         assert!(is_newer("0.0.0", "0.0.1-rc.1"));
+        assert!(is_newer("0.3.2", "1.0.0"));
         assert!(!is_newer("0.0.1", "0.0.1+sha.abc"));
         assert!(!is_newer("1.0.0", "0.9.9"));
         assert_eq!(strip_prerelease_metadata("v1.2.3-rc.4"), "1.2.3");

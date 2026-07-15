@@ -2922,6 +2922,56 @@ mod tests {
     }
 
     #[test]
+    fn collect_window_horizontal_approach_reaches_the_prop_with_normal_locomotion() {
+        let mut world = world_with_collect(433);
+        place_static_goose(&mut world, Vec2::new(150.0, 400.0));
+        world.goose.direction = 0.0;
+        world.goose.target_pos = world.goose.position;
+        world.goose.velocity = Vec2::ZERO;
+        world.force_collect_window(CollectWindowKind::Note);
+        world.tick();
+        let request = match world.take_collect_window_commands().as_slice() {
+            [CollectWindowCommand::Spawn { request, .. }] => *request,
+            other => panic!("unexpected commands: {other:?}"),
+        };
+        world.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id: CollectWindowId(433),
+            request,
+            kind: CollectWindowKind::Note,
+            rect: Rect::new(Vec2::new(600.0, 300.0), Vec2::new(900.0, 500.0)),
+            alive: true,
+            close_origin: None,
+        }));
+
+        let mut grabbed = false;
+        let mut typed = false;
+        for _ in 0..(120 * 15) {
+            world.tick();
+            for command in world.take_collect_window_commands() {
+                match command {
+                    CollectWindowCommand::SetPassthrough {
+                        passthrough: true, ..
+                    } => grabbed = true,
+                    CollectWindowCommand::TypeNote { .. } => typed = true,
+                    _ => {}
+                }
+            }
+            if typed {
+                break;
+            }
+        }
+
+        assert!(
+            grabbed,
+            "a horizontal side-view approach must bring the beak to the prop"
+        );
+        assert!(
+            typed,
+            "the fixed-tick collect flow must progress through release and typing"
+        );
+    }
+
+    #[test]
     fn poke_honk_queues_sound_without_ticking() {
         let mut w = World::new(bounds(), 19);
         assert_eq!(w.poke(PokeAction::Honk), PokeOutcome::Applied);

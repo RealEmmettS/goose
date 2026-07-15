@@ -93,13 +93,13 @@ display observations.
   Record that evidence here before closing `#m16r`.
 - `#m17r` is closed from its original readiness scope. Linux x64 and ARM hosted X11 visible smoke passed, including
   internal frame proof, root screenshot proof, IPC status/reload/stop/poke, terminal-filter
-  fixture coverage, and GNU/musl target checks. v0.3.3 adds a stricter exact-binary visual-layout
+  fixture coverage, and GNU/musl target checks. v1.0.0 adds a stricter exact-binary visual-layout
   gate whose first x64/ARM64 candidate executions are still pending and must not be inferred from
   the older closure.
 - `#m18r` is closed from its original readiness scope. Linux x64 and ARM hosted Wayland reduced-mode smoke passed under
   headless sway, including visible frame proof, IPC status/reload/stop/poke, and explicit
   unsupported mischief status. The new semantic `grim` compositor assertion likewise remains a
-  v0.3.3 native-candidate gate until both hosted architectures run it.
+  v1.0.0 native-candidate gate until both hosted architectures run it.
 
 ## Physical M2 macOS Evidence (2026-07-12)
 
@@ -160,7 +160,7 @@ foreach ($target in $targets) {
 - 2026-07-13 - strengthened the Linux x64/ARM64 smoke contracts so one exact binary is retained,
   X11 byte layout fails closed, and `grim` checks the real two-output fractional-scale Sway
   composition for body/wing/asymmetric warm pixels. Focused local contracts pass; first hosted
-  execution of this stronger v0.3.3 gate remains pending.
+  execution of this stronger v1.0.0 gate remains pending.
 - 2026-07-13 - focused automated onboarding gates passed: five engine permission-wait tests,
   thirteen managed-install/marker/transition tests, all 17 macOS platform tests (including bundle
   metadata, prompt-thread, Settings failure, and hot-plug interactivity contracts), and five

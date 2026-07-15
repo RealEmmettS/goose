@@ -177,6 +177,59 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
 
 
 class WindowsOverlaySmokeContractTests(unittest.TestCase):
+    def test_controller_and_background_enter_pmv2_before_winforms(self):
+        smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
+        enable = "[Honk300DpiAwareness]::EnablePerMonitorV2()"
+        first_winforms_load = "Add-Type -AssemblyName System.Windows.Forms"
+        for required in (
+            "new IntPtr(-4)",
+            "SetProcessDpiAwarenessContext",
+            "SetThreadDpiAwarenessContext",
+            "AreDpiAwarenessContextsEqual",
+            "GetDpiForWindow",
+            enable,
+        ):
+            self.assertIn(required, smoke)
+        self.assertLess(smoke.index(enable), smoke.index(first_winforms_load))
+
+    def test_background_channel_is_atomic_versioned_and_retry_safe(self):
+        smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
+        for required in (
+            "function Write-TextFileAtomically",
+            "function Read-SharedTextFile",
+            "[System.IO.FileShare]::Delete",
+            "[System.IO.File]::Move($temporaryPath, $Path, $true)",
+            "color.request",
+            "$requestToken = [Guid]::NewGuid().ToString('N')",
+            "Write-TextFileAtomically -Path $colorRequestPath",
+            "Write-TextFileAtomically -Path $ackPath",
+            "Write-TextFileAtomically -Path $readyPath",
+            "Wait-ForBackgroundReady -Expected $Hex -Token $requestToken",
+        ):
+            self.assertIn(required, smoke)
+        self.assertNotIn("color.txt", smoke)
+        self.assertNotIn("Remove-Item -LiteralPath $ackPath", smoke)
+        self.assertNotIn("Get-Content -LiteralPath $ackPath", smoke)
+
+    def test_pre_runtime_capture_proves_background_and_records_dpi_geometry(self):
+        smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
+        for required in (
+            "background-diagnostics.txt",
+            "capture-diagnostics.txt",
+            "background-proof-dark.png",
+            "background-proof-light.png",
+            "background-proof.txt",
+            "Assert-ControlledBackgroundCapture",
+            "overlay_hwnd=0x",
+            "overlay_dpi=",
+            "virtual_screen=",
+        ):
+            self.assertIn(required, smoke)
+        self.assertLess(
+            smoke.index("$darkProofCapture ="),
+            smoke.index("$runtime = Start-ExactRuntime -Label 'first'"),
+        )
+
     def test_native_smoke_freezes_one_surface_and_fails_closed_on_semantics(self):
         smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
         for required in (

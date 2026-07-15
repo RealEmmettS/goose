@@ -34,3 +34,5 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0021 — Native Wayland Capability Strata](./0021-native-wayland-capability-strata.md)
 - [0022 — macOS Accessibility First-Run Onboarding](./0022-macos-accessibility-first-run-onboarding.md)
 - [0023 — Rolling Latest Artifacts And Debian Package Lifecycle](./0023-rolling-latest-artifacts-and-debian-lifecycle.md)
+- [0024 — macOS Menu-Bar Control](./0024-macos-menu-bar-control.md)
+- [0025 — First Stable v1 Release And Post-Release Hardware Verification](./0025-first-stable-v1-release.md)

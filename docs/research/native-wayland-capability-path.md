@@ -83,7 +83,7 @@ prank. Honk300's existing layer-shell reduced mode remains the safe portable bas
 
 ## Release boundary
 
-v0.3.3 does not add a portal grant, compositor plugin, privileged helper, or new configuration
+v1.0.0 does not add a portal grant, compositor plugin, privileged helper, or new configuration
 schema. It keeps the already-tested reduced native mode and records the implementation path as
 follow-up work. This avoids mixing a security-sensitive Linux expansion into the macOS
 qualification release while still closing the research decision.

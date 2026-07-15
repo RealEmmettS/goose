@@ -10,5 +10,9 @@ No administrator password or sudo is required. The installer also creates the
 honk300, honk, and goose terminal aliases in ~/.local/bin. Login autostart remains
 off unless you later run: honk300 install --autostart
 
+Open Honk300 from ~/Applications or pin it to your Dock. While the goose is running,
+the “Honk” menu-bar item can open the terminal settings interface or send the goose
+walking safely off screen before it quits.
+
 Terminal install is also supported from the exact-tag installer published with this
 release. Checksums are listed in sha256.sum and the individual .sha256 files.

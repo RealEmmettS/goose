@@ -16,6 +16,134 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+if ($IsWindows) {
+    # PowerShell has no DPI contract of its own. Establish PMv2 before either this
+    # controller or the child background host loads WinForms or creates an HWND, so
+    # VirtualScreen, GetWindowRect, and BitBlt all use physical-pixel coordinates.
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+public static class Honk300DpiAwareness {
+    private static readonly IntPtr PerMonitorV2 = new IntPtr(-4);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr value);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetThreadDpiAwarenessContext();
+    [DllImport("user32.dll")]
+    private static extern bool AreDpiAwarenessContextsEqual(IntPtr first, IntPtr second);
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    public static string EnablePerMonitorV2() {
+        bool processSet = SetProcessDpiAwarenessContext(PerMonitorV2);
+        int processError = processSet ? 0 : Marshal.GetLastWin32Error();
+
+        // A host manifest may have fixed the process default already. A PMv2 thread
+        // override is still required and verified before any HWND-affecting API use.
+        IntPtr previous = SetThreadDpiAwarenessContext(PerMonitorV2);
+        if (previous == IntPtr.Zero) {
+            throw new Win32Exception(Marshal.GetLastWin32Error(),
+                "SetThreadDpiAwarenessContext(PMv2) failed");
+        }
+        if (!IsCurrentThreadPerMonitorV2()) {
+            throw new InvalidOperationException("current thread did not enter PMv2 DPI awareness");
+        }
+
+        return processSet
+            ? "process-and-thread-pmv2"
+            : "thread-pmv2-process-set-error-" + processError;
+    }
+
+    public static bool IsCurrentThreadPerMonitorV2() {
+        return AreDpiAwarenessContextsEqual(GetThreadDpiAwarenessContext(), PerMonitorV2);
+    }
+
+    public static uint WindowDpi(IntPtr hwnd) {
+        return GetDpiForWindow(hwnd);
+    }
+}
+'@
+    $script:DpiAwarenessMode = [Honk300DpiAwareness]::EnablePerMonitorV2()
+}
+
+function Write-TextFileAtomically {
+    param(
+        [Parameter(Mandatory = $true)] [string] $Path,
+        [Parameter(Mandatory = $true)] [string] $Value
+    )
+
+    $directory = [System.IO.Path]::GetDirectoryName($Path)
+    if (-not [System.IO.Directory]::Exists($directory)) {
+        [System.IO.Directory]::CreateDirectory($directory) | Out-Null
+    }
+    $temporaryPath = Join-Path $directory ".$(Split-Path -Leaf $Path).$PID.$([Guid]::NewGuid().ToString('N')).tmp"
+    [System.IO.File]::WriteAllText(
+        $temporaryPath,
+        $Value,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    try {
+        for ($attempt = 0; $attempt -lt 20; $attempt += 1) {
+            try {
+                [System.IO.File]::Move($temporaryPath, $Path, $true)
+                return
+            }
+            catch [System.IO.IOException] {
+                if ($attempt -eq 19) { throw }
+            }
+            catch [System.UnauthorizedAccessException] {
+                if ($attempt -eq 19) { throw }
+            }
+            Start-Sleep -Milliseconds 10
+        }
+    }
+    finally {
+        if ([System.IO.File]::Exists($temporaryPath)) {
+            [System.IO.File]::Delete($temporaryPath)
+        }
+    }
+}
+
+function Read-SharedTextFile {
+    param([Parameter(Mandatory = $true)] [string] $Path)
+
+    $share = [System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete
+    for ($attempt = 0; $attempt -lt 20; $attempt += 1) {
+        $stream = $null
+        $reader = $null
+        try {
+            $stream = [System.IO.FileStream]::new(
+                $Path,
+                [System.IO.FileMode]::Open,
+                [System.IO.FileAccess]::Read,
+                $share
+            )
+            $reader = [System.IO.StreamReader]::new($stream)
+            return $reader.ReadToEnd()
+        }
+        catch [System.IO.FileNotFoundException] {
+            # Atomic replacement can make a probe briefly observe no current name.
+        }
+        catch [System.IO.IOException] {
+            if ($attempt -eq 19) { throw }
+        }
+        catch [System.UnauthorizedAccessException] {
+            if ($attempt -eq 19) { throw }
+        }
+        finally {
+            if ($null -ne $reader) { $reader.Dispose() }
+            if ($null -ne $stream) { $stream.Dispose() }
+        }
+        Start-Sleep -Milliseconds 10
+    }
+    return $null
+}
+
 function Start-ControlledBackground {
     param([string] $StateDirectory)
 
@@ -27,10 +155,11 @@ function Start-ControlledBackground {
         Add-Type -AssemblyName System.Drawing
     }
 
-    $colorPath = Join-Path $StateDirectory 'color.txt'
+    $colorRequestPath = Join-Path $StateDirectory 'color.request'
     $ackPath = Join-Path $StateDirectory 'color.ack'
     $readyPath = Join-Path $StateDirectory 'ready'
     $stopPath = Join-Path $StateDirectory 'stop'
+    $diagnosticsPath = Join-Path $StateDirectory 'background-diagnostics.txt'
     $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
     if ($screen.Width -lt 320 -or $screen.Height -lt 240) {
         throw "interactive virtual screen is unavailable: $($screen.Width)x$($screen.Height)"
@@ -45,20 +174,23 @@ function Start-ControlledBackground {
     $form.ShowInTaskbar = $false
     $form.TopMost = $true
 
-    $script:BackgroundColor = ''
+    $script:BackgroundRequestToken = ''
     $applyColor = {
-        if (-not (Test-Path -LiteralPath $colorPath -PathType Leaf)) { return }
-        $requested = (Get-Content -LiteralPath $colorPath -Raw).Trim().TrimStart('#').ToUpperInvariant()
-        if ($requested -notmatch '^[0-9A-F]{6}$') { return }
-        if ($requested -ne $script:BackgroundColor) {
-            $form.BackColor = [System.Drawing.ColorTranslator]::FromHtml("#$requested")
-            $form.Refresh()
-            $script:BackgroundColor = $requested
+        if (-not (Test-Path -LiteralPath $colorRequestPath -PathType Leaf)) { return }
+        $requestDocument = Read-SharedTextFile -Path $colorRequestPath
+        if ($null -eq $requestDocument) { return }
+        $request = $requestDocument.Trim()
+        if ($request -notmatch '^(?<Token>[0-9A-Fa-f]{32}) (?<Color>[0-9A-Fa-f]{6})$') {
+            throw "invalid controlled-background request: $request"
         }
-        # Re-acknowledge the already-active color too. The controller deliberately
-        # removes the ack before each capture so the first dark frame cannot race the
-        # form's initial paint.
-        Set-Content -LiteralPath $ackPath -Value $requested -Encoding ascii -NoNewline
+        $requestToken = $Matches.Token.ToLowerInvariant()
+        $requested = $Matches.Color.ToUpperInvariant()
+        if ($requestToken -eq $script:BackgroundRequestToken) { return }
+
+        $form.BackColor = [System.Drawing.ColorTranslator]::FromHtml("#$requested")
+        $form.Refresh()
+        Write-TextFileAtomically -Path $ackPath -Value "$requestToken $requested"
+        $script:BackgroundRequestToken = $requestToken
     }
 
     $timer = New-Object System.Windows.Forms.Timer
@@ -72,7 +204,32 @@ function Start-ControlledBackground {
     })
     $form.Add_Shown({
         & $applyColor
-        Set-Content -LiteralPath $readyPath -Value $PID -Encoding ascii -NoNewline
+        if (-not $script:BackgroundRequestToken) {
+            throw 'controlled background did not receive its initial color request'
+        }
+        $windowDpi = [Honk300DpiAwareness]::WindowDpi($form.Handle)
+        if ($windowDpi -eq 0) { throw 'GetDpiForWindow returned zero for controlled background' }
+        $bounds = $form.Bounds
+        if (
+            $bounds.X -ne $screen.X -or
+            $bounds.Y -ne $screen.Y -or
+            $bounds.Width -ne $screen.Width -or
+            $bounds.Height -ne $screen.Height
+        ) {
+            throw "controlled background bounds $($bounds.X),$($bounds.Y),$($bounds.Width),$($bounds.Height) do not match virtual screen $($screen.X),$($screen.Y),$($screen.Width),$($screen.Height)"
+        }
+        $threadPmv2 = [Honk300DpiAwareness]::IsCurrentThreadPerMonitorV2().ToString().ToLowerInvariant()
+        $windowHandle = $form.Handle.ToInt64().ToString('X')
+        Write-TextFileAtomically -Path $diagnosticsPath -Value (@(
+            'process=background'
+            "dpi_awareness=$script:DpiAwarenessMode"
+            "thread_pmv2=$threadPmv2"
+            "virtual_screen=$($screen.X),$($screen.Y),$($screen.Width),$($screen.Height)"
+            "window_hwnd=0x$windowHandle"
+            "window_dpi=$windowDpi"
+            "window_bounds=$($bounds.X),$($bounds.Y),$($bounds.Width),$($bounds.Height)"
+        ) -join [Environment]::NewLine)
+        Write-TextFileAtomically -Path $readyPath -Value "$PID"
         $timer.Start()
     })
     try {
@@ -114,13 +271,15 @@ $work = Join-Path $runnerTemp "honk300-windows-overlay-$([Guid]::NewGuid().ToStr
 $backgroundState = Join-Path $work 'background'
 New-Item -ItemType Directory -Force -Path $backgroundState | Out-Null
 $config = Join-Path $work 'config.toml'
-$colorPath = Join-Path $backgroundState 'color.txt'
+$colorRequestPath = Join-Path $backgroundState 'color.request'
 $ackPath = Join-Path $backgroundState 'color.ack'
 $readyPath = Join-Path $backgroundState 'ready'
 $stopPath = Join-Path $backgroundState 'stop'
+$backgroundDiagnosticsPath = Join-Path $backgroundState 'background-diagnostics.txt'
 $darkHex = '203040'
 $lightHex = 'F4EDE4'
-Set-Content -LiteralPath $colorPath -Value $darkHex -Encoding ascii -NoNewline
+$initialColorToken = [Guid]::NewGuid().ToString('N')
+Write-TextFileAtomically -Path $colorRequestPath -Value "$initialColorToken $darkHex"
 
 try {
     Add-Type -AssemblyName System.Drawing.Common
@@ -142,6 +301,8 @@ public sealed class Honk300OverlayRect {
     public int Y;
     public int Width;
     public int Height;
+    public long Hwnd;
+    public uint Dpi;
 }
 
 public static class Honk300OverlaySmokeNative {
@@ -162,6 +323,8 @@ public static class Honk300OverlaySmokeNative {
     private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr GetDC(IntPtr hwnd);
     [DllImport("user32.dll")]
@@ -206,7 +369,12 @@ public static class Honk300OverlaySmokeNative {
             if (width > 1 && height > 1 && area > bestArea) {
                 bestArea = area;
                 best = new Honk300OverlayRect {
-                    X = rect.Left, Y = rect.Top, Width = width, Height = height
+                    X = rect.Left,
+                    Y = rect.Top,
+                    Width = width,
+                    Height = height,
+                    Hwnd = hwnd.ToInt64(),
+                    Dpi = GetDpiForWindow(hwnd)
                 };
             }
             return true;
@@ -258,6 +426,20 @@ public static class Honk300OverlaySmokeNative {
 }
 '@
 
+$controllerVirtualScreen = [System.Windows.Forms.SystemInformation]::VirtualScreen
+if ($controllerVirtualScreen.Width -lt 320 -or $controllerVirtualScreen.Height -lt 240) {
+    throw "interactive virtual screen is unavailable to controller: $($controllerVirtualScreen.Width)x$($controllerVirtualScreen.Height)"
+}
+$captureDiagnosticsPath = Join-Path $evidence 'capture-diagnostics.txt'
+$controllerThreadPmv2 = [Honk300DpiAwareness]::IsCurrentThreadPerMonitorV2().ToString().ToLowerInvariant()
+$controllerDiagnostics = (@(
+    'process=controller'
+    "dpi_awareness=$script:DpiAwarenessMode"
+    "thread_pmv2=$controllerThreadPmv2"
+    "virtual_screen=$($controllerVirtualScreen.X),$($controllerVirtualScreen.Y),$($controllerVirtualScreen.Width),$($controllerVirtualScreen.Height)"
+) -join [Environment]::NewLine) + [Environment]::NewLine
+Write-TextFileAtomically -Path $captureDiagnosticsPath -Value $controllerDiagnostics
+
 function Invoke-ExactBinary {
     param(
         [Parameter(Mandatory = $true)] [string[]] $Arguments,
@@ -304,11 +486,21 @@ function Wait-ForRuntime {
 }
 
 function Wait-ForBackgroundReady {
-    param([string] $Expected)
+    param(
+        [Parameter(Mandatory = $true)] [string] $Expected,
+        [Parameter(Mandatory = $true)] [string] $Token
+    )
+    $expectedAck = "$($Token.ToLowerInvariant()) $($Expected.ToUpperInvariant())"
+    $last = '<missing>'
     for ($attempt = 0; $attempt -lt 100; $attempt += 1) {
         if (Test-Path -LiteralPath $ackPath -PathType Leaf) {
-            $actual = (Get-Content -LiteralPath $ackPath -Raw).Trim().ToUpperInvariant()
-            if ($actual -eq $Expected.ToUpperInvariant()) {
+            $ackDocument = Read-SharedTextFile -Path $ackPath
+            if ($null -eq $ackDocument) {
+                Start-Sleep -Milliseconds 50
+                continue
+            }
+            $last = $ackDocument.Trim()
+            if ($last -ceq $expectedAck) {
                 # Let DWM present the acknowledged repaint before copying screen pixels.
                 Start-Sleep -Milliseconds 200
                 return
@@ -316,14 +508,14 @@ function Wait-ForBackgroundReady {
         }
         Start-Sleep -Milliseconds 50
     }
-    throw "controlled background did not acknowledge #$Expected"
+    throw "controlled background did not acknowledge '$expectedAck' (last '$last')"
 }
 
 function Set-ControlledBackground {
     param([string] $Hex)
-    Remove-Item -LiteralPath $ackPath -Force -ErrorAction SilentlyContinue
-    Set-Content -LiteralPath $colorPath -Value $Hex.ToUpperInvariant() -Encoding ascii -NoNewline
-    Wait-ForBackgroundReady -Expected $Hex
+    $requestToken = [Guid]::NewGuid().ToString('N')
+    Write-TextFileAtomically -Path $colorRequestPath -Value "$requestToken $($Hex.ToUpperInvariant())"
+    Wait-ForBackgroundReady -Expected $Hex -Token $requestToken
 }
 
 function Save-ScreenRect {
@@ -370,6 +562,41 @@ function Save-ScreenRect {
         $graphics.Dispose()
         $bitmap.Dispose()
     }
+}
+
+function Assert-ControlledBackgroundCapture {
+    param(
+        [Parameter(Mandatory = $true)] [string] $Path,
+        [Parameter(Mandatory = $true)] [string] $ExpectedHex
+    )
+
+    $expected = [System.Drawing.ColorTranslator]::FromHtml("#$ExpectedHex")
+    $bitmap = [System.Drawing.Bitmap]::new($Path)
+    $matching = 0
+    $total = $bitmap.Width * $bitmap.Height
+    try {
+        for ($y = 0; $y -lt $bitmap.Height; $y += 1) {
+            for ($x = 0; $x -lt $bitmap.Width; $x += 1) {
+                $pixel = $bitmap.GetPixel($x, $y)
+                if (
+                    $pixel.R -eq $expected.R -and
+                    $pixel.G -eq $expected.G -and
+                    $pixel.B -eq $expected.B
+                ) {
+                    $matching += 1
+                }
+            }
+        }
+    }
+    finally {
+        $bitmap.Dispose()
+    }
+
+    $coverage = [double]$matching / $total
+    if ($coverage -lt 0.95) {
+        throw "controlled background proof for #$ExpectedHex covered only $matching/$total pixels ($coverage)"
+    }
+    return $coverage
 }
 
 function Start-ExactRuntime {
@@ -419,7 +646,53 @@ try {
     if (-not (Test-Path -LiteralPath $readyPath -PathType Leaf)) {
         throw 'controlled background host did not expose an interactive desktop'
     }
-    Wait-ForBackgroundReady -Expected $darkHex
+    Wait-ForBackgroundReady -Expected $darkHex -Token $initialColorToken
+    if (-not (Test-Path -LiteralPath $backgroundDiagnosticsPath -PathType Leaf)) {
+        throw 'controlled background did not publish DPI and geometry diagnostics'
+    }
+    $backgroundDiagnostics = Read-SharedTextFile -Path $backgroundDiagnosticsPath
+    $expectedVirtualScreen = "virtual_screen=$($controllerVirtualScreen.X),$($controllerVirtualScreen.Y),$($controllerVirtualScreen.Width),$($controllerVirtualScreen.Height)"
+    if ($backgroundDiagnostics -notmatch "(?m)^$([regex]::Escape($expectedVirtualScreen))$") {
+        throw "controller/background virtual-screen mismatch: expected '$expectedVirtualScreen', got '$backgroundDiagnostics'"
+    }
+    Copy-Item -LiteralPath $backgroundDiagnosticsPath `
+        -Destination (Join-Path $evidence 'background-diagnostics.txt') -Force
+
+    # Prove the controller and the ordinary TopMost background agree on physical
+    # coordinates before the goose starts. This turns wallpaper-only captures into
+    # an immediate infrastructure failure instead of twelve misleading pose retries.
+    $proofScreen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+    $proofRect = [Honk300OverlayRect]::new()
+    $proofRect.Width = 64
+    $proofRect.Height = 64
+    $proofRect.X = $proofScreen.X + [Math]::Floor(($proofScreen.Width - $proofRect.Width) / 2)
+    $proofRect.Y = $proofScreen.Y + [Math]::Floor(($proofScreen.Height - $proofRect.Height) / 2)
+    $darkProofCapture = Join-Path $evidence 'background-proof-dark.png'
+    $lightProofCapture = Join-Path $evidence 'background-proof-light.png'
+    Save-ScreenRect -Rect $proofRect -Path $darkProofCapture
+    try {
+        Set-ControlledBackground -Hex $lightHex
+        Save-ScreenRect -Rect $proofRect -Path $lightProofCapture
+    }
+    finally {
+        Set-ControlledBackground -Hex $darkHex
+    }
+    $darkCoverage = Assert-ControlledBackgroundCapture -Path $darkProofCapture -ExpectedHex $darkHex
+    $lightCoverage = Assert-ControlledBackgroundCapture -Path $lightProofCapture -ExpectedHex $lightHex
+    $darkProofHash = (Get-FileHash -LiteralPath $darkProofCapture -Algorithm SHA256).Hash.ToLowerInvariant()
+    $lightProofHash = (Get-FileHash -LiteralPath $lightProofCapture -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($darkProofHash -eq $lightProofHash) {
+        throw 'controlled background dark/light proof captures are byte-identical'
+    }
+    Set-Content -LiteralPath (Join-Path $evidence 'background-proof.txt') -Encoding utf8NoBOM -Value @"
+rect=$($proofRect.X),$($proofRect.Y),$($proofRect.Width),$($proofRect.Height)
+dark_hex=$darkHex
+dark_coverage=$($darkCoverage.ToString('F6', [System.Globalization.CultureInfo]::InvariantCulture))
+dark_sha256=$darkProofHash
+light_hex=$lightHex
+light_coverage=$($lightCoverage.ToString('F6', [System.Globalization.CultureInfo]::InvariantCulture))
+light_sha256=$lightProofHash
+"@
 
     # The config path must not be pre-created: setup owns its atomic first write.
     if (Test-Path -LiteralPath $config) { throw "temporary config unexpectedly exists: $config" }
@@ -462,6 +735,10 @@ try {
             # discovery probe and NtSuspendProcess cannot offset the capture crop.
             $rect = [Honk300OverlaySmokeNative]::FindLargestVisibleOverlay($runtime.Id)
             if ($null -eq $rect) { throw 'visible overlay disappeared while freezing the runtime' }
+            if ($rect.Dpi -eq 0) { throw 'GetDpiForWindow returned zero for the frozen overlay' }
+            $overlayHandle = $rect.Hwnd.ToString('X')
+            Add-Content -LiteralPath $captureDiagnosticsPath -Encoding utf8NoBOM -Value `
+                "attempt=$attempt overlay_hwnd=0x$overlayHandle overlay_rect=$($rect.X),$($rect.Y),$($rect.Width),$($rect.Height) overlay_dpi=$($rect.Dpi)"
             $darkCapture = Join-Path $evidence "overlay-attempt-$attempt-dark.png"
             $lightCapture = Join-Path $evidence "overlay-attempt-$attempt-light.png"
             $analysis = Join-Path $evidence "overlay-attempt-$attempt-analysis.json"

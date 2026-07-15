@@ -8,7 +8,7 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: implementation in progress.** M0-M19 are implemented in-tree. M16.1 macOS
+**Current stage: v1.0.0 first-stable release qualification.** M0-M19 are implemented in-tree. M16.1 macOS
 Accessibility onboarding is implemented and automated tests are green, while readiness remains
 gated on exact signed-candidate denied, non-nagging relaunch, live-grant, and live-revocation
 evidence. The Cargo workspace exists: `honk-engine` (platform-free
@@ -47,10 +47,10 @@ reference.
 R5/v0.3.1 (ADRs 0018–0019) is the distribution-readiness stabilization: config schema v2,
 region-aware desktop layouts, bounded damage and shared runtime ordering, Concept C renderer,
 platform/IPC hardening, Global MSI as the Windows default, an exact-tag transactional shell
-installer for macOS/Linux, and one atomic immutable release workflow. v0.3.3/ADR 0020 adds the
+installer for macOS/Linux, and one atomic immutable release workflow. v1.0.0/ADR 0020 adds the
 first native macOS qualification, Developer ID signing/notarization, a per-user graphical DMG,
 and shared gait refinement. ADR 0022 adds managed one-prompt-per-update Accessibility onboarding,
-a calm safe-edge wait, and same-process grant/revocation transitions. v0.3.3 also adds shared
+a calm safe-edge wait, and same-process grant/revocation transitions. v1.0.0 also adds shared
 exposed-edge locomotion (continuous monitor seams, occasional hidden wrap, fully offscreen
 startup/graceful exit) and the user-only 30% collect-close annoyed reaction with a separately gated
 bounded nab. Independent review closed the final-clear, gapped-topology, state-latch/deadline,
@@ -58,13 +58,23 @@ typed-close, Windows-provenance, and reaction-visibility regressions with focuse
 lifecycle ownership now pins verified Windows artifacts through execution, removes ambient lease
 bypasses, rolls Unix signals back explicitly, checks machine-wide Windows paths across sessions,
 and kills every unaccepted deferred helper. ADR 0023 adds stable rolling-latest links, exact-tag
-platform/provenance-isolated updates, and native amd64/arm64 Debian package ownership. The first
-candidate proved the complete Developer ID/notarized/stapled Mac producer; it then failed closed
-on an X11 debug-compositor background and a Windows managed-capture flag error. Both native smoke
-paths are repaired locally without relaxing semantic thresholds, and a final exact-SHA candidate
-rerun plus exact-candidate Mac evidence remain release gates. The current release gate is
-`docs/readiness/v0.3.3-readiness.md` and task `#m20q`. Stable/latest remains v0.3.2 until that
-checklist is complete and the immutable v0.3.3 release is independently verified.
+platform/provenance-isolated updates, and native amd64/arm64 Debian package ownership. ADR 0024
+adds one macOS-only status item whose Configure action launches the existing terminal TUI and
+whose Quit action enters the shared graceful walk-off; it adds no native settings model or
+Windows/Linux tray. ADR 0025 retargets the unpublished prospective v0.3.3 milestone to the first
+stable v1.0.0 release and makes later Alienware hands-on checks post-release input to forward
+patches. Candidate `29384134561` proved the complete signed/notarized/stapled Mac
+producer and Windows x64 compositor/lifecycle path at commit `3908794`, then failed closed on the
+X11 compositor's cached gray root tile and on Windows ARM64 DPI/capture coordination. The current
+tree replaces the Linux qualification background with a persistent test-only X11 client, makes
+both Windows smoke processes PMv2-aware with an atomic tokenized color channel and preflight
+capture proof, and treats a closed downstream status pipe as normal without hiding other write
+errors. A live collect run also exposed the body-target-versus-beak-arrival locomotion mismatch;
+current source repairs it with a beak-offset target and a realistic fixed-tick regression, and the
+complete integrated local gate passes. Exact signed-app collect proof remains a release blocker. A final
+exact-SHA candidate rerun and exact-candidate Mac evidence remain required. The current release
+gate is `docs/readiness/v1.0.0-readiness.md` and task `#m20q`. Stable/latest remains v0.3.2 until
+that checklist is complete and the immutable v1.0.0 release is independently verified.
 
 ## Read these first (source-of-truth pointers)
 
@@ -88,8 +98,9 @@ checklist is complete and the immutable v0.3.3 release is independently verified
   boundaries, renderer architecture, capability traits, packaging targets, or milestone scope.
   ADR 0001 records the accepted M7 cursor-mischief contract and Renderer V2 direction; ADR 0002
   records the M8 foreign-window watch-and-ride contract; ADR 0003 records the M9 collect-window,
-  asset, and no-donate decisions; ADR 0004 records the M10 CLI/TUI-only control plane, local IPC,
-  and terminal-window protection rule; ADR 0007 records the M13 dynamic-mood and local-time
+  asset, and no-donate decisions; ADR 0004 records the original M10 CLI/TUI-only control plane,
+  local IPC, and terminal-window protection rule (only its macOS menu prohibition is superseded
+  by ADR 0024); ADR 0007 records the M13 dynamic-mood and local-time
   injection contract; ADR 0008 records the M14 schedule/presence/Autumn contract; ADR 0009
   records the M15 multi-monitor/appearance contract; ADR 0010 records the M16 macOS agent-bundle,
   permission degradation, status protocol, and TUI-only control contract; ADR 0011 records the
@@ -105,7 +116,9 @@ checklist is complete and the immutable v0.3.3 release is independently verified
   portable native Wayland reduced mode plus explicit compositor capability strata; ADR 0022
   records the managed macOS Accessibility first-run and live-transition boundary; ADR 0023
   defines every-release cross-platform production, stable latest names, exact update identity,
-  and Debian package lifecycle ownership.
+  and Debian package lifecycle ownership; ADR 0024 defines the macOS-only menu-bar bridge to the
+  existing configuration TUI and graceful shutdown; ADR 0025 records the first stable v1.0.0
+  identity and post-release hardware-verification boundary.
 
 ## Big-picture architecture (original → planned port)
 
@@ -174,8 +187,10 @@ checklist is complete and the immutable v0.3.3 release is independently verified
   size/hash verification through execution; generated bootstrap delegation must reacquire without
   an ambient bypass, machine-wide paths are checked across sessions, reboot-deferred MSI results
   fail closed, and every pre-READY helper error kills and waits for the child.
-- Starting, stopping, and configuration are **CLI/TUI-only over local IPC**. There is no system
-  tray and no global quit key.
+- Starting, stopping, and configuration remain **CLI/TUI over local IPC** on every platform.
+  macOS alone adds a visible-while-running status item whose Configure action launches that same
+  TUI and whose Quit action requests the same graceful walk-off. There is no native preferences
+  model, Windows/Linux tray, or global quit key.
 - Terminal windows are protected: the goose may visually overlay them, but must never move,
   focus, type into, drag, ride, collect, or otherwise manipulate terminal windows, including in
   spicy/default-off modes.
@@ -192,7 +207,8 @@ checklist is complete and the immutable v0.3.3 release is independently verified
 - M7's accepted decisions live in `docs/adr/0001-m7-cursor-mischief-renderer-and-platform-guardrails.md`.
 - M8's accepted decisions live in `docs/adr/0002-m8-foreign-window-watch-and-ride.md`.
 - M9's accepted decisions live in `docs/adr/0003-m9-collect-window-assets-and-no-donate.md`.
-- M10's accepted decisions live in `docs/adr/0004-m10-cli-tui-control-plane-and-terminal-protection.md`.
+- M10's accepted decisions live in `docs/adr/0004-m10-cli-tui-control-plane-and-terminal-protection.md`;
+  ADR 0024 supersedes only its no-menu-bar clause on macOS.
 - M13's accepted decisions live in `docs/adr/0007-m13-moods-and-local-time-injection.md`.
 - M14's accepted decisions live in `docs/adr/0008-m14-schedule-presence-and-autumn.md`.
 - M15's accepted decisions live in `docs/adr/0009-m15-multi-monitor-and-appearance.md`.
@@ -215,6 +231,10 @@ checklist is complete and the immutable v0.3.3 release is independently verified
 - Rolling latest artifacts, every-release Mac production, platform-isolated updates, and Debian
   package lifecycle ownership live in
   `docs/adr/0023-rolling-latest-artifacts-and-debian-lifecycle.md`.
+- The macOS-only status item, terminal-TUI launcher, and graceful menu Quit live in
+  `docs/adr/0024-macos-menu-bar-control.md`.
+- The first stable v1.0.0 identity and post-release Alienware verification boundary live in
+  `docs/adr/0025-first-stable-v1-release.md`.
 
 ## Task management system
 
@@ -246,9 +266,11 @@ Relevant skills: `tasks-start`, `tasks-management`, `tasks-update`, `tasks-memor
 - **Terminal windows are never mischief targets.** Backend filters must exclude terminal windows
   before foreign-window ride, collect-window, or future spicy behavior code can target them.
 - **macOS needs a real `.app` bundle** (stable bundle-id) for a durable Accessibility grant;
-  a bare `~/.cargo/bin` binary can't hold one. The bundle is an LSUIElement agent/permission
-  identity only: no native preferences window, menu-bar settings UI, Dock control surface, or
-  AppleScript `.sdef` command surface.
+  a bare `~/.cargo/bin` binary can't hold one. The bundle remains an LSUIElement agent/permission
+  identity with no native preferences window, running Dock control surface, or AppleScript
+  `.sdef` command surface. Its one macOS status item may only launch the existing terminal TUI or
+  request engine-owned graceful shutdown; keep its target retained and all AppKit access on the
+  main thread.
 - **macOS permission prompting is a managed-install privilege.** Record the owner-only
   per-update marker before opening native UI; if eligibility or secure state fails, retain the
   existing denied/degraded runtime without prompting. A denied managed app enters the engine's
@@ -267,7 +289,7 @@ family's local gate:
 - `cargo build --release`
 - Windows host only: `pwsh -File script/smoke_windows_overlay.ps1 -Binary target/release/honk300.exe -EvidenceDirectory target/windows-overlay-evidence`
 - Linux host only: `HONK300_BIN="$PWD/target/release/honk300" bash script/smoke_m17_m18_linux.sh`
-- `dist plan --tag=v0.3.3`
+- `dist plan --tag=v1.0.0`
 - `cargo audit --version 0.22.2`
 
 Release packaging uses **cargo-dist** for portable archives plus project-owned atomic release,

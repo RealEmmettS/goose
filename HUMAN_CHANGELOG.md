@@ -17,7 +17,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > controls. Mac support and the Linux desktop paths are now in the codebase, with repeatable
 > CI smoke proof for hosted Mac bundle checks and Linux desktop behavior. The installed Mac app
 > now has a calm, non-nagging permission handoff, while its denied, repeat-denied, granted, and
-> revoked behavior still needs one final unchanged signed-app run. Every desktop now stages the
+> revoked behavior still needs one final unchanged signed-app run. While running, the Mac app also
+> has a Honk menu that opens the same terminal settings screen or starts its animated goodbye.
+> Every desktop now stages the
 > Goose's arrival and departure beyond a real screen edge, and a person closing its note or meme
 > can provoke a safely bounded annoyed reaction. The Windows/Linux installer
 > and update
@@ -29,6 +31,13 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Latest — July 2026
 
 ### Added
+- **Mac users now get a simple Honk menu while the Goose is running.** Configure opens the same
+  terminal settings screen that already owns every setting, and Quit sends the Goose walking
+  fully offscreen before the app closes. The menu disappears with the app and does not add a
+  second preferences window, a running Dock control, or a tray to Windows and Linux. This makes a
+  graphical Mac install easier to control without splitting settings or bypassing the animated
+  goodbye. A local packaged app opened and restored the full settings screen and walked fully out
+  when Quit was chosen; the final signed release still has to repeat both actions.
 - **Mac permission setup is now a calm, one-time handoff.** The officially installed Goose asks
   once for each installed update, opens the right Mac privacy page, and waits visibly near a safe
   screen edge instead of wandering off or attempting pranks. Honk, status, reload, and stop still
@@ -89,6 +98,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   Linux does not currently open those windows, so it has no close reaction there.
 
 ### Improved
+- **This is now the first stable Honk300 release.** Every download, installer, update record, and
+  website check moves to the same stable baseline, including upgrades from the previous public
+  build. Extra hands-on Windows checks will continue afterward, and anything they find will be
+  repaired in a new update instead of silently replacing already published files. This makes the
+  release identity clear and keeps downloads reproducible.
 - **One stable download address now follows every complete release.** The familiar Mac disk
   image, Windows installers, Linux packages, and terminal installers keep the same latest links,
   while every older release and its files stay frozen. A release started from any computer still
@@ -121,12 +135,22 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   Accessibility checks happen without rebuilding the app between them.
 
 ### Fixed
-- **Windows and Linux release screenshots now use the intended desktop capture paths.** Windows
-  now asks the native screen API to include layered windows instead of passing a flag combination
-  that its managed image helper rejects. The Linux X11 rehearsal uses the normal client-side
-  compositor and first proves that controlled dark and light desktops are clean before the Goose
-  starts. The actual color, transparency, and body-part standards were not relaxed, so these fixes
-  repair the test environment without hiding a bad Goose.
+- **Windows and Linux release screenshots now prove their test desktop before judging the Goose.**
+  A later release rehearsal showed that Linux was photographing a compositor's remembered gray
+  tile and Windows on ARM could miss both its colored test surface and the Goose because the two
+  helpers disagreed about screen scaling and briefly fought over one file. Linux now keeps a
+  temporary colored window alive behind the Goose only inside its fake test desktop. Both Windows
+  helpers agree on physical screen coordinates, exchange each color safely, and prove real dark
+  and light pictures before the Goose starts. Piping status into a command that stops reading is
+  also treated as a normal finish, while genuine output errors still fail. None of the required
+  body-part, color, shadow, or transparency standards were loosened, and the repaired source must
+  still pass one final hosted run.
+- **The Goose's beak is being aligned with windows it fetches.** A live Mac run found that its
+  body could reach the center of a note while its beak—the part that actually has to grab it—was
+  still too far away, leaving the behavior stuck. The Goose now adjusts where its body is headed
+  as its beak moves, and a lifelike timed check walks all the way through grabbing and typing
+  without moving the beak by hand. The full local test set passes. A real signed-app fetch still
+  has to pass before release, so final native proof remains honestly open.
 - **An older Goose note or meme no longer blocks the next one.** Mac and Windows now keep track of
   which new window the Goose is actively fetching, even when an earlier note stays open. Closing
   an older window is still noticed once, but it cannot hide the current window and make the new

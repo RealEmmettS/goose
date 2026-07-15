@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Immutable stable release tag, for example v0.3.3"
+        description: "Immutable stable release tag, for example v1.0.0"
         required: true
         type: string
       commit:
@@ -212,8 +212,10 @@ jobs:
           app="target/dist/macos-universal2/Honk300.app"
           helper="target/dist/macos-universal2/Install Honk300.app"
           app_bin="$app/Contents/MacOS/honk300"
+          configure_launcher="$app/Contents/Resources/Configure Honk300.command"
           helper_bin="$helper/Contents/MacOS/Install Honk300"
           test -d "$app" && test -d "$helper"
+          test -x "$configure_launcher"
           lipo "$app_bin" -verify_arch x86_64 arm64
           lipo "$helper_bin" -verify_arch x86_64 arm64
           xcrun vtool -show-build "$helper_bin" > "$RUNNER_TEMP/helper-deployment.txt"
@@ -272,6 +274,7 @@ jobs:
           mkdir -p "$extracted"
           ditto -x -k "$output/honk300-universal2.app.zip" "$extracted"
           test -d "$extracted/Honk300.app"
+          test -x "$extracted/Honk300.app/Contents/Resources/Configure Honk300.command"
           codesign --verify --strict --verbose=4 "$extracted/Honk300.app"
           xcrun stapler validate "$extracted/Honk300.app"
           spctl --assess --type execute --verbose=4 "$extracted/Honk300.app"
@@ -317,6 +320,7 @@ jobs:
           trap 'hdiutil detach "$mount" >/dev/null 2>&1 || true' EXIT
           test -d "$mount/Honk300.app"
           test -d "$mount/Install Honk300.app"
+          test -x "$mount/Honk300.app/Contents/Resources/Configure Honk300.command"
           test -f "$mount/Read Me.txt"
           test ! -e "$mount/Applications"
           test "$(find "$mount" -mindepth 1 -maxdepth 1 ! -name '.Trashes' | wc -l | tr -d ' ')" -eq 3
@@ -355,6 +359,7 @@ jobs:
           trap 'hdiutil detach "$mount" >/dev/null 2>&1 || true' EXIT
           codesign --verify --strict --verbose=4 "$mount/Honk300.app"
           codesign --verify --strict --verbose=4 "$mount/Install Honk300.app"
+          test -x "$mount/Honk300.app/Contents/Resources/Configure Honk300.command"
           spctl --assess --type execute --verbose=4 "$mount/Honk300.app"
           spctl --assess --type execute --verbose=4 "$mount/Install Honk300.app"
           hdiutil detach "$mount"

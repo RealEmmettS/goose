@@ -13,7 +13,7 @@ shape that originally created this follow-up.
 - The Windows backend owns one layered window per monitor and clips each dirty world region to the
   intersecting monitor before `UpdateLayeredWindow`.
 - Focused damage tests include a 4K non-accumulation case; Windows x64 and ARM64 target checks pass.
-- The v0.3.3 Mac profile independently meets its present-cost envelope at 8.30% median CPU and
+- The v1.0.0 Mac profile independently meets its present-cost envelope at 8.30% median CPU and
   54.48 MiB maximum RSS after warm-up.
 
 ## Activity

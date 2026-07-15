@@ -24,8 +24,8 @@
 
 | Project | Status | Source |
 |---|---|---|
-| Honk300 | v0.3.3 macOS qualification and signed distribution active | `#m20q` |
-| Desktop Goose site | DMG-first rollout follows verified v0.3.3 publication | `/Users/realemmetts/Downloads/temp_git/desktop-goose-site` |
+| Honk300 | v1.0.0 macOS qualification and signed distribution active | `#m20q` |
+| Desktop Goose site | DMG-first rollout follows verified v1.0.0 publication | `/Users/realemmetts/Downloads/temp_git/desktop-goose-site` |
 
 ## Preferences
 

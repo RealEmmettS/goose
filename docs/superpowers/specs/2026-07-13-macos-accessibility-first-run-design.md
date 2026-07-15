@@ -2,7 +2,7 @@
 
 Date: 2026-07-13
 Status: Approved
-Release: Honk300 v0.3.3
+Release: Honk300 v1.0.0
 Board: `#m20q` / `#m16r`
 
 ## Goal

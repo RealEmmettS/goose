@@ -113,6 +113,13 @@ fn arrived(goose: &GooseEntity, tol: f32) -> bool {
     Vec2::distance(goose.position, goose.target_pos) < tol
 }
 
+/// Translate an interaction point for the beak into the body/ground target consumed by
+/// locomotion. Driving the body directly to the interaction point can never satisfy a beak-based
+/// arrival gate in side view because the beak remains a neck-height away after the body stops.
+fn beak_locomotion_target(goose: &GooseEntity, beak_target: Vec2) -> Vec2 {
+    beak_target - (goose.rig.beak_tip - goose.position)
+}
+
 fn random_point(ctx: &mut TaskCtx) -> Vec2 {
     ctx.layout.sample_point(ctx.rng)
 }
@@ -897,7 +904,9 @@ impl Task for CollectWindowTask {
                 deadline,
             } => {
                 if let Some(snapshot) = Self::live_snapshot(ctx, request, payload) {
-                    goose.target_pos = snapshot.center();
+                    goose.target_pos = ctx
+                        .layout
+                        .clamp_point(beak_locomotion_target(goose, snapshot.center()));
                     self.state = CollectState::RunToPickup { request, payload };
                     false
                 } else {
@@ -909,7 +918,9 @@ impl Task for CollectWindowTask {
                     return true;
                 };
                 let pickup = snapshot.center();
-                goose.target_pos = ctx.layout.clamp_point(pickup);
+                goose.target_pos = ctx
+                    .layout
+                    .clamp_point(beak_locomotion_target(goose, pickup));
                 if Vec2::distance(goose.rig.beak_tip, pickup) <= COLLECT_PICKUP_DISTANCE {
                     let offset = snapshot.rect.min - goose.rig.beak_tip;
                     let release_at = ctx
@@ -1851,8 +1862,17 @@ mod tests {
         ctx.collect_window_snapshot =
             Some(collect_snapshot(request, CollectWindowKind::Note, rect));
         ctx.now = 0.1;
+        let pickup = Vec2::new(350.0, 200.0);
+        let expected_body_target = ctx
+            .layout
+            .clamp_point(beak_locomotion_target(&goose, pickup));
         assert!(!task.run(&mut goose, &mut ctx));
-        assert_eq!(goose.target_pos, Vec2::new(350.0, 200.0));
+        assert_eq!(goose.target_pos, expected_body_target);
+        assert_eq!(
+            goose.target_pos + (goose.rig.beak_tip - goose.position),
+            pickup,
+            "collect locomotion must aim the beak, not the body, at the prop"
+        );
 
         ctx.collect_window_commands.clear();
         goose.rig.beak_tip = Vec2::new(350.0, 200.0);

@@ -4,7 +4,7 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/); release versions follow
 [Semantic Versioning](https://semver.org/).
 
-> **Project stage: implementation in progress.** Milestones M0-M19 are implemented in-tree. The
+> **Project stage: first stable release.** Milestones M0-M19 are implemented in-tree. The
 > managed macOS Accessibility first run is implemented and automated tests are green; M16.1
 > readiness remains gated on exact signed-candidate denied, non-nagging relaunch, live-grant, and
 > live-revocation evidence. The goose now renders, walks, leaves mud, plays sounds, reacts to the
@@ -16,14 +16,29 @@ All notable changes to this project are documented here. Format based on
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
 > ratatui config TUI, dynamic moods, the local on-hour double honk, quiet-hours/DND/fullscreen
 > manners, built-in Autumn leaves, Windows multi-monitor chase, and live appearance/recolor
-> controls, plus macOS runtime/status/app-bundle staging, Linux X11 visible overlay support,
+> controls, plus macOS runtime/status/app-bundle staging and a menu-bar shortcut to the existing
+> TUI/graceful Quit, Linux X11 visible overlay support,
 > native Wayland reduced-mode rendering, CI smoke gates, and M19 Windows/Linux lifecycle plus
 > release packaging with artifact evidence. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-14
+
 ### Added
+- **macOS menu-bar Configure and graceful Quit (2026-07-14, ADR 0024)** - the running
+  `LSUIElement` app owns one main-thread AppKit status item labeled `Honk`. Its accessible
+  Configure action opens a signed-bundle `Configure Honk300.command` resource which executes the
+  same app binary's existing ratatui `config` entry point; Quit sets the shared engine graceful-
+  stop intent so simulation/presentation continue through the fully offscreen walk and final
+  transparent acknowledgement. The bridge explicitly retains AppKit's weak menu target for the
+  item lifetime, removes the item on runtime teardown, and adds no native settings schema/window,
+  running Dock control surface, AppleScript API, global key, or Windows/Linux tray. Packaging
+  contracts require the executable launcher before signing and in the final app ZIP and both DMG
+  validation passes. A local packaged universal app exposed all items through macOS accessibility
+  inspection, opened/restored the full TUI in Terminal, and completed animated Quit in four
+  seconds; exact final signed-candidate interaction evidence remains open.
 - **Managed macOS Accessibility first run (2026-07-13, ADR 0022)** - only the exact receipted app
   at `~/Applications/Honk300.app` can open automatic permission UI. Before calling the native
   consent request and opening Accessibility settings, the runtime atomically creates an
@@ -35,7 +50,7 @@ All notable changes to this project are documented here. Format based on
   the non-nagging wait after revocation. Focused engine, eligibility/marker, native bridge, and
   smoke-contract tests pass; the exact signed-candidate denied/non-nag/grant/revoke smoke remains
   a release gate.
-- **Developer ID macOS distribution (v0.3.3, ADR 0020)** - the universal app now carries exact
+- **Developer ID macOS distribution (v1.0.0, ADR 0020)** - the universal app now carries exact
   version/tag/commit metadata, and the DMG contains `Honk300.app`, a separately signed native
   `Install Honk300.app`, and concise per-user instructions without an `/Applications` symlink.
   The helper verifies the target bundle id, signature, and matching nonempty Developer ID team,
@@ -96,6 +111,12 @@ All notable changes to this project are documented here. Format based on
   Program cleanup never rolls; Linux remains explicitly collect-unsupported and has no trigger.
 
 ### Changed
+- **First stable major release (2026-07-14, ADR 0025)** - the prospective unpublished v0.3.3
+  milestone is released as v1.0.0. Package, app-bundle, receipt, manifest, installer, updater,
+  readiness, and website identities advance together; v0.3.2-to-v1.0.0 is an explicitly tested
+  normal upgrade. Earlier v0.3.3 candidate runs remain diagnostic only. Additional Alienware
+  hands-on verification happens after publication and any findings ship in forward patch releases
+  without rewriting the immutable v1.0.0 tag or assets.
 - **Complete rolling-latest release channel (2026-07-14, ADR 0023)** - every general tag now
   requires the complete cross-platform producer matrix, including a fresh GitHub-macOS-built,
   Developer ID-signed/notarized/stapled app and DMG plus both Debian packages regardless of the
@@ -136,20 +157,33 @@ All notable changes to this project are documented here. Format based on
   allowing denied and granted Accessibility evidence on one unchanged signed identity.
 
 ### Fixed
-- **Native release-capture rehearsal failures (2026-07-14)** - Windows paired compositor capture
-  now uses native `BitBlt` with `SRCCOPY | CAPTUREBLT` instead of passing an invalid combined
-  managed `CopyPixelOperation` enum to `CopyFromScreen`. X11 qualification now uses the ordinary
-  client-side `xcompmgr` path and proves a clean controlled dark/light compositor baseline before
-  launching the exact goose binary, preventing an automatic server-side debug compositor from
-  turning transparent root pixels opaque black. Semantic goose/alpha thresholds remain
-  unchanged and fail closed.
+- **Final-source native candidate diagnostics (2026-07-14)** - after native `BitBlt` repaired the
+  first Windows capture failure, candidate `29384134561` proved the notarized Mac producer and
+  Windows x64 path but failed closed because `xcompmgr` held its cached gray root tile on every
+  Linux target and the ARM64 Windows controller captured neither its ordinary TopMost background
+  nor the overlay before racing the shared color file. X11 qualification now uses a persistent,
+  test-only opaque client behind the goose, changes its controlled color through an atomic
+  command plus acknowledgement, and forces real compositor damage without adding any background
+  to the product. Both Windows smoke processes enter per-monitor-v2 DPI awareness before WinForms
+  or HWND creation, exchange tokenized atomic color requests, prove matching physical virtual-
+  screen geometry and a real dark/light capture before launch, and retain per-overlay DPI/rect
+  evidence. Cross-platform `status` output also treats only a downstream `BrokenPipe` as normal
+  while preserving every other write failure. Semantic goose/color/alpha thresholds remain
+  unchanged; the source differs from the proven candidate and must rerun exactly before release.
+- **Collect pickup now aims locomotion at the beak interaction point** - live macOS qualification
+  exposed a side-view deadlock where the body stopped at the prop center but completion measured
+  distance from the neck-height beak. Locomotion now recomputes the body target from current beak
+  geometry each tick, keeping the beak-distance arrival gate authoritative. A realistic 120 Hz
+  world regression reaches passthrough/grab and note typing within 15 seconds without teleporting
+  the beak, and the complete integrated local gate passes. An exact signed-app live collect remains
+  a release blocker and is not yet accepted as final native evidence.
 - **Lingering collect windows cannot starve a newer request** - the macOS and Windows native
   controllers now prefer the most recently spawned typed request over older notes or memes that
   remain open. Dead-window events are still drained first, matched by request id and kind, and
   removed exactly once, so delayed user-close reactions remain truthful without making a newer
   collect task time out behind arbitrary map iteration order.
 - **Current macOS hands-on release runbook** - replaced the historical ad-hoc, unnotarized,
-  terminal-first checklist with the exact v0.3.3 Developer ID/notarized/stapled DMG-first flow.
+  terminal-first checklist with the exact v1.0.0 Developer ID/notarized/stapled DMG-first flow.
   The runbook now preserves one candidate identity across four Accessibility states, native
   terminal protection, renderer and performance evidence, lifecycle rollback, the one-display
   waiver, immutable publication, and fresh-download verification. The README now links the exact

@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = (ROOT / "script" / "package_macos_app.sh").read_text(encoding="utf-8")
 HELPER_PACKAGE_PATH = ROOT / "script" / "package_macos_installer_helper.sh"
 HELPER_SOURCE_PATH = ROOT / "packaging" / "macos" / "InstallHonk300" / "main.swift"
+CONFIGURE_LAUNCHER_PATH = ROOT / "packaging" / "macos" / "Configure Honk300.command"
 HELPER_PACKAGE = HELPER_PACKAGE_PATH.read_text(encoding="utf-8")
 WORKFLOW = (ROOT / ".github" / "workflows" / "macos-packaging.yml").read_text(
     encoding="utf-8"
@@ -21,6 +22,11 @@ class MacosPackagingTests(unittest.TestCase):
             'ditto "$ROOT/THIRD_PARTY_ASSETS.md" "$RESOURCES_DIR/THIRD_PARTY_ASSETS.md"',
             PACKAGE,
         )
+        self.assertIn(
+            'ditto "$ROOT/packaging/macos/Configure Honk300.command"',
+            PACKAGE,
+        )
+        self.assertIn('chmod 755 "$RESOURCES_DIR/Configure Honk300.command"', PACKAGE)
         self.assertNotIn('"$ROOT/Assets"', PACKAGE)
         self.assertIn("MACOS_SIGN_IDENTITY", PACKAGE)
         self.assertIn('codesign --force --options runtime --sign - "$BIN"', PACKAGE)
@@ -32,6 +38,18 @@ class MacosPackagingTests(unittest.TestCase):
         tail = PACKAGE[verify:]
         self.assertNotIn("ditto ", tail)
         self.assertNotIn("cp ", tail)
+
+    def test_menu_bar_configure_launcher_runs_the_bundled_tui(self) -> None:
+        self.assertTrue(CONFIGURE_LAUNCHER_PATH.is_file())
+        launcher = CONFIGURE_LAUNCHER_PATH.read_text(encoding="utf-8")
+        self.assertIn('#!/bin/sh', launcher)
+        self.assertIn('CONTENTS_DIR=', launcher)
+        self.assertIn('MacOS/honk300" config', launcher)
+        self.assertNotIn("sudo", launcher)
+        self.assertLess(
+            PACKAGE.index('chmod 755 "$RESOURCES_DIR/Configure Honk300.command"'),
+            PACKAGE.index('codesign --force --options runtime --sign - "$BIN"'),
+        )
 
     def test_release_emits_signed_notarized_stapled_app_and_primary_dmg(self) -> None:
         self.assertIn("honk300-universal2.app.zip", WORKFLOW)
@@ -69,6 +87,10 @@ class MacosPackagingTests(unittest.TestCase):
     def test_dmg_contains_only_the_two_apps_and_readme(self) -> None:
         self.assertIn('test -d "$mount/Honk300.app"', WORKFLOW)
         self.assertIn('test -d "$mount/Install Honk300.app"', WORKFLOW)
+        self.assertIn(
+            'test -x "$mount/Honk300.app/Contents/Resources/Configure Honk300.command"',
+            WORKFLOW,
+        )
         self.assertIn('test -f "$mount/Read Me.txt"', WORKFLOW)
         self.assertIn('test ! -e "$mount/Applications"', WORKFLOW)
         self.assertIn("-eq 3", WORKFLOW)

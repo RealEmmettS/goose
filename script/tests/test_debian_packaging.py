@@ -27,8 +27,8 @@ class DebianPackagingTests(unittest.TestCase):
             installed = PACKAGE_DEB.build_package_tree(
                 staging,
                 binary,
-                "0.3.3",
-                "v0.3.3",
+                "1.0.0",
+                "v1.0.0",
                 "0123456789abcdef0123456789abcdef01234567",
                 "amd64",
             )
@@ -44,7 +44,7 @@ class DebianPackagingTests(unittest.TestCase):
                 (staging / "usr" / "share" / "honk300" / "release.json").read_text()
             )
             self.assertEqual(metadata["target"], "x86_64-unknown-linux-gnu")
-            self.assertEqual(metadata["tag"], "v0.3.3")
+            self.assertEqual(metadata["tag"], "v1.0.0")
             control = (staging / "DEBIAN" / "control").read_text()
             self.assertIn("Package: honk300\n", control)
             self.assertIn("Architecture: amd64\n", control)
@@ -59,13 +59,13 @@ class DebianPackagingTests(unittest.TestCase):
             binary.write_bytes(b"elf")
             with self.assertRaisesRegex(ValueError, "version and tag"):
                 PACKAGE_DEB.build_package_tree(
-                    temp / "one", binary, "0.3.3", "v0.3.4", "0" * 40, "amd64"
+                    temp / "one", binary, "1.0.0", "v1.0.1", "0" * 40, "amd64"
                 )
             link = temp / "link"
             link.symlink_to(binary)
             with self.assertRaisesRegex(ValueError, "regular non-symlink"):
                 PACKAGE_DEB.build_package_tree(
-                    temp / "two", link, "0.3.3", "v0.3.3", "0" * 40, "arm64"
+                    temp / "two", link, "1.0.0", "v1.0.0", "0" * 40, "arm64"
                 )
 
 

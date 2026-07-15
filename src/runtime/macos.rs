@@ -21,8 +21,8 @@ use honk_engine::{
 };
 use honk_platform_macos::{
     accessibility_state, local_time, main_bundle_release_metadata, open_accessibility_settings,
-    presence_state, request_accessibility_prompt, warp_cursor, AccessibilityState,
-    CollectWindowController, ForeignWindowWatcher, Overlay,
+    open_configuration_tui, presence_state, request_accessibility_prompt, warp_cursor,
+    AccessibilityState, CollectWindowController, ForeignWindowWatcher, Overlay, StatusMenuCommand,
 };
 
 pub fn run(
@@ -119,11 +119,21 @@ pub fn run(
     let mut warned_cursor_warp = false;
     let mut warned_collect_window = false;
 
-    println!("honk300: a macOS goose is loose. Use `honk300 stop` to send it home.");
+    println!(
+        "honk300: a macOS goose is loose. Use the Honk menu or `honk300 stop` to send it home."
+    );
 
     loop {
         if !overlay.pump() {
             break;
+        }
+
+        if let Some(command) = overlay.take_status_menu_command() {
+            if let Err(err) =
+                handle_status_menu_command(command, &mut world, open_configuration_tui)
+            {
+                eprintln!("honk300: Configure could not open ({err})");
+            }
         }
 
         if overlay.take_topology_changed() {
@@ -480,6 +490,21 @@ pub fn run(
     Ok(())
 }
 
+fn handle_status_menu_command(
+    command: StatusMenuCommand,
+    world: &mut World,
+    open_configuration: impl FnOnce() -> std::io::Result<()>,
+) -> std::io::Result<()> {
+    match command {
+        StatusMenuCommand::Configure => open_configuration(),
+        StatusMenuCommand::Quit => {
+            println!("honk300: menu-bar Quit received; walking home.");
+            RuntimeCore::begin_graceful_stop(world);
+            Ok(())
+        }
+    }
+}
+
 fn prepare_dirty_canvas(
     canvas: &mut Option<Pixmap>,
     width: u32,
@@ -798,8 +823,8 @@ mod tests {
             state_root.join("install-receipt.json"),
             serde_json::to_vec(&json!({
                 "schema": "honk300.install.v1",
-                "version": "0.3.3",
-                "tag": "v0.3.3",
+                "version": "1.0.0",
+                "tag": "v1.0.0",
                 "commit": TEST_SHA,
                 "install_root": app.to_string_lossy(),
             }))
@@ -808,15 +833,15 @@ mod tests {
         .expect("receipt");
         let metadata = MacBundleReleaseMetadata {
             bundle_id: "dev.emmetts.honk300".into(),
-            version: "0.3.3".into(),
-            tag: "v0.3.3".into(),
+            version: "1.0.0".into(),
+            tag: "v1.0.0".into(),
             commit: TEST_SHA.into(),
         };
         let onboarding = AccessibilityOnboarding::detect(home.path(), &executable, &metadata)
             .expect("managed onboarding");
         let marker = home
             .path()
-            .join("Library/Application Support/honk300/state/accessibility-prompt-v1/0.3.3");
+            .join("Library/Application Support/honk300/state/accessibility-prompt-v1/1.0.0");
         (home, onboarding, marker)
     }
 
@@ -953,6 +978,33 @@ mod tests {
             }),
             BackendCapability::Unsupported
         );
+    }
+
+    #[test]
+    fn menu_bar_configure_uses_the_shared_terminal_tui_launcher() {
+        let mut world = World::new(Rect::new(Vec2::ZERO, Vec2::new(1200.0, 800.0)), 7);
+        let mut opened = false;
+
+        handle_status_menu_command(StatusMenuCommand::Configure, &mut world, || {
+            opened = true;
+            Ok(())
+        })
+        .expect("configuration launcher should succeed");
+
+        assert!(opened);
+        assert!(!world.graceful_exit_requested());
+    }
+
+    #[test]
+    fn menu_bar_quit_requests_the_existing_graceful_walk_off() {
+        let mut world = World::new(Rect::new(Vec2::ZERO, Vec2::new(1200.0, 800.0)), 7);
+
+        handle_status_menu_command(StatusMenuCommand::Quit, &mut world, || {
+            panic!("Quit must not invoke the configuration launcher")
+        })
+        .expect("Quit should be accepted");
+
+        assert!(world.graceful_exit_requested());
     }
 
     #[test]

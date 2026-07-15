@@ -13,7 +13,7 @@ precision, display gaps were treated as usable desktop, TUI IPC could block rend
 runtimes looked unsupported, and platform loops had drifted in tick/reload/damage ordering.
 
 The original release was a correctness and distribution-readiness pass without a new control
-surface. The v0.3.3 amendment adds shared exposed-edge locomotion and a collect-window close
+surface. The v1.0.0 amendment adds shared exposed-edge locomotion and a collect-window close
 reaction inside the existing engine/task/config/capability boundaries; it introduces no new
 settings schema, native settings UI, or platform privilege.
 

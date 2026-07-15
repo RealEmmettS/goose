@@ -16,6 +16,12 @@ assert SPEC and SPEC.loader
 ANALYZER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = ANALYZER
 SPEC.loader.exec_module(ANALYZER)
+BACKGROUND_PATH = ROOT / "script" / "x11_smoke_background.py"
+BACKGROUND_SPEC = importlib.util.spec_from_file_location("x11_smoke_background", BACKGROUND_PATH)
+assert BACKGROUND_SPEC and BACKGROUND_SPEC.loader
+BACKGROUND = importlib.util.module_from_spec(BACKGROUND_SPEC)
+sys.modules[BACKGROUND_SPEC.name] = BACKGROUND
+BACKGROUND_SPEC.loader.exec_module(BACKGROUND)
 
 
 def png_chunk(kind: bytes, payload: bytes) -> bytes:
@@ -146,6 +152,41 @@ class LinuxOverlaySmokeContractTests(unittest.TestCase):
         ):
             self.assertIn(required, smoke)
         self.assertNotIn("xcompmgr -a", smoke)
+
+    def test_x11_background_is_a_disposable_lowered_client_not_an_app_surface(self) -> None:
+        smoke = (ROOT / "script" / "smoke_m17_m18_linux.sh").read_text(encoding="utf-8")
+        helper = BACKGROUND_PATH.read_text(encoding="utf-8")
+        for required in (
+            "script/x11_smoke_background.py",
+            'start_x11_background "#203040"',
+            'set_x11_background "#203040"',
+            'set_x11_background "#d8e6f4"',
+            'kill "${X11_BACKGROUND_PID}"',
+        ):
+            self.assertIn(required, smoke)
+        for required in (
+            "CW_OVERRIDE_REDIRECT",
+            "XChangeWindowAttributes",
+            "XLowerWindow",
+            "XSetWindowBackground",
+            "XClearWindow",
+            "honk300-smoke-background",
+        ):
+            self.assertIn(required, helper)
+
+    def test_x11_background_command_and_ready_files_are_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            command = root / "command"
+            ready = root / "ready"
+            command.write_text("#203040\n", encoding="ascii")
+            self.assertEqual(BACKGROUND.read_color(command), "#203040")
+            command.write_text("red\n", encoding="ascii")
+            with self.assertRaises(ValueError):
+                BACKGROUND.read_color(command)
+            BACKGROUND.write_ready(ready, "#d8e6f4")
+            self.assertEqual(ready.read_text(encoding="ascii"), "#d8e6f4\n")
+            self.assertEqual(ready.stat().st_mode & 0o777, 0o600)
 
 
 if __name__ == "__main__":

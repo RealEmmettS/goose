@@ -4,20 +4,28 @@
 
 Honk300 is a Rust 1.95, cross-platform procedural desktop goose for Windows, macOS, X11, and
 native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. The active
-v0.3.3 effort is the first complete native macOS qualification: fix AppKit pixel presentation,
+v1.0.0 effort is the first complete native macOS qualification: fix AppKit pixel presentation,
 refine shared walking and exposed-edge lifecycle, add the safely gated user-close reaction, meet
 runtime budgets, prove denied/granted Accessibility, ship a Developer ID-signed/notarized
-per-user DMG, add native Debian packages and platform-isolated rolling updates, publish
+per-user DMG with a macOS-only Configure/graceful-Quit menu-bar item, add native Debian packages
+and platform-isolated rolling updates, publish
 atomically, and only then make the stable latest DMG the recommended macOS download at
 thegoose.app.
 
 ## Status
 
-- Active branch/worktree: `codex/macos-v0.3.3` in `.worktrees/macos-v0.3.3`.
-- Stable public release remains v0.3.2 until the v0.3.3 readiness checklist is complete.
+- Active branch/worktree: `codex/v1.0.0` in the legacy-named `.worktrees/macos-v0.3.3`
+  directory (the release target changed after the worktree was created).
+- Stable public release remains v0.3.2 until the v1.0.0 readiness checklist is complete.
 - Active board cards: `#m20q` and exact-candidate Mac evidence card `#m16r`; the live shared task
   board is tracked under `.tasks/`.
-- Version: 0.3.3 in source.
+- Version: 1.0.0 in source.
+- macOS control: ADR 0024 adds a visible-while-running **Honk** status item. Configure opens the
+  signed bundle's existing terminal TUI, and Quit requests the same engine-owned walk-off used by
+  CLI/TUI stop. There is no second settings schema/window, running Dock control surface,
+  AppleScript API, or Windows/Linux tray. A local packaged-app smoke exposed the full accessible
+  menu, opened/restored the complete TUI, and completed animated Quit in four seconds; exact final
+  signed-app repetition remains open.
 - Renderer: AppKit/CoreGraphics RGBA regressions pass. The reusable AppKit image-view presenter
   now produces opaque, black-rectangle-free WindowServer captures in normal motion and readable
   dark-mode notes; byte-exact candidate light/dark repetition remains required.
@@ -29,7 +37,11 @@ thegoose.app.
   their independent focused review. Final transparent clearing, gapped-monitor staging,
   permission/hot-plug and Stop ordering, typed close correlation, positive Windows provenance,
   bounded exit ownership, and offscreen reaction deferral are pinned by regressions. Exact native
-  candidate observations remain open; Linux still has no collect trigger.
+  candidate observations remain open; Linux still has no collect trigger. A live Mac collect run
+  exposed that body locomotion could target the prop while completion measured beak arrival,
+  making a normal horizontal approach stall. The beak-offset source correction and focused
+  realistic 120 Hz regression now pass; exact signed-app collect proof is still required before
+  release.
 - Performance: bounded capture-safe surfaces reduced the post-transient regression from 40.45%
   to 12.00% median CPU during unlocked visible motion. The Device-RGB alpha-last bitmap now feeds
   a stable standard-sRGB window destination, leaving final display-profile composition to
@@ -42,12 +54,27 @@ thegoose.app.
   has no ambient lease bypass, checks machine-wide paths across sessions, rejects reboot-deferred
   MSI completion, and reaps every deferred helper that has not completed its exact READY handoff.
   Native candidate lifecycle execution remains open.
-- Packaging: a universal x86_64/arm64 installer helper targeting macOS 11.0 in both slices and a
-  fail-closed signing/notarization workflow are in-tree. Candidate run `29381861208` successfully
-  built, Developer ID-signed, notarized, stapled, and Gatekeeper-validated the universal app and
-  DMG on GitHub's macOS runner. The same candidate failed closed later on an X11 debug-compositor
-  background and a Windows managed screen-capture flag; both capture paths are repaired locally
-  without weaker semantic thresholds, and the final exact-SHA candidate remains required.
+- Packaging/candidate: a universal x86_64/arm64 installer helper targeting macOS 11.0 in both
+  slices and a fail-closed signing/notarization workflow are in-tree. Candidate run
+  `29384134561` at source `39087949731f9a8326d0661182fa4a2dbe89c61b` passed the complete
+  Developer ID/notarized/stapled Mac producer and Windows x64 compositor/lifecycle path. It failed
+  closed before assembly because all four Linux jobs saw `xcompmgr`'s unchanged gray cached root
+  tile, while Windows ARM64 captured neither the controlled background nor goose and then raced
+  its shared color file. Current source uses a persistent test-only X11 background client,
+  establishes PMv2 before either Windows smoke process creates an HWND, transfers colors through
+  an atomic token/ack channel, and proves DPI/geometry and dark/light capture before goose launch.
+  Status output also treats only `BrokenPipe` from a closed downstream consumer as success. These
+  source repairs and the new menu resource supersede `3908794`, so a final candidate rerun remains
+  mandatory; no release assembly or publication has occurred.
+- Integrated final-source gate: formatting, strict workspace clippy, 432 Rust tests including all
+  seven renderer goldens, release and both Apple builds, cargo-dist planning, 86 Python contracts,
+  actionlint, shell/PowerShell syntax, pinned cargo-audit over 374 dependencies and 1,160
+  advisories, Windows x64/ARM64 strict cross-clippy, Linux x64/ARM64 GNU/musl engine/backend
+  checks, and diff validation pass. Hosted native candidate gates remain open.
+- v1.0.0 retarget gate: the affected identity paths also pass 107 root tests, 22 native Mac
+  platform tests, a release binary reporting 1.0.0, cargo-dist v1.0.0 planning, 86 packaging/
+  workflow contracts, workflow and script syntax, local link/tree validation, and the live board
+  check. The exact candidate rebuilds the complete native matrix on the frozen SHA.
 - Debian/update: deterministic `honk300-amd64.deb` and `honk300-arm64.deb` packaging reuses the
   exact qualified GNU executables. Package-owned paths, aliases, marker, metadata, platform-kind
   isolation, `dpkg` ownership/elevation, update, preserve-on-uninstall, backup-on-purge, assembly
@@ -60,14 +87,15 @@ thegoose.app.
   dependency, 22 unit/lint/build/budget, and 10 browser/axe/keyboard/responsive/visual checks pass;
   hosted site CI run `29383684660` passed on Windows and Linux. Its protected Vercel preview is
   deployed and correctly rejects the still-live v0.3.2 manifest. Final app candidate
-  qualification, release publication, live-v0.3.3 validation, and production promotion remain
+  qualification, release publication, live-v1.0.0 validation, and production promotion remain
   deliberate gates.
 
 ## Goals
 
 1. Preserve a platform-free 120 Hz simulation engine and shared procedural renderer.
 2. Present correct premultiplied-alpha output through each native desktop backend.
-3. Keep all CLI/TUI/IPC control local, single-instance, and owner-scoped.
+3. Keep all CLI/TUI/IPC control local, single-instance, and owner-scoped; let the macOS status
+   item call only the existing TUI and graceful-stop path.
 4. Never manipulate terminal windows, even when visual overlays may cover them.
 5. Keep install/update/uninstall transactional and preserve foreign files and user media.
 6. Publish immutable, complete, machine-verifiable releases with no crates.io distribution.
@@ -81,6 +109,8 @@ thegoose.app.
     releases; update only through exact-tag, hash/size/target/provenance-matched artifacts.
 11. Offer native amd64/arm64 Debian packages with real package-manager ownership while preserving
     the per-user no-sudo shell path for other Linux users.
+12. Give graphical macOS users a visible Configure/Quit path without adding a native settings
+    model, abrupt termination, or a tray to Windows/Linux.
 
 ## Architecture
 
@@ -97,18 +127,21 @@ thegoose.app.
 - `.github/workflows/release.yml`: candidate-first and atomic immutable release orchestration.
 - `.github/workflows/macos-packaging.yml`: universal app/helper signing, app+DMG notarization,
   stapling, validation, and evidence.
-- `packaging/macos`: native graphical helper source and DMG instructions.
+- `packaging/macos`: native graphical helper source, signed terminal-TUI launcher, and DMG
+  instructions.
 - `docs/adr`: durable decisions. ADR 0020 is current for macOS distribution; ADR 0018 remains
-  current for atomic publication, and ADR 0023 governs rolling latest and Debian lifecycle.
+  current for atomic publication, ADR 0023 governs rolling latest and Debian lifecycle, and ADR
+  0024 governs the macOS-only menu-bar bridge. ADR 0025 records the first stable v1.0.0 identity
+  and post-release Alienware verification boundary.
 
 ## Verification Source Of Truth
 
-- Current release gate: `docs/readiness/v0.3.3-readiness.md`.
+- Current release gate: `docs/readiness/v1.0.0-readiness.md`.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
 - Board handoff and activity: `.tasks/tasks/m20q.md`.
 - Canonical product plan: `honk300_plan.md`.
 - Required local gate: fmt, workspace clippy with warnings denied, workspace tests, release build,
-  universal Apple builds, `dist plan --tag=v0.3.3`, complete Python contracts, cargo-audit
+  universal Apple builds, `dist plan --tag=v1.0.0`, complete Python contracts, cargo-audit
   0.22.2, actionlint, and diff check.
 
 ## Current Workspace Tree
@@ -350,11 +383,14 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── 0021-native-wayland-capability-strata.md
 │   │   ├── 0022-macos-accessibility-first-run-onboarding.md
 │   │   ├── 0023-rolling-latest-artifacts-and-debian-lifecycle.md
+│   │   ├── 0024-macos-menu-bar-control.md
+│   │   ├── 0025-first-stable-v1-release.md
 │   │   └── README.md
 │   ├── agents
 │   │   └── handoff
 │   │       ├── 2026-07-13-001-macos-v0-3-3-qualification-release.md
-│   │       └── 2026-07-14-001-macos-v0-3-3-alienware-resume.md
+│   │       ├── 2026-07-14-001-macos-v0-3-3-alienware-resume.md
+│   │       └── 2026-07-14-002-alienware-post-v1-verification.md
 │   ├── art-reference
 │   │   ├── goose-side-alt.svg
 │   │   ├── goose-side-head-left.svg
@@ -365,7 +401,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── macos-handson-checklist.md
 │   │   ├── v0.3.1-readiness.md
 │   │   ├── v0.3.2-readiness.md
-│   │   └── v0.3.3-readiness.md
+│   │   └── v1.0.0-readiness.md
 │   ├── research
 │   │   └── native-wayland-capability-path.md
 │   ├── superpowers
@@ -386,6 +422,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   └── install-source-exe-global.txt
 ├── packaging
 │   └── macos
+│       ├── Configure Honk300.command
 │       ├── DMG-README.txt
 │       └── InstallHonk300
 │           └── main.swift
@@ -395,30 +432,31 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   ├── analyze_windows_overlay_capture.py
 │   ├── honk300-installer.ps1.in
 │   ├── honk300-installer.sh.in
+│   ├── package_deb.py
 │   ├── package_macos_app.sh
 │   ├── package_macos_installer_helper.sh
-│   ├── package_deb.py
 │   ├── release_metadata.py
 │   ├── smoke_m16_macos.sh
 │   ├── smoke_m16_macos_accessibility.sh
 │   ├── smoke_m17_m18_linux.sh
-│   ├── smoke_released_unix.sh
 │   ├── smoke_released_deb.sh
+│   ├── smoke_released_unix.sh
 │   ├── smoke_released_windows.ps1
 │   ├── smoke_windows_overlay.ps1
+│   ├── tests
+│   │   ├── test_debian_packaging.py
+│   │   ├── test_installer_templates.py
+│   │   ├── test_linux_overlay_smoke.py
+│   │   ├── test_macos_packaging.py
+│   │   ├── test_macos_smoke_contract.py
+│   │   ├── test_post_release_smoke.py
+│   │   ├── test_release_metadata.py
+│   │   ├── test_release_workflows.py
+│   │   ├── test_verify_binary_architecture.py
+│   │   ├── test_windows_overlay_smoke.py
+│   │   └── test_windows_packaging.py
 │   ├── verify_binary_architecture.py
-│   └── tests
-│       ├── test_installer_templates.py
-│       ├── test_debian_packaging.py
-│       ├── test_linux_overlay_smoke.py
-│       ├── test_macos_packaging.py
-│       ├── test_macos_smoke_contract.py
-│       ├── test_post_release_smoke.py
-│       ├── test_release_metadata.py
-│       ├── test_release_workflows.py
-│       ├── test_verify_binary_architecture.py
-│       ├── test_windows_overlay_smoke.py
-│       └── test_windows_packaging.py
+│   └── x11_smoke_background.py
 ├── security-audit
 │   └── 2026-07-10-1635-diff-review.md
 ├── src
@@ -472,5 +510,5 @@ Finder metadata are excluded; every project source/document/configuration path i
     ├── corporate.wxs
     └── install-source-msi-corporate.txt
 
-78 directories, 263 files
+78 directories, 281 files
 ```

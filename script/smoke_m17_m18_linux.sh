@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# shellcheck disable=SC1007,SC1010
 set -eu
 
 if [ "$(uname -s)" != "Linux" ]; then
@@ -31,6 +32,7 @@ PID=""
 XVFB_PID=""
 OPENBOX_PID=""
 XCOMPMGR_PID=""
+X11_BACKGROUND_PID=""
 SWAY_PID=""
 RUNTIME_PAUSED=0
 WAYLAND_FIRST_OUTPUT=""
@@ -47,6 +49,10 @@ cleanup() {
   fi
   if [ -n "${OPENBOX_PID}" ]; then
     kill "${OPENBOX_PID}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "${X11_BACKGROUND_PID}" ]; then
+    kill "${X11_BACKGROUND_PID}" >/dev/null 2>&1 || true
+    wait "${X11_BACKGROUND_PID}" 2>/dev/null || true
   fi
   if [ -n "${XCOMPMGR_PID}" ]; then
     kill "${XCOMPMGR_PID}" >/dev/null 2>&1 || true
@@ -149,6 +155,48 @@ PY
   exit 1
 }
 
+wait_for_x11_background() {
+  expected="$1"
+  for _ in $(seq 1 40); do
+    if [ -f "${WORK}/x11-background.ready" ] \
+      && [ "$(cat "${WORK}/x11-background.ready")" = "${expected}" ]; then
+      sleep 0.20
+      return 0
+    fi
+    if ! kill -0 "${X11_BACKGROUND_PID}" >/dev/null 2>&1; then
+      cat "${WORK}/x11-background.log" >&2 || true
+      echo "smoke_m17_m18_linux: X11 background client exited early" >&2
+      exit 1
+    fi
+    sleep 0.10
+  done
+  cat "${WORK}/x11-background.log" >&2 || true
+  echo "smoke_m17_m18_linux: X11 background did not acknowledge ${expected}" >&2
+  exit 1
+}
+
+start_x11_background() {
+  color="$1"
+  printf '%s\n' "${color}" >"${WORK}/x11-background.command"
+  rm -f "${WORK}/x11-background.ready"
+  python3 "${ROOT}/script/x11_smoke_background.py" \
+    --color "${color}" \
+    --command "${WORK}/x11-background.command" \
+    --ready "${WORK}/x11-background.ready" \
+    >"${WORK}/x11-background.log" 2>&1 &
+  X11_BACKGROUND_PID="$!"
+  wait_for_x11_background "${color}"
+}
+
+set_x11_background() {
+  color="$1"
+  temporary="${WORK}/x11-background.command.$$"
+  printf '%s\n' "${color}" >"${temporary}"
+  mv "${temporary}" "${WORK}/x11-background.command"
+  kill -USR1 "${X11_BACKGROUND_PID}"
+  wait_for_x11_background "${color}"
+}
+
 wait_for_frame() {
   frame="$1"
   for _ in $(seq 1 100); do
@@ -229,11 +277,9 @@ PY
 capture_x11_background_pairs() {
   for _ in $(seq 1 24); do
     pause_runtime
-    xsetroot -solid "#203040"
-    sleep 0.20
+    set_x11_background "#203040"
     import -window root "PNG32:${WORK}/x11-dark.png" >/dev/null 2>&1 || true
-    xsetroot -solid "#d8e6f4"
-    sleep 0.20
+    set_x11_background "#d8e6f4"
     import -window root "PNG32:${WORK}/x11-light.png" >/dev/null 2>&1 || true
     set +e
     python3 "${ANALYZER}" \
@@ -255,11 +301,9 @@ capture_x11_background_pairs() {
 }
 
 validate_x11_capture_baseline() {
-  xsetroot -solid "#203040"
-  sleep 0.20
+  set_x11_background "#203040"
   import -window root "PNG32:${WORK}/x11-baseline-dark.png"
-  xsetroot -solid "#d8e6f4"
-  sleep 0.20
+  set_x11_background "#d8e6f4"
   import -window root "PNG32:${WORK}/x11-baseline-light.png"
   python3 "${ANALYZER}" \
     --pair x11-baseline "${WORK}/x11-baseline-dark.png" "${WORK}/x11-baseline-light.png" \
@@ -331,6 +375,7 @@ start_x11_server() {
   xcompmgr -n >"${WORK}/xcompmgr.log" 2>&1 &
   XCOMPMGR_PID="$!"
   wait_for_x11_compositor
+  start_x11_background "#203040"
   validate_x11_capture_baseline
 }
 
@@ -452,6 +497,10 @@ if [ ! -x "${BIN}" ]; then
 fi
 if [ ! -f "${ANALYZER}" ]; then
   echo "smoke_m17_m18_linux: capture analyzer is missing: ${ANALYZER}" >&2
+  exit 1
+fi
+if [ ! -f "${ROOT}/script/x11_smoke_background.py" ]; then
+  echo "smoke_m17_m18_linux: X11 background helper is missing" >&2
   exit 1
 fi
 {

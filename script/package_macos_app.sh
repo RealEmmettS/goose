@@ -52,6 +52,9 @@ chmod 755 "$BIN"
 
 ditto "$ROOT/LICENSE" "$RESOURCES_DIR/LICENSE"
 ditto "$ROOT/THIRD_PARTY_ASSETS.md" "$RESOURCES_DIR/THIRD_PARTY_ASSETS.md"
+ditto "$ROOT/packaging/macos/Configure Honk300.command" \
+  "$RESOURCES_DIR/Configure Honk300.command"
+chmod 755 "$RESOURCES_DIR/Configure Honk300.command"
 
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

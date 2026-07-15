@@ -28,6 +28,7 @@ use honk_control::{
 };
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use runtime::RuntimeOptions;
+use std::io::{self, Write};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(windows)]
@@ -105,7 +106,7 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             ) =>
         {
             if matches!(cli.command, Some(Command::Status)) {
-                print_status(RuntimeStatus::not_running());
+                print_status(RuntimeStatus::not_running())?;
                 return Ok(());
             }
             return Err("honk300: no running goose instance.".into());
@@ -123,31 +124,49 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
         ControlResponse::Err(code) => Err(format!("honk300 command rejected: {code}").into()),
         ControlResponse::Status(status) => {
-            print_status(status);
+            print_status(status)?;
             Ok(())
         }
     }
 }
 
-fn print_status(status: RuntimeStatus) {
-    println!(
+fn print_status(status: RuntimeStatus) -> io::Result<()> {
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+    ignore_broken_pipe(write_status(&mut stdout, status))
+}
+
+fn write_status(writer: &mut impl Write, status: RuntimeStatus) -> io::Result<()> {
+    writeln!(
+        writer,
         "honk300: {}",
         if status.running {
             "running"
         } else {
             "not running"
         }
-    );
-    println!("platform: {}", status.platform.label());
-    println!("bundle: {}", status.bundle.label());
-    println!("overlay: {}", status.overlay.label());
-    println!("accessibility: {}", status.accessibility.label());
-    println!("cursor: {}", status.cursor.label());
-    println!("window: {}", status.window.label());
-    println!("collect: {}", status.collect.label());
-    println!("presence: {}", status.presence.label());
-    println!("audio: {}", status.audio.label());
-    println!("assets: {} notes, {} memes", status.notes, status.memes);
+    )?;
+    writeln!(writer, "platform: {}", status.platform.label())?;
+    writeln!(writer, "bundle: {}", status.bundle.label())?;
+    writeln!(writer, "overlay: {}", status.overlay.label())?;
+    writeln!(writer, "accessibility: {}", status.accessibility.label())?;
+    writeln!(writer, "cursor: {}", status.cursor.label())?;
+    writeln!(writer, "window: {}", status.window.label())?;
+    writeln!(writer, "collect: {}", status.collect.label())?;
+    writeln!(writer, "presence: {}", status.presence.label())?;
+    writeln!(writer, "audio: {}", status.audio.label())?;
+    writeln!(
+        writer,
+        "assets: {} notes, {} memes",
+        status.notes, status.memes
+    )
+}
+
+fn ignore_broken_pipe(result: io::Result<()>) -> io::Result<()> {
+    match result {
+        Err(err) if err.kind() == io::ErrorKind::BrokenPipe => Ok(()),
+        result => result,
+    }
 }
 
 fn run_config(config: Option<std::path::PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
@@ -308,6 +327,41 @@ fn run_start(options: StartOptions) -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
     use std::fs;
+
+    struct FailingWriter(io::ErrorKind);
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+            Err(io::Error::from(self.0))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn status_output_treats_a_closed_downstream_pipe_as_success() {
+        let result = write_status(
+            &mut FailingWriter(io::ErrorKind::BrokenPipe),
+            RuntimeStatus::not_running(),
+        );
+
+        assert!(ignore_broken_pipe(result).is_ok());
+    }
+
+    #[test]
+    fn status_output_preserves_other_write_errors() {
+        let result = write_status(
+            &mut FailingWriter(io::ErrorKind::PermissionDenied),
+            RuntimeStatus::not_running(),
+        );
+
+        assert_eq!(
+            ignore_broken_pipe(result).unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+    }
 
     #[test]
     fn setup_creates_a_valid_v2_config_only_when_missing() {

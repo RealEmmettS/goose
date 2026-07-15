@@ -4,9 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Published immutable stable tag to verify, for example v0.3.1"
+        description: "Published immutable stable tag to verify, for example v1.0.0"
         required: true
-        default: v0.3.1
         type: string
 
 permissions:

@@ -178,7 +178,7 @@ Expected: no warnings.
 ```rust
 #[test]
 fn exact_receipted_release_is_managed_and_prompts_once_per_version() {
-    let fixture = managed_fixture("0.3.3", "v0.3.3", SHA);
+    let fixture = managed_fixture("1.0.0", "v1.0.0", SHA);
     let mut policy = AccessibilityOnboarding::detect(
         fixture.home(), fixture.executable(), fixture.metadata()).unwrap();
     assert!(policy.managed());
@@ -301,14 +301,14 @@ Build and sign one universal app once, install it through the shared lifecycle, 
 - Modify: `HUMAN_CHANGELOG.md`
 - Modify: `CODEX_PROJECT.md`
 - Modify: `docs/readiness/m16-m18-readiness.md`
-- Modify: `docs/readiness/v0.3.3-readiness.md`
+- Modify: `docs/readiness/v1.0.0-readiness.md`
 - Modify: `.tasks/TASKS.md`
 - Modify: `.tasks/tasks/m16r.md`
 - Modify: `.tasks/tasks/m20q.md`
 
 **Interfaces:**
 - Consumes: exact native evidence and final gates.
-- Produces: candidate-proven v0.3.3 publication plus a complete handoff. Website rollout remains parked.
+- Produces: candidate-proven v1.0.0 publication plus a complete handoff. Website rollout remains parked.
 
 - [ ] **Step 1: Document only verified behavior**
 
@@ -321,7 +321,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v0.3.3
+dist plan --tag=v1.0.0
 python3 -m unittest discover -s script/tests -p 'test_*.py' -v
 cargo audit
 target/tools/bin/actionlint
@@ -332,12 +332,12 @@ Expected: every gate passes; cross-target checks and the one-display hardware wa
 
 - [ ] **Step 3: Commit and push the complete branch**
 
-Stage code, docs, board assets, task handoffs, and the final handoff document. Verify no secret or temporary evidence is staged. Commit with conventional release-scoped messages and push `codex/macos-v0.3.3`.
+Stage code, docs, board assets, task handoffs, and the final handoff document. Verify no secret or temporary evidence is staged. Commit with conventional release-scoped messages and push `codex/v1.0.0`.
 
 - [ ] **Step 4: Candidate, default branch, tag, and release**
 
-Run candidate mode against the exact SHA. When green, fast-forward `main`, wait for ordinary CI, create the single immutable `v0.3.3` tag, and wait for atomic publication plus post-release smoke. Missing notarization credentials fail closed and must be recorded as the only publication blocker.
+Run candidate mode against the exact SHA. When green, fast-forward `main`, wait for ordinary CI, create the single immutable `v1.0.0` tag, and wait for atomic publication plus post-release smoke. Missing notarization credentials fail closed and must be recorded as the only publication blocker.
 
 - [ ] **Step 5: Fresh-download verification and cleanup**
 
-Download the published app ZIP and DMG; verify hashes, Developer ID team, hardened runtime, notarization, stapling, Gatekeeper, install, and v0.3.2-to-v0.3.3 update. Return this Mac to no installed app, aliases, LaunchAgent, socket, receipt, or test media. Push final board/readiness evidence and stop; do not deploy the website in this session.
+Download the published app ZIP and DMG; verify hashes, Developer ID team, hardened runtime, notarization, stapling, Gatekeeper, install, and v0.3.2-to-v1.0.0 update. Return this Mac to no installed app, aliases, LaunchAgent, socket, receipt, or test media. Push final board/readiness evidence and stop; do not deploy the website in this session.
