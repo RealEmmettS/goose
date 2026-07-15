@@ -24,7 +24,7 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-07-14
+## [1.0.0] - 2026-07-15
 
 ### Added
 - **macOS menu-bar Configure and graceful Quit (2026-07-14, ADR 0024)** - the running
@@ -157,6 +157,15 @@ All notable changes to this project are documented here. Format based on
   allowing denied and granted Accessibility evidence on one unchanged signed identity.
 
 ### Fixed
+- **Hermetic Wayland compositor evidence (2026-07-15)** - exact candidate `29389882143` passed
+  every release producer, native compositor/package job, and final assembly at commit `c44b89d`.
+  Ordinary main CI then exposed a non-hermetic difference: installing Ubuntu's recommended Sway
+  packages loaded `/etc/sway/config`, its wallpaper, and its bar on `HEADLESS-1`; Honk300's
+  transparent layer correctly revealed that distro background while `HEADLESS-2` showed the
+  requested solid. The smoke now starts Sway with an owner-written minimal config, addresses both
+  outputs explicitly, requires `swaybg`, and proves paired goose-free solid baselines on both
+  fractional-scale outputs before launching Honk300. No product background, renderer behavior,
+  or semantic threshold changed.
 - **Candidate-native evidence calibration (2026-07-14, ADR 0026)** - candidate `29387569722`
   passed the trusted Mac producer, Windows x64 paired-DWM compositor/lifecycle proof, native
   Windows ARM64 PE/MSI lifecycle, and X11 plus dual-output Wayland on three of four Linux

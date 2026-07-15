@@ -176,6 +176,25 @@ class LinuxOverlaySmokeContractTests(unittest.TestCase):
             self.assertIn(required, smoke)
         self.assertNotIn("xcompmgr -a", smoke)
 
+    def test_wayland_capture_owns_a_minimal_compositor_and_exact_output_backgrounds(self) -> None:
+        smoke = (ROOT / "script" / "smoke_m17_m18_linux.sh").read_text(encoding="utf-8")
+        for required in (
+            "need_cmd swaybg",
+            "sway-smoke.conf",
+            "output * bg #203040 solid_color",
+            'sway -c "${WORK}/sway-smoke.conf" -d',
+            "set_wayland_background",
+            'swaymsg output "${WAYLAND_FIRST_OUTPUT}" bg "${color}" solid_color',
+            'swaymsg output "${WAYLAND_SECOND_OUTPUT}" bg "${color}" solid_color',
+            "validate_wayland_capture_baseline",
+            "wayland-baseline-first-dark.png",
+            "wayland-baseline-second-light.png",
+            "Wayland compositor capture baseline is invalid before launch",
+            "--require-no-goose",
+        ):
+            self.assertIn(required, smoke)
+        self.assertNotIn("WLR_LIBINPUT_NO_DEVICES=1 sway -d", smoke)
+
     def test_x11_background_is_a_disposable_lowered_client_not_an_app_surface(self) -> None:
         smoke = (ROOT / "script" / "smoke_m17_m18_linux.sh").read_text(encoding="utf-8")
         helper = BACKGROUND_PATH.read_text(encoding="utf-8")

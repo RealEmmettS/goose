@@ -218,7 +218,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            grim imagemagick libasound2-dev openbox python3 sway x11-utils \
+            grim imagemagick libasound2-dev openbox python3 sway swaybg x11-utils \
             x11-xserver-utils xcompmgr xvfb
 
       - name: Install native packages
@@ -431,7 +431,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            grim imagemagick libasound2-dev openbox python3 sway x11-utils \
+            grim imagemagick libasound2-dev openbox python3 sway swaybg x11-utils \
             x11-xserver-utils xcompmgr xvfb
 
       - name: Prove native package, aliases, compositor, updates, uninstall, and purge

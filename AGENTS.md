@@ -76,12 +76,18 @@ wallpaper for two acknowledged visible-window colors. Current source calibrates 
 floor to 10 while retaining body/wing/transparency checks. ADR 0026 permits an ARM64 fallback only
 for the exact GitHub-hosted wallpaper signature: the native process must expose a visible HWND and
 atomically record the cropped premultiplied-BGRA DIB only after `UpdateLayeredWindow` succeeds;
-raw alpha/channel, opaque-surface, articulation, shadow, and frozen HWND/rectangle checks remain
-fail closed. Local/self-hosted ARM64 and all ordinary x64 runs still require paired DWM capture.
-Exact signed-app collect proof, one fresh exact-SHA candidate, and exact-candidate Mac evidence
-remain release blockers. The current release gate is `docs/readiness/v1.0.0-readiness.md` and task
-`#m20q`. Stable/latest remains v0.3.2 until that checklist is complete and the immutable v1.0.0
-release is independently verified.
+raw alpha/channel, opaque-surface, articulation, shadow, exact-HWND, and bounded fresh-rectangle
+checks remain fail closed. Local/self-hosted ARM64 and all ordinary x64 runs still require paired
+DWM capture. Exact candidate `29389882143` at `c44b89d` passed the complete Mac producer, every
+portable/native Windows and Linux gate, both Debian packages, and final assembly. Same-SHA main CI
+then exposed only fixture contamination on Ubuntu 24.04: inherited `/etc/sway/config` wallpaper/bar
+remained visible through Honk300's transparent layer on one headless output. Current source starts
+Sway with a minimal private config, applies exact per-output backgrounds, and proves both outputs
+before launching the goose; it does not add a product background or weaken the analyzer. Exact
+signed-app collect/Accessibility evidence plus the changed-SHA candidate/main gates remain release
+blockers. The current release gate is `docs/readiness/v1.0.0-readiness.md` and task `#m20q`.
+Stable/latest remains v0.3.2 until that checklist is complete and the immutable v1.0.0 release is
+independently verified.
 
 ## Read these first (source-of-truth pointers)
 

@@ -322,12 +322,10 @@ validate_x11_capture_baseline() {
 capture_wayland_background_pairs() {
   for _ in $(seq 1 24); do
     pause_runtime
-    swaymsg output "*" bg "#203040" solid_color >/dev/null
-    sleep 0.20
+    set_wayland_background "#203040"
     grim -o "${WAYLAND_FIRST_OUTPUT}" "${WORK}/wayland-first-dark.png" >/dev/null 2>&1 || true
     grim -o "${WAYLAND_SECOND_OUTPUT}" "${WORK}/wayland-second-dark.png" >/dev/null 2>&1 || true
-    swaymsg output "*" bg "#d8e6f4" solid_color >/dev/null
-    sleep 0.20
+    set_wayland_background "#d8e6f4"
     grim -o "${WAYLAND_FIRST_OUTPUT}" "${WORK}/wayland-first-light.png" >/dev/null 2>&1 || true
     grim -o "${WAYLAND_SECOND_OUTPUT}" "${WORK}/wayland-second-light.png" >/dev/null 2>&1 || true
     set +e
@@ -349,6 +347,37 @@ capture_wayland_background_pairs() {
   cat "${WORK}/sway.log" >&2 || true
   echo "smoke_m17_m18_linux: paired per-output Wayland compositor captures did not validate" >&2
   exit 1
+}
+
+set_wayland_background() {
+  color="$1"
+  # Use exact output rules. An inherited system Sway config can leave an existing wallpaper/swaybg
+  # surface alive on one output after a later wildcard update. This smoke owns its compositor, so
+  # each output must receive the same explicit background before capture.
+  swaymsg output "${WAYLAND_FIRST_OUTPUT}" bg "${color}" solid_color >/dev/null
+  swaymsg output "${WAYLAND_SECOND_OUTPUT}" bg "${color}" solid_color >/dev/null
+  sleep 0.20
+}
+
+validate_wayland_capture_baseline() {
+  set_wayland_background "#203040"
+  grim -o "${WAYLAND_FIRST_OUTPUT}" "${WORK}/wayland-baseline-first-dark.png"
+  grim -o "${WAYLAND_SECOND_OUTPUT}" "${WORK}/wayland-baseline-second-dark.png"
+  set_wayland_background "#d8e6f4"
+  grim -o "${WAYLAND_FIRST_OUTPUT}" "${WORK}/wayland-baseline-first-light.png"
+  grim -o "${WAYLAND_SECOND_OUTPUT}" "${WORK}/wayland-baseline-second-light.png"
+  python3 "${ANALYZER}" \
+    --pair "${WAYLAND_FIRST_OUTPUT}" "${WORK}/wayland-baseline-first-dark.png" "${WORK}/wayland-baseline-first-light.png" \
+    --pair "${WAYLAND_SECOND_OUTPUT}" "${WORK}/wayland-baseline-second-dark.png" "${WORK}/wayland-baseline-second-light.png" \
+    --require-no-goose \
+    --output "${WORK}/wayland-baseline-analysis.json" \
+    >"${WORK}/wayland-baseline-analysis.log" 2>&1 || {
+      cat "${WORK}/wayland-baseline-analysis.log" >&2 || true
+      echo "smoke_m17_m18_linux: Wayland compositor capture baseline is invalid before launch" >&2
+      exit 1
+    }
+  cat "${WORK}/wayland-baseline-analysis.log"
+  set_wayland_background "#203040"
 }
 
 start_x11_server() {
@@ -383,6 +412,7 @@ start_x11_server() {
 
 start_sway_headless() {
   need_cmd sway
+  need_cmd swaybg
   need_cmd swaymsg
   need_cmd grim
   # AF_UNIX paths are limited to 108 bytes on Linux. Candidate evidence paths include the full
@@ -393,7 +423,13 @@ start_sway_headless() {
   export XDG_RUNTIME_DIR="${WAYLAND_RUNTIME_DIR}"
   chmod 700 "${XDG_RUNTIME_DIR}"
   export WAYLAND_DISPLAY="${HONK300_WAYLAND_DISPLAY:-honk300-wayland-smoke}"
-  WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 sway -d >"${WORK}/sway.log" 2>&1 &
+  # Never inherit the runner's distro wallpaper, bar, includes, or output-specific rules. The
+  # native smoke compositor has one purpose: expose controlled pixels beneath Honk300's own
+  # transparent layer surfaces.
+  printf '%s\n' 'output * bg #203040 solid_color' >"${WORK}/sway-smoke.conf"
+  chmod 600 "${WORK}/sway-smoke.conf"
+  WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 \
+    sway -c "${WORK}/sway-smoke.conf" -d >"${WORK}/sway.log" 2>&1 &
   SWAY_PID="$!"
   for _ in $(seq 1 100); do
     if [ -S "${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}" ]; then
@@ -458,7 +494,6 @@ start_sway_headless() {
   WAYLAND_SECOND_OUTPUT="${second_output}"
   swaymsg output "${first_output}" scale 1.5 pos 0 0 >/dev/null
   swaymsg output "${second_output}" scale 2 pos 1280 0 >/dev/null
-  swaymsg output "*" bg "#203040" solid_color >/dev/null
   swaymsg -r -t get_outputs | python3 -c '
 import json
 import sys
@@ -469,6 +504,7 @@ if len(active) < 2 or 1.5 not in scales or 2.0 not in scales:
     raise SystemExit(f"unexpected headless output topology: {active!r}")
 print(f"Wayland headless outputs: {len(active)}; scales: {scales}")
 '
+  validate_wayland_capture_baseline
 }
 
 exercise_mode() {

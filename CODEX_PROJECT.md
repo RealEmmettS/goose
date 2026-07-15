@@ -88,8 +88,18 @@ thegoose.app.
   but exact rectangle-string comparison rejected them after the goose advanced one or two pixels
   between atomic record completion and suspension. Current source retains exact HWND binding and
   all semantic checks, polls at five milliseconds, and allows only a three-physical-pixel
-  origin/dimension delta for that one presentation interval. Another exact candidate is required;
-  no release assembly or publication has occurred.
+  origin/dimension delta for that one presentation interval. That repair required another exact
+  candidate. Exact candidate `29389882143` at
+  `c44b89d35abb6b30fca5a48064334a79bfcb3839` then passed the complete Mac trust producer, every
+  portable target, Windows x64 paired-DWM, both native ARM64 compositor paths, all four Linux
+  compositor paths, both Debian native-package jobs, and final candidate assembly. That SHA was
+  fast-forwarded to `main`; ordinary CI passed audit/contracts, Windows x64/ARM64, and both Mac
+  bundle jobs, but its two Linux jobs inherited Ubuntu's recommended default Sway wallpaper/bar on
+  one headless output. Honk300 remained transparent and exposed that backdrop while the wildcard
+  update left the other output correctly solid. Current source gives the smoke an isolated minimal
+  Sway config, exact per-output colors, an explicit `swaybg` dependency, and paired goose-free
+  baselines before launch. A changed-SHA candidate and ordinary CI repeat remain required; the tag
+  and public release are still untouched.
 - Integrated final-source gate: formatting, strict workspace clippy, 432 Rust tests including all
   seven renderer goldens, release and both Apple builds, cargo-dist planning, 95 Python contracts,
   actionlint, shell/PowerShell syntax, pinned cargo-audit over 374 dependencies and 1,160
