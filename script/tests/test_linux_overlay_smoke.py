@@ -138,6 +138,13 @@ class LinuxOverlayAnalyzerTests(unittest.TestCase):
 
 
 class LinuxOverlaySmokeContractTests(unittest.TestCase):
+    def test_wayland_runtime_socket_directory_stays_short_and_is_cleaned(self) -> None:
+        smoke = (ROOT / "script" / "smoke_m17_m18_linux.sh").read_text(encoding="utf-8")
+        self.assertIn('WAYLAND_RUNTIME_DIR="$(mktemp -d /tmp/honk300-wl.XXXXXX)"', smoke)
+        self.assertIn('export XDG_RUNTIME_DIR="${WAYLAND_RUNTIME_DIR}"', smoke)
+        self.assertIn('rm -rf "${WAYLAND_RUNTIME_DIR}"', smoke)
+        self.assertNotIn('export XDG_RUNTIME_DIR="${WORK}/runtime"', smoke)
+
     def test_x11_capture_uses_client_compositing_and_proves_a_clean_baseline(self) -> None:
         smoke = (ROOT / "script" / "smoke_m17_m18_linux.sh").read_text(encoding="utf-8")
         for required in (

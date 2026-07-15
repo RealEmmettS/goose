@@ -135,6 +135,13 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   Accessibility checks happen without rebuilding the app between them.
 
 ### Fixed
+- **The hosted desktop checks now use safe temporary paths on Linux and read Windows line endings
+  correctly.** The first major-release rehearsal successfully photographed the new Linux test
+  background and proved matching Windows screen geometry, then stopped because Linux's socket
+  filename was too long and Windows read its multi-line report as the wrong shape. Linux now uses
+  a short private socket folder and removes it afterward; Windows accepts both standard line-
+  ending styles while still demanding an exact geometry line. The Goose's drawing standards were
+  not loosened, so these fixes let the real checks run instead of changing what counts as a pass.
 - **Windows and Linux release screenshots now prove their test desktop before judging the Goose.**
   A later release rehearsal showed that Linux was photographing a compositor's remembered gray
   tile and Windows on ARM could miss both its colored test surface and the Goose because the two

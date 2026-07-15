@@ -157,6 +157,14 @@ All notable changes to this project are documented here. Format based on
   allowing denied and granted Accessibility evidence on one unchanged signed identity.
 
 ### Fixed
+- **Portable native-smoke runtime paths and Windows diagnostics (2026-07-14)** - the first
+  v1.0.0 candidate proved all four repaired X11 compositor paths and matching Windows controller/
+  background geometry, then failed closed before product capture. Sway's AF_UNIX sockets now use
+  a short owner-only temporary runtime directory instead of an evidence path that can exceed
+  Linux's 108-byte limit, and cleanup removes it while retaining logs/screenshots. Windows
+  geometry validation now splits exact CRLF/LF diagnostic lines instead of applying a Unix-style
+  end anchor to a CRLF document. No product background, renderer behavior, or semantic capture
+  threshold changed.
 - **Final-source native candidate diagnostics (2026-07-14)** - after native `BitBlt` repaired the
   first Windows capture failure, candidate `29384134561` proved the notarized Mac producer and
   Windows x64 path but failed closed because `xcompmgr` held its cached gray root tile on every

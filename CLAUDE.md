@@ -71,8 +71,14 @@ both Windows smoke processes PMv2-aware with an atomic tokenized color channel a
 capture proof, and treats a closed downstream status pipe as normal without hiding other write
 errors. A live collect run also exposed the body-target-versus-beak-arrival locomotion mismatch;
 current source repairs it with a beak-offset target and a realistic fixed-tick regression, and the
-complete integrated local gate passes. Exact signed-app collect proof remains a release blocker. A final
-exact-SHA candidate rerun and exact-candidate Mac evidence remain required. The current release
+complete integrated local gate passes. Candidate `29386819926` at `bc3c1d9` then passed the
+complete trusted Mac producer, both Apple and Windows portable builds, the ARM64 Windows
+installer producer, and all four repaired X11 compositor halves. It failed closed because the
+evidence-derived Wayland socket paths exceeded Linux's 108-byte AF_UNIX limit and the Windows x64
+controller treated matching native CRLF diagnostics as one line. Current source gives Wayland a
+short owner-only cleaned runtime directory and parses exact CRLF/LF diagnostic lines; neither fix
+weakens a product behavior or capture threshold. Exact signed-app collect proof remains a release
+blocker. A final exact-SHA candidate rerun and exact-candidate Mac evidence remain required. The current release
 gate is `docs/readiness/v1.0.0-readiness.md` and task `#m20q`. Stable/latest remains v0.3.2 until
 that checklist is complete and the immutable v1.0.0 release is independently verified.
 

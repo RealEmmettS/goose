@@ -34,6 +34,7 @@ OPENBOX_PID=""
 XCOMPMGR_PID=""
 X11_BACKGROUND_PID=""
 SWAY_PID=""
+WAYLAND_RUNTIME_DIR=""
 RUNTIME_PAUSED=0
 WAYLAND_FIRST_OUTPUT=""
 WAYLAND_SECOND_OUTPUT=""
@@ -63,9 +64,10 @@ cleanup() {
   if [ -n "${SWAY_PID}" ]; then
     kill "${SWAY_PID}" >/dev/null 2>&1 || true
   fi
-  if [ -n "${EVIDENCE_DIR}" ]; then
-    rm -rf "${WORK}/runtime"
-  else
+  if [ -n "${WAYLAND_RUNTIME_DIR}" ]; then
+    rm -rf "${WAYLAND_RUNTIME_DIR}"
+  fi
+  if [ -z "${EVIDENCE_DIR}" ]; then
     rm -rf "${WORK}"
   fi
 }
@@ -383,8 +385,12 @@ start_sway_headless() {
   need_cmd sway
   need_cmd swaymsg
   need_cmd grim
-  export XDG_RUNTIME_DIR="${WORK}/runtime"
-  mkdir -p "${XDG_RUNTIME_DIR}"
+  # AF_UNIX paths are limited to 108 bytes on Linux. Candidate evidence paths include the full
+  # target triple and can push sway's generated wayland-N / sway-ipc socket names past that
+  # limit, so runtime sockets always live in a short owner-only temporary directory. Logs and
+  # screenshots remain in WORK/EVIDENCE_DIR.
+  WAYLAND_RUNTIME_DIR="$(mktemp -d /tmp/honk300-wl.XXXXXX)"
+  export XDG_RUNTIME_DIR="${WAYLAND_RUNTIME_DIR}"
   chmod 700 "${XDG_RUNTIME_DIR}"
   export WAYLAND_DISPLAY="${HONK300_WAYLAND_DISPLAY:-honk300-wayland-smoke}"
   WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 sway -d >"${WORK}/sway.log" 2>&1 &

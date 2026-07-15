@@ -230,6 +230,12 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
             smoke.index("$runtime = Start-ExactRuntime -Label 'first'"),
         )
 
+    def test_background_geometry_parser_accepts_windows_crlf_diagnostics(self):
+        smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
+        self.assertIn("$backgroundDiagnostics -split '\\r?\\n'", smoke)
+        self.assertIn("$backgroundDiagnosticLines -notcontains $expectedVirtualScreen", smoke)
+        self.assertNotIn('(?m)^$([regex]::Escape($expectedVirtualScreen))$', smoke)
+
     def test_native_smoke_freezes_one_surface_and_fails_closed_on_semantics(self):
         smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
         for required in (

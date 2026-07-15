@@ -65,14 +65,20 @@ thegoose.app.
   an atomic token/ack channel, and proves DPI/geometry and dark/light capture before goose launch.
   Status output also treats only `BrokenPipe` from a closed downstream consumer as success. These
   source repairs and the new menu resource supersede `3908794`, so a final candidate rerun remains
-  mandatory; no release assembly or publication has occurred.
+  mandatory; no release assembly or publication has occurred. First v1.0.0 candidate
+  `29386819926` at `bc3c1d9` then passed the complete trusted Mac producer, both Apple/Windows
+  portable pairs, ARM64 Windows installers, and every repaired X11 compositor half. It failed
+  closed because evidence-derived Wayland socket paths exceeded Linux's 108-byte AF_UNIX limit
+  and the Windows x64 controller treated a matching CRLF geometry document as one line. Current
+  source uses a short cleaned Wayland runtime directory and exact CRLF/LF line parsing; every
+  native semantic threshold stays unchanged and another exact candidate is required.
 - Integrated final-source gate: formatting, strict workspace clippy, 432 Rust tests including all
-  seven renderer goldens, release and both Apple builds, cargo-dist planning, 86 Python contracts,
+  seven renderer goldens, release and both Apple builds, cargo-dist planning, 88 Python contracts,
   actionlint, shell/PowerShell syntax, pinned cargo-audit over 374 dependencies and 1,160
   advisories, Windows x64/ARM64 strict cross-clippy, Linux x64/ARM64 GNU/musl engine/backend
   checks, and diff validation pass. Hosted native candidate gates remain open.
 - v1.0.0 retarget gate: the affected identity paths also pass 107 root tests, 22 native Mac
-  platform tests, a release binary reporting 1.0.0, cargo-dist v1.0.0 planning, 86 packaging/
+  platform tests, a release binary reporting 1.0.0, cargo-dist v1.0.0 planning, 88 packaging/
   workflow contracts, workflow and script syntax, local link/tree validation, and the live board
   check. The exact candidate rebuilds the complete native matrix on the frozen SHA.
 - Debian/update: deterministic `honk300-amd64.deb` and `honk300-arm64.deb` packaging reuses the
@@ -83,10 +89,10 @@ thegoose.app.
   GitHub for every release but Mac CLI updates consume the exact-tag app ZIP through the pinned
   bootstrap.
 - Release/site: the stable-latest DMG and native Debian progressive-disclosure refinement is
-  complete and pushed at exact site SHA `7a212dca1b7aebe7093cf873f88bbac1e1a3a9ae`. Local
-  dependency, 22 unit/lint/build/budget, and 10 browser/axe/keyboard/responsive/visual checks pass;
-  hosted site CI run `29383684660` passed on Windows and Linux. Its protected Vercel preview is
-  deployed and correctly rejects the still-live v0.3.2 manifest. Final app candidate
+  retargeted to v1.0.0 and pushed at exact site SHA `d195aeaf35943b45aa50cff462a94c41a332875b`.
+  Local dependency, 22 unit/lint/build/budget, and 10 browser/axe/keyboard/responsive/visual checks
+  pass; hosted native snapshot refresh run `29386864800` is the final pre-preview site check. The
+  protected preview still correctly rejects the live v0.3.2 manifest. Final app candidate
   qualification, release publication, live-v1.0.0 validation, and production promotion remain
   deliberate gates.
 

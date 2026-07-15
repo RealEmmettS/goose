@@ -652,7 +652,10 @@ try {
     }
     $backgroundDiagnostics = Read-SharedTextFile -Path $backgroundDiagnosticsPath
     $expectedVirtualScreen = "virtual_screen=$($controllerVirtualScreen.X),$($controllerVirtualScreen.Y),$($controllerVirtualScreen.Width),$($controllerVirtualScreen.Height)"
-    if ($backgroundDiagnostics -notmatch "(?m)^$([regex]::Escape($expectedVirtualScreen))$") {
+    $backgroundDiagnosticLines = @(
+        $backgroundDiagnostics -split '\r?\n' | Where-Object { $_.Length -gt 0 }
+    )
+    if ($backgroundDiagnosticLines -notcontains $expectedVirtualScreen) {
         throw "controller/background virtual-screen mismatch: expected '$expectedVirtualScreen', got '$backgroundDiagnostics'"
     }
     Copy-Item -LiteralPath $backgroundDiagnosticsPath `
