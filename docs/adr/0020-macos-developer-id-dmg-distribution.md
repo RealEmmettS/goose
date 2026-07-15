@@ -100,6 +100,11 @@ the sealed application bundle.
 
 - ADR 0018's candidate-first, exact-SHA, atomic draft publication remains unchanged. Missing
   signing or notarization credentials fail candidate mode; there is no release ad-hoc fallback.
+- Every general stable release invokes the reusable macOS producer on GitHub's macOS runners,
+  regardless of the workstation that pushed the tag. The stable public filename is
+  `honk300-universal2.dmg`; GitHub's `/releases/latest/download/` pointer advances only when the
+  complete release publishes, while every tagged DMG remains immutable. ADR 0023 defines this
+  rolling-latest and exact-update boundary for all platforms.
 - The website may recommend the DMG only after the immutable v0.3.3 release is live and a fresh
   download independently passes checksum, signature, team, notarization, stapling, Gatekeeper,
   install, and update checks.

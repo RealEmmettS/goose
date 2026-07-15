@@ -57,8 +57,12 @@ bounded nab. Independent review closed the final-clear, gapped-topology, state-l
 typed-close, Windows-provenance, and reaction-visibility regressions with focused tests. Retained
 lifecycle ownership now pins verified Windows artifacts through execution, removes ambient lease
 bypasses, rolls Unix signals back explicitly, checks machine-wide Windows paths across sessions,
-and kills every unaccepted deferred helper. Exact-candidate Mac evidence and native Windows/Linux
-execution remain release gates. The current release gate is
+and kills every unaccepted deferred helper. ADR 0023 adds stable rolling-latest links, exact-tag
+platform/provenance-isolated updates, and native amd64/arm64 Debian package ownership. The first
+candidate proved the complete Developer ID/notarized/stapled Mac producer; it then failed closed
+on an X11 debug-compositor background and a Windows managed-capture flag error. Both native smoke
+paths are repaired locally without relaxing semantic thresholds, and a final exact-SHA candidate
+rerun plus exact-candidate Mac evidence remain release gates. The current release gate is
 `docs/readiness/v0.3.3-readiness.md` and task `#m20q`. Stable/latest remains v0.3.2 until that
 checklist is complete and the immutable v0.3.3 release is independently verified.
 
@@ -99,7 +103,9 @@ checklist is complete and the immutable v0.3.3 release is independently verified
   the v0.3.x stabilization contracts; ADR 0020 replaces only ADR 0018's macOS distribution
   decisions with Developer ID, notarization, and a DMG-first per-user install; ADR 0021 defines
   portable native Wayland reduced mode plus explicit compositor capability strata; ADR 0022
-  records the managed macOS Accessibility first-run and live-transition boundary.
+  records the managed macOS Accessibility first-run and live-transition boundary; ADR 0023
+  defines every-release cross-platform production, stable latest names, exact update identity,
+  and Debian package lifecycle ownership.
 
 ## Big-picture architecture (original → planned port)
 
@@ -131,9 +137,17 @@ checklist is complete and the immutable v0.3.3 release is independently verified
   flag (reduced mischief).
 - Packaging: Windows recommends the x64/ARM64 machine-wide Global MSI. macOS recommends the
   Developer ID-signed, notarized, stapled universal DMG and installs per-user into
-  `~/Applications`; the exact-tag shell bootstrap remains a secondary terminal path. Linux
-  recommends that shell bootstrap. Corporate/EXE/portable artifacts remain secondary.
-  **No crates.io.**
+  `~/Applications`; the shell bootstrap remains a secondary terminal path. Debian/Ubuntu
+  recommends the native architecture-matched `.deb`; other Linux systems use the per-user
+  no-sudo shell bootstrap. Corporate/EXE/portable artifacts remain secondary. **No crates.io.**
+- Every general stable tag builds the complete platform set in GitHub Actions, including a fresh
+  GitHub-macOS-produced signed/notarized/stapled app and DMG plus both Debian packages regardless
+  of the operator's trigger host. Stable unversioned `latest/download` names advance only after
+  atomic publication; existing tagged assets never change. The updater discovers through the
+  latest manifest but downloads exact-tag bytes and requires platform, architecture, install
+  provenance, artifact kind, size, and SHA-256 to agree before mutation. The DMG is a graphical
+  install artifact; managed Mac CLI updates consume the exact-tag universal app ZIP through the
+  pinned bootstrap.
 - Release-mode macOS artifacts must fail closed without Developer ID and App Store Connect API
   credentials. No ad-hoc release fallback, `codesign --deep` signing, or DMG `/Applications`
   symlink is permitted.
@@ -198,6 +212,9 @@ checklist is complete and the immutable v0.3.3 release is independently verified
   `docs/adr/0021-native-wayland-capability-strata.md`.
 - Managed macOS Accessibility first-run onboarding lives in
   `docs/adr/0022-macos-accessibility-first-run-onboarding.md`.
+- Rolling latest artifacts, every-release Mac production, platform-isolated updates, and Debian
+  package lifecycle ownership live in
+  `docs/adr/0023-rolling-latest-artifacts-and-debian-lifecycle.md`.
 
 ## Task management system
 

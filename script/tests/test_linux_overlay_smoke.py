@@ -96,6 +96,13 @@ class LinuxOverlayAnalyzerTests(unittest.TestCase):
             self.assertEqual(ANALYZER.validate(metrics), [])
             self.assertFalse(metrics.has_goose)
 
+    def test_cli_accepts_an_explicit_background_only_baseline(self) -> None:
+        source = (ROOT / "script" / "analyze_linux_overlay_capture.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('goose.add_argument("--require-no-goose"', source)
+        self.assertIn("baseline unexpectedly contains goose palette features", source)
+
     def test_rejects_large_opaque_black_component(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -122,6 +129,23 @@ class LinuxOverlayAnalyzerTests(unittest.TestCase):
             )
             self.assertTrue(any("light controlled background" in failure for failure in failures))
             self.assertTrue(any("transition" in failure for failure in failures))
+
+
+class LinuxOverlaySmokeContractTests(unittest.TestCase):
+    def test_x11_capture_uses_client_compositing_and_proves_a_clean_baseline(self) -> None:
+        smoke = (ROOT / "script" / "smoke_m17_m18_linux.sh").read_text(encoding="utf-8")
+        for required in (
+            "xcompmgr -n",
+            "validate_x11_capture_baseline",
+            "x11-baseline-dark.png",
+            "x11-baseline-light.png",
+            "--require-no-goose",
+            "X11 compositor capture baseline is invalid before launch",
+            "capture_x11_background_pairs",
+            "--require-goose-each",
+        ):
+            self.assertIn(required, smoke)
+        self.assertNotIn("xcompmgr -a", smoke)
 
 
 if __name__ == "__main__":

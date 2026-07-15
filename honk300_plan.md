@@ -72,7 +72,7 @@ still build the full installer matrix because matching the `*300` family is an e
 | **Config UI** | A **ratatui** Claude-Code/QubeTX-family-style TUI at `<name> config`, toggling every behavior incl. Autumn; **hot-apply where cheap**, restart-note otherwise. |
 | **Linux** | **X11-first** (runs under XWayland). **Native Wayland** behind an opt-in `--wayland` flag (reduced mischief). |
 | **Targets** | **Every OS + arch we advertise:** Windows x64 **and ARM64**, macOS Intel **and Apple Silicon** (universal2), Linux x64 **and ARM** (gnu + musl). |
-| **Packaging** | Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) **built per-arch** + shell/PowerShell installers + a Developer ID-signed/notarized macOS universal DMG with per-user helper + Linux `.desktop`. **No crates.io** (`crates-publish.yml` dropped). |
+| **Packaging** | Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) **built per-arch** + shell/PowerShell installers + a Developer ID-signed/notarized macOS universal DMG with per-user helper + native amd64/arm64 Debian packages + Linux `.desktop`. Every general release builds the complete platform set in GitHub Actions and publishes stable unversioned latest links backed by immutable tags. **No crates.io** (`crates-publish.yml` dropped). |
 | **macOS first run** | Only the exact receipted app at `~/Applications/Honk300.app` may request Accessibility automatically. It records an owner-only prompt marker before opening UI, asks at most once per installed update, waits calmly at a safe screen edge while denied, and detects grants/revocations in the same process. Development, bare, source-tree, and mounted-DMG launches retain non-prompting degraded behavior. |
 
 ---
@@ -748,11 +748,15 @@ and starts a fresh FirstUX introduction without restarting, while a live revocat
 the safe wait without reopening UI for the already-marked update. Windows and Linux never
 activate this engine mode.
 
-### 13.4 Linux: `.desktop` + tarball/AppImage, X11-first, per-arch
+### 13.4 Linux: `.desktop` + tarball/Debian, X11-first, per-arch
 Shell installer drops the binary (all three aliases), extracts assets, installs
 `~/.local/share/applications/honk300.desktop` + optional `~/.config/autostart/honk300.desktop`,
-for **each arch** (x64 + ARM, gnu + musl). Optional per-arch AppImage and `.deb`/`.rpm` via
-cargo-dist extras. Default runs X11/XWayland; `--wayland` opts into the degraded layer-shell mode.
+for **each arch** (x64 + ARM, gnu + musl). Each release also assembles native
+`honk300-amd64.deb` and `honk300-arm64.deb` packages from the exact qualified GNU binaries. The
+packages own `/usr/lib/honk300`, all three `/usr/bin` aliases, release metadata, and a desktop
+entry; personal media remains in user XDG storage. CLI update/remove proves `dpkg` ownership and
+uses `sudo` or `pkexec` only for the machine-wide package, while the shell path remains per-user
+and no-sudo. Default runs X11/XWayland; `--wayland` opts into the degraded layer-shell mode.
 
 ### 13.5 In-binary `install / uninstall / update / setup`
 Reuse the family's atomic-write + marker-block + symlink-resolution machinery
@@ -763,18 +767,24 @@ app would wrongly spawn a goose on every shell start). Self-update: read
 `HKCU\Software\Honk300\InstallSource` (or path classification) **and the running arch**, download
 the **arch-matched** installer, SHA-256-verify (refuse on mismatch), run silently
 (`msiexec /i /passive /norestart` or Inno `/SILENT /SUPPRESSMSGBOXES /NORESTART`), handle msiexec
-`3010` honestly, post-install `--version` verify. **Never** a `cargo install` strategy.
+`3010` honestly, post-install `--version` verify. Debian provenance selects only the matching
+GNU `.deb`, verifies the manifest's target/kind/size/hash plus exact owned path and `dpkg-query`
+identity, then performs the package-manager upgrade. **Never** a `cargo install` strategy.
 
 ### 13.6 Uninstall (`<name> uninstall`)
 Channel-aware; `--yes` / `--purge` / `--json`. `--purge` removes state/config/registry/PATH and
 the `HKCU\Software\Honk300` key, but **backs up user memes/notes first** and tells the user
 where. Automated **"leave nothing behind"** script scans PATH/registry/filesystem after uninstall.
 
-### 13.7 CI workflows
+### 13.7 CI workflows and rolling latest
 `ci.yml` (fmt, clippy `-D warnings`, test, build on push/PR, all targets); cargo-dist
-`release.yml` (tag-triggered, full target matrix + GitHub Release); `windows-installers.yml`
-(`workflow_run` after Release, per-arch Corporate MSI + 2 Inno EXEs, `.sha256`, `--clobber`).
-**No `crates-publish.yml`.**
+`release.yml` (candidate/exact-tag full target matrix + one atomic GitHub Release);
+`windows-installers.yml` and `macos-packaging.yml` are reusable producers, not independent
+publishers. A tag pushed from any workstation still builds a fresh signed/notarized Mac app/DMG
+on GitHub macOS runners and both Debian packages from qualified GNU payloads. Stable unversioned
+`latest/download` names advance only after the complete release publishes; updates use that
+manifest for discovery but download exact-tag, platform/provenance-matched bytes. **No
+`crates-publish.yml`.**
 
 ---
 
@@ -806,7 +816,7 @@ being implemented three more times.
 | M17 | Linux X11 backend (XShape + EWMH + device_query) | full parity on X11/XWayland |
 | M18 | `--wayland` layer-shell degraded mode (stop/poke via IPC) | renders on Wayland; mischief self-disables; `goose stop` works |
 | M19 | install/update/uninstall(`--purge`)/setup + packaging **all targets** (Win x64+ARM64 ×4 installers, mac universal2 `.dmg`, Linux x64/ARM gnu+musl) + 3 aliases | installers produce working artifacts w/ autostart + shortcut on every OS/arch |
-| R6 / v0.3.3 | native macOS qualification, AppKit RGBA repair, shared gait refinement, Developer ID/notarization, graphical per-user DMG, managed Accessibility first run, DMG-first site | exact signed app passes renderer, denied/non-nag/grant/revoke Accessibility, lifecycle, and performance gates; immutable DMG is independently verified before promotion |
+| R6 / v0.3.3 | native macOS qualification, AppKit RGBA repair, shared gait refinement, Developer ID/notarization, graphical per-user DMG, managed Accessibility first run, native amd64/arm64 Debian packages, rolling latest platform-isolated updates, DMG-first site | exact signed app passes renderer, denied/non-nag/grant/revoke Accessibility, lifecycle, and performance gates; immutable tag assets and stable latest links are independently verified before promotion |
 
 Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
 and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus

@@ -234,6 +234,7 @@ def main() -> int:
     goose = parser.add_mutually_exclusive_group(required=True)
     goose.add_argument("--require-goose-any", action="store_true")
     goose.add_argument("--require-goose-each", action="store_true")
+    goose.add_argument("--require-no-goose", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -249,6 +250,8 @@ def main() -> int:
         failures.extend(f"{label}: {failure}" for failure in validate(metrics))
         if args.require_goose_each and not metrics.has_goose:
             failures.append(f"{label}: articulated goose palette features are missing")
+        if args.require_no_goose and metrics.has_goose:
+            failures.append(f"{label}: baseline unexpectedly contains goose palette features")
 
     if args.require_goose_any and not any(report.has_goose for report in reports):
         failures.append("no output contains the articulated goose palette features")

@@ -25,11 +25,10 @@ compatibility.
 
 ### macOS
 
-Starting with the published v0.3.3 release, the signed and notarized universal DMG is the
-recommended install for both Apple Silicon and Intel Macs. Until that immutable release is live,
-the version-bound link below intentionally does not replace the current stable install path:
+The signed and notarized universal DMG is the recommended install for both Apple Silicon and
+Intel Macs:
 
-- [Download the v0.3.3 Honk300 DMG after publication](https://github.com/RealEmmettS/goose/releases/download/v0.3.3/honk300-universal2.dmg)
+- [Download the latest Honk300 DMG](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-universal2.dmg)
 
 Open the disk image and run **Install Honk300**. The universal Intel/Apple Silicon helper verifies
 the adjacent app's Developer ID team and bundle identity, installs it without `sudo` into
@@ -49,7 +48,10 @@ permission UI automatically.
 
 The app and graphical helper use hardened Developer ID signatures. The app sealed inside the ZIP
 and the DMG are Apple-notarized and stapled, and release checks publish SHA-256 values for every
-artifact. The exact-tag terminal bootstrap remains a supported secondary install:
+artifact. Every general release uses GitHub's macOS runners to produce a fresh signed/notarized
+DMG even when the release was initiated from Windows or Linux. The stable link above advances to
+the newest complete release; each tag and its DMG bytes remain immutable. The terminal bootstrap
+remains a supported secondary install:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -fsSL https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.sh | sh
@@ -57,7 +59,16 @@ curl --proto '=https' --tlsv1.2 -fsSL https://github.com/RealEmmettS/goose/relea
 
 ### Linux
 
-Use the exact-tag terminal bootstrap:
+On Debian or Ubuntu, install the native package for the machine architecture:
+
+- [Debian/Ubuntu x64 package](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-amd64.deb)
+- [Debian/Ubuntu ARM64 package](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-arm64.deb)
+
+The package installs machine-wide under `/usr/lib/honk300`, provides all three commands in
+`/usr/bin`, and can request `sudo` or a graphical administrator prompt for install, update, and
+removal. Configuration and personal memes/notes remain in the current user's XDG directories.
+
+For other Linux distributions, or for a no-sudo per-user install, use the terminal bootstrap:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -fsSL https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.sh | sh
@@ -71,6 +82,11 @@ use `sudo`.
 - Linux: managed payload under `${XDG_DATA_HOME:-~/.local/share}/honk300/install`; receipt,
   desktop entry, and user media stay in the corresponding XDG user directories; aliases under
   `~/.local/bin`.
+
+Each general release contains both Debian packages plus x64/ARM64 GNU and musl archives. Stable
+`latest` links point to the newest complete release, while the updater resolves the manifest's
+exact immutable tag and verifies the selected platform artifact's kind, target, size, and SHA-256
+before changing an owned installation.
 
 ## Use
 
@@ -121,7 +137,8 @@ User notes and PNG memes can be added without modifying the program:
 
 ## Remove or update
 
-On Windows, use Add/Remove Programs or rerun the Global MSI. On macOS/Linux:
+On Windows, use Add/Remove Programs or rerun the Global MSI. On macOS and Linux, all three command
+names share the same update and removal paths:
 
 ```text
 honk300 update
@@ -130,7 +147,8 @@ honk300 uninstall --purge
 ```
 
 A normal uninstall preserves user media. `--purge` backs up user media before removing user
-state. Autostart is opt-in and off by default.
+state. Debian package installs update and uninstall through `dpkg` and may request administrator
+approval; per-user macOS/Linux installs do not use `sudo`. Autostart is opt-in and off by default.
 
 ## Platform support
 
@@ -170,7 +188,9 @@ Architecture decisions are under [`docs/adr`](docs/adr/README.md). ADR 0018 defi
 and atomic publication; ADR 0019 defines the v0.3.x configuration, runtime, renderer, and platform
 stabilization contracts; ADR 0020 defines Developer ID signing, notarization, and the per-user
 graphical DMG; ADR 0021 defines native Wayland capability strata; ADR 0022 defines the managed
-macOS Accessibility first-run, non-nagging wait, and live grant/revocation boundary.
+macOS Accessibility first-run, non-nagging wait, and live grant/revocation boundary; ADR 0023
+defines stable latest links, exact-tag platform-isolated updates, every-release Mac packaging,
+and native Debian lifecycle ownership.
 [`docs/readiness/v0.3.3-readiness.md`](docs/readiness/v0.3.3-readiness.md) is the release checklist.
 
 ## License and assets

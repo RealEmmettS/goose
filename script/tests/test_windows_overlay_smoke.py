@@ -184,7 +184,11 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
             "[Honk300OverlaySmokeNative]::Resume($runtime.Id)",
             "Save-ScreenRect -Rect $rect -Path $darkCapture",
             "Save-ScreenRect -Rect $rect -Path $lightCapture",
-            "[System.Drawing.CopyPixelOperation]::CaptureBlt",
+            "const uint CAPTUREBLT = 0x40000000",
+            "const uint SRCCOPY = 0x00CC0020",
+            "[Honk300OverlaySmokeNative]::CaptureScreen(",
+            "$destination = $graphics.GetHdc()",
+            "$graphics.ReleaseHdc($destination)",
             "[System.Windows.Forms.SystemInformation]::VirtualScreen",
             "'-Sta'",
             "analyze_windows_overlay_capture.py",
@@ -196,6 +200,8 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
             "@('quiet_hours_enabled', 'pause_on_fullscreen')",
         ):
             self.assertIn(required, smoke)
+        self.assertNotIn("[System.Drawing.CopyPixelOperation]::CaptureBlt", smoke)
+        self.assertNotIn("$graphics.CopyFromScreen(", smoke)
 
     def test_ci_and_release_candidate_run_the_exact_binary_smoke(self):
         ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")

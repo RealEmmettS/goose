@@ -5,6 +5,8 @@
 //! allowed desktop goose instance.
 
 mod cli;
+#[cfg(not(windows))]
+mod debian;
 mod install;
 mod runtime;
 mod update;

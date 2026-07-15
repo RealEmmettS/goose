@@ -42,6 +42,13 @@ All notable changes to this project are documented here. Format based on
   requires the fixed `M9D5379H93` Developer ID Application certificate identity on both apps,
   delegates to the shared no-sudo install transaction, reports native failures, and opens the
   installed app on success.
+- **Native Debian packages (2026-07-14, ADR 0023)** - every release now assembles stable
+  `honk300-amd64.deb` and `honk300-arm64.deb` assets from the byte-exact, already-qualified GNU
+  archive executables. Each package owns `/usr/lib/honk300/honk300`, stable `/usr/bin` aliases,
+  its source marker, desktop entry, license, and exact release metadata while keeping mutable
+  media in user XDG storage. Debian provenance adds target/kind/architecture-isolated CLI update,
+  real `dpkg` removal, non-purge media preservation, purge backup, ownership proof, and native
+  amd64/arm64 post-release compositor/lifecycle smokes.
 - **Fail-closed signing and notarization pipeline** - candidate and release macOS jobs now import
   a password-protected Developer ID P12 into an ephemeral keychain, sign nested code inside-out
   with hardened runtime and secure timestamps, notarize/staple/validate the app and DMG, retain
@@ -89,6 +96,15 @@ All notable changes to this project are documented here. Format based on
   Program cleanup never rolls; Linux remains explicitly collect-unsupported and has no trigger.
 
 ### Changed
+- **Complete rolling-latest release channel (2026-07-14, ADR 0023)** - every general tag now
+  requires the complete cross-platform producer matrix, including a fresh GitHub-macOS-built,
+  Developer ID-signed/notarized/stapled app and DMG plus both Debian packages regardless of the
+  operator's trigger host. Stable unversioned `latest/download` installer names advance only
+  after atomic publication; existing tags and their assets remain immutable. All three CLI names
+  read the latest manifest only for discovery, then download the platform/provenance-matched
+  payload from its exact tag and verify kind, target, size, and SHA-256 before mutation. Managed
+  Mac apps update through the exact-tag universal app ZIP selected by the pinned bootstrap, not
+  by replacing from the DMG.
 - **Quicker shared walk recovery** - the platform-neutral planted-foot trigger now releases at
   four pixels and normal/moderate recovery keeps its weighted 70%-of-beat cadence. A speed-aware
   body-travel cap shortens only Run/Charge recovery: tests bound Walk lag at 16 pixels and
@@ -120,6 +136,13 @@ All notable changes to this project are documented here. Format based on
   allowing denied and granted Accessibility evidence on one unchanged signed identity.
 
 ### Fixed
+- **Native release-capture rehearsal failures (2026-07-14)** - Windows paired compositor capture
+  now uses native `BitBlt` with `SRCCOPY | CAPTUREBLT` instead of passing an invalid combined
+  managed `CopyPixelOperation` enum to `CopyFromScreen`. X11 qualification now uses the ordinary
+  client-side `xcompmgr` path and proves a clean controlled dark/light compositor baseline before
+  launching the exact goose binary, preventing an automatic server-side debug compositor from
+  turning transparent root pixels opaque black. Semantic goose/alpha thresholds remain
+  unchanged and fail closed.
 - **Lingering collect windows cannot starve a newer request** - the macOS and Windows native
   controllers now prefer the most recently spawned typed request over older notes or memes that
   remain open. Dead-window events are still drained first, matched by request id and kind, and

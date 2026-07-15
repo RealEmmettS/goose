@@ -24,6 +24,8 @@ jobs:
         run: python3 -m unittest discover -s script/tests -p 'test_release_metadata.py' -v
       - name: Installer template tests
         run: python3 -m unittest discover -s script/tests -p 'test_installer_templates.py' -v
+      - name: Debian packaging contract tests
+        run: python3 -m unittest discover -s script/tests -p 'test_debian_packaging.py' -v
       - name: macOS packaging contract tests
         run: python3 -m unittest discover -s script/tests -p 'test_macos_packaging.py' -v
       - name: Windows packaging contract tests

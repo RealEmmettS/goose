@@ -57,6 +57,26 @@ class ReleaseMetadataTests(unittest.TestCase):
             # The result is a stable public wire shape, not a Python-only object graph.
             json.dumps(manifest, sort_keys=True)
 
+    def test_debian_artifacts_are_architecture_scoped(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in ("honk300-amd64.deb", "honk300-arm64.deb"):
+                (root / name).write_bytes(name.encode())
+            release_metadata.write_sha256_sidecars(root)
+            manifest = release_metadata.build_manifest(
+                str(root), "v0.3.3", "0123456789abcdef0123456789abcdef01234567"
+            )
+            artifacts = {artifact["name"]: artifact for artifact in manifest["artifacts"]}
+            self.assertEqual(artifacts["honk300-amd64.deb"]["kind"], "deb")
+            self.assertEqual(
+                artifacts["honk300-amd64.deb"]["target"],
+                "x86_64-unknown-linux-gnu",
+            )
+            self.assertEqual(
+                artifacts["honk300-arm64.deb"]["target"],
+                "aarch64-unknown-linux-gnu",
+            )
+
     def test_manifest_ignores_sidecars_and_internal_build_manifests(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

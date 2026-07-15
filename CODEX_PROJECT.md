@@ -7,8 +7,9 @@ native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tre
 v0.3.3 effort is the first complete native macOS qualification: fix AppKit pixel presentation,
 refine shared walking and exposed-edge lifecycle, add the safely gated user-close reaction, meet
 runtime budgets, prove denied/granted Accessibility, ship a Developer ID-signed/notarized
-per-user DMG, publish atomically, and only then make that DMG the
-recommended macOS download at thegoose.app.
+per-user DMG, add native Debian packages and platform-isolated rolling updates, publish
+atomically, and only then make the stable latest DMG the recommended macOS download at
+thegoose.app.
 
 ## Status
 
@@ -42,15 +43,25 @@ recommended macOS download at thegoose.app.
   MSI completion, and reaps every deferred helper that has not completed its exact READY handoff.
   Native candidate lifecycle execution remains open.
 - Packaging: a universal x86_64/arm64 installer helper targeting macOS 11.0 in both slices and a
-  fail-closed signing/notarization workflow are in-tree. The current universal app and helper pass
-  current G2 Developer ID chain, team, hardened-runtime, timestamp, designated-requirement, and
-  slice checks. The selected App Store Connect API key authenticates with `notarytool`; all six
-  signing/notarization GitHub secrets are configured. Candidate notarization has not run yet.
-- Release/site: the site progressive-disclosure implementation and local tests are complete, but
-  candidate notarization, native qualification, release publication, and live-manifest validation
-  remain deliberate prerequisites to production deployment. Exact site SHA
-  `85954409a54d88019f29c1209102586cfd497bff` is pushed and has a protected Vercel preview; it
-  intentionally fails closed against the still-live v0.3.2 manifest.
+  fail-closed signing/notarization workflow are in-tree. Candidate run `29381861208` successfully
+  built, Developer ID-signed, notarized, stapled, and Gatekeeper-validated the universal app and
+  DMG on GitHub's macOS runner. The same candidate failed closed later on an X11 debug-compositor
+  background and a Windows managed screen-capture flag; both capture paths are repaired locally
+  without weaker semantic thresholds, and the final exact-SHA candidate remains required.
+- Debian/update: deterministic `honk300-amd64.deb` and `honk300-arm64.deb` packaging reuses the
+  exact qualified GNU executables. Package-owned paths, aliases, marker, metadata, platform-kind
+  isolation, `dpkg` ownership/elevation, update, preserve-on-uninstall, backup-on-purge, assembly
+  evidence, and native amd64/arm64 published smokes are implemented. Stable latest discovery now
+  resolves exact immutable tag bytes for every platform and provenance; the DMG is rebuilt by
+  GitHub for every release but Mac CLI updates consume the exact-tag app ZIP through the pinned
+  bootstrap.
+- Release/site: the stable-latest DMG and native Debian progressive-disclosure refinement is
+  complete and pushed at exact site SHA `7a212dca1b7aebe7093cf873f88bbac1e1a3a9ae`. Local
+  dependency, 22 unit/lint/build/budget, and 10 browser/axe/keyboard/responsive/visual checks pass;
+  hosted site CI run `29383684660` passed on Windows and Linux. Its protected Vercel preview is
+  deployed and correctly rejects the still-live v0.3.2 manifest. Final app candidate
+  qualification, release publication, live-v0.3.3 validation, and production promotion remain
+  deliberate gates.
 
 ## Goals
 
@@ -66,6 +77,10 @@ recommended macOS download at thegoose.app.
    outside real monitor pixels; enter and exit through locomotion rather than visible pops.
 9. Treat a user-close annoyed reaction as character only: program cleanup is excluded and any
    cursor nab remains bounded by existing settings, manners, permission, and capability.
+10. Publish stable unversioned latest installer URLs backed only by complete immutable tagged
+    releases; update only through exact-tag, hash/size/target/provenance-matched artifacts.
+11. Offer native amd64/arm64 Debian packages with real package-manager ownership while preserving
+    the per-user no-sudo shell path for other Linux users.
 
 ## Architecture
 
@@ -76,14 +91,15 @@ recommended macOS download at thegoose.app.
 - `crates/honk-platform-*`: native Windows, capture-safe AppKit/CoreGraphics, X11, and Wayland
   adapters.
 - `src/runtime`: platform event loops built around shared `RuntimeCore` ordering.
-- `src/install.rs` / `src/update.rs`: ownership receipts, atomic lifecycle transactions,
-  channel-aware updates, and foreign-file preservation.
+- `src/install.rs` / `src/update.rs` / `src/debian.rs`: ownership receipts, atomic lifecycle
+  transactions, platform/provenance-aware updates, Debian package ownership, and foreign-file
+  preservation.
 - `.github/workflows/release.yml`: candidate-first and atomic immutable release orchestration.
 - `.github/workflows/macos-packaging.yml`: universal app/helper signing, app+DMG notarization,
   stapling, validation, and evidence.
 - `packaging/macos`: native graphical helper source and DMG instructions.
 - `docs/adr`: durable decisions. ADR 0020 is current for macOS distribution; ADR 0018 remains
-  current for atomic publication and non-macOS install decisions.
+  current for atomic publication, and ADR 0023 governs rolling latest and Debian lifecycle.
 
 ## Verification Source Of Truth
 
@@ -333,6 +349,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── 0020-macos-developer-id-dmg-distribution.md
 │   │   ├── 0021-native-wayland-capability-strata.md
 │   │   ├── 0022-macos-accessibility-first-run-onboarding.md
+│   │   ├── 0023-rolling-latest-artifacts-and-debian-lifecycle.md
 │   │   └── README.md
 │   ├── agents
 │   │   └── handoff
@@ -380,16 +397,19 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   ├── honk300-installer.sh.in
 │   ├── package_macos_app.sh
 │   ├── package_macos_installer_helper.sh
+│   ├── package_deb.py
 │   ├── release_metadata.py
 │   ├── smoke_m16_macos.sh
 │   ├── smoke_m16_macos_accessibility.sh
 │   ├── smoke_m17_m18_linux.sh
 │   ├── smoke_released_unix.sh
+│   ├── smoke_released_deb.sh
 │   ├── smoke_released_windows.ps1
 │   ├── smoke_windows_overlay.ps1
 │   ├── verify_binary_architecture.py
 │   └── tests
 │       ├── test_installer_templates.py
+│       ├── test_debian_packaging.py
 │       ├── test_linux_overlay_smoke.py
 │       ├── test_macos_packaging.py
 │       ├── test_macos_smoke_contract.py
@@ -405,6 +425,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   ├── assets.rs
 │   ├── audio.rs
 │   ├── cli.rs
+│   ├── debian.rs
 │   ├── install.rs
 │   ├── main.rs
 │   ├── runtime

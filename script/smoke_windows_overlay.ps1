@@ -162,6 +162,22 @@ public static class Honk300OverlaySmokeNative {
     private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetDC(IntPtr hwnd);
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(IntPtr hwnd, IntPtr deviceContext);
+    [DllImport("gdi32.dll", SetLastError = true)]
+    private static extern bool BitBlt(
+        IntPtr destination,
+        int destinationX,
+        int destinationY,
+        int width,
+        int height,
+        IntPtr source,
+        int sourceX,
+        int sourceY,
+        uint operation
+    );
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr OpenProcess(uint access, bool inherit, int processId);
     [DllImport("kernel32.dll")]
@@ -218,6 +234,26 @@ public static class Honk300OverlaySmokeNative {
             int status = NtResumeProcess(handle);
             if (status != 0) throw new InvalidOperationException("NtResumeProcess returned " + status);
         } finally { CloseHandle(handle); }
+    }
+
+    public static void CaptureScreen(
+        IntPtr destination,
+        int sourceX,
+        int sourceY,
+        int width,
+        int height
+    ) {
+        const uint SRCCOPY = 0x00CC0020;
+        const uint CAPTUREBLT = 0x40000000;
+        IntPtr source = GetDC(IntPtr.Zero);
+        if (source == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+        try {
+            if (!BitBlt(destination, 0, 0, width, height, source, sourceX, sourceY, SRCCOPY | CAPTUREBLT)) {
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
+        } finally {
+            ReleaseDC(IntPtr.Zero, source);
+        }
     }
 }
 '@
@@ -310,21 +346,24 @@ function Save-ScreenRect {
         [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
     )
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-    # CAPTUREBLT is required for layered windows; SRCCOPY alone may omit the exact
-    # UpdateLayeredWindow surface this smoke exists to qualify.
-    $copyOperation = [System.Drawing.CopyPixelOperation] (
-        [int] [System.Drawing.CopyPixelOperation]::SourceCopy -bor
-        [int] [System.Drawing.CopyPixelOperation]::CaptureBlt
-    )
     try {
-        $graphics.CopyFromScreen(
-            $Rect.X,
-            $Rect.Y,
-            0,
-            0,
-            [System.Drawing.Size]::new($Rect.Width, $Rect.Height),
-            $copyOperation
-        )
+        # CAPTUREBLT is required for layered windows; SRCCOPY alone may omit the exact
+        # UpdateLayeredWindow surface this smoke exists to qualify. Graphics.CopyFromScreen
+        # rejects the native SRCCOPY | CAPTUREBLT combination as an undefined managed enum,
+        # so call BitBlt with the real Win32 raster-operation flags.
+        $destination = $graphics.GetHdc()
+        try {
+            [Honk300OverlaySmokeNative]::CaptureScreen(
+                $destination,
+                $Rect.X,
+                $Rect.Y,
+                $Rect.Width,
+                $Rect.Height
+            )
+        }
+        finally {
+            $graphics.ReleaseHdc($destination)
+        }
         $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
     }
     finally {

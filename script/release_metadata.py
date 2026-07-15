@@ -33,6 +33,8 @@ REQUIRED_RELEASE_ARTIFACTS = (
     "honk300-installer.ps1",
     "honk300-universal2.app.zip",
     "honk300-universal2.dmg",
+    "honk300-amd64.deb",
+    "honk300-arm64.deb",
     *(f"honk300-{target}.tar.xz" for target in MACOS_TARGETS),
     *(f"honk300-{target}.tar.xz" for target in LINUX_TARGETS),
     *(f"honk300-{target}.zip" for target in WINDOWS_TARGETS),
@@ -115,6 +117,8 @@ def _classify(name: str) -> tuple[str, str]:
         "honk300-installer.ps1": ("windows", "bootstrap-powershell"),
         "honk300-universal2.app.zip": ("universal2-apple-darwin", "mac-app"),
         "honk300-universal2.dmg": ("universal2-apple-darwin", "mac-dmg"),
+        "honk300-amd64.deb": ("x86_64-unknown-linux-gnu", "deb"),
+        "honk300-arm64.deb": ("aarch64-unknown-linux-gnu", "deb"),
     }
     if name in exact:
         return exact[name]

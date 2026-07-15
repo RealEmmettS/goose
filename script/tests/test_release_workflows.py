@@ -50,6 +50,18 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("Delete this run's unpublished draft after failure", RELEASE)
         self.assertIn('if: ${{ failure() && steps.create_draft.outcome == \'success\' }}', RELEASE)
 
+    def test_every_general_release_advances_latest_only_after_complete_platform_assembly(self) -> None:
+        self.assertIn("tags:\n      - 'v[0-9]+.[0-9]+.[0-9]+'", RELEASE)
+        self.assertIn("macos-app:\n    needs: plan", RELEASE)
+        assembly = RELEASE[RELEASE.index("assemble-and-publish:") :]
+        self.assertIn("- macos-app", assembly)
+        self.assertIn("- windows-installers", assembly)
+        self.assertIn("- build-debian-packages", assembly)
+        self.assertIn("- qualify-debian-packages", assembly)
+        self.assertIn('gh release edit "$TAG"', assembly)
+        self.assertIn("--draft=false --latest", assembly)
+        self.assertNotIn("--clobber", assembly)
+
     def test_candidate_preflight_assembles_without_consuming_a_tag_or_release(self) -> None:
         for workflow in (RELEASE, WINDOWS, MACOS):
             self.assertIn("candidate:", workflow)
@@ -127,6 +139,39 @@ class ReleaseWorkflowTests(unittest.TestCase):
             RELEASE.index("Qualify exact Linux archive payload before upload"),
             RELEASE.index("Upload portable artifacts to the orchestrator"),
         )
+
+    def test_stable_debian_packages_reuse_exact_qualified_gnu_binaries(self) -> None:
+        for required in (
+            "build-debian-packages:",
+            "Build stable packages from the exact qualified binaries",
+            "honk300-amd64.deb",
+            "honk300-arm64.deb",
+            "python3 script/package_deb.py",
+            'cmp "$binary" "$extracted/usr/lib/honk300/honk300"',
+            "dpkg-deb --field",
+            "verify_binary_architecture.py",
+            "release-debian-packages",
+            "qualification-debian-package-build",
+        ):
+            self.assertIn(required, RELEASE)
+        self.assertLess(
+            RELEASE.index("Build stable packages from the exact qualified binaries"),
+            RELEASE.index("Validate exact compatibility and primary artifact set"),
+        )
+
+    def test_candidate_natively_qualifies_both_debian_architectures_before_assembly(self) -> None:
+        for required in (
+            "qualify-debian-packages:",
+            "runner: ubuntu-22.04",
+            "runner: ubuntu-22.04-arm",
+            "HONK300_DEB_PACKAGE:",
+            "HONK300_DEB_SKIP_LATEST: '1'",
+            "smoke_released_deb.sh",
+            "qualification-debian-package-${{ matrix.architecture }}",
+        ):
+            self.assertIn(required, RELEASE)
+        assembly = RELEASE[RELEASE.index("assemble-and-publish:") :]
+        self.assertIn("- qualify-debian-packages", assembly)
 
     def test_windows_cargo_dist_zips_are_native_qualified_before_assembly(self) -> None:
         portable = RELEASE[RELEASE.index("qualify-windows-portable:") :]

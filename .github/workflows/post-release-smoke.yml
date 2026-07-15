@@ -93,3 +93,41 @@ jobs:
           name: honk300-windows-overlay-published-${{ matrix.triple }}-${{ inputs.tag }}
           path: target/post-release-windows-overlay-${{ matrix.triple }}
           if-no-files-found: error
+
+  debian-package:
+    name: live Debian package (${{ matrix.architecture }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            architecture: amd64
+          - runner: ubuntu-22.04-arm
+            architecture: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - name: Install Debian and compositor qualification prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            grim imagemagick libasound2-dev openbox python3 sway x11-utils \
+            x11-xserver-utils xcompmgr xvfb
+      - name: Prove stable latest package, aliases, compositor, update, uninstall, and purge
+        env:
+          HONK300_SMOKE_TAG: ${{ inputs.tag }}
+          HONK300_DEB_EVIDENCE_DIR: ${{ github.workspace }}/target/post-release-deb-${{ matrix.architecture }}
+        shell: bash
+        run: sh script/smoke_released_deb.sh "$HONK300_SMOKE_TAG"
+      - name: Upload published Debian package evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: honk300-debian-published-${{ matrix.architecture }}-${{ inputs.tag }}
+          path: target/post-release-deb-${{ matrix.architecture }}
+          if-no-files-found: error

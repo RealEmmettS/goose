@@ -254,6 +254,25 @@ capture_x11_background_pairs() {
   exit 1
 }
 
+validate_x11_capture_baseline() {
+  xsetroot -solid "#203040"
+  sleep 0.20
+  import -window root "PNG32:${WORK}/x11-baseline-dark.png"
+  xsetroot -solid "#d8e6f4"
+  sleep 0.20
+  import -window root "PNG32:${WORK}/x11-baseline-light.png"
+  python3 "${ANALYZER}" \
+    --pair x11-baseline "${WORK}/x11-baseline-dark.png" "${WORK}/x11-baseline-light.png" \
+    --require-no-goose \
+    --output "${WORK}/x11-baseline-analysis.json" \
+    >"${WORK}/x11-baseline-analysis.log" 2>&1 || {
+      cat "${WORK}/x11-baseline-analysis.log" >&2 || true
+      echo "smoke_m17_m18_linux: X11 compositor capture baseline is invalid before launch" >&2
+      exit 1
+    }
+  cat "${WORK}/x11-baseline-analysis.log"
+}
+
 capture_wayland_background_pairs() {
   for _ in $(seq 1 24); do
     pause_runtime
@@ -305,9 +324,14 @@ start_x11_server() {
     openbox >"${WORK}/openbox.log" 2>&1 &
     OPENBOX_PID="$!"
   fi
-  xcompmgr -a >"${WORK}/xcompmgr.log" 2>&1 &
+  # Simple client-side compositing is xcompmgr's default production-like mode and
+  # paints the final desktop into the Composite overlay. Automatic server-side
+  # mode (-a) is a debugging mode whose root capture can flatten ARGB windows
+  # against black instead of proving their per-pixel composition.
+  xcompmgr -n >"${WORK}/xcompmgr.log" 2>&1 &
   XCOMPMGR_PID="$!"
   wait_for_x11_compositor
+  validate_x11_capture_baseline
 }
 
 start_sway_headless() {

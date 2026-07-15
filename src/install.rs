@@ -36,9 +36,12 @@ pub enum InstallSource {
     ManualLocal,
     Shell,
     PowerShell,
-    /// A macOS `honk300.app` bundle installed under `~/Applications` (R3, ADR 0017). Distinct
-    /// from `ManualLocal` because its `update` path replaces the bundle from a DMG rather than
-    /// re-running a per-user installer.
+    /// A machine-wide Debian package rooted at `/usr/lib/honk300` with stable `/usr/bin`
+    /// aliases. Its updater selects the architecture-matched `.deb` from the immutable tag.
+    Deb,
+    /// A macOS `Honk300.app` bundle installed under `~/Applications` (ADR 0020). Distinct from
+    /// `ManualLocal` because its update path replaces the managed bundle from the exact-tag
+    /// universal app ZIP selected by the pinned bootstrap; the DMG is the graphical install path.
     MacApp,
     Unknown,
 }
@@ -53,12 +56,12 @@ impl InstallSource {
             "manual-local" => Self::ManualLocal,
             "shell" => Self::Shell,
             "powershell" => Self::PowerShell,
+            "deb" => Self::Deb,
             "mac-app" => Self::MacApp,
             _ => Self::Unknown,
         }
     }
 
-    #[cfg(any(test, windows, target_os = "linux"))]
     pub fn marker_value(self) -> &'static str {
         match self {
             Self::MsiGlobal => "msi-global",
@@ -68,6 +71,7 @@ impl InstallSource {
             Self::ManualLocal => "manual-local",
             Self::Shell => "shell",
             Self::PowerShell => "powershell",
+            Self::Deb => "deb",
             Self::MacApp => "mac-app",
             Self::Unknown => "unknown",
         }
@@ -353,6 +357,9 @@ pub fn uninstall(purge: bool) -> Result<(), DynError> {
 
 #[cfg(target_os = "linux")]
 pub fn uninstall(purge: bool) -> Result<(), DynError> {
+    if detect_install_source() == InstallSource::Deb {
+        return uninstall_debian_package(purge);
+    }
     let root = linux_user_install_root()?;
     let receipt = linux_receipt_path()?;
     ensure_owned_install_root_or_receipt(
@@ -397,6 +404,33 @@ pub fn uninstall(purge: bool) -> Result<(), DynError> {
     }
 
     println!("honk300: uninstalled.");
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn uninstall_debian_package(purge: bool) -> Result<(), DynError> {
+    let current_exe = std::env::current_exe()?;
+    crate::debian::prove_current_executable(&current_exe)?;
+    let _lifecycle_lease = LifecycleLease::acquire()?;
+    let media = linux_media_root()?;
+    ensure_external_media_root(&media)?;
+    let backup = if purge {
+        backup_user_content(&media, &linux_backup_root()?)?
+    } else {
+        None
+    };
+
+    crate::debian::remove_package()?;
+    if purge {
+        purge_config_state_preserving_foreign_receipt(
+            &linux_config_state_root()?,
+            Path::new(crate::debian::INSTALL_ROOT),
+        )?;
+        report_backup(backup);
+    } else {
+        report_preserved(media_has_user_content(&media)?.then_some(media));
+    }
+    println!("honk300: Debian package uninstalled.");
     Ok(())
 }
 
@@ -2896,6 +2930,7 @@ mod tests {
             ("manual-local", InstallSource::ManualLocal),
             ("shell", InstallSource::Shell),
             ("powershell", InstallSource::PowerShell),
+            ("deb", InstallSource::Deb),
             ("mac-app", InstallSource::MacApp),
         ] {
             assert_eq!(InstallSource::from_marker(marker), source);

@@ -302,6 +302,156 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  build-debian-packages:
+    name: Debian package producer
+    needs:
+      - plan
+      - build-portable-artifacts
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download exact qualified GNU archives
+        uses: actions/download-artifact@v7
+        with:
+          pattern: release-portable-*-unknown-linux-gnu
+          path: target/debian-portable-input
+
+      - name: Build stable packages from the exact qualified binaries
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          COMMIT: ${{ needs.plan.outputs.commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          source_date_epoch="$(git show -s --format=%ct "$COMMIT")"
+          packages="target/debian-packages"
+          evidence="target/debian-package-build-evidence"
+          mkdir -p "$packages" "$evidence"
+          while read -r target architecture machine; do
+            mapfile -t archives < <(find target/debian-portable-input -type f \
+              -name "honk300-$target.tar.xz" -print)
+            test "${#archives[@]}" -eq 1
+            archive="${archives[0]}"
+            extraction="target/debian-input-$architecture"
+            case "$architecture" in
+              amd64) output="$packages/honk300-amd64.deb" ;;
+              arm64) output="$packages/honk300-arm64.deb" ;;
+              *) echo "unsupported Debian architecture: $architecture" >&2; exit 1 ;;
+            esac
+            rm -rf "$extraction"
+            mkdir -p "$extraction" "$evidence/$architecture"
+            tar -xJf "$archive" -C "$extraction"
+            mapfile -t binaries < <(find "$extraction" -type f -name honk300 -print)
+            test "${#binaries[@]}" -eq 1
+            binary="${binaries[0]}"
+            python3 script/package_deb.py \
+              --binary "$binary" \
+              --output "$output" \
+              --version "$version" \
+              --tag "$TAG" \
+              --commit "$COMMIT" \
+              --architecture "$architecture" \
+              --source-date-epoch "$source_date_epoch"
+            dpkg-deb --info "$output" > "$evidence/$architecture/info.txt"
+            dpkg-deb --contents "$output" > "$evidence/$architecture/contents.txt"
+            extracted="$evidence/$architecture/root"
+            dpkg-deb --extract "$output" "$extracted"
+            cmp "$binary" "$extracted/usr/lib/honk300/honk300"
+            test "$(readlink "$extracted/usr/bin/honk300")" = '../lib/honk300/honk300'
+            test "$(readlink "$extracted/usr/bin/honk")" = '../lib/honk300/honk300'
+            test "$(readlink "$extracted/usr/bin/goose")" = '../lib/honk300/honk300'
+            test "$(cat "$extracted/usr/lib/honk300/install-source.txt")" = deb
+            test "$(dpkg-deb --field "$output" Package)" = honk300
+            test "$(dpkg-deb --field "$output" Version)" = "$version"
+            test "$(dpkg-deb --field "$output" Architecture)" = "$architecture"
+            python3 script/verify_binary_architecture.py \
+              --format elf --machine "$machine" "$extracted/usr/lib/honk300/honk300" \
+              > "$evidence/$architecture/architecture.txt"
+            sha256sum "$archive" "$binary" "$extracted/usr/lib/honk300/honk300" "$output" \
+              > "$evidence/$architecture/sha256.txt"
+          done <<'DEBIAN_TARGETS'
+          x86_64-unknown-linux-gnu amd64 62
+          aarch64-unknown-linux-gnu arm64 183
+          DEBIAN_TARGETS
+
+      - name: Upload Debian release packages
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-debian-packages
+          path: target/debian-packages/*.deb
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Preserve Debian build identity evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualification-debian-package-build
+          path: target/debian-package-build-evidence
+          if-no-files-found: error
+          retention-days: 7
+
+  qualify-debian-packages:
+    name: native Debian package (${{ matrix.architecture }})
+    needs:
+      - plan
+      - build-debian-packages
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            architecture: amd64
+          - runner: ubuntu-22.04-arm
+            architecture: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+          persist-credentials: false
+
+      - name: Download exact Debian packages
+        uses: actions/download-artifact@v7
+        with:
+          name: release-debian-packages
+          path: target/debian-package-input
+
+      - name: Install compositor qualification prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            grim imagemagick libasound2-dev openbox python3 sway x11-utils \
+            x11-xserver-utils xcompmgr xvfb
+
+      - name: Prove native package, aliases, compositor, updates, uninstall, and purge
+        env:
+          HONK300_DEB_PACKAGE: ${{ github.workspace }}/target/debian-package-input/honk300-${{ matrix.architecture }}.deb
+          HONK300_DEB_EVIDENCE_DIR: ${{ github.workspace }}/target/debian-package-qualification-${{ matrix.architecture }}
+          HONK300_DEB_SKIP_LATEST: '1'
+          TAG: ${{ needs.plan.outputs.tag }}
+        shell: bash
+        run: sh script/smoke_released_deb.sh "$TAG"
+
+      - name: Preserve native Debian package evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualification-debian-package-${{ matrix.architecture }}
+          path: target/debian-package-qualification-${{ matrix.architecture }}
+          if-no-files-found: error
+          retention-days: 7
+
   qualify-windows-portable:
     name: exact portable ZIP (${{ matrix.triple }})
     needs:
@@ -416,6 +566,8 @@ jobs:
     needs:
       - plan
       - build-portable-artifacts
+      - build-debian-packages
+      - qualify-debian-packages
       - qualify-windows-portable
       - windows-installers
       - macos-app

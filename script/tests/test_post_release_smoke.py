@@ -15,6 +15,7 @@ def source(path: str) -> str:
 WORKFLOW = source(".github/workflows/post-release-smoke.yml")
 UNIX_SMOKE = source("script/smoke_released_unix.sh")
 WINDOWS_SMOKE = source("script/smoke_released_windows.ps1")
+DEBIAN_SMOKE = source("script/smoke_released_deb.sh")
 
 
 class PostReleaseSmokeTests(unittest.TestCase):
@@ -31,7 +32,7 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn("smoke_released_unix.sh", WORKFLOW)
         self.assertIn("smoke_released_windows.ps1", WORKFLOW)
         self.assertIn("permissions:\n  contents: read", WORKFLOW)
-        self.assertEqual(WORKFLOW.count("HONK300_SMOKE_TAG: ${{ inputs.tag }}"), 2)
+        self.assertEqual(WORKFLOW.count("HONK300_SMOKE_TAG: ${{ inputs.tag }}"), 3)
         self.assertNotIn("'${{ inputs.tag }}'", WORKFLOW)
 
     def test_unix_smoke_proves_idempotence_and_complete_fault_rollback(self) -> None:
@@ -77,6 +78,32 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn("Install Linux compositor qualification packages", WORKFLOW)
         self.assertIn("post-release-linux-overlay-${{ matrix.slug }}", WORKFLOW)
         self.assertIn("if-no-files-found: error", WORKFLOW)
+
+    def test_debian_release_smoke_covers_both_native_architectures_and_latest_channel(self) -> None:
+        for required in (
+            "debian-package:",
+            "architecture: amd64",
+            "architecture: arm64",
+            "smoke_released_deb.sh",
+            "post-release-deb-${{ matrix.architecture }}",
+        ):
+            self.assertIn(required, WORKFLOW)
+        for required in (
+            "releases/latest/download/honk300-$ARCHITECTURE.deb",
+            "cmp \"$PACKAGE\" \"$LATEST_PACKAGE\"",
+            "HONK300_DEB_PACKAGE",
+            "HONK300_DEB_SKIP_LATEST",
+            '[ ! -L "$LOCAL_PACKAGE" ]',
+            "local Debian smoke input must explicitly skip",
+            "/usr/bin/$name\" update",
+            "HONK300_BIN=/usr/lib/honk300/honk300",
+            "installed-ldd.txt",
+            "runtime library unresolved",
+            "/usr/bin/goose uninstall",
+            "/usr/bin/honk300 uninstall --purge",
+            "dpkg-query --search /usr/lib/honk300/honk300",
+        ):
+            self.assertIn(required, DEBIAN_SMOKE)
 
 
 if __name__ == "__main__":

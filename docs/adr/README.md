@@ -33,3 +33,4 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0020 — Developer ID macOS Distribution And Per-User DMG Install](./0020-macos-developer-id-dmg-distribution.md)
 - [0021 — Native Wayland Capability Strata](./0021-native-wayland-capability-strata.md)
 - [0022 — macOS Accessibility First-Run Onboarding](./0022-macos-accessibility-first-run-onboarding.md)
+- [0023 — Rolling Latest Artifacts And Debian Package Lifecycle](./0023-rolling-latest-artifacts-and-debian-lifecycle.md)

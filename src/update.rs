@@ -1,6 +1,8 @@
 use crate::install::{detect_install_source, InstallSource};
 #[cfg(windows)]
 use crate::install::{system_windows_msiexec_path, system_windows_powershell_path};
+#[cfg(not(windows))]
+use honk_control::LifecycleLease;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{self, Read};
@@ -64,6 +66,7 @@ enum UpdateStrategy {
     ExeCorporate,
     PowerShell,
     Shell,
+    Deb,
 }
 
 impl UpdateStrategy {
@@ -75,6 +78,7 @@ impl UpdateStrategy {
             Self::ExeCorporate => "Corporate EXE installer",
             Self::PowerShell => "PowerShell installer",
             Self::Shell => "shell installer",
+            Self::Deb => "Debian package",
         }
     }
 }
@@ -179,7 +183,9 @@ fn windows_strategy_executable(
         UpdateStrategy::ExeCorporate => {
             marker_derived_windows_executable(source, InstallSource::ExeCorporate, current_exe)
         }
-        UpdateStrategy::Shell => Err("shell updates are not a Windows strategy".into()),
+        UpdateStrategy::Shell | UpdateStrategy::Deb => {
+            Err("Unix updates are not a Windows strategy".into())
+        }
     }
 }
 
@@ -299,6 +305,7 @@ fn windows_update_helper_invocation(
             format!("@('{artifact_argument_literal}')"),
             false,
         ),
+        UpdateStrategy::Deb => unreachable!("Debian updates never use the Windows handoff"),
     };
     let elevation = if elevated { " -Verb RunAs" } else { "" };
     let installer_literal = powershell_literal(&installer);
@@ -600,6 +607,11 @@ pub fn run() -> Result<(), DynError> {
 
     #[cfg(not(windows))]
     {
+        let _lifecycle_lease = if plan.strategy == UpdateStrategy::Deb {
+            Some(LifecycleLease::acquire()?)
+        } else {
+            None
+        };
         run_installer(plan.strategy, &temp_path)?;
         verify_post_install(&installed_executable, &latest)?;
         remove_verified_temp_artifact(&temp_path, artifact)?;
@@ -647,14 +659,60 @@ fn current_release_target() -> Option<ReleaseTarget> {
 
 fn select_update_plan(source: InstallSource, target: ReleaseTarget) -> Result<UpdatePlan, String> {
     if target.is_macos() {
-        // Every modern macOS provenance updates through the managed shell installer. The DMG
-        // remains a release compatibility asset solely for the already-shipped v0.2.1 updater.
+        if matches!(
+            source,
+            InstallSource::MsiGlobal
+                | InstallSource::MsiCorporate
+                | InstallSource::ExeGlobal
+                | InstallSource::ExeCorporate
+                | InstallSource::Deb
+        ) {
+            return Err(format!(
+                "{} install provenance is incompatible with {}",
+                source.marker_value(),
+                target.triple()
+            ));
+        }
+        // Every modern macOS provenance updates through the pinned bootstrap and exact-tag app
+        // ZIP. The DMG remains the graphical fresh-install artifact (and legacy v0.2.1 updater
+        // compatibility transport), not the modern in-place update payload.
         return Ok(UpdatePlan {
             strategy: UpdateStrategy::Shell,
             artifact: "honk300-installer.sh".into(),
         });
     }
     if target.is_linux() {
+        if matches!(
+            source,
+            InstallSource::MsiGlobal
+                | InstallSource::MsiCorporate
+                | InstallSource::ExeGlobal
+                | InstallSource::ExeCorporate
+                | InstallSource::PowerShell
+                | InstallSource::MacApp
+        ) {
+            return Err(format!(
+                "{} install provenance is incompatible with {}",
+                source.marker_value(),
+                target.triple()
+            ));
+        }
+        if source == InstallSource::Deb {
+            let artifact = match target {
+                ReleaseTarget::LinuxX64Gnu => "honk300-amd64.deb",
+                ReleaseTarget::LinuxArm64Gnu => "honk300-arm64.deb",
+                _ => {
+                    return Err(format!(
+                        "Debian package provenance is incompatible with {}",
+                        target.triple()
+                    ))
+                }
+            };
+            return Ok(UpdatePlan {
+                strategy: UpdateStrategy::Deb,
+                artifact: artifact.into(),
+            });
+        }
         return Ok(UpdatePlan {
             strategy: UpdateStrategy::Shell,
             artifact: "honk300-installer.sh".into(),
@@ -683,10 +741,17 @@ fn select_update_plan(source: InstallSource, target: ReleaseTarget) -> Result<Up
             artifact: format!("honk300-{triple}-corporate-setup.exe"),
         },
         // Unknown/legacy portable installs converge on the product's primary machine-wide MSI.
-        InstallSource::ManualLocal | InstallSource::Unknown | InstallSource::MacApp => UpdatePlan {
+        InstallSource::ManualLocal | InstallSource::Unknown => UpdatePlan {
             strategy: UpdateStrategy::MsiGlobal,
             artifact: format!("honk300-{triple}.msi"),
         },
+        InstallSource::MacApp | InstallSource::Deb => {
+            return Err(format!(
+                "{} install provenance is incompatible with {}",
+                source.marker_value(),
+                target.triple()
+            ));
+        }
         InstallSource::PowerShell | InstallSource::Shell => UpdatePlan {
             strategy: UpdateStrategy::PowerShell,
             artifact: "honk300-installer.ps1".into(),
@@ -806,9 +871,22 @@ fn windows_current_marker_matches(executable: &Path, source: InstallSource) -> i
 #[cfg(not(windows))]
 fn strategy_owned_executable(
     strategy: UpdateStrategy,
-    _source: InstallSource,
+    source: InstallSource,
     target: ReleaseTarget,
 ) -> Result<PathBuf, DynError> {
+    if strategy == UpdateStrategy::Deb {
+        if source != InstallSource::Deb
+            || !matches!(
+                target,
+                ReleaseTarget::LinuxX64Gnu | ReleaseTarget::LinuxArm64Gnu
+            )
+        {
+            return Err(
+                "honk300 update: Debian package provenance does not match this target".into(),
+            );
+        }
+        return crate::debian::prove_current_executable(&std::env::current_exe()?);
+    }
     if strategy != UpdateStrategy::Shell || !(target.is_linux() || target.is_macos()) {
         return Err("honk300 update: no receipt-owned executable exists for this strategy".into());
     }
@@ -900,6 +978,7 @@ fn manifest_artifact<'a>(
         UpdateStrategy::ExeCorporate => "exe-corporate",
         UpdateStrategy::PowerShell => "bootstrap-powershell",
         UpdateStrategy::Shell => "bootstrap-shell",
+        UpdateStrategy::Deb => "deb",
     };
     if artifact.kind != expected_kind {
         return Err(format!(
@@ -910,6 +989,7 @@ fn manifest_artifact<'a>(
     let target_matches = match plan.strategy {
         UpdateStrategy::Shell => artifact.target == "universal-unix",
         UpdateStrategy::PowerShell => artifact.target == "windows",
+        UpdateStrategy::Deb => artifact.target == target.triple(),
         _ => artifact.target == target.triple(),
     };
     if !target_matches {
@@ -1111,6 +1191,9 @@ fn checksum_verdict(expected: &str, actual: &str) -> Result<(), String> {
 
 #[cfg(not(windows))]
 fn run_installer(strategy: UpdateStrategy, path: &Path) -> Result<(), DynError> {
+    if strategy == UpdateStrategy::Deb {
+        return crate::debian::install_package(path);
+    }
     let status = match strategy {
         UpdateStrategy::MsiGlobal | UpdateStrategy::MsiCorporate => Command::new("msiexec")
             .arg("/i")
@@ -1126,6 +1209,7 @@ fn run_installer(strategy: UpdateStrategy, path: &Path) -> Result<(), DynError> 
             .arg(path)
             .status(),
         UpdateStrategy::Shell => Command::new("sh").arg(path).status(),
+        UpdateStrategy::Deb => unreachable!("handled before the platform installer match"),
     }?;
 
     if status.success() {
@@ -1347,6 +1431,48 @@ mod tests {
             assert_eq!(plan.strategy, UpdateStrategy::Shell);
             assert_eq!(plan.artifact, "honk300-installer.sh");
         }
+    }
+
+    #[test]
+    fn debian_provenance_updates_with_the_matching_stable_package_name() {
+        for (target, artifact) in [
+            (ReleaseTarget::LinuxX64Gnu, "honk300-amd64.deb"),
+            (ReleaseTarget::LinuxArm64Gnu, "honk300-arm64.deb"),
+        ] {
+            let plan = select_update_plan(InstallSource::Deb, target).unwrap();
+            assert_eq!(plan.strategy, UpdateStrategy::Deb);
+            assert_eq!(plan.artifact, artifact);
+            let manifest = ReleaseManifest {
+                version: "0.3.3".into(),
+                tag: "v0.3.3".into(),
+                commit: "0".repeat(40),
+                artifacts: vec![ReleaseArtifact {
+                    name: artifact.into(),
+                    target: target.triple().into(),
+                    kind: "deb".into(),
+                    sha256: "a".repeat(64),
+                    size: 123,
+                }],
+            };
+            assert_eq!(
+                manifest_artifact(&manifest, &plan, target).unwrap().target,
+                target.triple()
+            );
+            let mut wrong_kind = manifest.clone();
+            wrong_kind.artifacts[0].kind = "portable".into();
+            assert!(manifest_artifact(&wrong_kind, &plan, target).is_err());
+            let mut wrong_target = manifest;
+            wrong_target.artifacts[0].target = "a-different-target".into();
+            assert!(manifest_artifact(&wrong_target, &plan, target).is_err());
+        }
+        assert!(select_update_plan(InstallSource::Deb, ReleaseTarget::LinuxX64Musl).is_err());
+    }
+
+    #[test]
+    fn cross_platform_install_provenance_fails_closed() {
+        assert!(select_update_plan(InstallSource::Deb, ReleaseTarget::WindowsX64).is_err());
+        assert!(select_update_plan(InstallSource::MacApp, ReleaseTarget::LinuxX64Gnu).is_err());
+        assert!(select_update_plan(InstallSource::MsiGlobal, ReleaseTarget::MacosArm64).is_err());
     }
 
     #[test]

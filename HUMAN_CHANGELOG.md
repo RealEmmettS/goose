@@ -43,6 +43,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   fixed Developer ID application certificate, installs only for the signed-in user without an administrator password,
   explains failures in a normal Mac dialog, and opens the installed Goose. This makes the Mac
   download approachable without creating a second, inconsistent install system.
+- **Debian and Ubuntu now have native packages for regular and ARM computers.** Each package
+  installs all three Goose command names through the operating system's package manager while
+  leaving personal notes, memes, and settings in the user's own folders. Updating and removing a
+  package checks that it really belongs to Honk300 first, preserves personal media by default,
+  and backs it up before a full cleanup. Real release checks install and run both architectures,
+  which makes the new download more than a renamed archive.
 - **Mac release builds now require Apple's trust checks.** Automated release work signs the app
   and installer with hardened settings, sends both the app and disk image to Apple, attaches the
   approval tickets, and checks that Gatekeeper accepts them. Missing credentials stop the build
@@ -83,6 +89,13 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   Linux does not currently open those windows, so it has no close reaction there.
 
 ### Improved
+- **One stable download address now follows every complete release.** The familiar Mac disk
+  image, Windows installers, Linux packages, and terminal installers keep the same latest links,
+  while every older release and its files stay frozen. A release started from any computer still
+  asks GitHub's Mac machines to make and pass Apple's checks on a fresh Mac download. Installed
+  copies discover the newest release, then fetch and verify the exact matching file for their
+  operating system, processor, and install type before changing anything. The Mac disk image is
+  for graphical installs; command-line updates use the signed app package behind the same release.
 - **Walking looks less stretchy everywhere without becoming frantic.** Planted feet release a
   little sooner, while only the fastest running and charging strides shorten further. Normal
   walking keeps its weighted rhythm, and checks prevent rapid bicycle-like stepping. The same
@@ -108,6 +121,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   Accessibility checks happen without rebuilding the app between them.
 
 ### Fixed
+- **Windows and Linux release screenshots now use the intended desktop capture paths.** Windows
+  now asks the native screen API to include layered windows instead of passing a flag combination
+  that its managed image helper rejects. The Linux X11 rehearsal uses the normal client-side
+  compositor and first proves that controlled dark and light desktops are clean before the Goose
+  starts. The actual color, transparency, and body-part standards were not relaxed, so these fixes
+  repair the test environment without hiding a bad Goose.
 - **An older Goose note or meme no longer blocks the next one.** Mac and Windows now keep track of
   which new window the Goose is actively fetching, even when an earlier note stays open. Closing
   an older window is still noticed once, but it cannot hide the current window and make the new

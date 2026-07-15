@@ -32,6 +32,10 @@
     - [x] Check machine-wide Windows paths across sessions and reject reboot-deferred MSI state.
     - [x] Kill and reap every deferred-uninstall helper that fails before the exact READY handoff.
   - [x] Pin the exact G2 Developer ID leaf in CI and revalidate the extracted final app ZIP, stapling, Gatekeeper result, and required notarization evidence.
+  - [ ] Prove the rolling latest-update channel and immutable per-tag DMG behavior from every release trigger host.
+    > Stable asset names and `latest/download/release-manifest.json` drive exact-tag, size/hash-pinned in-place updates. A Windows-triggered global release still uses GitHub's macOS runner for a fresh signed/notarized DMG; older tagged DMGs are never mutated.
+  - [x] Add deterministic native amd64/arm64 Debian packages with real package-manager-owned aliases, platform-isolated CLI updates, preserve-on-uninstall, and backup-on-purge.
+  - [ ] Prove both Debian packages on native amd64/arm64 candidate and published-release hosts, including exact-vs-latest bytes, compositor output, all three update aliases, uninstall, and purge.
   - [x] Run the complete integrated local Rust, universal-Apple, packaging, workflow, audit, shell, cross-target, and diff gate on the Mac stopping commit.
   - [ ] Capture and inspect the exact Mac candidate across light/dark output, eight headings, animation/secondary motion, mud/prank states, entry/wrap/exit, and a real user-close reaction.
   - [ ] Repeat exact-candidate CLI/TUI/IPC/audio/terminal behavior, including ordinary-window positives and protected-terminal negatives.
@@ -40,6 +44,7 @@
   - [ ] Pass candidate and default-branch CI on the same exact SHA before creating the immutable tag.
   - [ ] Cut the immutable v0.3.3 release and pass atomic publication plus post-release smoke tests.
   - [ ] Fresh-download the published app ZIP and DMG and independently recheck hashes, trust, install, and v0.3.2→v0.3.3 update.
+  - [x] Finish and push the accessible progressive-disclosure site with stable latest DMG/Debian links, strict manifest checks, local/browser tests, hosted Windows/Linux CI, and a protected preview.
   - [ ] Validate the website preview against the live v0.3.3 manifest, then promote and verify the DMG-first production deployment.
   - [ ] Synchronize ADRs, README, both changelogs, readiness evidence, CODEX_PROJECT, guidance, task activity, and the Alienware handoff; commit and push the completed board.
 - [ ] **M16.1 — exact-candidate macOS host readiness** - one unchanged signed candidate through first-denied, non-nagging relaunch, live grant/revocation, terminal protection, and ordinary-window evidence #m16r
