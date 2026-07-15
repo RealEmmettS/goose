@@ -31,6 +31,14 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Behind the scenes
+- **The first stable release and its download page are live and independently checked.** The
+  complete cross-platform rehearsal, ordinary follow-up checks, Apple trust checks, fresh Mac
+  install and update, and the public download page all passed before the release board closed.
+  Extra hands-on computer checks remain useful, but any issue they find will become a new update
+  instead of silently changing the already published downloads. This keeps the release
+  reproducible while still leaving a clear path for hardware-specific refinements.
+
 ### Added
 - **Mac users now get a simple Honk menu while the Goose is running.** Configure opens the same
   terminal settings screen that already owns every setting, and Quit sends the Goose walking

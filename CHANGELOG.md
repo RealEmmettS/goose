@@ -25,6 +25,15 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Changed
+- **v1.0.1 publication closure (2026-07-15)** - recorded the exact candidate, same-SHA main CI,
+  atomic publication, post-release native smoke, independent Developer ID/notarization/stapling/
+  Gatekeeper and v0.3.2 upgrade checks, and the DMG-first `thegoose.app` production deployment.
+  The immutable public release remains bound to
+  `de8da8a9dd049286787d20e167bb115ce8afc107`; this documentation-only closure leaves product
+  bytes, tags, and release assets unchanged and moves supplemental Alienware/Mac observations to
+  forward-patch card `#v1a`.
+
 ## [1.0.1] - 2026-07-15
 
 ### Added

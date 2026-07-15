@@ -8,7 +8,7 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.0.1 first-public-stable fix-forward qualification.** M0-M19 are implemented
+**Current stage: v1.0.1 is the first public stable release.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -95,9 +95,12 @@ CI `29392827146` passed at `9c5692b`. The immutable `v1.0.0` release then failed
 creation only because Windows x64 sampled valid top-down frames against a side-only oracle; all
 other producers, including signed/notarized Mac and native Debian, passed. The strict ADR 0027
 side-or-top-down analyzer now rejects partial/cropped, channel-swapped, opaque, straight-alpha,
-and double-premultiplied evidence. The current release gate is
-`docs/readiness/v1.0.1-readiness.md` and task `#m20q`. Stable/latest remains v0.3.2 until the
-immutable v1.0.1 release is independently verified.
+and double-premultiplied evidence. Exact candidate `29401457634`, same-SHA main CI
+`29401961540` attempt 2, atomic release `29403056159`, and post-release smoke `29403596212`
+passed at `de8da8a9dd049286787d20e167bb115ce8afc107`. Stable/latest is v1.0.1; independent
+fresh Mac trust/update checks and the DMG-first production site passed. Completed release evidence
+is in `docs/readiness/v1.0.1-readiness.md` and done task `#m20q`; supplemental hardware checks are
+To-Do task `#v1a` and may only lead to forward patches.
 
 ## Read these first (source-of-truth pointers)
 

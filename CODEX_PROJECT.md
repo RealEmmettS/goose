@@ -3,25 +3,29 @@
 ## TL;DR
 
 Honk300 is a Rust 1.95, cross-platform procedural desktop goose for Windows, macOS, X11, and
-native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. The active
-v1.0.1 effort is the first public stable release and complete native macOS qualification: fix AppKit pixel presentation,
+native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.0.1 is now
+the first public stable release and completed native macOS qualification: it fixes AppKit pixel presentation,
 refine shared walking and exposed-edge lifecycle, add the safely gated user-close reaction, meet
 runtime budgets, prove denied/granted Accessibility, ship a Developer ID-signed/notarized
 per-user DMG with a macOS-only Configure/graceful-Quit menu-bar item, add native Debian packages
-and platform-isolated rolling updates, publish
-atomically, and only then make the stable latest DMG the recommended macOS download at
-thegoose.app.
+and platform-isolated rolling updates, publishes atomically, and makes the independently verified
+stable-latest DMG the recommended macOS download at `thegoose.app`.
 
 ## Status
 
-- Active branch/worktree: `codex/v1.0.1` in the legacy-named `.worktrees/macos-v0.3.3`
+- Closure branch/worktree: `codex/v1.0.1` in the legacy-named `.worktrees/macos-v0.3.3`
   directory (the release target changed after the worktree was created).
-- Stable public release remains v0.3.2 until the v1.0.1 readiness checklist is complete. The
-  immutable v1.0.0 tag failed closed before draft creation and is retained unpublished.
-- Active board card: `#m20q`; completed native Mac evidence is retained under `#m16r`, and
+- Stable/latest is public v1.0.1 at exact release commit
+  `de8da8a9dd049286787d20e167bb115ce8afc107`. The immutable v1.0.0 tag failed closed before
+  draft creation and remains unpublished and untouched.
+- Completed release card: `#m20q`; completed native Mac evidence is retained under `#m16r`, and
   supplemental post-release hardware checks are visible as To-Do card `#v1a`. The live shared
   task board is tracked under `.tasks/`.
 - Version: 1.0.1 in source.
+- Release evidence: candidate `29401457634`, same-SHA main CI `29401961540` attempt 2, atomic
+  publication `29403056159`, and post-release smoke `29403596212` passed. The latest GitHub
+  Release contains 22 payloads plus sidecars/manifest for 47 assets and is bound to the exact
+  commit above.
 - macOS control: ADR 0024 adds a visible-while-running **Honk** status item. Configure opens the
   signed bundle's existing terminal TUI, and Quit requests the same engine-owned walk-off used by
   CLI/TUI stop. There is no second settings schema/window, running Dock control surface,
@@ -57,8 +61,9 @@ thegoose.app.
   singleton; Unix signals carry explicit rollback statuses; Windows verifies from pinned streams,
   has no ambient lease bypass, checks machine-wide paths across sessions, rejects reboot-deferred
   MSI completion, and reaps every deferred helper that has not completed its exact READY handoff.
-  Native candidate transactions and final scoped cleanup passed; live published-update and fault-
-  injection repetition remains post-release verification.
+  Native candidate transactions, final scoped cleanup, and a fresh published v0.3.2-to-v1.0.1
+  CLI update passed. Fault-injection and broader interaction repetition remain supplemental
+  post-release verification under `#v1a`.
 - Packaging/candidate: a universal x86_64/arm64 installer helper targeting macOS 11.0 in both
   slices and a fail-closed signing/notarization workflow are in-tree. Candidate run
   `29384134561` at source `39087949731f9a8326d0661182fa4a2dbe89c61b` passed the complete
@@ -137,15 +142,13 @@ thegoose.app.
   resolves exact immutable tag bytes for every platform and provenance; the DMG is rebuilt by
   GitHub for every release but Mac CLI updates consume the exact-tag app ZIP through the pinned
   bootstrap.
-- Release/site: the stable-latest DMG and native Debian progressive-disclosure refinement is
-  retargeted to v1.0.1 from the pre-release site SHA
-  `a8f5c5dee24c5715e875dddbc4c1cc528afb9ebb`. Local dependency, 22 unit/lint/build/budget, and
-  10 browser/axe/keyboard/responsive/visual checks pass; native snapshot refresh run
-  `29386864800` and final hosted Windows/Linux site CI run `29387702663` are green. Vercel built
-  the exact protected preview at
-  `https://desktop-goose-site-n20ue4aen-realemmetts.vercel.app`; it remains protected and the live
-  manifest remains v0.3.2 by design. Final v1.0.1 candidate qualification, release publication,
-  authenticated live-v1.0.1 preview validation, and production promotion remain deliberate gates.
+- Release/site: exact site SHA `4f4bf426979e6b4e59c850ef39a8eea6a3d08386` passed local and
+  hosted unit/lint/build/budget plus 10 browser/axe/keyboard/responsive/visual checks, live v1.0.1
+  manifest validation, protected preview deployment `5454267825`, and Vercel production
+  deployment `5454715097`. Public `thegoose.app` now makes the stable-latest notarized DMG the
+  primary Mac action and exposes the native Debian x64/ARM64 packages. A docs-only site closure
+  commit `7f20f1c87d1e2e3545bc33779caf67598b1161b2` passed CI `29404580116` and Vercel
+  production deployment `5454761833` without changing the tested bundle.
 
 ## Goals
 
@@ -195,7 +198,8 @@ thegoose.app.
 
 ## Verification Source Of Truth
 
-- Current release gate: `docs/readiness/v1.0.1-readiness.md`.
+- Completed release evidence and explicit forward-verification waivers:
+  `docs/readiness/v1.0.1-readiness.md`.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
 - Board handoff and activity: `.tasks/tasks/m20q.md`.
 - Canonical product plan: `honk300_plan.md`.

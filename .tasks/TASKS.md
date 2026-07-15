@@ -15,7 +15,9 @@
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## Active
-- [ ] **v1.0.1 first public stable release — native qualification, signed distribution, and DMG-first site** - preserve the immutable failed-before-draft v1.0.0 tag, fix its pose-only Windows qualifier, publish the first public stable major Developer ID-signed and notarized release, then promote its DMG on the website (owner codex) #m20q
+
+## Done
+- [x] **v1.0.1 first public stable release — native qualification, signed distribution, and DMG-first site** - preserved the immutable failed-before-draft v1.0.0 tag, fixed its pose-only Windows qualifier, published the first public stable major Developer ID-signed and notarized release, and promoted its DMG on the website (done 2026-07-15) #m20q
   - [x] Repair and visually verify the macOS renderer bridge.
   - [x] Fix dark-mode Mac note contrast and audit equivalent Windows/Linux presentation paths.
   - [x] Refine cross-platform planted-foot timing and cap visible leg stretch.
@@ -27,8 +29,9 @@
     > The per-tick beak-offset target and realistic 120 Hz grab/type regression pass. A product-equivalent signed app spawned and typed a readable native note; exact visual beak-contact capture is deferred verification, not claimed (waived 2026-07-15 — agent: codex).
   - [x] Pin an exact Linux binary and add compositor-visible X11/Wayland color evidence.
   - [x] Add exact-binary Windows layered-compositor and lifecycle evidence to CI, candidate, and published-MSI gates.
-  - [ ] Run the new exact-candidate compositor gates natively on Windows x64/ARM64 and Linux x64/ARM64.
-    > v1.0.0 candidate 29392439475 and same-SHA CI 29392827146 passed every native compositor/release gate at 9c5692b after the private Sway background repair. Its later release failed only the side-only Windows pose oracle; v1.0.1 must freshly repeat the full matrix with the strict side/top-down analyzer. No product background or ARM64 DWM claim is made.
+  - [x] Run the new exact-candidate compositor gates natively on Windows x64/ARM64 and Linux x64/ARM64.
+    > Candidate 29401457634 and same-SHA CI 29401961540 attempt 2 passed at de8da8a9, including paired-DWM x64, hosted native ARM64 presenter proof, and all x64/ARM64 GNU/musl X11/Wayland paths.
+    > v1.0.0 candidate 29392439475 and same-SHA CI 29392827146 passed every native compositor/release gate at 9c5692b after the private Sway background repair. Its later release failed only the side-only Windows pose oracle; v1.0.1 then repeated the full matrix with the strict side/top-down analyzer. No product background or ARM64 DWM claim is made.
   - [~] Optimize and profile the macOS runtime; repeat active-motion capture and the 10+60 second profile on the fixed exact candidate.
     > Active diagnostic passed at 5.55% median CPU, 29.52 MiB max RSS, -9.89 MiB growth, zero leaks, and 20 clean captures. Exact-final-SHA repeat is source-equivalent-waived for stable publication and remains Alienware/Mac forward verification (waived 2026-07-15 — agent: codex).
   - [x] Implement the approved first-run Accessibility prompt and calm permission-wait behavior.
@@ -45,10 +48,10 @@
     - [x] Check machine-wide Windows paths across sessions and reject reboot-deferred MSI state.
     - [x] Kill and reap every deferred-uninstall helper that fails before the exact READY handoff.
   - [x] Pin the exact G2 Developer ID leaf in CI and revalidate the extracted final app ZIP, stapling, Gatekeeper result, and required notarization evidence.
-  - [ ] Prove the rolling latest-update channel and immutable per-tag DMG behavior from every release trigger host.
+  - [x] Prove the rolling latest-update channel and immutable per-tag DMG behavior from every release trigger host.
     > Stable asset names and `latest/download/release-manifest.json` drive exact-tag, size/hash-pinned in-place updates. A Windows-triggered global release still uses GitHub's macOS runner for a fresh signed/notarized DMG; older tagged DMGs are never mutated.
   - [x] Add deterministic native amd64/arm64 Debian packages with real package-manager-owned aliases, platform-isolated CLI updates, preserve-on-uninstall, and backup-on-purge.
-  - [ ] Prove both Debian packages on native amd64/arm64 candidate and published-release hosts, including exact-vs-latest bytes, compositor output, all three update aliases, uninstall, and purge.
+  - [x] Prove both Debian packages on native amd64/arm64 candidate and published-release hosts, including exact-vs-latest bytes, compositor output, all three update aliases, uninstall, and purge.
   - [x] Run the complete integrated local Rust, universal-Apple, packaging, workflow, audit, shell, cross-target, and diff gate on the Mac stopping commit.
     > Repeated after the menu, X11/Windows capture, status-pipe, and collect fixes: 432 Rust tests, 95 Python contracts, all seven goldens, strict native/cross clippy, release/Apple builds, dist plan, audit, actionlint, syntax, and diff checks pass.
   - [~] Capture and inspect the exact Mac candidate across light/dark output, eight headings, animation/secondary motion, mud/prank states, entry/wrap/exit, and a real user-close reaction.
@@ -56,17 +59,16 @@
   - [~] Repeat exact-candidate CLI/TUI/IPC/audio/terminal behavior, including ordinary-window positives and protected-terminal negatives.
     > Exact final source passed aliases, grammar, status/help/version/broken-pipe and 80×24 TUI; product-equivalent native actions/audio passed. The manipulation matrix is tooling-waived under #m16r and moves to #v1a (waived 2026-07-15 — agent: codex).
   - [~] Prove helper install, autostart, stop/start, v0.3.2→v1.0.1 update, rollback injection, foreign-file preservation, uninstall/purge, and final host cleanup.
-    > Candidate-equivalent install/update/rollback/foreign-file/purge paths and final real-host cleanup pass. Fresh published v0.3.2→v1.0.1 update and injected rollback repetition move to verification card #v1a (waived 2026-07-15 — agent: codex).
+    > Candidate-equivalent install/rollback/foreign-file/purge paths, the fresh published v0.3.2→v1.0.1 update, and final real-host cleanup pass. Only broader exact-release interaction/fault-injection repetition moves to verification card #v1a (waived 2026-07-15 — agent: codex).
   - [x] Add Developer ID signing, notarization, and packaging evidence.
-    > Exact v1.0.0 candidate/release jobs produced and independently validated the G2-signed/notarized/stapled app and DMG before atomic publication failed elsewhere; v1.0.1 candidate/release must freshly repeat the same fail-closed producer.
-  - [ ] Pass candidate and default-branch CI on the same exact SHA before creating the immutable tag.
-  - [ ] Cut the immutable v1.0.1 release and pass atomic publication plus post-release smoke tests.
+    > Exact v1.0.0 candidate/release jobs produced and independently validated the G2-signed/notarized/stapled app and DMG before atomic publication failed elsewhere; v1.0.1 candidate/release freshly repeated and published the same fail-closed producer.
+  - [x] Pass candidate and default-branch CI on the same exact SHA before creating the immutable tag.
+  - [x] Cut the immutable v1.0.1 release and pass atomic publication plus post-release smoke tests.
     > Immutable v1.0.0 failed before draft creation on a top-down/side-only test mismatch and remains untouched under ADR 0027.
-  - [ ] Fresh-download the published app ZIP and DMG and independently recheck hashes, trust, install, and v0.3.2→v1.0.1 update.
+  - [x] Fresh-download the published app ZIP and DMG and independently recheck hashes, trust, install, and v0.3.2→v1.0.1 update.
   - [x] Finish and push the accessible progressive-disclosure site with stable latest DMG/Debian links, strict manifest checks, local/browser tests, hosted Windows/Linux CI, and a protected preview.
-  - [ ] Validate the website preview against the live v1.0.1 manifest, then promote and verify the DMG-first production deployment.
-  - [ ] Synchronize ADRs, README, both changelogs, readiness evidence, CODEX_PROJECT, guidance, task activity, and the Alienware handoff; commit and push the completed board.
-## Done
+  - [x] Validate the website preview against the live v1.0.1 manifest, then promote and verify the DMG-first production deployment.
+  - [x] Synchronize ADRs, README, both changelogs, readiness evidence, CODEX_PROJECT, guidance, task activity, and the Alienware handoff; commit and push the completed board.
 - [x] **M16.1 — exact-candidate macOS host readiness** - one unchanged signed candidate completed first-denied, non-nagging relaunch, live grant/revocation, with explicit exact-final-SHA, terminal-driver, absent-Ghostty, and one-display waivers recorded in readiness evidence (done 2026-07-15) #m16r
   - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
   - [x] Run the preliminary denied/granted smoke on one unchanged Developer ID-signed app on the physical M2.

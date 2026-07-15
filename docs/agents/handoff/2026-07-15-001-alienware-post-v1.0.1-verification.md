@@ -4,12 +4,12 @@
 
 **Scope:** verification-only follow-up on Emmett's Alienware and later native hardware
 
-**Board:** `#v1a` (To-Do); release card `#m20q` owns publication closure
+**Board:** `#v1a` (To-Do); release card `#m20q` is complete
 
 **Repository:** `https://github.com/RealEmmettS/goose`
 
-**Release:** v1.0.1, the first public stable release; exact published SHA and run IDs are recorded
-in `docs/readiness/v1.0.1-readiness.md`
+**Release:** v1.0.1, the first public stable release, exact commit
+`de8da8a9dd049286787d20e167bb115ce8afc107`
 
 ## TL;DR
 
@@ -24,15 +24,37 @@ creation because a valid complete top-down Windows pose was judged by a side-onl
 oracle. ADR 0027 fixes forward to v1.0.1 with strict complete side and top-down profiles; it does
 not change renderer, engine, presenter, or user behavior.
 
+## Published authority
+
+- Candidate `29401457634` passed against the exact release commit.
+- Ordinary main CI `29401961540` passed on failed-job-only attempt 2; attempt 1 had one pre-render
+  hosted Windows desktop-helper startup flake. Source and workflow inputs stayed fixed; the rerun
+  rebuilt/re-executed the failed job and retained its own evidence artifact.
+- Atomic release `29403056159` and post-release smoke `29403596212` passed. The latest public
+  Release contains 22 payloads plus sidecars/manifest for 47 assets.
+- Fresh public DMG and app-ZIP downloads passed manifest/sidecar hashes, universal slices,
+  Developer ID team `M9D5379H93`, hardened runtime, secure timestamp, designated requirement,
+  notarization/stapling, Gatekeeper, isolated install, and cleanup checks.
+- A real isolated published v0.3.2 install updated through the CLI to v1.0.1; all three aliases and
+  the receipt converged on the exact app ZIP, repeat updates were clean no-ops, and purge restored
+  both the fixture and physical account to uninstalled state.
+- Site commit `4f4bf426979e6b4e59c850ef39a8eea6a3d08386` passed live-manifest, preview, CI, browser,
+  accessibility, responsive, and budget gates. Vercel production deployment `5454715097` made
+  the real DMG the primary public macOS action at `thegoose.app`. Documentation-only closure
+  `7f20f1c87d1e2e3545bc33779caf67598b1161b2` also passed CI and production deployment without
+  changing the tested bundle.
+
 ## State to inherit
 
-- `main`, tag v1.0.1, the GitHub Release, and `release-manifest.json` must all resolve to the exact
-  commit recorded in the readiness document. Do not work from v1.0.0.
+- Tag v1.0.1, the GitHub Release, and `release-manifest.json` must all resolve to exact release
+  commit `de8da8a9dd049286787d20e167bb115ce8afc107`. `main` may be a descendant containing only
+  post-tag documentation/board closure; verify the release commit is its ancestor and do not work
+  from v1.0.0.
 - The complete hosted candidate/default-branch/publication evidence is release authority. This
   handoff adds physical-hardware observations; it does not weaken or replace that authority.
-- `#m20q` is closed only after atomic publication, fresh-download trust/hash checks, DMG-first
-  production deployment, and tracked-board synchronization. The remaining work then lives only
-  on To-Do card `#v1a`.
+- `#m20q` is closed after atomic publication, fresh-download trust/hash checks, DMG-first
+  production deployment, and tracked-board synchronization. The remaining work lives only on
+  To-Do card `#v1a`.
 - The Mac used for qualification was returned to an uninstalled/stopped state. Honk300's own
   Accessibility toggle was turned off with explicit operator approval; no other Accessibility
   entry was changed.
@@ -67,7 +89,9 @@ Verify byte counts and SHA-256 before executing anything. Confirm each stable
 
 ### Release and updater identity
 
-- Confirm tag, Release target, manifest `commit`, and default-branch commit agree exactly.
+- Confirm tag, Release target, and manifest `commit` agree exactly. Confirm the default branch
+  contains that release commit as an ancestor; it may also include the documented post-tag
+  release-evidence checkpoint.
 - Confirm GitHub marks v1.0.1 latest and every required stable filename occurs exactly once.
 - Confirm `honk300 --version`, `honk --version`, and `goose --version` report 1.0.1.
 - From an installed v0.3.2 fixture, run update through each alias. Discovery may use `latest`, but
@@ -187,7 +211,8 @@ When Mac hardware is next available, start with the published v1.0.1 app ZIP/DMG
 - a repeated exact-release 10-second warm-up plus 60-second active profile;
 - Configure and animated Quit through the status item;
 - visible beak contact during collect;
-- v0.3.2 to v1.0.1 update, injected rollback, foreign-file preservation, uninstall, and purge;
+- optional second-hardware repetition of the already-passed published v0.3.2 to v1.0.1 update,
+  plus injected rollback, foreign-file preservation, uninstall, and purge;
 - ordinary-window positive plus Terminal.app, Codex, VS Code terminal, and Ghostty negatives;
 - real multi-monitor/hot-plug only if hardware exists.
 

@@ -8,6 +8,11 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
+**Latest stable:** [v1.0.1](https://github.com/RealEmmettS/goose/releases/tag/v1.0.1), the first
+public stable release. Its cross-platform artifacts, native installer smokes, Developer ID and
+Apple notarization/stapling checks, and stable download aliases passed independent publication
+verification on 2026-07-15.
+
 ## Install
 
 ### Windows
@@ -206,7 +211,9 @@ existing terminal TUI and graceful shutdown; ADR 0025 records the first stable v
 post-release Alienware verification boundary; ADR 0026 defines the narrow GitHub-hosted Windows
 ARM64 compositor-evidence exception without weakening normal paired-DWM proof; and ADR 0027
 records the immutable-tag fix-forward to the public v1.0.1 identity.
-[`docs/readiness/v1.0.1-readiness.md`](docs/readiness/v1.0.1-readiness.md) is the release checklist.
+[`docs/readiness/v1.0.1-readiness.md`](docs/readiness/v1.0.1-readiness.md) records the completed
+release qualification and the explicit supplemental hardware-verification waivers carried into
+future forward patches.
 
 ## License and assets
 
