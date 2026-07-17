@@ -55,6 +55,9 @@ All notable changes to this project are documented here. Format based on
   StatusNotifier host is non-fatal and visible while CLI, TUI, IPC, overlays, and supported
   mischief remain independent. Windows ARM64 hosted qualification may use this waiver only when
   an independent stock-icon `Shell_NotifyIconW` registration also fails.
+- **Windows Server tray-recovery qualification** - keeps the `TaskbarCreated` recovery check
+  strict while allowing the shell's rectangle API a bounded ten seconds to expose a successfully
+  restored icon. Failure evidence now includes poll count and runtime restoration diagnostics.
 
 ## [1.0.3] - 2026-07-17
 

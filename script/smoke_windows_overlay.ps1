@@ -245,12 +245,24 @@ runtime_message=$($runtimeMessage.Trim())
     }
     $after = -1
     $afterRect = [Honk300TraySmoke+Rect]::new()
-    for ($attempt = 0; $attempt -lt 40; $attempt += 1) {
+    $recoveryPollAttempts = 0
+    # Shell_NotifyIconGetRect can remain S_FALSE briefly after a successful NIM_ADD on the
+    # Windows Server 2022 shell. Keep this bounded, but allow Explorer up to ten seconds to
+    # materialize the icon rectangle after the runtime has processed TaskbarCreated.
+    for ($attempt = 0; $attempt -lt 400; $attempt += 1) {
         Start-Sleep -Milliseconds 25
+        $recoveryPollAttempts = $attempt + 1
         $after = [Honk300TraySmoke]::Shell_NotifyIconGetRect([ref] $identifier, [ref] $afterRect)
         if ($after -eq 0) { break }
     }
-    if ($after -ne 0) { throw "tray icon did not recover after TaskbarCreated (HRESULT $after)" }
+    if ($after -ne 0) {
+        $runtimeMessage = if (Test-Path -LiteralPath $RuntimeStderrPath) {
+            (Get-Content -LiteralPath $RuntimeStderrPath -Raw).Trim()
+        } else {
+            '<runtime stderr unavailable>'
+        }
+        throw "tray icon did not recover after TaskbarCreated (HRESULT $after after $recoveryPollAttempts polls; runtime: $runtimeMessage)"
+    }
 
     Set-Content -LiteralPath $EvidencePath -Encoding utf8NoBOM -Value @"
 owner=0x$($owner.ToInt64().ToString('X'))
@@ -260,6 +272,7 @@ independent_shell_probe=$($independentProbe.ToString().ToLowerInvariant())
 before_rect=$($beforeRect.Left),$($beforeRect.Top),$($beforeRect.Right),$($beforeRect.Bottom)
 missing_hresult=$missing
 taskbar_created_message=$taskbarCreated
+recovery_poll_attempts=$recoveryPollAttempts
 after_rect=$($afterRect.Left),$($afterRect.Top),$($afterRect.Right),$($afterRect.Bottom)
 "@
 }
