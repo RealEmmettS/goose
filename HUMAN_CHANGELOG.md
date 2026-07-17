@@ -96,9 +96,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   gives up safely when a broken peer sends nothing, which keeps startup responsive and reliable.
 
 ### Behind the scenes
-- **Release checks now wait for slow Windows shells to finish restoring the icon.** The test still
-  fails if the control does not return, but it allows a bounded settling period and saves clearer
-  timing details. This prevents a successful recovery from being mistaken for a broken one.
+- **Release checks now reproduce Windows shell restart ordering.** The test first proves the old
+  icon stays gone before asking the Goose to restore it, then allows a bounded settling period and
+  saves clearer timing details. This prevents a delayed old removal from erasing a successful
+  recovery during the test.
 - **Every finished Mac download must contain the menu artwork.** Release checks now look for both
   the reusable source and the Mac-ready image before signing, after packing the app, and in both
   inspections of the finished disk image. A missing icon stops publication instead of quietly

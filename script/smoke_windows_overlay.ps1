@@ -237,6 +237,23 @@ runtime_message=$($runtimeMessage.Trim())
     $missing = [Honk300TraySmoke]::Shell_NotifyIconGetRect([ref] $identifier, [ref] $missingRect)
     if ($missing -eq 0) { throw 'tray icon remained registered after exact NIM_DELETE' }
 
+    # NIM_DELETE is asynchronous on the Windows Server 2022 shell. A real TaskbarCreated arrives
+    # only after Explorer has discarded the old taskbar state; reproduce that ordering by
+    # requiring one full second of continuously absent GUID state before asking the runtime to
+    # re-add. Otherwise the pending delete can land after a successful NIM_ADD and erase it.
+    $deletionSettlePolls = 0
+    for ($attempt = 0; $attempt -lt 40; $attempt += 1) {
+        Start-Sleep -Milliseconds 25
+        $settledMissingRect = [Honk300TraySmoke+Rect]::new()
+        $settledMissing = [Honk300TraySmoke]::Shell_NotifyIconGetRect(
+            [ref] $identifier, [ref] $settledMissingRect
+        )
+        if ($settledMissing -eq 0) {
+            throw "tray icon reappeared while waiting for NIM_DELETE to settle (poll $attempt)"
+        }
+        $deletionSettlePolls = $attempt + 1
+    }
+
     $taskbarCreated = [Honk300TraySmoke]::RegisterWindowMessage('TaskbarCreated')
     if ($taskbarCreated -eq 0 -or -not [Honk300TraySmoke]::PostMessage(
         $owner, $taskbarCreated, [IntPtr]::Zero, [IntPtr]::Zero
@@ -271,6 +288,7 @@ accessible_name=Honk300 controls
 independent_shell_probe=$($independentProbe.ToString().ToLowerInvariant())
 before_rect=$($beforeRect.Left),$($beforeRect.Top),$($beforeRect.Right),$($beforeRect.Bottom)
 missing_hresult=$missing
+deletion_settle_polls=$deletionSettlePolls
 taskbar_created_message=$taskbarCreated
 recovery_poll_attempts=$recoveryPollAttempts
 after_rect=$($afterRect.Left),$($afterRect.Top),$($afterRect.Right),$($afterRect.Bottom)

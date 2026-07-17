@@ -56,8 +56,10 @@ All notable changes to this project are documented here. Format based on
   mischief remain independent. Windows ARM64 hosted qualification may use this waiver only when
   an independent stock-icon `Shell_NotifyIconW` registration also fails.
 - **Windows Server tray-recovery qualification** - keeps the `TaskbarCreated` recovery check
-  strict while allowing the shell's rectangle API a bounded ten seconds to expose a successfully
-  restored icon. Failure evidence now includes poll count and runtime restoration diagnostics.
+  strict while first requiring the simulated `NIM_DELETE` to remain settled for one second, then
+  allowing the shell's rectangle API a bounded ten seconds to expose a successfully restored icon.
+  This matches Explorer's destroy-then-broadcast ordering and records both poll counts plus runtime
+  restoration diagnostics.
 
 ## [1.0.3] - 2026-07-17
 

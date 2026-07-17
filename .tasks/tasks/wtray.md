@@ -32,6 +32,12 @@ gate rather than a fabricated local claim.
 
 ## Activity
 
+- 2026-07-17 09:48 — replacement candidate 29586856960 proved the ten-second post-broadcast wait
+  was not the issue: both Server 2022 x64 jobs logged successful runtime restoration but remained
+  absent after 400 polls, while every other producer passed. The synthetic NIM_DELETE was racing
+  the immediate re-add; unlike real Explorer destroy-then-broadcast ordering, its asynchronous
+  removal could land after NIM_ADD. The smoke now requires one full second of continuously absent
+  GUID state before broadcasting, while retaining the strict recovery bound afterward. (agent: codex)
 - 2026-07-17 09:35 — candidate 29586092092 passed every completed Mac, Linux, Debian, Windows
   ARM64, and portable producer but failed both Windows Server 2022 x64 tray-recovery observations.
   Retained stderr proves the runtime processed TaskbarCreated and successfully restored the icon;

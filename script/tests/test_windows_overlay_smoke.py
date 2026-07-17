@@ -406,6 +406,9 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
 class WindowsOverlaySmokeContractTests(unittest.TestCase):
     def test_taskbar_recovery_allows_bounded_shell_rect_settle_and_records_latency(self):
         smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
+        self.assertIn("$deletionSettlePolls = 0", smoke)
+        self.assertIn("continuously absent GUID state", smoke)
+        self.assertIn("deletion_settle_polls=$deletionSettlePolls", smoke)
         self.assertIn("for ($attempt = 0; $attempt -lt 400; $attempt += 1)", smoke)
         self.assertIn("$recoveryPollAttempts = $attempt + 1", smoke)
         self.assertIn("recovery_poll_attempts=$recoveryPollAttempts", smoke)
