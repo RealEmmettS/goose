@@ -58,7 +58,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ### Fixed
 - **Checking for updates now works in built-in Windows shells.** Download addresses and file
   locations are passed safely, and response text is decoded consistently, so update discovery no
-  longer stops at a command-parsing error.
+  longer stops at a command-parsing error. Windows users with an older copy need to rerun the
+  current installer once because the already-published old copy cannot repair itself; settings
+  and personal content remain in place.
 - **Two supported Windows installs no longer confuse each other's maintenance commands.** The
   copy whose command you invoked keeps its own update and removal identity, even when both the
   all-users and per-user editions exist.

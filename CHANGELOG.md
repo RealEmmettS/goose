@@ -42,7 +42,9 @@ All notable changes to this project are documented here. Format based on
   command source, uses non-interactive stop-on-error requests, decodes Windows PowerShell 5.1 byte
   responses as UTF-8, and preserves exact-tag size/SHA verification. Both installed v0.3.1 and
   exact portable v1.0.2 reproduced the old parser failure; rebuilt source passes live discovery
-  and a quoted-path exact download.
+  and a quoted-path exact download. Because the immutable older executable cannot repair itself,
+  Windows users on v1.0.2 or earlier must rerun the supported installer once to reach v1.0.3;
+  ordinary installer upgrade preserves user content, and subsequent update checks use the fix.
 - **Coexisting Global/Corporate lifecycle identity** - the marker beside the invoked executable
   now wins before registry fallback, and Corporate uninstall discovery searches current-user then
   machine registration while retaining exact product/publisher/ProductCode/root validation.

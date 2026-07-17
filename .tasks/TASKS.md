@@ -7,11 +7,6 @@
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## To-Do
-- [ ] **Shared tray contract and asset pipeline** - extend ADR 0028 into a platform-neutral Configure/graceful-Quit contract and reusable packaged goose icon assets (needs #r103) (ms #v110) (owner codex) #trayc
-  - [ ] Research native tray dependencies and event-loop constraints for supported Windows and Linux targets.
-  - [ ] Define the shared tray command/lifetime contract and terminal-launch behavior in a new ADR.
-  - [ ] Build reusable icon derivation and packaging checks from the canonical goose SVG.
-  - [ ] Add platform-neutral tests that prevent abrupt Quit or a second settings model.
 - [ ] **Windows tray implementation and native qualification** - add an accessible goose tray icon with Configure and graceful Quit, package it correctly, and prove it on the Alienware (needs #trayc) (ms #v110) (owner codex) #wtray
   - [ ] Implement the Windows notification-area icon and native action routing.
   - [ ] Preserve terminal restoration, local IPC, permissions, singleton, and animated graceful exit.
@@ -29,13 +24,20 @@
   - [ ] Publish atomically, pass post-release smoke, fresh-download artifacts, verify updates, and finish on clean main.
 
 ## Active
-- [ ] **Publish v1.0.3 Alienware hardening** - turn the completed hardware findings into an exact-SHA immutable patch release and independently verify public artifacts and updates (needs #v1a) (ms #v103) (owner codex) #r103
-  - [x] Synchronize the patch version, ADR/readiness guidance, board evidence, and both changelogs.
-  - [x] Pass the complete local, cross-target, packaging, workflow, audit, and native Windows gate.
-  - [ ] Pass candidate and same-SHA main CI before creating the immutable tag.
-  - [ ] Publish atomically, fresh-download and verify artifacts/updates, validate stable/latest/site, and return to clean main.
+- [ ] **Shared tray contract and asset pipeline** - extend ADR 0028 into a platform-neutral Configure/graceful-Quit contract and reusable packaged goose icon assets (needs #r103) (ms #v110) (owner codex) #trayc
+  - [ ] Research native tray dependencies and event-loop constraints for supported Windows and Linux targets.
+  - [ ] Define the shared tray command/lifetime contract and terminal-launch behavior in a new ADR.
+  - [ ] Build reusable icon derivation and packaging checks from the canonical goose SVG.
+  - [ ] Add platform-neutral tests that prevent abrupt Quit or a second settings model.
 
 ## Done
+- [x] **Publish v1.0.3 Alienware hardening** - published and independently verified the exact-SHA immutable patch with native/public Windows lifecycle, update-discovery, terminal-safety, signed Mac, Linux, Debian, stable/latest, and site evidence (done 2026-07-17) #r103
+  - [x] Synchronize the patch version, ADR/readiness guidance, board evidence, and both changelogs.
+  - [x] Pass the complete local, cross-target, packaging, workflow, audit, and native Windows gate.
+  - [x] Pass candidate and same-SHA main CI before creating the immutable tag.
+    > Candidate 29577145711 attempt 2 and main CI 29577774029 passed at exact commit 5192fab9690ff8b6777366a5918c12bbe1ee247a.
+  - [x] Publish atomically, fresh-download and verify artifacts/updates, validate stable/latest/site, and return to clean main.
+    > Atomic release 29578238463 and post-release smoke 29578671930 passed; fresh public Windows/site checks and the supported v1.0.2→v1.0.3 installer migration passed with the physical Global elevation waiver preserved.
 - [x] **Post-v1 Alienware and supplemental native verification** - fresh-downloaded and bound public v1.0.2, completed physical Windows compositor/Corporate/runtime qualification, and converted every reproduced finding into reviewed v1.0.3 regressions without mutating prior releases (done 2026-07-17) #v1a
   - [x] Verify published SHA, manifest, hashes, stable latest aliases, and Windows x64 lifecycle paths on the Alienware.
     > Portable and Corporate paths passed. Three Global elevation attempts ended before `msiexec`, logging, or byte mutation—the final attempt was explicitly canceled by the operator—so physical privileged mutation is waived, not inferred; candidate and post-release hosted Global MSI smoke remain mandatory.

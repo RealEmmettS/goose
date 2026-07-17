@@ -8,8 +8,8 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.0.2](https://github.com/RealEmmettS/goose/releases/tag/v1.0.2),
-published from exact commit `964305869e9ec28768c789465db1b6317dfa3f6f`. Its complete Windows,
+**Current stable release:** [v1.0.3](https://github.com/RealEmmettS/goose/releases/tag/v1.0.3),
+published from exact commit `5192fab9690ff8b6777366a5918c12bbe1ee247a`. Its complete Windows,
 macOS, and Linux matrix, ordinary same-SHA CI, atomic publication, and post-release installer
 smokes passed. The Mac app and DMG are Developer ID-signed, notarized, stapled, and independently
 Gatekeeper-verified; the menu bar now uses the shared accessible goose icon while preserving the
@@ -30,6 +30,10 @@ installers, portable archives, checksums, and the PowerShell bootstrap remain un
 [GitHub release](https://github.com/RealEmmettS/goose/releases/latest) for administrators and
 compatibility.
 
+Windows users on v1.0.2 or earlier must rerun the current installer once to reach v1.0.3. The
+older immutable Windows executable cannot self-repair its update-discovery bug; v1.0.3 fixes
+subsequent update checks. Supported installer upgrades preserve settings and user content.
+
 ### macOS
 
 The signed and notarized universal DMG is the recommended install for both Apple Silicon and
@@ -49,7 +53,7 @@ the Dock as a launcher. While Honk300 is running, an accessible goose menu-bar i
 which sends the goose walking fully offscreen before the app exits. The item exists only while
 the Mac app is running. Honk300 remains an agent app with no native settings window or running
 Dock control surface. The shared icon and these exact behaviors are the contract for later
-Windows/Linux tray work, but v1.0.2 does not claim those platform surfaces yet.
+Windows/Linux tray work, but v1.0.3 does not claim those platform surfaces yet.
 
 When the exact managed app starts without Accessibility permission, it records a secure
 per-update prompt marker before asking macOS for consent and opening Privacy & Security >
@@ -218,8 +222,8 @@ records the immutable-tag fix-forward to the public v1.0.1 identity. ADR 0028 de
 goose control-surface icon and the Configure/TUI plus graceful-Quit parity contract for future
 platform trays. ADR 0029 records the Alienware-derived Windows update/lifecycle, Corporate retry,
 and integrated-terminal hardening contract.
-[`docs/readiness/v1.0.3-readiness.md`](docs/readiness/v1.0.3-readiness.md) is the active forward-
-patch gate; the v1.0.2 readiness report remains completed immutable-release history.
+[`docs/readiness/v1.0.3-readiness.md`](docs/readiness/v1.0.3-readiness.md) is the completed patch
+record; the v1.0.2 readiness report remains completed immutable-release history.
 
 ## License and assets
 

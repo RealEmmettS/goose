@@ -8,9 +8,9 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.0.2 is the public stable/latest release at exact source commit
-`964305869e9ec28768c789465db1b6317dfa3f6f`; v1.0.3 is the in-flight Alienware hardening
-candidate under ADR 0029 and `#r103`.** M0-M19 are implemented
+**Current stage: v1.0.3 is the public stable/latest release at exact source commit
+`5192fab9690ff8b6777366a5918c12bbe1ee247a`; ADR 0029 and `#r103` record the completed
+Alienware hardening patch.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -117,9 +117,11 @@ passed at `de8da8a9dd049286787d20e167bb115ce8afc107`. v1.0.2 replacement candida
 post-release smoke `29567257622` then passed at
 `964305869e9ec28768c789465db1b6317dfa3f6f`. Public Mac trust, graphical install,
 v1.0.1→v1.0.2 managed update, menu/TUI/graceful-Quit, and the DMG-first production site passed.
-Completed v1.0.2 evidence is in `docs/readiness/v1.0.2-readiness.md`; hardware task `#v1a` is
-done, and the active forward v1.0.3 gate is in `docs/readiness/v1.0.3-readiness.md`. Tray work
-remains blocked until that patch is public.
+Candidate `29577145711` attempt 2, same-SHA main CI `29577774029`, atomic publication
+`29578238463`, and post-release smoke `29578671930` passed v1.0.3 at
+`5192fab9690ff8b6777366a5918c12bbe1ee247a`. Completed evidence is in
+`docs/readiness/v1.0.3-readiness.md`; `#v1a` and `#r103` are done, and `#trayc` begins the separate
+v1.1.0 Windows/Linux tray release.
 
 ## Read these first (source-of-truth pointers)
 

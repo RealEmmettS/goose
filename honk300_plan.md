@@ -736,7 +736,7 @@ and **Quit Honk300** enters the existing graceful walk-off. The main-thread AppK
 target are retained for the item's lifetime; the canonical SVG, macOS 11-safe PNG representation,
 and launcher are verified before signing and again in the app ZIP and both DMG passes. There is no
 second configuration model or new IPC schema. Windows/Linux trays are later platform work governed
-by the same shared icon and behavior, not a v1.0.2 claim.
+by the same shared icon and behavior, not a v1.0.3 claim.
 
 Transparent overlay pixels are presented through reusable premultiplied-RGBA AppKit image views
 in the ordinary window backing store so WindowServer capture and screen sharing match the
@@ -977,6 +977,6 @@ intentionally limited.
 ### Document control
 - **Historical role:** this plan defined the original implementation sequence; current behavior
   is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, completed stable
-  v1.0.2 task `#v102`, completed hardware-verification task `#v1a`, active v1.0.3 release task `#r103`,
-  and the readiness evidence.
+  v1.0.2 task `#v102`, completed hardware-verification task `#v1a`, completed v1.0.3 release task
+  `#r103`, active shared-tray task `#trayc`, and the readiness evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

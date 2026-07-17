@@ -3,27 +3,25 @@
 ## TL;DR
 
 Honk300 is a Rust 1.95, cross-platform procedural desktop goose for Windows, macOS, X11, and
-native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.0.2 is the
+native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.0.3 is the
 public stable/latest release at exact source commit
-`964305869e9ec28768c789465db1b6317dfa3f6f`. It retains v1.0.1's native macOS qualification,
+`5192fab9690ff8b6777366a5918c12bbe1ee247a`. It retains v1.0.1's native macOS qualification,
 shared gait/edge lifecycle, Developer ID/notarized DMG delivery, Debian packages, rolling updates,
 and atomic publication while replacing the temporary Mac menu title with a shared accessible
 goose icon. The icon's sealed macOS 11-safe representation and exact Configure/TUI plus animated-
-Quit behavior are the contract future Windows/Linux trays must mimic.
-The current source is the v1.0.3 Alienware hardening candidate under ADR 0029; v1.0.2 remains the
-public stable/latest release until the exact-SHA patch gate completes.
+Quit behavior are the contract future Windows/Linux trays must mimic. ADR 0029 adds the completed
+Alienware-derived Windows lifecycle/update and integrated-terminal hardening.
 
 ## Status
 
-- Default branch `main` contains the post-release v1.0.2 closure; the immutable tag peels to
-  `964305869e9ec28768c789465db1b6317dfa3f6f`. The unpublished v1.0.0 tag and prior public v1.0.1
-  release remain untouched history.
-- Completed release/evidence cards: v1.0.2 `#v102`, v1.0.1 `#m20q`, native Mac evidence `#m16r`,
-  and Alienware verification `#v1a`. The v1.0.3 release `#r103` is active; Windows/Linux tray work
-  remains blocked behind that separate public patch. The shared board lives under `.tasks/`.
-- Version: 1.0.3 in candidate source; 1.0.2 remains public stable/latest.
-- v1.0.2 release evidence: replacement candidate `29565557915`, same-SHA main CI `29566294408`,
-  atomic publication `29566759574`, and post-release smoke `29567257622` all passed at the exact
+- Default branch `main` contains the post-release v1.0.3 closure; the immutable tag peels to
+  `5192fab9690ff8b6777366a5918c12bbe1ee247a`. Prior public tags/releases remain untouched history.
+- Completed release/evidence cards: v1.0.3 `#r103`, v1.0.2 `#v102`, v1.0.1 `#m20q`, native Mac
+  evidence `#m16r`, and Alienware verification `#v1a`. Shared tray contract `#trayc` is active for
+  the separate v1.1.0 release. The shared board lives under `.tasks/`.
+- Version: 1.0.3 in source and public stable/latest.
+- v1.0.3 release evidence: candidate `29577145711` attempt 2, same-SHA main CI `29577774029`,
+  atomic publication `29578238463`, and post-release smoke `29578671930` all passed at the exact
   commit. The immutable GitHub Release contains 22 payloads plus sidecars/manifest for 47 assets.
 - macOS control: ADRs 0024/0028 define a visible-while-running image-only goose status item with
   an independent **Honk300 controls** accessibility name. Configure opens the signed bundle's
@@ -31,7 +29,7 @@ public stable/latest release until the exact-SHA patch gate completes.
   canonical Quiver SVG and deterministic 36×36 PNG are sealed and checked across every app/DMG
   shape, with a resilient text fallback only for malformed/unbundled development runs. Future
   Windows/Linux trays must mimic this icon, TUI launch, same-user boundary, and graceful exit, but
-  v1.0.2 does not implement them.
+  v1.0.3 does not implement them.
 - Renderer: AppKit/CoreGraphics RGBA regressions pass. The reusable AppKit image-view presenter
   now produces opaque, black-rectangle-free WindowServer captures in normal motion and readable
   dark-mode notes. The product-equivalent signed candidate passed live capture and the exact final
@@ -224,7 +222,7 @@ public stable/latest release until the exact-SHA patch gate completes.
 
 ## Verification Source Of Truth
 
-- Active v1.0.3 release evidence: `docs/readiness/v1.0.3-readiness.md`; completed v1.0.2 and v1.0.1
+- Completed v1.0.3 release evidence: `docs/readiness/v1.0.3-readiness.md`; v1.0.2 and v1.0.1
   readiness reports remain immutable-release history.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
 - Board handoff and activity: `.tasks/tasks/v102.md` and `.tasks/tasks/v1a.md`.

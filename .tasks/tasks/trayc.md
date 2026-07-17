@@ -25,8 +25,12 @@ One reviewed contract covers accessibility naming, Configure terminal/TUI restor
 
 ## Status
 
-To-Do; blocked on #r103 so the independently verified v1.0.3 public baseline exists before new UI code changes runtime behavior.
+Active. Public v1.0.3 and its exact-SHA/post-release evidence are complete. Next: research the
+supported native Windows/Linux tray dependencies and event-loop boundaries, then record the shared
+contract before implementation.
 
 ## Activity
 
+- 2026-07-17 07:20 — moved To-Do → Active after immutable v1.0.3 and public verification closed
+  `#r103`. Scope remains the four board subtasks only. (agent: codex)
 - 2026-07-17 04:45 — created as the shared prerequisite for #wtray and #ltray under milestone #v110. (agent: codex)
