@@ -8,9 +8,9 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.0.3 is the public stable/latest release at exact source commit
-`5192fab9690ff8b6777366a5918c12bbe1ee247a`; v1.1.0 is the in-flight Windows/Linux tray-parity
-candidate under ADR 0030 and `#r110`.** M0-M19 are implemented
+**Current stage: v1.1.0 is the public stable/latest release at exact source commit
+`e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`; Windows/Linux tray parity is complete under ADR
+0030 and `#r110`.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -112,8 +112,11 @@ v1.0.1→v1.0.2 managed update, menu/TUI/graceful-Quit, and the DMG-first produc
 Candidate `29577145711` attempt 2, same-SHA main CI `29577774029`, atomic publication
 `29578238463`, and post-release smoke `29578671930` passed v1.0.3 at
 `5192fab9690ff8b6777366a5918c12bbe1ee247a`. Completed evidence is in
-`docs/readiness/v1.0.3-readiness.md`; `#v1a`, `#r103`, `#trayc`, `#wtray`, and `#ltray` are done.
-The complete v1.1.0 release gate is `docs/readiness/v1.1.0-readiness.md` and task `#r110`.
+`docs/readiness/v1.0.3-readiness.md`. Candidate `29588487072`, same-SHA main CI `29589048598`,
+atomic publication `29589698302`, and post-release smoke `29590274819` passed v1.1.0 at
+`e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`. Its completed release gate is
+`docs/readiness/v1.1.0-readiness.md`; `#v1a`, `#r103`, `#trayc`, `#wtray`, `#ltray`, and `#r110`
+are done.
 
 ## Read these first (source-of-truth pointers)
 

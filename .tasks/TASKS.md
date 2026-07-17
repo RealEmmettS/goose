@@ -9,13 +9,15 @@
 ## To-Do
 
 ## Active
-- [ ] **Publish v1.1.0 cross-platform tray parity** - run the full exact-SHA matrix, publish immutable artifacts, verify updates and stable/latest, and deploy synchronized docs/site changes (needs #wtray, #ltray) (ms #v110) (owner codex) #r110
-  - [x] Synchronize version, ADRs, README, guidance, task records, and both changelogs.
-  - [x] Pass local, cross-target, packaging, security, workflow, and platform-native gates.
-  - [ ] Pass candidate and same-SHA main CI before creating the immutable tag.
-  - [ ] Publish atomically, pass post-release smoke, fresh-download artifacts, verify updates, and finish on clean main.
 
 ## Done
+- [x] **Publish v1.1.0 cross-platform tray parity** - published and independently verified the immutable Windows/Linux tray-parity release across the complete Windows, macOS, Linux, Debian, stable/latest, and production-site matrix (done 2026-07-17) #r110
+  - [x] Synchronize version, ADRs, README, guidance, task records, and both changelogs.
+  - [x] Pass local, cross-target, packaging, security, workflow, and platform-native gates.
+  - [x] Pass candidate and same-SHA main CI before creating the immutable tag.
+    > Candidate 29588487072 and main CI 29589048598 passed at exact commit e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea.
+  - [x] Publish atomically, pass post-release smoke, fresh-download artifacts, verify updates, and finish on clean main.
+    > Atomic release 29589698302 and post-release smoke 29590274819 passed; 47 public assets, recommended payload hashes, fresh Windows tray behavior, stable/latest, and the manifest-driven production site all agree on v1.1.0.
 - [x] **Linux tray implementation and hosted qualification** - added accessible Configure/graceful-Quit StatusNotifier controls, explicit unavailable degradation, and package ownership without changing X11 or native Wayland capability claims (done 2026-07-17) #ltray
   - [x] Implement the supported Linux status-notifier path with explicit unavailable degradation.
   - [x] Preserve one TUI schema, graceful IPC stop, terminal protection, and X11/Wayland capability boundaries.

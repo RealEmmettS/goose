@@ -980,6 +980,6 @@ intentionally limited.
 - **Historical role:** this plan defined the original implementation sequence; current behavior
   is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, completed stable
   v1.0.2 task `#v102`, completed hardware-verification task `#v1a`, completed v1.0.3 release task
-  `#r103`, completed tray tasks `#trayc`/`#wtray`/`#ltray`, active v1.1.0 release task `#r110`,
+  `#r103`, completed tray tasks `#trayc`/`#wtray`/`#ltray`, completed v1.1.0 release task `#r110`,
   and the readiness evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

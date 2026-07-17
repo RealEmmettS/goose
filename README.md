@@ -8,16 +8,12 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.0.3](https://github.com/RealEmmettS/goose/releases/tag/v1.0.3),
-published from exact commit `5192fab9690ff8b6777366a5918c12bbe1ee247a`. Its complete Windows,
-macOS, and Linux matrix, ordinary same-SHA CI, atomic publication, and post-release installer
-smokes passed. The Mac app and DMG are Developer ID-signed, notarized, stapled, and independently
-Gatekeeper-verified; the menu bar now uses the shared accessible goose icon while preserving the
-existing Configure and animated-Quit behavior.
-
-**Next release candidate:** v1.1.0 adds the same accessible goose control to the Windows
-notification area and compatible Linux StatusNotifier hosts. It remains gated on one exact-SHA
-all-platform candidate, ordinary main CI, atomic publication, and fresh public verification.
+**Current stable release:** [v1.1.0](https://github.com/RealEmmettS/goose/releases/tag/v1.1.0),
+published from exact commit `e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`. Its complete Windows,
+macOS, Linux, and Debian matrix, ordinary same-SHA CI, atomic publication, and live post-release
+installer smokes passed. The Mac app and DMG are Developer ID-signed, notarized, stapled, and
+independently Gatekeeper-verified. While the goose runs, macOS, Windows, and compatible Linux
+desktops expose the same accessible Configure and animated-Quit control surface.
 
 ## Install
 
@@ -34,9 +30,9 @@ installers, portable archives, checksums, and the PowerShell bootstrap remain un
 [GitHub release](https://github.com/RealEmmettS/goose/releases/latest) for administrators and
 compatibility.
 
-Windows users on v1.0.2 or earlier must rerun the current installer once to reach v1.0.3. The
-older immutable Windows executable cannot self-repair its update-discovery bug; v1.0.3 fixes
-subsequent update checks. Supported installer upgrades preserve settings and user content.
+Windows users on v1.0.2 or earlier must rerun the current installer once. Those older immutable
+executables cannot self-repair their update-discovery bug; v1.0.3 and later perform subsequent
+update checks correctly. Supported installer upgrades preserve settings and user content.
 
 While Honk300 is running, an accessible **Honk300 controls** notification-area icon offers
 **Configure Honk300…**, which launches the exact running copy's existing terminal settings
@@ -63,8 +59,8 @@ the Dock as a launcher. While Honk300 is running, an accessible goose menu-bar i
 **Configure Honk300…**, which opens the existing terminal settings screen, and **Quit Honk300**,
 which sends the goose walking fully offscreen before the app exits. The item exists only while
 the Mac app is running. Honk300 remains an agent app with no native settings window or running
-Dock control surface. The shared icon and these exact behaviors are the contract for later
-platform controls; v1.1.0 applies that contract to Windows and compatible Linux desktops.
+Dock control surface. v1.1.0 applies this same shared-icon and action contract to Windows and
+compatible Linux desktops.
 
 When the exact managed app starts without Accessibility permission, it records a secure
 per-update prompt marker before asking macOS for consent and opening Privacy & Security >
@@ -241,8 +237,8 @@ goose control-surface icon and the Configure/TUI plus graceful-Quit parity contr
 records the Alienware-derived Windows update/lifecycle, Corporate retry, and integrated-terminal
 hardening contract; ADR 0030 implements that contract with native Windows and Linux surfaces and
 explicit unavailable-host boundaries.
-[`docs/readiness/v1.1.0-readiness.md`](docs/readiness/v1.1.0-readiness.md) is the active release
-gate; the v1.0.3 readiness report remains completed immutable-release history.
+[`docs/readiness/v1.1.0-readiness.md`](docs/readiness/v1.1.0-readiness.md) records the completed
+stable release evidence; earlier readiness reports remain immutable-release history.
 
 ## License and assets
 

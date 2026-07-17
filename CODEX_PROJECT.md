@@ -3,24 +3,27 @@
 ## TL;DR
 
 Honk300 is a Rust 1.95, cross-platform procedural desktop goose for Windows, macOS, X11, and
-native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.0.3 is the
+native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.1.0 is the
 public stable/latest release at exact source commit
-`5192fab9690ff8b6777366a5918c12bbe1ee247a`. It retains v1.0.1's native macOS qualification,
+`e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`. It retains v1.0.1's native macOS qualification,
 shared gait/edge lifecycle, Developer ID/notarized DMG delivery, Debian packages, rolling updates,
-and atomic publication while replacing the temporary Mac menu title with a shared accessible
-goose icon. The icon's sealed macOS 11-safe representation and exact Configure/TUI plus animated-
-Quit behavior are now implemented through native Windows notification-area and compatible Linux
-StatusNotifier controls in the in-flight v1.1.0 candidate. ADR 0029 records the completed
-Alienware-derived Windows lifecycle/update hardening; ADR 0030 records tray parity.
+and atomic publication while extending the shared accessible goose control from macOS to native
+Windows notification-area and compatible Linux StatusNotifier owners. Configure launches the
+existing exact-executable terminal TUI and Quit uses the engine-owned animated walk-off on all
+three tray-capable platforms. ADR 0029 records the completed Alienware-derived Windows lifecycle/
+update hardening; ADR 0030 records the completed tray-parity contract.
 
 ## Status
 
-- Default branch `main` contains the post-release v1.0.3 closure; the immutable tag peels to
-  `5192fab9690ff8b6777366a5918c12bbe1ee247a`. Prior public tags/releases remain untouched history.
+- Default branch `main` contains the post-release v1.1.0 closure; the immutable tag peels to
+  `e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`. Prior public tags/releases remain untouched history.
 - Completed release/evidence cards: v1.0.3 `#r103`, v1.0.2 `#v102`, v1.0.1 `#m20q`, native Mac
   evidence `#m16r`, Alienware verification `#v1a`, and tray implementation `#trayc`/`#wtray`/
-  `#ltray`. v1.1.0 publication task `#r110` is active. The shared board lives under `.tasks/`.
-- Version: 1.1.0 in candidate source; v1.0.3 remains public stable/latest until publication.
+  `#ltray`. v1.1.0 publication task `#r110` is complete. The shared board lives under `.tasks/`.
+- Version: 1.1.0 in source and public stable/latest distribution.
+- v1.1.0 release evidence: candidate `29588487072`, same-SHA main CI `29589048598`, atomic
+  publication `29589698302`, and post-release smoke `29590274819` all passed at the exact commit.
+  The immutable GitHub Release contains 22 payloads plus sidecars/manifest for 47 assets.
 - v1.0.3 release evidence: candidate `29577145711` attempt 2, same-SHA main CI `29577774029`,
   atomic publication `29578238463`, and post-release smoke `29578671930` all passed at the exact
   commit. The immutable GitHub Release contains 22 payloads plus sidecars/manifest for 47 assets.
@@ -224,7 +227,7 @@ Alienware-derived Windows lifecycle/update hardening; ADR 0030 records tray pari
 
 ## Verification Source Of Truth
 
-- Active v1.1.0 release gate: `docs/readiness/v1.1.0-readiness.md`; v1.0.3, v1.0.2, and v1.0.1
+- Completed v1.1.0 release gate: `docs/readiness/v1.1.0-readiness.md`; v1.0.3, v1.0.2, and v1.0.1
   readiness reports remain immutable-release history.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
 - Board handoff and activity: `.tasks/tasks/v102.md` and `.tasks/tasks/v1a.md`.
