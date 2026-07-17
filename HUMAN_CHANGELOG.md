@@ -62,6 +62,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   shipping the developer fallback. Follow-up checks on the physical Mac also confirmed the real
   settings screen, permission transition, readable dark note, animated goodbye, quick restart,
   and low process-specific memory and processor use.
+- **The newest goose-menu update is live across every supported desktop.** The complete release
+  rehearsal, ordinary follow-up checks, Mac trust and graphical install, real in-place update
+  through all three command names, repeat update, and public download hashes passed. The download
+  page now shows one recommended option for the visitor's computer and reveals other systems or
+  terminal choices only when requested. This makes the release easier to choose while preserving
+  independently checked Windows, Mac, and Linux downloads.
 - **The first stable release and its download page are live and independently checked.** The
   complete cross-platform rehearsal, ordinary follow-up checks, Apple trust checks, fresh Mac
   install and update, and the public download page all passed before the release board closed.

@@ -1,4 +1,4 @@
-TT;DR: After the first public stable release is live, use the Alienware and any later Mac/Linux
+TL;DR: With v1.0.2 stable/latest, use the Alienware and any later Mac/Linux
 hardware for defense-in-depth verification. Findings fix forward; published tags/assets and the
 Mac security/presentation contracts are immutable.
 
@@ -7,7 +7,7 @@ Mac security/presentation contracts are immutable.
 To-Do. This card intentionally does not block the operator-approved first stable publication once
 the repository's exact-SHA candidate/default-branch/atomic-release gates pass. Start from fresh
 published bytes, not a local rebuild. The tracked operator handoff is
-`docs/agents/handoff/2026-07-15-001-alienware-post-v1.0.1-verification.md`.
+`docs/agents/handoff/2026-07-17-001-alienware-post-v1.0.2-verification.md`.
 
 ## Why
 
@@ -29,7 +29,7 @@ observations into claimed passes.
    planted gait, secondary motion, mud/prank returns, and multi-monitor seams/hot-plug.
 4. When a Mac is available again, fresh-download the published app ZIP/DMG and repeat the exact-
    SHA 10+60 profile, menu Configure/Quit, visible beak contact, terminal/ordinary-window matrix,
-   v0.3.2 update, rollback injection, foreign-file preservation, and any available Ghostty or
+   v1.0.1 update, rollback injection, foreign-file preservation, and any available Ghostty or
    multi-display checks. Preserve the accepted AppKit RGBA, Accessibility, Developer ID,
    notarization/stapling, per-user install, semantic note color, and graceful-exit contracts.
 5. Record real Linux hardware observations when available. Native Wayland remains reduced mode;
@@ -39,7 +39,8 @@ observations into claimed passes.
 
 ## Verification
 
-- [ ] Published tag, release target, manifest commit, hashes, and latest aliases agree.
+- [x] Published v1.0.2 tag, release target, manifest commit, hashes, and latest aliases agree on
+  the physical Mac and hosted release; the Alienware should independently repeat this preflight.
 - [ ] Alienware x64 paired-DWM and lifecycle smoke passes from the published executable.
 - [ ] Windows Global MSI and portable update/uninstall behavior passes on real hardware.
 - [ ] Windows renderer/movement/reaction/audio/TUI/terminal/multi-monitor observations are logged.
@@ -51,6 +52,14 @@ observations into claimed passes.
 
 ## Activity
 
+- 2026-07-17 09:30 - public v1.0.2 was independently resolved to exact source
+  `964305869e9ec28768c789465db1b6317dfa3f6f`. Candidate `29565557915`, same-SHA CI
+  `29566294408`, atomic release `29566759574`, and post-release smoke `29567257622` passed.
+  Fresh public Mac app/DMG trust, v1.0.1→v1.0.2 managed update, three-alias repeat no-op, menu
+  icon/accessibility, five-second graceful Quit/restart, live progressive-disclosure website, and
+  final host purge passed. Remaining work is verification-only: Alienware x64 hardware, later
+  Linux observations, visible beak contact, broader terminal/fault injection, and any future
+  multi-display/Ghostty Mac availability. (agent: codex)
 - 2026-07-17 02:10 - fresh published v1.0.1 DMG/app trust, graphical install, receipt/aliases,
   menu Configure into the complete 120×30 TUI, same-process Accessibility grant, semantic dark-
   mode note contrast, animated 5.415-second menu Quit, and immediate restart passed on the physical

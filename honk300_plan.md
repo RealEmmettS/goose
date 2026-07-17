@@ -974,6 +974,6 @@ intentionally limited.
 
 ### Document control
 - **Historical role:** this plan defined the original implementation sequence; current behavior
-  is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, active v1.0.2 task
-  `#v102`, supplemental hardware-verification task `#v1a`, and the readiness evidence.
+  is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, completed stable
+  v1.0.2 task `#v102`, supplemental hardware-verification task `#v1a`, and the readiness evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

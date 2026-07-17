@@ -8,10 +8,12 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Release target:** v1.0.2, a forward patch that gives the Mac menu bar a shared accessible goose
-icon while preserving the existing Configure and animated-Quit behavior. The immutable
-[v1.0.1](https://github.com/RealEmmettS/goose/releases/tag/v1.0.1) release remains stable/latest
-until v1.0.2 completes candidate, exact-SHA CI, signing/notarization, and atomic publication.
+**Current stable release:** [v1.0.2](https://github.com/RealEmmettS/goose/releases/tag/v1.0.2),
+published from exact commit `964305869e9ec28768c789465db1b6317dfa3f6f`. Its complete Windows,
+macOS, and Linux matrix, ordinary same-SHA CI, atomic publication, and post-release installer
+smokes passed. The Mac app and DMG are Developer ID-signed, notarized, stapled, and independently
+Gatekeeper-verified; the menu bar now uses the shared accessible goose icon while preserving the
+existing Configure and animated-Quit behavior.
 
 ## Install
 
@@ -214,8 +216,8 @@ ARM64 compositor-evidence exception without weakening normal paired-DWM proof; a
 records the immutable-tag fix-forward to the public v1.0.1 identity. ADR 0028 defines the shared
 goose control-surface icon and the Configure/TUI plus graceful-Quit parity contract for future
 platform trays.
-[`docs/readiness/v1.0.2-readiness.md`](docs/readiness/v1.0.2-readiness.md) tracks the current
-forward-patch qualification; the v1.0.1 readiness record remains immutable release history.
+[`docs/readiness/v1.0.2-readiness.md`](docs/readiness/v1.0.2-readiness.md) is the completed release
+record; the v1.0.1 readiness report remains immutable prior-release history.
 
 ## License and assets
 

@@ -41,6 +41,14 @@ All notable changes to this project are documented here. Format based on
   independent `Honk300 controls` accessibility label/tooltip. The Rust owner retains both image
   and AppKit's weak action target. Missing or undecodable resources keep the variable-width
   `Honk` development fallback without preventing Configure or Quit from launching.
+- **v1.0.2 atomic publication closure** - replacement candidate `29565557915`, exact-SHA main CI
+  `29566294408`, atomic release `29566759574`, and post-release smoke `29567257622` passed at
+  `964305869e9ec28768c789465db1b6317dfa3f6f`. The immutable latest release contains 22 payloads
+  and 47 total assets. Fresh public Mac app/DMG hashes, G2 Developer ID identity, hardened runtime,
+  notarization, staples, Gatekeeper, resources, universal slices, graphical lifecycle, the real
+  v1.0.1→v1.0.2 three-alias managed update, and repeat no-ops passed. The deployed progressive-
+  disclosure site reports that exact release and recommended immutable DMG; all published Windows,
+  Linux, Debian, and Mac installer smokes passed.
 - **v1.0.1 publication closure carried forward** - retained the exact candidate, same-SHA main CI,
   atomic publication, post-release native smoke, independent Developer ID/notarization/stapling/
   Gatekeeper, v0.3.2 upgrade, and DMG-first site evidence without mutating its immutable tag or

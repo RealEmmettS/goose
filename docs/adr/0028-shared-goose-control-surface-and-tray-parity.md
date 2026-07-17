@@ -103,6 +103,26 @@ remain explicit hardware/software waivers. Hardened runtime prevents `leaks` fro
 exact signed release; product-equivalent instrumentable zero-leak evidence is retained without
 claiming an exact-release attach.
 
+## Release outcome
+
+v1.0.2 shipped from exact commit `964305869e9ec28768c789465db1b6317dfa3f6f`. Replacement
+candidate `29565557915`, same-SHA main CI `29566294408`, atomic release `29566759574`, and
+post-release installer smoke `29567257622` all passed the complete Windows/macOS/Linux matrix.
+The first candidate had failed closed before tagging when Windows treated a transient zero-byte
+`PIPE_NOWAIT` named-pipe poll as an empty command; bounded retry through the existing deadline
+fixed that transport race without changing this ADR's icon or control semantics.
+
+Fresh public artifacts passed the pinned G2 Developer ID identity, hardened runtime/timestamps,
+notarization, stapling, Gatekeeper, universal slices, sealed icon resources, manifest hashes, and
+the three-item DMG contract. The public app ZIP hash is
+`1c78959543e5860ebd33e5e1a8aac1c73be3c8cf7c2a3465f7478fa822933e98`; the public DMG hash is
+`7ee91efd374a5777e43f78a22d652a5847b7087105d3ccbde6569e87b0844ce5`. A preserved public v1.0.1
+installation updated through the real latest manifest to these v1.0.2 app bytes, all three aliases
+then no-op updated without disturbing the process or receipt, and the public menu completed its
+graceful Quit in five seconds before immediate restart. `thegoose.app` resolved the same exact DMG
+through its OS-specific progressive disclosure. These are observed release facts; one-display,
+absent-Ghostty, and hardened-runtime attach limitations remain explicit.
+
 ## Consequences
 
 - macOS users get a compact goose mark that follows system appearance while keeping the exact

@@ -8,8 +8,8 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.0.2 is the active production-patch target; v1.0.1 remains the first public
-stable release until publication completes.** M0-M19 are implemented
+**Current stage: v1.0.2 is the public stable/latest release at exact source commit
+`964305869e9ec28768c789465db1b6317dfa3f6f`.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -101,11 +101,13 @@ other producers, including signed/notarized Mac and native Debian, passed. The s
 side-or-top-down analyzer now rejects partial/cropped, channel-swapped, opaque, straight-alpha,
 and double-premultiplied evidence. Exact candidate `29401457634`, same-SHA main CI
 `29401961540` attempt 2, atomic release `29403056159`, and post-release smoke `29403596212`
-passed at `de8da8a9dd049286787d20e167bb115ce8afc107`. Stable/latest is v1.0.1; independent
-fresh Mac trust/update checks and the DMG-first production site passed. Completed release evidence
-  is in `docs/readiness/v1.0.1-readiness.md` and done task `#m20q`. The v1.0.2 menu-icon patch is
-  tracked by `docs/readiness/v1.0.2-readiness.md` and active task `#v102`; supplemental hardware
-  checks remain To-Do task `#v1a` and may only lead to later forward patches.
+passed at `de8da8a9dd049286787d20e167bb115ce8afc107`. v1.0.2 replacement candidate
+`29565557915`, same-SHA main CI `29566294408`, atomic publication `29566759574`, and
+post-release smoke `29567257622` then passed at
+`964305869e9ec28768c789465db1b6317dfa3f6f`. Public Mac trust, graphical install,
+v1.0.1→v1.0.2 managed update, menu/TUI/graceful-Quit, and the DMG-first production site passed.
+Completed v1.0.2 evidence is in `docs/readiness/v1.0.2-readiness.md` and done task `#v102`;
+supplemental hardware checks remain To-Do task `#v1a` and may only lead to later forward patches.
 
 ## Read these first (source-of-truth pointers)
 

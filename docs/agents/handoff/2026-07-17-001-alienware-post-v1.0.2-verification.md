@@ -20,15 +20,15 @@ not add another settings schema or call an abrupt process-exit/kill API.
 
 ## Resolve the exact public identity first
 
-Record the actual values after publication:
+Published identity:
 
 ```text
 Tag: v1.0.2
-Release commit: <fill from published tag>
-Candidate workflow: <fill>
-Same-SHA main CI: <fill>
-Atomic release workflow: <fill>
-Post-release smoke: <fill>
+Release commit: 964305869e9ec28768c789465db1b6317dfa3f6f
+Candidate workflow: 29565557915
+Same-SHA main CI: 29566294408
+Atomic release workflow: 29566759574
+Post-release smoke: 29567257622
 ```
 
 Then verify:
@@ -36,13 +36,30 @@ Then verify:
 ```powershell
 git fetch origin --tags
 git rev-parse v1.0.2^{}
-gh release view v1.0.2 --json tagName,targetCommitish,isLatest,url,assets
+gh release view v1.0.2 --json tagName,targetCommitish,isImmutable,isDraft,isPrerelease,url,assets
+gh api repos/RealEmmettS/goose/releases/latest --jq .tag_name
 ```
 
 Download `release-manifest.json` from both the immutable tag and `latest/download`. Require schema
 `honk300.release.v1`, version `1.0.2`, tag `v1.0.2`, the same full commit, unique safe filenames,
 and exact hash/size agreement. The latest objects must resolve the complete v1.0.2 release; do not
 mix a latest manifest with a different tag's payload.
+
+Fresh public verification on the release Mac recorded:
+
+```text
+honk300-universal2.app.zip
+  SHA-256 1c78959543e5860ebd33e5e1a8aac1c73be3c8cf7c2a3465f7478fa822933e98
+honk300-universal2.dmg
+  SHA-256 7ee91efd374a5777e43f78a22d652a5847b7087105d3ccbde6569e87b0844ce5
+```
+
+Both matched manifest/sidecars and passed universal slices, the pinned G2 Developer ID leaf/team,
+hardened runtime, secure timestamp, notarization, stapling, Gatekeeper, sealed resources, and the
+three-item DMG layout. Candidate and release artifacts were separate timestamped/notarized builds;
+do not describe them as byte-identical. Public `thegoose.app` reported this exact release commit,
+redirected its recommended Mac action to this immutable DMG, and passed progressive-disclosure,
+keyboard, responsive, and zero-Axe-violation production checks.
 
 ## What changed on macOS and must be preserved
 
@@ -135,6 +152,14 @@ ADR and board card rather than folding unreviewed UI into a verification patch.
   preservation/backup. Do not manually overwrite a running binary.
 
 ### Runtime and compositor
+
+The first v1.0.2 candidate failed only because a connected Windows `PIPE_NOWAIT` named pipe can
+briefly return `Ok(0)` before the client's bytes become readable. The engine had already applied
+`Wander`; decoding that transient poll as an empty/EOF frame caused `ERR EMPTY`. Source now retries
+zero-byte polls in bounded 10 ms slices through the existing read deadline and still times out a
+peer that never sends data. Preserve the delayed-byte and permanent-silence regressions. Do not
+restore immediate empty-frame decoding or weaken the deadline. Replacement candidate
+`29565557915` and post-release Windows x64/ARM64 smokes passed this exact repair.
 
 Run the exact published x64 executable:
 

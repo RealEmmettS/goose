@@ -3,30 +3,26 @@
 ## TL;DR
 
 Honk300 is a Rust 1.95, cross-platform procedural desktop goose for Windows, macOS, X11, and
-native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.0.1 is the
-first public stable release and completed native macOS qualification, shared gait/edge lifecycle,
-Developer ID/notarized DMG delivery, Debian packages, rolling updates, and atomic publication.
-v1.0.2 is the active forward patch: it replaces the temporary Mac menu title with a shared,
-accessible goose template icon, seals a macOS 11-safe runtime representation, records the exact
-Configure/TUI and animated-Quit behavior future Windows/Linux trays must mimic, and repeats the
-physical-Mac plus complete hosted release path before advancing `thegoose.app` latest downloads.
+native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.0.2 is the
+public stable/latest release at exact source commit
+`964305869e9ec28768c789465db1b6317dfa3f6f`. It retains v1.0.1's native macOS qualification,
+shared gait/edge lifecycle, Developer ID/notarized DMG delivery, Debian packages, rolling updates,
+and atomic publication while replacing the temporary Mac menu title with a shared accessible
+goose icon. The icon's sealed macOS 11-safe representation and exact Configure/TUI plus animated-
+Quit behavior are the contract future Windows/Linux trays must mimic.
 
 ## Status
 
-- Patch branch/worktree: `codex/v1.0.1` in the legacy-named `.worktrees/macos-v0.3.3` directory;
-  its exact v1.0.2 candidate commit will be fast-forwarded to default branch `main` after candidate
-  qualification.
-- Stable/latest is public v1.0.1 at exact release commit
-  `de8da8a9dd049286787d20e167bb115ce8afc107`. The immutable v1.0.0 tag failed closed before
-  draft creation and remains unpublished and untouched.
-- Active patch card: `#v102`; completed v1.0.1 release card: `#m20q`; completed native Mac evidence
-  is retained under `#m16r`; supplemental Alienware/Linux checks remain To-Do card `#v1a`. The
-  live shared task board is tracked under `.tasks/`.
-- Version: 1.0.2 in source; v1.0.1 remains stable/latest until atomic publication completes.
-- Release evidence: candidate `29401457634`, same-SHA main CI `29401961540` attempt 2, atomic
-  publication `29403056159`, and post-release smoke `29403596212` passed. The latest GitHub
-  Release contains 22 payloads plus sidecars/manifest for 47 assets and is bound to the exact
-  commit above.
+- Default branch `main` contains the exact v1.0.2 release source; the immutable tag peels to
+  `964305869e9ec28768c789465db1b6317dfa3f6f`. The unpublished v1.0.0 tag and prior public v1.0.1
+  release remain untouched history.
+- Completed release cards: v1.0.2 `#v102`, v1.0.1 `#m20q`, and native Mac evidence `#m16r`.
+  Supplemental Alienware/Linux checks remain To-Do card `#v1a`; the shared board lives under
+  `.tasks/`.
+- Version: 1.0.2 in source and public stable/latest.
+- v1.0.2 release evidence: replacement candidate `29565557915`, same-SHA main CI `29566294408`,
+  atomic publication `29566759574`, and post-release smoke `29567257622` all passed at the exact
+  commit. The immutable GitHub Release contains 22 payloads plus sidecars/manifest for 47 assets.
 - macOS control: ADRs 0024/0028 define a visible-while-running image-only goose status item with
   an independent **Honk300 controls** accessibility name. Configure opens the signed bundle's
   existing terminal TUI; Quit requests the same engine-owned walk-off used by CLI/TUI stop. The
@@ -63,9 +59,10 @@ physical-Mac plus complete hosted release path before advancing `thegoose.app` l
   singleton; Unix signals carry explicit rollback statuses; Windows verifies from pinned streams,
   has no ambient lease bypass, checks machine-wide paths across sessions, rejects reboot-deferred
   MSI completion, and reaps every deferred helper that has not completed its exact READY handoff.
-  Native candidate transactions, final scoped cleanup, and a fresh published v0.3.2-to-v1.0.1
-  CLI update passed. Fault-injection and broader interaction repetition remain supplemental
-  post-release verification under `#v1a`.
+  Native candidate transactions, final scoped cleanup, a fresh published v0.3.2-to-v1.0.1
+  update, and the real public v1.0.1-to-v1.0.2 CLI update passed. All three aliases converge and
+  repeat as PID/binary/receipt-stable no-ops. Fault-injection and broader interaction repetition
+  remain supplemental verification under `#v1a`.
 - Packaging/candidate: a universal x86_64/arm64 installer helper targeting macOS 11.0 in both
   slices and a fail-closed signing/notarization workflow are in-tree. Candidate run
   `29384134561` at source `39087949731f9a8326d0661182fa4a2dbe89c61b` passed the complete
@@ -138,17 +135,19 @@ physical-Mac plus complete hosted release path before advancing `thegoose.app` l
   diff validation pass. Both Windows targets cross-check from macOS; all four Linux platform
   targets cross-check, while complete Linux audio/root-binary qualification correctly remains on
   native hosted runners because this Mac has no Linux ALSA sysroot.
-- First v1.0.2 candidate 29564261409 failed closed before tagging only in the Windows x64 exact
+- First v1.0.2 candidate `29564261409` failed closed before tagging only in the Windows x64 exact
   overlay smoke: the server applied `Wander`, but a connected `PIPE_NOWAIT` zero-byte poll was
   interpreted as an empty command before the client frame became readable. Mac Developer ID
   signing/notarization/stapling and every other completed producer passed. The bounded Windows
   reader now retries that transient state through the existing deadline and retains a hard
-  timeout for peers that never send bytes; the complete replacement candidate remains pending.
-- Update rehearsal: all three command aliases produced PID/binary/receipt-stable v1.0.1 latest
-  no-ops. A separate real published v1.0.1 install converged through the locally rendered signed
-  v1.0.2 shell transaction with exact aliases/receipt, repeat install, and purge. The real CLI
-  forward update remains the first post-publication check because update discovery intentionally
-  trusts only the atomic public latest manifest.
+  timeout for peers that never send bytes. Replacement candidate `29565557915`, same-SHA CI
+  `29566294408`, atomic release `29566759574`, and post-release smoke `29567257622` then passed
+  the complete matrix at `964305869e9ec28768c789465db1b6317dfa3f6f`.
+- Update acceptance: all three v1.0.1 aliases first proved PID/binary/receipt-stable latest no-ops.
+  After publication, the preserved public v1.0.1 managed app used the real atomic latest manifest
+  to converge to the fresh public v1.0.2 app ZIP. Version, exact receipt, aliases, universal G2
+  signature, notarization staple, Gatekeeper assessment, immediate restart, and subsequent no-op
+  updates through `goose`, `honk`, and `honk300` all passed before final purge.
 - Historical v1.0.0 retarget gate: the affected identity paths passed 107 root tests, 22 native
   Mac platform tests, a release binary reporting 1.0.0, cargo-dist v1.0.0 planning, 95 packaging/
   workflow contracts, workflow and script syntax, local link/tree validation, and the live board
@@ -161,13 +160,13 @@ physical-Mac plus complete hosted release path before advancing `thegoose.app` l
   resolves exact immutable tag bytes for every platform and provenance; the DMG is rebuilt by
   GitHub for every release but Mac CLI updates consume the exact-tag app ZIP through the pinned
   bootstrap.
-- Release/site: exact site SHA `4f4bf426979e6b4e59c850ef39a8eea6a3d08386` passed local and
-  hosted unit/lint/build/budget plus 10 browser/axe/keyboard/responsive/visual checks, live v1.0.1
-  manifest validation, protected preview deployment `5454267825`, and Vercel production
-  deployment `5454715097`. Public `thegoose.app` now makes the stable-latest notarized DMG the
-  primary Mac action and exposes the native Debian x64/ARM64 packages. A docs-only site closure
-  commit `7f20f1c87d1e2e3545bc33779caf67598b1161b2` passed CI `29404580116` and Vercel
-  production deployment `5454761833` without changing the tested bundle.
+- Release/site: progressive-disclosure site commit
+  `aac97943367e767d3de0afdf2c41f1c5002d98fb` passed hosted CI `29559081404` and production
+  deployment `5484883674`. Public `thegoose.app` now shows one OS-appropriate recommended path,
+  keeps terminal and alternate downloads collapsed, reports verified v1.0.2 from the uncached
+  live manifest, and points the primary Mac action at the exact immutable v1.0.2 notarized DMG.
+  Live desktop/mobile browser checks found no horizontal overflow, preserved keyboard disclosure,
+  and reported zero Axe violations.
 
 ## Goals
 
@@ -221,8 +220,8 @@ physical-Mac plus complete hosted release path before advancing `thegoose.app` l
 
 ## Verification Source Of Truth
 
-- Active v1.0.2 patch and release evidence: `docs/readiness/v1.0.2-readiness.md`; completed v1.0.1
-  evidence remains release history in `docs/readiness/v1.0.1-readiness.md`.
+- Completed v1.0.2 release evidence: `docs/readiness/v1.0.2-readiness.md`; v1.0.1 remains prior
+  immutable release history in `docs/readiness/v1.0.1-readiness.md`.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
 - Board handoff and activity: `.tasks/tasks/v102.md` and `.tasks/tasks/v1a.md`.
 - Canonical product plan: `honk300_plan.md`.
