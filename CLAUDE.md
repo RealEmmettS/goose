@@ -317,6 +317,10 @@ Relevant skills: `tasks-start`, `tasks-management`, `tasks-update`, `tasks-memor
   compositor-specific adapters, but the portable layer-shell path stays honestly reduced.
 - **Terminal windows are never mischief targets.** Backend filters must exclude terminal windows
   before foreign-window ride, collect-window, or future spicy behavior code can target them.
+- **Windows `PIPE_NOWAIT` zero-byte reads are transient, not EOF.** A client can connect before
+  its command bytes become readable; keep the bounded retry in `honk-control` and never decode a
+  successful zero-byte poll as an empty frame. A peer that stays silent must still hit the
+  existing deadline and fail closed.
 - **macOS needs a real `.app` bundle** (stable bundle-id) for a durable Accessibility grant;
   a bare `~/.cargo/bin` binary can't hold one. The bundle remains an LSUIElement agent/permission
   identity with no native preferences window, running Dock control surface, or AppleScript

@@ -53,6 +53,11 @@ All notable changes to this project are documented here. Format based on
 - **Old-macOS icon decoder dependency** - the runtime now loads a sealed PNG representation rather
   than depending on raw SVG decoding across the macOS 11+ support range. Native AppKit tests
   require a nonzero representation, 18-point size, and template state.
+- **Bounded Windows named-pipe startup reads** - a successful zero-byte poll from a connected
+  `PIPE_NOWAIT` command pipe is now treated as a transient scheduler state instead of an empty
+  command frame. The existing deadline still fails closed when a peer never supplies data, and
+  Windows-target regressions pin both the delayed-frame and bounded-timeout paths. This repairs
+  the only failure in the first v1.0.2 candidate without changing the shared command protocol.
 - **Release-shape icon enforcement** - macOS packaging copies the canonical SVG and runtime PNG
   before signing and fails closed unless both survive the staged app, extracted final app ZIP,
   initial DMG mount, and final notarized/stapled DMG remount. The updater regression now explicitly

@@ -138,6 +138,12 @@ physical-Mac plus complete hosted release path before advancing `thegoose.app` l
   diff validation pass. Both Windows targets cross-check from macOS; all four Linux platform
   targets cross-check, while complete Linux audio/root-binary qualification correctly remains on
   native hosted runners because this Mac has no Linux ALSA sysroot.
+- First v1.0.2 candidate 29564261409 failed closed before tagging only in the Windows x64 exact
+  overlay smoke: the server applied `Wander`, but a connected `PIPE_NOWAIT` zero-byte poll was
+  interpreted as an empty command before the client frame became readable. Mac Developer ID
+  signing/notarization/stapling and every other completed producer passed. The bounded Windows
+  reader now retries that transient state through the existing deadline and retains a hard
+  timeout for peers that never send bytes; the complete replacement candidate remains pending.
 - Update rehearsal: all three command aliases produced PID/binary/receipt-stable v1.0.1 latest
   no-ops. A separate real published v1.0.1 install converged through the locally rendered signed
   v1.0.2 shell transaction with exact aliases/receipt, repeat install, and purge. The real CLI

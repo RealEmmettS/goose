@@ -49,6 +49,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   developer copy somehow lacks the artwork, the old word appears instead and the app remains
   controllable. This keeps a cosmetic problem from blocking startup.
 
+### Fixed
+- **Windows command startup no longer mistakes a brief pause for an empty request.** If the Goose
+  and a command connect just before the command bytes arrive, it now waits for the rest of the
+  existing short deadline instead of rejecting an action that it actually received. It still
+  gives up safely when a broken peer sends nothing, which keeps startup responsive and reliable.
+
 ### Behind the scenes
 - **Every finished Mac download must contain the menu artwork.** Release checks now look for both
   the reusable source and the Mac-ready image before signing, after packing the app, and in both

@@ -584,9 +584,30 @@ mod imp {
         buf: &mut [u8],
         timeout: Duration,
     ) -> io::Result<usize> {
+        read_bounded_with(buf, timeout, |buffer| file.read(buffer))
+    }
+
+    fn read_bounded_with(
+        buf: &mut [u8],
+        timeout: Duration,
+        mut read: impl FnMut(&mut [u8]) -> io::Result<usize>,
+    ) -> io::Result<usize> {
         let deadline = Instant::now() + timeout;
         loop {
-            match file.read(buf) {
+            match read(buf) {
+                // A byte-mode wrapper over a PIPE_NOWAIT named pipe can surface the
+                // connected-but-not-yet-written state as a successful zero-byte read. It is not
+                // EOF: returning immediately lets the server reject a command as EMPTY even
+                // though the client writes its frame a scheduler slice later.
+                Ok(0) => {
+                    if Instant::now() >= deadline {
+                        return Err(io::Error::new(
+                            io::ErrorKind::TimedOut,
+                            "named-pipe peer did not send data before the deadline",
+                        ));
+                    }
+                    thread::sleep(Duration::from_millis(10));
+                }
                 Ok(len) => return Ok(len),
                 Err(err)
                     if err.kind() == io::ErrorKind::WouldBlock
@@ -595,7 +616,7 @@ mod imp {
                     if Instant::now() >= deadline {
                         return Err(io::Error::new(
                             io::ErrorKind::TimedOut,
-                            "named-pipe client did not send a command before the deadline",
+                            "named-pipe peer did not send data before the deadline",
                         ));
                     }
                     thread::sleep(Duration::from_millis(10));
@@ -717,6 +738,35 @@ mod imp {
                 "missing runtime took {:?}",
                 started.elapsed()
             );
+        }
+
+        #[test]
+        fn connected_zero_byte_pipe_polls_are_not_treated_as_empty_frames() {
+            let mut polls = 0_u8;
+            let mut buffer = [0_u8; 8];
+            let length = read_bounded_with(&mut buffer, Duration::from_secs(1), |destination| {
+                polls += 1;
+                if polls < 3 {
+                    Ok(0)
+                } else {
+                    destination[..3].copy_from_slice(b"OK\n");
+                    Ok(3)
+                }
+            })
+            .expect("a connected nonblocking pipe must wait for its frame");
+
+            assert_eq!(length, 3);
+            assert_eq!(&buffer[..length], b"OK\n");
+            assert_eq!(polls, 3);
+        }
+
+        #[test]
+        fn zero_byte_pipe_poll_still_obeys_the_read_deadline() {
+            let mut buffer = [0_u8; 8];
+            let error = read_bounded_with(&mut buffer, Duration::ZERO, |_| Ok(0))
+                .expect_err("a peer that never sends bytes must time out");
+
+            assert_eq!(error.kind(), io::ErrorKind::TimedOut);
         }
     }
 }
