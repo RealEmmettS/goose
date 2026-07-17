@@ -15,6 +15,10 @@ smokes passed. The Mac app and DMG are Developer ID-signed, notarized, stapled, 
 Gatekeeper-verified; the menu bar now uses the shared accessible goose icon while preserving the
 existing Configure and animated-Quit behavior.
 
+**Next release candidate:** v1.1.0 adds the same accessible goose control to the Windows
+notification area and compatible Linux StatusNotifier hosts. It remains gated on one exact-SHA
+all-platform candidate, ordinary main CI, atomic publication, and fresh public verification.
+
 ## Install
 
 ### Windows
@@ -33,6 +37,13 @@ compatibility.
 Windows users on v1.0.2 or earlier must rerun the current installer once to reach v1.0.3. The
 older immutable Windows executable cannot self-repair its update-discovery bug; v1.0.3 fixes
 subsequent update checks. Supported installer upgrades preserve settings and user content.
+
+While Honk300 is running, an accessible **Honk300 controls** notification-area icon offers
+**Configure Honk300…**, which launches the exact running copy's existing terminal settings
+screen, and **Quit Honk300**, which sends the goose through its normal full walk-off before exit.
+The fixed product icon returns after Explorer recreates the taskbar. If an unusual interactive
+session cannot host notification icons, Honk300 reports the limitation and keeps CLI/TUI/IPC
+control available.
 
 ### macOS
 
@@ -53,7 +64,7 @@ the Dock as a launcher. While Honk300 is running, an accessible goose menu-bar i
 which sends the goose walking fully offscreen before the app exits. The item exists only while
 the Mac app is running. Honk300 remains an agent app with no native settings window or running
 Dock control surface. The shared icon and these exact behaviors are the contract for later
-Windows/Linux tray work, but v1.0.3 does not claim those platform surfaces yet.
+platform controls; v1.1.0 applies that contract to Windows and compatible Linux desktops.
 
 When the exact managed app starts without Accessibility permission, it records a secure
 per-update prompt marker before asking macOS for consent and opening Privacy & Security >
@@ -106,6 +117,13 @@ Each general release contains both Debian packages plus x64/ARM64 GNU and musl a
 `latest` links point to the newest complete release, while the updater resolves the manifest's
 exact immutable tag and verifies the selected platform artifact's kind, target, size, and SHA-256
 before changing an owned installation.
+
+While Honk300 is running, desktops with a StatusNotifier watcher and host show the shared
+**Honk300 controls** item with the same Configure and graceful-Quit actions. Configure prefers
+`xdg-terminal-exec` and then known terminal argument-vector interfaces; it never interpolates a
+shell command. The icon is embedded in portable binaries, and Debian packages also own its
+hicolor-theme copy. Sessions without a compatible host or session bus log the explicit non-fatal
+reason while overlays, CLI/TUI/IPC, and supported mischief continue independently.
 
 ## Use
 
@@ -174,10 +192,10 @@ approval; per-user macOS/Linux installs do not use `sudo`. Autostart is opt-in a
 
 | Platform | Architectures | Desktop path |
 | --- | --- | --- |
-| Windows | x64, ARM64 | PMv2 layered overlays, one per monitor |
+| Windows | x64, ARM64 | PMv2 layered overlays, one per monitor; Configure/Quit notification-area item |
 | macOS 11+ | Intel, Apple Silicon | Universal LSUIElement app; capture-safe AppKit RGBA overlays, one per display; Configure/Quit menu-bar item |
-| Linux X11/XWayland | x64/ARM64, GNU/musl | Full overlay and supported mischief |
-| Linux native Wayland | x64/ARM64, GNU/musl | Opt-in reduced overlay mode |
+| Linux X11/XWayland | x64/ARM64, GNU/musl | Full overlay and supported mischief; Configure/Quit when a StatusNotifier host exists |
+| Linux native Wayland | x64/ARM64, GNU/musl | Opt-in reduced overlay mode; independent StatusNotifier control when hosted |
 
 Linux collect-window behavior is unsupported and reported honestly. Exact signed-app macOS
 Accessibility evidence for first denial, non-nagging relaunch, live grant, and live revocation
@@ -204,7 +222,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.0.3
+dist plan --tag=v1.1.0
 cargo audit --version 0.22.2
 ```
 
@@ -219,11 +237,12 @@ existing terminal TUI and graceful shutdown; ADR 0025 records the first stable v
 post-release Alienware verification boundary; ADR 0026 defines the narrow GitHub-hosted Windows
 ARM64 compositor-evidence exception without weakening normal paired-DWM proof; and ADR 0027
 records the immutable-tag fix-forward to the public v1.0.1 identity. ADR 0028 defines the shared
-goose control-surface icon and the Configure/TUI plus graceful-Quit parity contract for future
-platform trays. ADR 0029 records the Alienware-derived Windows update/lifecycle, Corporate retry,
-and integrated-terminal hardening contract.
-[`docs/readiness/v1.0.3-readiness.md`](docs/readiness/v1.0.3-readiness.md) is the completed patch
-record; the v1.0.2 readiness report remains completed immutable-release history.
+goose control-surface icon and the Configure/TUI plus graceful-Quit parity contract. ADR 0029
+records the Alienware-derived Windows update/lifecycle, Corporate retry, and integrated-terminal
+hardening contract; ADR 0030 implements that contract with native Windows and Linux surfaces and
+explicit unavailable-host boundaries.
+[`docs/readiness/v1.1.0-readiness.md`](docs/readiness/v1.1.0-readiness.md) is the active release
+gate; the v1.0.3 readiness report remains completed immutable-release history.
 
 ## License and assets
 

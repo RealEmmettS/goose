@@ -18,12 +18,43 @@ All notable changes to this project are documented here. Format based on
 > ratatui config TUI, dynamic moods, the local on-hour double honk, quiet-hours/DND/fullscreen
 > manners, built-in Autumn leaves, Windows multi-monitor chase, and live appearance/recolor
 > controls, plus macOS runtime/status/app-bundle staging and a menu-bar shortcut to the existing
-> TUI/graceful Quit, Linux X11 visible overlay support,
+> TUI/graceful Quit, Windows notification-area controls, Linux StatusNotifier controls and X11
+> visible overlay support,
 > native Wayland reduced-mode rendering, CI smoke gates, and M19 Windows/Linux lifecycle plus
 > release packaging with artifact evidence. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
+
+## [1.1.0] - 2026-07-17
+
+### Added
+- **Windows and Linux tray control parity (ADR 0030)** - adds one accessible **Honk300 controls**
+  surface while the goose is running. Windows uses a fixed-GUID native notification-area icon;
+  compatible Linux desktops use a pure-Rust StatusNotifierItem with an embedded contrasting goose
+  icon. Both expose only **Configure Honk300…** and **Quit Honk300**.
+- **Native lifecycle and recovery qualification** - Windows restores the same icon after Explorer's
+  `TaskbarCreated` broadcast and Linux recovers after its StatusNotifier watcher returns. Hosted
+  Linux tests exercise watcher/host registration, accessible properties, menu events, recovery,
+  and explicit no-host or no-session-bus behavior.
+
+### Changed
+- **One control-surface command path** - macOS, Windows, and Linux now emit the same finite
+  `Configure`/`Quit` command type. Configure launches the exact running executable's existing
+  terminal TUI without shell interpolation; Quit reaches only the engine's animated graceful
+  walk-off and never terminates directly from a native callback.
+- **Linux package integration** - Debian packages now own the shared icon in the hicolor theme and
+  reference it from the existing desktop entry. Portable archives keep the icon embedded and add
+  no GTK, AppIndicator, or compositor dependency.
+
+### Fixed
+- **Windows TUI launch isolation** - the tray launcher creates a normal new console without
+  inheriting the goose process's redirected standard handles, preventing a blank configuration
+  screen while leaving the running goose and singleton intact.
+- **Explicit tray-unavailable boundaries** - a missing Windows shell owner or Linux session-bus/
+  StatusNotifier host is non-fatal and visible while CLI, TUI, IPC, overlays, and supported
+  mischief remain independent. Windows ARM64 hosted qualification may use this waiver only when
+  an independent stock-icon `Shell_NotifyIconW` registration also fails.
 
 ## [1.0.3] - 2026-07-17
 

@@ -40,3 +40,4 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0027 — v1.0.1 Fix-Forward And Windows Pose-Complete Evidence](./0027-v1-0-1-fix-forward-and-windows-pose-evidence.md)
 - [0028 — Shared Goose Control Surface And Tray Parity](./0028-shared-goose-control-surface-and-tray-parity.md)
 - [0029 — Windows Lifecycle And Terminal Hardening](./0029-windows-lifecycle-and-terminal-hardening.md)
+- [0030 — Windows And Linux Tray Control Parity](./0030-windows-linux-tray-control-parity.md)

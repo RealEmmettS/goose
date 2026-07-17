@@ -201,7 +201,7 @@ function Test-WindowsTrayRecovery {
         }
         Set-Content -LiteralPath $EvidencePath -Encoding utf8NoBOM -Value @"
 availability=unavailable
-reason=no TrayNotifyWnd notification-area host in the interactive runner session
+reason=independent stock-icon Shell_NotifyIconW control probe failed in the explicitly waived runner
 taskbar=0x$($taskbar.ToInt64().ToString('X'))
 notification_host=0x$($notificationHost.ToInt64().ToString('X'))
 independent_shell_probe=$($independentProbe.ToString().ToLowerInvariant())

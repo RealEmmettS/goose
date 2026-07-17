@@ -18,19 +18,24 @@ Supported X11/XWayland and native Wayland reduced-mode sessions expose the share
 
 ## Verification
 
-- [ ] Native Linux tests cover host available/unavailable behavior, terminal selection, graceful-stop routing, and capability separation.
-- [ ] x64/ARM64 GNU and musl builds plus Debian/archive packaging contracts pass without hidden unsupported dependencies.
-- [ ] Hosted X11 and native Wayland reduced-mode jobs exercise the tray where the desktop fixture supports it and assert honest degradation otherwise.
-- [ ] Install, update, and uninstall preserve user data and remove only owned tray resources.
+- [x] Native Linux tests cover host available/unavailable behavior, terminal selection, graceful-stop routing, and capability separation.
+- [x] x64/ARM64 GNU and musl builds plus Debian/archive packaging contracts pass without hidden unsupported dependencies.
+- [x] Hosted X11 and native Wayland reduced-mode jobs exercise the tray where the desktop fixture supports it and assert honest degradation otherwise.
+- [x] Install, update, and uninstall preserve user data and remove only owned tray resources.
 
 ## Status
 
-Active. The pinned pure-Rust StatusNotifier implementation, shared command routing, embedded ARGB
-icon, no-shell terminal selection, deterministic unavailable degradation, and Debian icon ownership
-are implemented. Native hosted D-Bus and X11/Wayland jobs are now the remaining gate.
+Done. The pinned pure-Rust StatusNotifier implementation, shared command routing, embedded ARGB
+icon, no-shell terminal selection, deterministic unavailable degradation, watcher recovery, and
+Debian icon ownership passed the native x64/ARM64 hosted and compositor matrix.
 
 ## Activity
 
+- 2026-07-17 08:48 — moved Active → Done after exact-SHA CI 29584610137 passed on native x64 and
+  ARM64 Linux. Both architectures exercised the private StatusNotifier watcher/host, accessible
+  properties, embedded icon, Configure/Quit menu events, no-host/missing-watcher errors, watcher
+  recovery, deterministic no-session-bus runtime, X11 overlay, native Wayland reduced mode, Debian
+  contracts, and every GNU/musl target check. (agent: codex)
 - 2026-07-17 08:02 — moved To-Do → Active after #wtray closed. Added the hosted private-D-Bus
   watcher/host protocol test for accessible identity, embedded icon, both menu actions, explicit
   no-host/missing-watcher failures, and watcher recovery. The compositor smoke now forces and

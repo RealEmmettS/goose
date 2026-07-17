@@ -7,20 +7,21 @@
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## To-Do
+
+## Active
 - [ ] **Publish v1.1.0 cross-platform tray parity** - run the full exact-SHA matrix, publish immutable artifacts, verify updates and stable/latest, and deploy synchronized docs/site changes (needs #wtray, #ltray) (ms #v110) (owner codex) #r110
-  - [ ] Synchronize version, ADRs, README, guidance, task records, and both changelogs.
-  - [ ] Pass local, cross-target, packaging, security, workflow, and platform-native gates.
+  - [x] Synchronize version, ADRs, README, guidance, task records, and both changelogs.
+  - [x] Pass local, cross-target, packaging, security, workflow, and platform-native gates.
   - [ ] Pass candidate and same-SHA main CI before creating the immutable tag.
   - [ ] Publish atomically, pass post-release smoke, fresh-download artifacts, verify updates, and finish on clean main.
 
-## Active
-- [ ] **Linux tray implementation and hosted qualification** - add the same accessible Configure/graceful-Quit controls without overstating X11 or native Wayland capabilities (needs #trayc) (ms #v110) (owner codex) #ltray
+## Done
+- [x] **Linux tray implementation and hosted qualification** - added accessible Configure/graceful-Quit StatusNotifier controls, explicit unavailable degradation, and package ownership without changing X11 or native Wayland capability claims (done 2026-07-17) #ltray
   - [x] Implement the supported Linux status-notifier path with explicit unavailable degradation.
   - [x] Preserve one TUI schema, graceful IPC stop, terminal protection, and X11/Wayland capability boundaries.
   - [x] Integrate archive, Debian, install, update, and uninstall ownership.
-  - [ ] Qualify X11 and native Wayland reduced mode in hosted/native Linux jobs and document unavailable desktop-shell cases.
-
-## Done
+  - [x] Qualify X11 and native Wayland reduced mode in hosted/native Linux jobs and document unavailable desktop-shell cases.
+    > CI 29584610137 passed the private StatusNotifier watcher/host protocol, menu actions, recovery, deterministic no-bus degradation, X11 and native Wayland reduced-mode smokes, Debian contracts, and GNU/musl target checks on native x64 and ARM64 Linux.
 - [x] **Windows tray implementation and native qualification** - added one accessible fixed-GUID goose icon with Configure and graceful Quit, kept packaging ownership embedded, and proved recovery/lifecycle behavior on the Alienware (done 2026-07-17) #wtray
   - [x] Implement the Windows notification-area icon and native action routing.
   - [x] Preserve terminal restoration, local IPC, permissions, singleton, and animated graceful exit.

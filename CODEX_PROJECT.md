@@ -9,27 +9,28 @@ public stable/latest release at exact source commit
 shared gait/edge lifecycle, Developer ID/notarized DMG delivery, Debian packages, rolling updates,
 and atomic publication while replacing the temporary Mac menu title with a shared accessible
 goose icon. The icon's sealed macOS 11-safe representation and exact Configure/TUI plus animated-
-Quit behavior are the contract future Windows/Linux trays must mimic. ADR 0029 adds the completed
-Alienware-derived Windows lifecycle/update and integrated-terminal hardening.
+Quit behavior are now implemented through native Windows notification-area and compatible Linux
+StatusNotifier controls in the in-flight v1.1.0 candidate. ADR 0029 records the completed
+Alienware-derived Windows lifecycle/update hardening; ADR 0030 records tray parity.
 
 ## Status
 
 - Default branch `main` contains the post-release v1.0.3 closure; the immutable tag peels to
   `5192fab9690ff8b6777366a5918c12bbe1ee247a`. Prior public tags/releases remain untouched history.
 - Completed release/evidence cards: v1.0.3 `#r103`, v1.0.2 `#v102`, v1.0.1 `#m20q`, native Mac
-  evidence `#m16r`, and Alienware verification `#v1a`. Shared tray contract `#trayc` is active for
-  the separate v1.1.0 release. The shared board lives under `.tasks/`.
-- Version: 1.0.3 in source and public stable/latest.
+  evidence `#m16r`, Alienware verification `#v1a`, and tray implementation `#trayc`/`#wtray`/
+  `#ltray`. v1.1.0 publication task `#r110` is active. The shared board lives under `.tasks/`.
+- Version: 1.1.0 in candidate source; v1.0.3 remains public stable/latest until publication.
 - v1.0.3 release evidence: candidate `29577145711` attempt 2, same-SHA main CI `29577774029`,
   atomic publication `29578238463`, and post-release smoke `29578671930` all passed at the exact
   commit. The immutable GitHub Release contains 22 payloads plus sidecars/manifest for 47 assets.
-- macOS control: ADRs 0024/0028 define a visible-while-running image-only goose status item with
-  an independent **Honk300 controls** accessibility name. Configure opens the signed bundle's
-  existing terminal TUI; Quit requests the same engine-owned walk-off used by CLI/TUI stop. The
-  canonical Quiver SVG and deterministic 36×36 PNG are sealed and checked across every app/DMG
-  shape, with a resilient text fallback only for malformed/unbundled development runs. Future
-  Windows/Linux trays must mimic this icon, TUI launch, same-user boundary, and graceful exit, but
-  v1.0.3 does not implement them.
+- Native controls: ADRs 0024/0028/0030 define one visible-while-running goose item with an
+  independent **Honk300 controls** accessibility name. macOS uses AppKit, Windows uses a fixed-
+  GUID notification-area owner, and compatible Linux desktops use a pure-Rust StatusNotifierItem.
+  Configure opens the exact executable's existing terminal TUI; Quit requests the same engine-
+  owned walk-off used by CLI/TUI stop. The canonical SVG and deterministic 36×36 PNG remain the
+  shared source. Missing shell hosts report explicitly without affecting CLI/TUI/IPC or overlay
+  capabilities.
 - Renderer: AppKit/CoreGraphics RGBA regressions pass. The reusable AppKit image-view presenter
   now produces opaque, black-rectangle-free WindowServer captures in normal motion and readable
   dark-mode notes. The product-equivalent signed candidate passed live capture and the exact final
@@ -172,7 +173,7 @@ Alienware-derived Windows lifecycle/update and integrated-terminal hardening.
 
 1. Preserve a platform-free 120 Hz simulation engine and shared procedural renderer.
 2. Present correct premultiplied-alpha output through each native desktop backend.
-3. Keep all CLI/TUI/IPC control local, single-instance, and owner-scoped; let the macOS status
+3. Keep all CLI/TUI/IPC control local, single-instance, and owner-scoped; let every native control
    item call only the existing TUI and graceful-stop path.
 4. Never manipulate terminal windows, even when visual overlays may cover them.
 5. Keep install/update/uninstall transactional and preserve foreign files and user media.
@@ -187,9 +188,8 @@ Alienware-derived Windows lifecycle/update and integrated-terminal hardening.
     releases; update only through exact-tag, hash/size/target/provenance-matched artifacts.
 11. Offer native amd64/arm64 Debian packages with real package-manager ownership while preserving
     the per-user no-sudo shell path for other Linux users.
-12. Give graphical macOS users a visible Configure/Quit path without adding a native settings
-    model or abrupt termination; keep its shared icon and behavior reusable for later qualified
-    Windows/Linux trays.
+12. Give graphical macOS, Windows, and compatible Linux users a visible Configure/Quit path
+    without adding a native settings model or abrupt termination; keep unavailable hosts honest.
 
 ## Architecture
 
@@ -199,7 +199,8 @@ Alienware-derived Windows lifecycle/update and integrated-terminal hardening.
 - `crates/honk-config` / `honk-config-tui`: schema-v2 TOML and ratatui control surface.
 - `crates/honk-platform-*`: native Windows, capture-safe AppKit/CoreGraphics, X11, and Wayland
   adapters.
-- `src/runtime`: platform event loops built around shared `RuntimeCore` ordering.
+- `src/runtime`: platform event loops built around shared `RuntimeCore` ordering and one finite
+  control-surface command router.
 - `src/install.rs` / `src/update.rs` / `src/debian.rs`: ownership receipts, atomic lifecycle
   transactions, platform/provenance-aware updates, Debian package ownership, and foreign-file
   preservation.
@@ -216,19 +217,20 @@ Alienware-derived Windows lifecycle/update and integrated-terminal hardening.
   post-release Alienware verification boundary. ADR 0026 defines the narrow GitHub-hosted Windows
   ARM64 presenter-evidence path without claiming full DWM composition. ADR 0027 records the
   immutable v1.0.0 failure, v1.0.1 fix-forward, and strict side/top-down evidence profiles. ADR
-  0028 defines the shared icon and future tray Configure/TUI plus graceful-Quit parity contract.
-  ADR 0029 defines the Windows updater/lifecycle, Corporate retry, and integrated-terminal
-  hardening found on the Alienware.
+  0028 defines the shared icon and Configure/TUI plus graceful-Quit parity contract. ADR 0029
+  defines the Windows updater/lifecycle, Corporate retry, and integrated-terminal hardening found
+  on the Alienware. ADR 0030 defines native Windows/Linux tray ownership, recovery, exact-
+  executable launching, package ownership, and unavailable-host boundaries.
 
 ## Verification Source Of Truth
 
-- Completed v1.0.3 release evidence: `docs/readiness/v1.0.3-readiness.md`; v1.0.2 and v1.0.1
+- Active v1.1.0 release gate: `docs/readiness/v1.1.0-readiness.md`; v1.0.3, v1.0.2, and v1.0.1
   readiness reports remain immutable-release history.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
 - Board handoff and activity: `.tasks/tasks/v102.md` and `.tasks/tasks/v1a.md`.
 - Canonical product plan: `honk300_plan.md`.
 - Required local gate: fmt, workspace clippy with warnings denied, workspace tests, release build,
-  universal Apple builds, `dist plan --tag=v1.0.3`, complete Python contracts, cargo-audit
+  universal Apple builds, `dist plan --tag=v1.1.0`, complete Python contracts, cargo-audit
   0.22.2, actionlint, and diff check.
 
 ## Current Workspace Tree
@@ -450,8 +452,11 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │       └── golden.rs
 │   ├── honk-platform-linux
 │   │   ├── Cargo.toml
-│   │   └── src
-│   │       └── lib.rs
+│   │   ├── src
+│   │   │   ├── lib.rs
+│   │   │   └── tray.rs
+│   │   └── tests
+│   │       └── linux_status_notifier.rs
 │   ├── honk-platform-macos
 │   │   ├── Cargo.toml
 │   │   └── src
@@ -459,7 +464,8 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   └── honk-platform-windows
 │       ├── Cargo.toml
 │       └── src
-│           └── lib.rs
+│           ├── lib.rs
+│           └── tray.rs
 ├── docs
 │   ├── adr
 │   │   ├── 0001-m7-cursor-mischief-renderer-and-platform-guardrails.md
@@ -491,6 +497,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── 0027-v1-0-1-fix-forward-and-windows-pose-evidence.md
 │   │   ├── 0028-shared-goose-control-surface-and-tray-parity.md
 │   │   ├── 0029-windows-lifecycle-and-terminal-hardening.md
+│   │   ├── 0030-windows-linux-tray-control-parity.md
 │   │   └── README.md
 │   ├── agents
 │   │   └── handoff
@@ -511,7 +518,8 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── v0.3.2-readiness.md
 │   │   ├── v1.0.1-readiness.md
 │   │   ├── v1.0.2-readiness.md
-│   │   └── v1.0.3-readiness.md
+│   │   ├── v1.0.3-readiness.md
+│   │   └── v1.1.0-readiness.md
 │   ├── research
 │   │   └── native-wayland-capability-path.md
 │   ├── superpowers
@@ -522,6 +530,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   └── thinking
 │       ├── 2026-06-27-m9-collect-window-plan.md
 │       ├── 2026-07-17-alienware-v1.0.2-verification.md
+│       ├── 2026-07-17-windows-linux-tray-design.md
 │       ├── 2026-07-06-active-task-resolution-plan.md
 │       └── 2026-07-07-b9e-spicy-behaviors-plan.md
 ├── honk300_plan.md
@@ -578,6 +587,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   ├── install.rs
 │   ├── main.rs
 │   ├── runtime
+│   │   ├── control_surface.rs
 │   │   ├── core.rs
 │   │   ├── linux.rs
 │   │   ├── macos.rs

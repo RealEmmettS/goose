@@ -20,6 +20,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > repeat-denied, granted, and revoked behavior on the physical Mac; a later fresh-release repeat
 > remains visible follow-up work. While running, the Mac app also has a small goose menu that
 > opens the same terminal settings screen or starts its animated goodbye.
+> Windows and compatible Linux desktops now show the same small goose control as the Mac: it
+> opens the one terminal settings screen or starts the Goose's animated goodbye.
 > Every desktop now stages the
 > Goose's arrival and departure beyond a real screen edge, and a person closing its note or meme
 > can provoke a safely bounded annoyed reaction. The Windows/Linux installer
@@ -32,6 +34,13 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Latest — July 2026
 
 ### Added
+- **Windows and compatible Linux desktops now have a Goose control icon.** While the Goose is
+  running, the small icon can open the existing settings screen or ask it to walk away and quit.
+  It uses the same accessible name and familiar two choices as the Mac, which makes control easier
+  to discover without creating another settings app.
+- **The control comes back when the desktop shell does.** Restarting Windows Explorer or a
+  compatible Linux panel no longer permanently loses the running Goose's shortcut, which keeps
+  the control useful through ordinary desktop restarts.
 - **The Mac menu now looks like the Goose.** A compact goose silhouette replaces the temporary
   word in the menu bar, automatically follows the Mac's light, dark, and highlighted appearances,
   and still has a clear spoken label for people using accessibility tools. The original artwork
@@ -39,6 +48,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   This update does not pretend those other trays already exist.
 
 ### Improved
+- **Every desktop control follows one behavior.** Configure opens the exact running copy's one
+  terminal settings screen, and Quit lets the Goose finish walking completely offscreen before it
+  closes. This keeps platform menus from drifting into separate settings or abrupt shutdowns.
+- **Linux packages cleanly own their menu artwork.** Supported package installs add the shared
+  Goose icon and remove only that owned copy during uninstall, so personal notes, pictures, and
+  settings remain untouched.
 - **Per-user Windows upgrades recover cleanly from a failed attempt.** The previous working copy
   stays intact until the new copy is fully installed, so retrying or removing the app does not
   inherit broken ownership records.
@@ -56,6 +71,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   controllable. This keeps a cosmetic problem from blocking startup.
 
 ### Fixed
+- **The Windows tray now opens a usable settings screen.** It starts a normal terminal with clean
+  input and output instead of inheriting background redirection, which prevents an empty-looking
+  settings window.
+- **Desktops without a compatible tray remain fully usable.** The Goose explains that the shortcut
+  is unavailable while command-line controls, settings, and supported desktop behavior continue
+  normally. This avoids pretending every Linux panel or unusual Windows session provides a tray.
 - **Checking for updates now works in built-in Windows shells.** Download addresses and file
   locations are passed safely, and response text is decoded consistently, so update discovery no
   longer stops at a command-parsing error. Windows users with an older copy need to rerun the

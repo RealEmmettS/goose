@@ -42,7 +42,7 @@ tiny-skia = { version = "0.11", features = ["png-format"] }
 # and M12 owns the full config TUI.
 [package]
 name = "honk300"
-version = "1.0.3"
+version = "1.1.0"
 description = "Cross-platform Desktop Goose — a procedural goose that roams your screen"
 edition.workspace = true
 rust-version.workspace = true
