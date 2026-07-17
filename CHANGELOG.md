@@ -59,7 +59,10 @@ All notable changes to this project are documented here. Format based on
   strict while first requiring the simulated `NIM_DELETE` to remain settled for one second, then
   allowing the shell's rectangle API a bounded ten seconds to expose a successfully restored icon.
   This matches Explorer's destroy-then-broadcast ordering and records both poll counts plus runtime
-  restoration diagnostics.
+  restoration diagnostics. A Server 2022 release runner may record recovery as unobservable only
+  when a separate hidden owner with a stock icon and fresh GUID also fails the same bounded
+  recovery sequence; Windows Latest, local/self-hosted Windows, and the physical Alienware remain
+  strict.
 
 ## [1.0.3] - 2026-07-17
 

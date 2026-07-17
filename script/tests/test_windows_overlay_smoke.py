@@ -409,6 +409,10 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
         self.assertIn("$deletionSettlePolls = 0", smoke)
         self.assertIn("continuously absent GUID state", smoke)
         self.assertIn("deletion_settle_polls=$deletionSettlePolls", smoke)
+        self.assertIn("ProbeNotificationAreaRecovery", smoke)
+        self.assertIn("independent_recovery_probe=$($independentRecoveryProbe", smoke)
+        self.assertIn("if ($independentRecoveryProbe)", smoke)
+        self.assertIn("if (-not $AllowUnobservableTrayRecoveryHost)", smoke)
         self.assertIn("for ($attempt = 0; $attempt -lt 400; $attempt += 1)", smoke)
         self.assertIn("$recoveryPollAttempts = $attempt + 1", smoke)
         self.assertIn("recovery_poll_attempts=$recoveryPollAttempts", smoke)
@@ -587,6 +591,10 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
         )
         self.assertIn("-AllowUnavailableTrayHost", ci)
         self.assertIn("-AllowUnavailableTrayHost:$allowUnavailableTrayHost", release)
+        self.assertIn(
+            "-AllowUnobservableTrayRecoveryHost:$allowUnobservableTrayRecoveryHost",
+            release,
+        )
         self.assertIn("if: ${{ always() }}", ci)
         self.assertIn("-Binary target/${{ matrix.triple }}/release/honk300.exe", installers)
         self.assertIn("qualification-windows-overlay-${{ matrix.triple }}", installers)
@@ -607,6 +615,9 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
         self.assertIn("smoke_windows_overlay.ps1", released_smoke)
         self.assertIn("-Binary $Binary", released_smoke)
         self.assertIn("-AllowUnavailableTrayHost:", released_smoke)
+        self.assertIn("-AllowUnobservableTrayRecoveryHost:", released_smoke)
+        self.assertIn("-AllowUnobservableTrayRecoveryHost", installers)
+        self.assertIn("-AllowUnobservableTrayRecoveryHost:", post_release)
         self.assertIn("windows-11-arm", post_release)
         self.assertIn("-TargetTriple '${{ matrix.triple }}'", post_release)
         self.assertIn(

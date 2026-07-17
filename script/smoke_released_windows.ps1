@@ -11,7 +11,9 @@ param(
 
     [string] $SourceBinaryPath = '',
 
-    [string] $OverlayEvidenceDirectory = ''
+    [string] $OverlayEvidenceDirectory = '',
+
+    [switch] $AllowUnobservableTrayRecoveryHost
 )
 
 $ErrorActionPreference = 'Stop'
@@ -180,7 +182,8 @@ try {
     & (Join-Path $PSScriptRoot 'smoke_windows_overlay.ps1') `
         -Binary $Binary `
         -EvidenceDirectory (Join-Path $OverlayEvidenceDirectory 'compositor') `
-        -AllowUnavailableTrayHost:($TargetTriple -eq 'aarch64-pc-windows-msvc')
+        -AllowUnavailableTrayHost:($TargetTriple -eq 'aarch64-pc-windows-msvc') `
+        -AllowUnobservableTrayRecoveryHost:$AllowUnobservableTrayRecoveryHost
 
     $downgrade = Start-Msi -Mode '/i' -Path $PreviousMsi
     if ($downgrade.ExitCode -in @(0, 3010)) { throw 'Downgrade unexpectedly succeeded' }

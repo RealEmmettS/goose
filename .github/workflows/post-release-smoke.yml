@@ -84,6 +84,7 @@ jobs:
           ./script/smoke_released_windows.ps1 `
             -Tag $env:HONK300_SMOKE_TAG `
             -TargetTriple '${{ matrix.triple }}' `
+            -AllowUnobservableTrayRecoveryHost:('${{ matrix.triple }}' -eq 'x86_64-pc-windows-msvc') `
             -OverlayEvidenceDirectory 'target/post-release-windows-overlay-${{ matrix.triple }}'
       - name: Upload published Windows overlay qualification evidence
         if: ${{ always() }}

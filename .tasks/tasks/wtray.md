@@ -32,6 +32,12 @@ gate rather than a fabricated local claim.
 
 ## Activity
 
+- 2026-07-17 10:02 — candidate 29587523040 again passed the full non-x64-tray matrix while both
+  Server 2022 x64 fixed-GUID re-adds remained unobservable despite successful runtime restoration
+  and settled removal. Added a separate stock-icon/fresh-GUID hidden owner that independently runs
+  the same add/observe/delete/settle/re-add/observe sequence. The Server runner may record the
+  recovery limitation only if this control also fails; any successful control keeps Honk300's
+  failure fatal, and Windows Latest/local/Alienware remain strict. (agent: codex)
 - 2026-07-17 09:48 — replacement candidate 29586856960 proved the ten-second post-broadcast wait
   was not the issue: both Server 2022 x64 jobs logged successful runtime restoration but remained
   absent after 400 polls, while every other producer passed. The synthetic NIM_DELETE was racing

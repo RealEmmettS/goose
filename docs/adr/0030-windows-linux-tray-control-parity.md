@@ -140,7 +140,13 @@ rules.
   claim the explicit unavailable path only when a second hidden owner using a stock icon also
   fails a minimal `Shell_NotifyIconW` control registration; if that independent probe succeeds,
   Honk300's registration failure remains fatal. This waiver is enabled only for the Windows ARM64
-  GitHub-hosted qualification session and is recorded in its evidence.
+  GitHub-hosted qualification session and is recorded in its evidence. The Windows Server 2022
+  release runner may record recovery as unobservable only after Honk300's fixed GUID was initially
+  observable, its removal remained settled, the runtime logged a successful TaskbarCreated re-add,
+  and a second hidden owner with a stock icon and fresh GUID independently also fails the same
+  add/observe/delete/settle/re-add/observe control sequence. If that control recovers, Honk300's
+  failure remains fatal. Windows Latest, local/self-hosted Windows, and the physical Alienware do
+  not receive this recovery-observation waiver.
 - Linux qualification covers StatusNotifier watcher/host registration, menu actions, terminal
   selection, explicit no-host degradation, X11 and native Wayland capability separation, GNU and
   musl builds, Debian icon ownership, and archive/package lifecycle.

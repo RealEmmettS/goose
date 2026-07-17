@@ -9,6 +9,9 @@ param(
     [Parameter(ParameterSetName = 'Smoke')]
     [switch] $AllowUnavailableTrayHost,
 
+    [Parameter(ParameterSetName = 'Smoke')]
+    [switch] $AllowUnobservableTrayRecoveryHost,
+
     [Parameter(Mandatory = $true, ParameterSetName = 'Background')]
     [switch] $BackgroundHost,
 
@@ -159,6 +162,68 @@ public static class Honk300TraySmoke {
             DestroyWindow(owner);
         }
     }
+
+    private static bool WaitForIconRect(ref NotifyIdentifier identifier, int attempts) {
+        for (int attempt = 0; attempt < attempts; attempt++) {
+            Rect rect;
+            if (Shell_NotifyIconGetRect(ref identifier, out rect) == 0) return true;
+            System.Threading.Thread.Sleep(25);
+        }
+        return false;
+    }
+
+    public static bool ProbeNotificationAreaRecovery() {
+        const uint WS_EX_TOOLWINDOW = 0x00000080;
+        const uint WS_POPUP = 0x80000000;
+        const uint NIF_MESSAGE = 0x00000001;
+        const uint NIF_ICON = 0x00000002;
+        const uint NIF_TIP = 0x00000004;
+        const uint NIF_GUID = 0x00000020;
+        const uint NIM_ADD = 0;
+        const uint NIM_DELETE = 2;
+        const uint NIM_SETVERSION = 4;
+        const uint NOTIFYICON_VERSION_4 = 4;
+        IntPtr owner = CreateWindowEx(
+            WS_EX_TOOLWINDOW, "STATIC", "Honk300 tray recovery API probe", WS_POPUP,
+            0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+        if (owner == IntPtr.Zero) return false;
+        NotifyIconData data = new NotifyIconData();
+        bool registered = false;
+        try {
+            data.cbSize = (uint)Marshal.SizeOf<NotifyIconData>();
+            data.hWnd = owner;
+            data.uID = 0x301;
+            data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_GUID;
+            data.uCallbackMessage = 0x0401;
+            data.hIcon = LoadIcon(IntPtr.Zero, new IntPtr(32512)); // IDI_APPLICATION
+            data.szTip = "Honk300 tray recovery API probe";
+            data.guidItem = Guid.NewGuid();
+            if (data.hIcon == IntPtr.Zero || !Shell_NotifyIcon(NIM_ADD, ref data)) return false;
+            registered = true;
+            data.uVersion = NOTIFYICON_VERSION_4;
+            if (!Shell_NotifyIcon(NIM_SETVERSION, ref data)) return false;
+
+            NotifyIdentifier identifier = new NotifyIdentifier();
+            identifier.cbSize = (uint)Marshal.SizeOf<NotifyIdentifier>();
+            identifier.hWnd = owner;
+            identifier.uID = data.uID;
+            identifier.guidItem = data.guidItem;
+            if (!WaitForIconRect(ref identifier, 80)) return false;
+
+            if (!Shell_NotifyIcon(NIM_DELETE, ref data)) return false;
+            registered = false;
+            System.Threading.Thread.Sleep(1000);
+            if (!Shell_NotifyIcon(NIM_ADD, ref data)) return false;
+            registered = true;
+            data.uVersion = NOTIFYICON_VERSION_4;
+            if (!Shell_NotifyIcon(NIM_SETVERSION, ref data)) return false;
+            return WaitForIconRect(ref identifier, 400);
+        }
+        finally {
+            if (registered) Shell_NotifyIcon(NIM_DELETE, ref data);
+            DestroyWindow(owner);
+        }
+    }
 }
 '@
 }
@@ -278,7 +343,33 @@ runtime_message=$($runtimeMessage.Trim())
         } else {
             '<runtime stderr unavailable>'
         }
-        throw "tray icon did not recover after TaskbarCreated (HRESULT $after after $recoveryPollAttempts polls; runtime: $runtimeMessage)"
+        if ($runtimeMessage -notmatch 'Windows taskbar recreated; restored Honk300 controls') {
+            throw "runtime did not report a successful TaskbarCreated restore (HRESULT $after after $recoveryPollAttempts polls; runtime: $runtimeMessage)"
+        }
+        $independentRecoveryProbe = [Honk300TraySmoke]::ProbeNotificationAreaRecovery()
+        if ($independentRecoveryProbe) {
+            throw "Honk300 tray icon did not recover even though an independent stock-icon recovery probe succeeded (HRESULT $after after $recoveryPollAttempts polls; runtime: $runtimeMessage)"
+        }
+        if (-not $AllowUnobservableTrayRecoveryHost) {
+            throw "tray recovery is unobservable and this host has no explicit waiver (HRESULT $after after $recoveryPollAttempts polls; independent recovery probe failed; runtime: $runtimeMessage)"
+        }
+        Set-Content -LiteralPath $EvidencePath -Encoding utf8NoBOM -Value @"
+availability=recovery-unobservable
+reason=independent stock-icon fixed-GUID recovery probe also failed on the explicitly waived host
+owner=0x$($owner.ToInt64().ToString('X'))
+guid=$guid
+accessible_name=Honk300 controls
+independent_shell_probe=$($independentProbe.ToString().ToLowerInvariant())
+independent_recovery_probe=$($independentRecoveryProbe.ToString().ToLowerInvariant())
+before_rect=$($beforeRect.Left),$($beforeRect.Top),$($beforeRect.Right),$($beforeRect.Bottom)
+missing_hresult=$missing
+deletion_settle_polls=$deletionSettlePolls
+taskbar_created_message=$taskbarCreated
+recovery_hresult=$after
+recovery_poll_attempts=$recoveryPollAttempts
+runtime_message=$runtimeMessage
+"@
+        return
     }
 
     Set-Content -LiteralPath $EvidencePath -Encoding utf8NoBOM -Value @"

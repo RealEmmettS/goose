@@ -172,6 +172,7 @@ jobs:
           ./script/smoke_windows_overlay.ps1
           -Binary target/${{ matrix.triple }}/release/honk300.exe
           -EvidenceDirectory target/windows-overlay-evidence
+          -AllowUnobservableTrayRecoveryHost
 
       - name: Upload Windows overlay qualification evidence
         if: ${{ always() && matrix.triple == 'x86_64-pc-windows-msvc' }}
