@@ -120,11 +120,40 @@ public static class Honk300TraySmoke {
 }
 
 function Test-WindowsTrayRecovery {
-    param([Parameter(Mandatory = $true)] [string] $EvidencePath)
+    param(
+        [Parameter(Mandatory = $true)] [string] $EvidencePath,
+        [Parameter(Mandatory = $true)] [string] $RuntimeStderrPath
+    )
 
     $guid = [Guid]'1282821f-82b6-42e2-945b-ef2fe8d9fbda'
     $owner = [Honk300TraySmoke]::FindWindow('honk300_status_tray_owner', 'Honk300 controls')
-    if ($owner -eq [IntPtr]::Zero) { throw 'Windows tray owner HWND is missing' }
+    if ($owner -eq [IntPtr]::Zero) {
+        $taskbar = [Honk300TraySmoke]::FindWindow('Shell_TrayWnd', $null)
+        $runtimeMessage = ''
+        for ($attempt = 0; $attempt -lt 40; $attempt += 1) {
+            if (Test-Path -LiteralPath $RuntimeStderrPath) {
+                $runtimeMessage = Get-Content -LiteralPath $RuntimeStderrPath -Raw
+                if ($runtimeMessage -match 'Windows notification-area controls are unavailable; CLI controls remain active') {
+                    break
+                }
+            }
+            Start-Sleep -Milliseconds 25
+        }
+        if ($taskbar -ne [IntPtr]::Zero) {
+            throw "Windows tray owner HWND is missing even though Shell_TrayWnd is available: $runtimeMessage"
+        }
+        if ($runtimeMessage -notmatch 'Windows notification-area controls are unavailable; CLI controls remain active') {
+            throw "Windows tray owner and Shell_TrayWnd are unavailable without explicit runtime degradation: $runtimeMessage"
+        }
+        Set-Content -LiteralPath $EvidencePath -Encoding utf8NoBOM -Value @"
+availability=unavailable
+reason=no Shell_TrayWnd in the interactive runner session
+guid=$guid
+accessible_name=Honk300 controls
+runtime_message=$($runtimeMessage.Trim())
+"@
+        return
+    }
 
     $identifier = [Honk300TraySmoke+NotifyIdentifier]::new()
     $identifier.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($identifier)
@@ -876,7 +905,9 @@ light_sha256=$lightProofHash
     $runtime = Start-ExactRuntime -Label 'first'
     $firstPid = $runtime.Id
     Wait-ForRuntime -Process $runtime -EvidenceName 'status-start.txt'
-    Test-WindowsTrayRecovery -EvidencePath (Join-Path $evidence 'tray-recovery.txt')
+    Test-WindowsTrayRecovery `
+        -EvidencePath (Join-Path $evidence 'tray-recovery.txt') `
+        -RuntimeStderrPath (Join-Path $evidence 'first-runtime.stderr.log')
 
     $duplicate = Invoke-ExactBinary -Arguments @('start', '--config', $config, '--no-sound') `
         -EvidenceName 'single-instance.txt'

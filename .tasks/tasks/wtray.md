@@ -32,6 +32,12 @@ gate rather than a fabricated local claim.
 
 ## Activity
 
+- 2026-07-17 08:16 — CI run 29582777831 proved both Linux architectures and Windows x64, then
+  exposed that GitHub's Windows ARM64 interactive session has DWM but no notification-area host;
+  the runtime correctly logged its explicit CLI-only degradation. Tightened the smoke to accept
+  that path only when `Shell_TrayWnd` is also absent, while continuing to require fixed-GUID
+  registration/recreation whenever a real taskbar exists. The revised probe passed locally with
+  the Alienware taskbar present. (agent: codex)
 - 2026-07-17 08:02 — moved Active → Done. The amended exact-binary Windows smoke removed the
   fixed-GUID icon, proved it absent, delivered TaskbarCreated, and verified the same item/rectangle
   returned. UI Automation found one accessible `Honk300 controls` button; native keyboard menu use
