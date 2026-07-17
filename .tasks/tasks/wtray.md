@@ -32,6 +32,11 @@ gate rather than a fabricated local claim.
 
 ## Activity
 
+- 2026-07-17 08:26 — CI run 29583354618 showed the ARM64 automation session has a top-level
+  `Shell_TrayWnd` but still rejects Shell_NotifyIconW with E_FAIL. Refined the host test to the
+  actual `TrayNotifyWnd` notification-area child; the Alienware has both layers. A missing child
+  permits only the already-explicit CLI degradation, while a present child still makes registration
+  failure fatal to the smoke. All other jobs passed on the run. (agent: codex)
 - 2026-07-17 08:16 — CI run 29582777831 proved both Linux architectures and Windows x64, then
   exposed that GitHub's Windows ARM64 interactive session has DWM but no notification-area host;
   the runtime correctly logged its explicit CLI-only degradation. Tightened the smoke to accept

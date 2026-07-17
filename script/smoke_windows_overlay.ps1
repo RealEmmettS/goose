@@ -112,6 +112,8 @@ public static class Honk300TraySmoke {
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern IntPtr FindWindow(string className, string title);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string className, string title);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern uint RegisterWindowMessage(string name);
     [DllImport("user32.dll")]
     public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
@@ -129,6 +131,12 @@ function Test-WindowsTrayRecovery {
     $owner = [Honk300TraySmoke]::FindWindow('honk300_status_tray_owner', 'Honk300 controls')
     if ($owner -eq [IntPtr]::Zero) {
         $taskbar = [Honk300TraySmoke]::FindWindow('Shell_TrayWnd', $null)
+        $notificationHost = [IntPtr]::Zero
+        if ($taskbar -ne [IntPtr]::Zero) {
+            $notificationHost = [Honk300TraySmoke]::FindWindowEx(
+                $taskbar, [IntPtr]::Zero, 'TrayNotifyWnd', $null
+            )
+        }
         $runtimeMessage = ''
         for ($attempt = 0; $attempt -lt 40; $attempt += 1) {
             if (Test-Path -LiteralPath $RuntimeStderrPath) {
@@ -139,15 +147,17 @@ function Test-WindowsTrayRecovery {
             }
             Start-Sleep -Milliseconds 25
         }
-        if ($taskbar -ne [IntPtr]::Zero) {
-            throw "Windows tray owner HWND is missing even though Shell_TrayWnd is available: $runtimeMessage"
+        if ($notificationHost -ne [IntPtr]::Zero) {
+            throw "Windows tray owner HWND is missing even though TrayNotifyWnd is available: $runtimeMessage"
         }
         if ($runtimeMessage -notmatch 'Windows notification-area controls are unavailable; CLI controls remain active') {
-            throw "Windows tray owner and Shell_TrayWnd are unavailable without explicit runtime degradation: $runtimeMessage"
+            throw "Windows tray owner and TrayNotifyWnd are unavailable without explicit runtime degradation: $runtimeMessage"
         }
         Set-Content -LiteralPath $EvidencePath -Encoding utf8NoBOM -Value @"
 availability=unavailable
-reason=no Shell_TrayWnd in the interactive runner session
+reason=no TrayNotifyWnd notification-area host in the interactive runner session
+taskbar=0x$($taskbar.ToInt64().ToString('X'))
+notification_host=0x$($notificationHost.ToInt64().ToString('X'))
 guid=$guid
 accessible_name=Honk300 controls
 runtime_message=$($runtimeMessage.Trim())
