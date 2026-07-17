@@ -136,7 +136,11 @@ rules.
   accessible tooltip, signed Windows callback coordinates, and contrasting embedded icon bytes.
 - Windows qualification covers keyboard/menu accessibility, exact-executable TUI launch and
   restoration, graceful animated Quit, immediate singleton restart, `TaskbarCreated` recovery,
-  DPI, available display topology, and installed/portable artifact identity.
+  DPI, available display topology, and installed/portable artifact identity. A hosted runner may
+  claim the explicit unavailable path only when a second hidden owner using a stock icon also
+  fails a minimal `Shell_NotifyIconW` control registration; if that independent probe succeeds,
+  Honk300's registration failure remains fatal. This waiver is enabled only for the Windows ARM64
+  GitHub-hosted qualification session and is recorded in its evidence.
 - Linux qualification covers StatusNotifier watcher/host registration, menu actions, terminal
   selection, explicit no-host degradation, X11 and native Wayland capability separation, GNU and
   musl builds, Debian icon ownership, and archive/package lifecycle.

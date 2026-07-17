@@ -526,9 +526,11 @@ jobs:
             "zip_sha256_before=$zipBefore",
             "binary_sha256_before=$binaryBefore"
           ) | Set-Content -LiteralPath (Join-Path $evidence 'identity.txt') -Encoding utf8
+          $allowUnavailableTrayHost = '${{ matrix.host_arch }}' -eq 'ARM64'
           ./script/smoke_windows_overlay.ps1 `
             -Binary $binary `
-            -EvidenceDirectory (Join-Path $evidence 'compositor')
+            -EvidenceDirectory (Join-Path $evidence 'compositor') `
+            -AllowUnavailableTrayHost:$allowUnavailableTrayHost
           $zipAfter = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           $binaryAfter = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($zipAfter -ne $zipBefore) { throw 'cargo-dist ZIP changed during qualification' }

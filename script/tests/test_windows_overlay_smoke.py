@@ -551,7 +551,11 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
         self.assertNotIn("$graphics.CopyFromScreen(", smoke)
 
     def test_ci_and_release_candidate_run_the_exact_binary_smoke(self):
+        smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
         ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        release = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+            encoding="utf-8"
+        )
         installers = (ROOT / ".github" / "workflows" / "windows-installers.yml").read_text(
             encoding="utf-8"
         )
@@ -563,12 +567,16 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
         )
         self.assertIn("-Binary target/release/honk300.exe", ci)
         self.assertIn("-EvidenceDirectory target/windows-overlay-evidence", ci)
+        self.assertIn("ProbeNotificationArea", smoke)
+        self.assertIn("independent_shell_probe", smoke)
         self.assertIn("runs-on: windows-11-arm", ci)
         self.assertIn("host: aarch64-pc-windows-msvc", ci)
         self.assertIn(
             "-Binary target/aarch64-pc-windows-msvc/release/honk300.exe",
             ci,
         )
+        self.assertIn("-AllowUnavailableTrayHost", ci)
+        self.assertIn("-AllowUnavailableTrayHost:$allowUnavailableTrayHost", release)
         self.assertIn("if: ${{ always() }}", ci)
         self.assertIn("-Binary target/${{ matrix.triple }}/release/honk300.exe", installers)
         self.assertIn("qualification-windows-overlay-${{ matrix.triple }}", installers)
@@ -588,6 +596,7 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
         )
         self.assertIn("smoke_windows_overlay.ps1", released_smoke)
         self.assertIn("-Binary $Binary", released_smoke)
+        self.assertIn("-AllowUnavailableTrayHost:", released_smoke)
         self.assertIn("windows-11-arm", post_release)
         self.assertIn("-TargetTriple '${{ matrix.triple }}'", post_release)
         self.assertIn(

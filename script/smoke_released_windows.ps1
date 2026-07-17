@@ -179,7 +179,8 @@ try {
 
     & (Join-Path $PSScriptRoot 'smoke_windows_overlay.ps1') `
         -Binary $Binary `
-        -EvidenceDirectory (Join-Path $OverlayEvidenceDirectory 'compositor')
+        -EvidenceDirectory (Join-Path $OverlayEvidenceDirectory 'compositor') `
+        -AllowUnavailableTrayHost:($TargetTriple -eq 'aarch64-pc-windows-msvc')
 
     $downgrade = Start-Msi -Mode '/i' -Path $PreviousMsi
     if ($downgrade.ExitCode -in @(0, 3010)) { throw 'Downgrade unexpectedly succeeded' }

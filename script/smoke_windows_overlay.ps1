@@ -6,6 +6,9 @@ param(
     [Parameter(Mandatory = $true, ParameterSetName = 'Smoke')]
     [string] $EvidenceDirectory,
 
+    [Parameter(ParameterSetName = 'Smoke')]
+    [switch] $AllowUnavailableTrayHost,
+
     [Parameter(Mandatory = $true, ParameterSetName = 'Background')]
     [switch] $BackgroundHost,
 
@@ -117,6 +120,45 @@ public static class Honk300TraySmoke {
     public static extern uint RegisterWindowMessage(string name);
     [DllImport("user32.dll")]
     public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr CreateWindowEx(
+        uint exStyle, string className, string windowName, uint style,
+        int x, int y, int width, int height, IntPtr parent, IntPtr menu,
+        IntPtr instance, IntPtr parameter);
+    [DllImport("user32.dll")]
+    private static extern bool DestroyWindow(IntPtr window);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr LoadIcon(IntPtr instance, IntPtr iconName);
+
+    public static bool ProbeNotificationArea() {
+        const uint WS_EX_TOOLWINDOW = 0x00000080;
+        const uint WS_POPUP = 0x80000000;
+        const uint NIF_MESSAGE = 0x00000001;
+        const uint NIF_ICON = 0x00000002;
+        const uint NIF_TIP = 0x00000004;
+        const uint NIM_ADD = 0;
+        const uint NIM_DELETE = 2;
+        IntPtr owner = CreateWindowEx(
+            WS_EX_TOOLWINDOW, "STATIC", "Honk300 tray API probe", WS_POPUP,
+            0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+        if (owner == IntPtr.Zero) return false;
+        try {
+            NotifyIconData data = new NotifyIconData();
+            data.cbSize = (uint)Marshal.SizeOf<NotifyIconData>();
+            data.hWnd = owner;
+            data.uID = 0x300;
+            data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+            data.uCallbackMessage = 0x0401;
+            data.hIcon = LoadIcon(IntPtr.Zero, new IntPtr(32512)); // IDI_APPLICATION
+            data.szTip = "Honk300 tray API probe";
+            bool added = data.hIcon != IntPtr.Zero && Shell_NotifyIcon(NIM_ADD, ref data);
+            if (added) Shell_NotifyIcon(NIM_DELETE, ref data);
+            return added;
+        }
+        finally {
+            DestroyWindow(owner);
+        }
+    }
 }
 '@
 }
@@ -128,6 +170,7 @@ function Test-WindowsTrayRecovery {
     )
 
     $guid = [Guid]'1282821f-82b6-42e2-945b-ef2fe8d9fbda'
+    $independentProbe = [Honk300TraySmoke]::ProbeNotificationArea()
     $owner = [Honk300TraySmoke]::FindWindow('honk300_status_tray_owner', 'Honk300 controls')
     if ($owner -eq [IntPtr]::Zero) {
         $taskbar = [Honk300TraySmoke]::FindWindow('Shell_TrayWnd', $null)
@@ -147,8 +190,11 @@ function Test-WindowsTrayRecovery {
             }
             Start-Sleep -Milliseconds 25
         }
-        if ($notificationHost -ne [IntPtr]::Zero) {
-            throw "Windows tray owner HWND is missing even though TrayNotifyWnd is available: $runtimeMessage"
+        if ($independentProbe) {
+            throw "Honk300 tray registration failed even though an independent Shell_NotifyIconW probe succeeded: $runtimeMessage"
+        }
+        if (-not $AllowUnavailableTrayHost) {
+            throw "Shell_NotifyIconW is unavailable and this runner has no explicit waiver: $runtimeMessage"
         }
         if ($runtimeMessage -notmatch 'Windows notification-area controls are unavailable; CLI controls remain active') {
             throw "Windows tray owner and TrayNotifyWnd are unavailable without explicit runtime degradation: $runtimeMessage"
@@ -158,6 +204,7 @@ availability=unavailable
 reason=no TrayNotifyWnd notification-area host in the interactive runner session
 taskbar=0x$($taskbar.ToInt64().ToString('X'))
 notification_host=0x$($notificationHost.ToInt64().ToString('X'))
+independent_shell_probe=$($independentProbe.ToString().ToLowerInvariant())
 guid=$guid
 accessible_name=Honk300 controls
 runtime_message=$($runtimeMessage.Trim())
@@ -171,6 +218,9 @@ runtime_message=$($runtimeMessage.Trim())
     $beforeRect = [Honk300TraySmoke+Rect]::new()
     $before = [Honk300TraySmoke]::Shell_NotifyIconGetRect([ref] $identifier, [ref] $beforeRect)
     if ($before -ne 0) { throw "Windows tray icon is not registered (HRESULT $before)" }
+    if (-not $independentProbe) {
+        throw 'Honk300 registered its icon but the independent Shell_NotifyIconW control probe failed'
+    }
 
     # Remove only the exact fixed-GUID item, then deliver the same registered broadcast Explorer
     # sends after taskbar recreation. The runtime must re-add and reapply NOTIFYICON_VERSION_4.
@@ -206,6 +256,7 @@ runtime_message=$($runtimeMessage.Trim())
 owner=0x$($owner.ToInt64().ToString('X'))
 guid=$guid
 accessible_name=Honk300 controls
+independent_shell_probe=$($independentProbe.ToString().ToLowerInvariant())
 before_rect=$($beforeRect.Left),$($beforeRect.Top),$($beforeRect.Right),$($beforeRect.Bottom)
 missing_hresult=$missing
 taskbar_created_message=$taskbarCreated

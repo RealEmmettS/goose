@@ -32,6 +32,11 @@ gate rather than a fabricated local claim.
 
 ## Activity
 
+- 2026-07-17 08:36 — CI run 29583883172 confirmed both shell window classes exist on the ARM64
+  runner, so class presence is not a valid capability oracle. Replaced the heuristic with an
+  independent minimal stock-icon Shell_NotifyIconW control registration. Honk300 now fails the
+  smoke whenever that control succeeds; only a control failure plus the runtime's explicit
+  degradation may use the ARM-hosted workflow's narrowly scoped waiver. (agent: codex)
 - 2026-07-17 08:26 — CI run 29583354618 showed the ARM64 automation session has a top-level
   `Shell_TrayWnd` but still rejects Shell_NotifyIconW with E_FAIL. Refined the host test to the
   actual `TrayNotifyWnd` notification-area child; the Alienware has both layers. A missing child

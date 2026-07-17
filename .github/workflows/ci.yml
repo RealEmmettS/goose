@@ -110,7 +110,8 @@ jobs:
             target/aarch64-pc-windows-msvc/release/honk300.exe
           ./script/smoke_windows_overlay.ps1 `
             -Binary target/aarch64-pc-windows-msvc/release/honk300.exe `
-            -EvidenceDirectory target/windows-overlay-evidence-arm64
+            -EvidenceDirectory target/windows-overlay-evidence-arm64 `
+            -AllowUnavailableTrayHost
       - name: Upload Windows ARM64 overlay qualification evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
