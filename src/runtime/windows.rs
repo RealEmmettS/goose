@@ -1,5 +1,6 @@
 use crate::assets;
 use crate::audio;
+use crate::runtime::control_surface;
 use crate::runtime::core::RuntimeCore;
 use crate::runtime::{audio_probe_capability, RuntimeOptions};
 use honk_config::{BackendCapability, BackendState, Config, EffectiveOptions};
@@ -18,7 +19,7 @@ use honk_engine::{
 };
 use honk_platform_windows::{
     init_dpi_awareness, local_time, pointer_state, presence_state, warp_cursor,
-    CollectWindowController, ForeignWindowWatcher, Overlay,
+    CollectWindowController, ForeignWindowWatcher, Overlay, StatusTray,
 };
 
 pub fn run(
@@ -34,6 +35,15 @@ pub fn run(
     init_dpi_awareness();
 
     let mut overlay = Overlay::new()?;
+    let mut status_tray = match StatusTray::new() {
+        Ok(tray) => Some(tray),
+        Err(error) => {
+            eprintln!(
+                "honk300: Windows notification-area controls are unavailable; CLI controls remain active ({error})"
+            );
+            None
+        }
+    };
     let primary_bounds = overlay.primary_monitor_bounds();
 
     // Backend capability only: Windows can always warp the cursor. The user's mouse-steal
@@ -122,6 +132,25 @@ pub fn run(
     loop {
         if !overlay.pump() {
             break;
+        }
+
+        if status_tray
+            .as_mut()
+            .is_some_and(|tray| tray.maintain().is_err())
+        {
+            eprintln!(
+                "honk300: Windows notification-area controls could not be restored; CLI controls remain active."
+            );
+            status_tray = None;
+        }
+        while let Some(command) = status_tray.as_ref().and_then(StatusTray::take_command) {
+            if let Err(error) = control_surface::handle_command(
+                command,
+                &mut world,
+                control_surface::open_configuration_tui,
+            ) {
+                eprintln!("honk300: Configure could not open ({error})");
+            }
         }
 
         // A monitor's DPI, resolution, or the display topology changed (WM_DPICHANGED /

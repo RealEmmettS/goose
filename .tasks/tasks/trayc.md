@@ -18,19 +18,23 @@ One reviewed contract covers accessibility naming, Configure terminal/TUI restor
 
 ## Verification
 
-- [ ] Maintained dependency choices and supported target implications are documented from primary sources.
-- [ ] A new ADR records the shared contract, rejected alternatives, packaging shape, and failure behavior.
-- [ ] Automated tests prove Configure uses the existing config TUI and Quit cannot take an abrupt process-exit path.
-- [ ] Canonical icon derivation and package-presence checks pass for Windows and Linux artifacts.
+- [x] Maintained dependency choices and supported target implications are documented from primary sources.
+- [x] A new ADR records the shared contract, rejected alternatives, packaging shape, and failure behavior.
+- [x] Automated tests prove Configure uses the existing config TUI and Quit cannot take an abrupt process-exit path.
+- [x] Canonical icon derivation and package-presence checks pass for Windows and Linux artifacts.
 
 ## Status
 
-Active. Public v1.0.3 and its exact-SHA/post-release evidence are complete. Next: research the
-supported native Windows/Linux tray dependencies and event-loop boundaries, then record the shared
-contract before implementation.
+Done. ADR 0030, the shared control enum/router, deterministic embedded icon representations,
+Debian package ownership, and platform-neutral regression tests are complete. Windows and Linux
+native qualification remain in their own tasks.
 
 ## Activity
 
+- 2026-07-17 08:25 — completed all four subtasks. Native Win32 plus pure-Rust StatusNotifierItem
+  boundaries are accepted, musl cross-check passes, and shared action/icon/package tests are in
+  place. Debian package-tree execution remains correctly assigned to Linux because this
+  non-elevated Windows host cannot create its Unix symlinks. (agent: codex)
 - 2026-07-17 07:20 — moved To-Do → Active after immutable v1.0.3 and public verification closed
   `#r103`. Scope remains the four board subtasks only. (agent: codex)
 - 2026-07-17 04:45 — created as the shared prerequisite for #wtray and #ltray under milestone #v110. (agent: codex)

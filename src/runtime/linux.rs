@@ -1,5 +1,6 @@
 use crate::assets;
 use crate::audio;
+use crate::runtime::control_surface;
 use crate::runtime::core::RuntimeCore;
 use crate::runtime::{audio_probe_capability, RuntimeOptions};
 use honk_config::{BackendCapability, BackendState, Config, EffectiveOptions};
@@ -19,7 +20,7 @@ use honk_engine::{
 use honk_platform_linux::{
     display_collect_window_supported, display_cursor_mischief_supported,
     display_foreign_window_watch_supported, local_time, presence_supported, DisplayServer, Overlay,
-    OverlayMode, SessionInfo,
+    OverlayMode, SessionInfo, StatusTray,
 };
 
 pub fn run(
@@ -32,6 +33,15 @@ pub fn run(
 
     let session = SessionInfo::detect(options.cli_overrides.wayland || config.platform.wayland);
     let mut overlay = Overlay::new(session.display_server)?;
+    let mut status_tray = match StatusTray::new() {
+        Ok(tray) => Some(tray),
+        Err(error) => {
+            eprintln!(
+                "honk300: Linux StatusNotifier controls are unavailable; CLI controls remain active ({error})"
+            );
+            None
+        }
+    };
     let overlay_mode = overlay.mode();
     let display_server = overlay.display_server();
     eprintln!(
@@ -99,6 +109,22 @@ pub fn run(
         if !overlay.pump() {
             eprintln!("honk300: Linux overlay closed.");
             return Ok(());
+        }
+
+        if status_tray.as_ref().is_some_and(StatusTray::is_closed) {
+            eprintln!(
+                "honk300: Linux StatusNotifier controls stopped; CLI controls remain active."
+            );
+            status_tray = None;
+        }
+        while let Some(command) = status_tray.as_ref().and_then(StatusTray::take_command) {
+            if let Err(error) = control_surface::handle_command(
+                command,
+                &mut world,
+                control_surface::open_configuration_tui,
+            ) {
+                eprintln!("honk300: Configure could not open ({error})");
+            }
         }
 
         if overlay.take_topology_changed() {

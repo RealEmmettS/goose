@@ -218,12 +218,21 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            grim imagemagick libasound2-dev openbox python3 sway swaybg x11-utils \
+            dbus grim imagemagick libasound2-dev openbox python3 sway swaybg x11-utils \
             x11-xserver-utils xcompmgr xvfb
 
       - name: Install native packages
         run: |
           ${{ matrix.packages_install }}
+
+      - name: Prove Linux StatusNotifier hosted protocol
+        if: ${{ runner.os == 'Linux' && contains(join(matrix.targets, ','), '-unknown-linux-') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dbus-run-session -- \
+            cargo test --locked -p honk-platform-linux --test linux_status_notifier -- \
+              --ignored --test-threads=1
 
       - name: Build exact-tag portable artifacts
         shell: bash

@@ -1,5 +1,6 @@
 use crate::assets;
 use crate::audio;
+use crate::runtime::control_surface;
 use crate::runtime::core::RuntimeCore;
 use crate::runtime::macos_accessibility::{
     safe_anchor, transition, AccessibilityOnboarding, PermissionTransition,
@@ -22,7 +23,7 @@ use honk_engine::{
 use honk_platform_macos::{
     accessibility_state, local_time, main_bundle_release_metadata, open_accessibility_settings,
     open_configuration_tui, presence_state, request_accessibility_prompt, warp_cursor,
-    AccessibilityState, CollectWindowController, ForeignWindowWatcher, Overlay, StatusMenuCommand,
+    AccessibilityState, CollectWindowController, ForeignWindowWatcher, Overlay,
 };
 
 pub fn run(
@@ -130,7 +131,7 @@ pub fn run(
 
         if let Some(command) = overlay.take_status_menu_command() {
             if let Err(err) =
-                handle_status_menu_command(command, &mut world, open_configuration_tui)
+                control_surface::handle_command(command, &mut world, open_configuration_tui)
             {
                 eprintln!("honk300: Configure could not open ({err})");
             }
@@ -488,21 +489,6 @@ pub fn run(
     }
 
     Ok(())
-}
-
-fn handle_status_menu_command(
-    command: StatusMenuCommand,
-    world: &mut World,
-    open_configuration: impl FnOnce() -> std::io::Result<()>,
-) -> std::io::Result<()> {
-    match command {
-        StatusMenuCommand::Configure => open_configuration(),
-        StatusMenuCommand::Quit => {
-            println!("honk300: menu-bar Quit received; walking home.");
-            RuntimeCore::begin_graceful_stop(world);
-            Ok(())
-        }
-    }
 }
 
 fn prepare_dirty_canvas(
@@ -978,33 +964,6 @@ mod tests {
             }),
             BackendCapability::Unsupported
         );
-    }
-
-    #[test]
-    fn menu_bar_configure_uses_the_shared_terminal_tui_launcher() {
-        let mut world = World::new(Rect::new(Vec2::ZERO, Vec2::new(1200.0, 800.0)), 7);
-        let mut opened = false;
-
-        handle_status_menu_command(StatusMenuCommand::Configure, &mut world, || {
-            opened = true;
-            Ok(())
-        })
-        .expect("configuration launcher should succeed");
-
-        assert!(opened);
-        assert!(!world.graceful_exit_requested());
-    }
-
-    #[test]
-    fn menu_bar_quit_requests_the_existing_graceful_walk_off() {
-        let mut world = World::new(Rect::new(Vec2::ZERO, Vec2::new(1200.0, 800.0)), 7);
-
-        handle_status_menu_command(StatusMenuCommand::Quit, &mut world, || {
-            panic!("Quit must not invoke the configuration launcher")
-        })
-        .expect("Quit should be accepted");
-
-        assert!(world.graceful_exit_requested());
     }
 
     #[test]

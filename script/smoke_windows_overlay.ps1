@@ -69,6 +69,109 @@ public static class Honk300DpiAwareness {
 }
 '@
     $script:DpiAwarenessMode = [Honk300DpiAwareness]::EnablePerMonitorV2()
+
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class Honk300TraySmoke {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct NotifyIconData {
+        public uint cbSize;
+        public IntPtr hWnd;
+        public uint uID;
+        public uint uFlags;
+        public uint uCallbackMessage;
+        public IntPtr hIcon;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string szTip;
+        public uint dwState;
+        public uint dwStateMask;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string szInfo;
+        public uint uVersion;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string szInfoTitle;
+        public uint dwInfoFlags;
+        public Guid guidItem;
+        public IntPtr hBalloonIcon;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NotifyIdentifier {
+        public uint cbSize;
+        public IntPtr hWnd;
+        public uint uID;
+        public Guid guidItem;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rect { public int Left, Top, Right, Bottom; }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    public static extern bool Shell_NotifyIcon(uint message, ref NotifyIconData data);
+    [DllImport("shell32.dll")]
+    public static extern int Shell_NotifyIconGetRect(ref NotifyIdentifier id, out Rect rect);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr FindWindow(string className, string title);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern uint RegisterWindowMessage(string name);
+    [DllImport("user32.dll")]
+    public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+}
+'@
+}
+
+function Test-WindowsTrayRecovery {
+    param([Parameter(Mandatory = $true)] [string] $EvidencePath)
+
+    $guid = [Guid]'1282821f-82b6-42e2-945b-ef2fe8d9fbda'
+    $owner = [Honk300TraySmoke]::FindWindow('honk300_status_tray_owner', 'Honk300 controls')
+    if ($owner -eq [IntPtr]::Zero) { throw 'Windows tray owner HWND is missing' }
+
+    $identifier = [Honk300TraySmoke+NotifyIdentifier]::new()
+    $identifier.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($identifier)
+    $identifier.guidItem = $guid
+    $beforeRect = [Honk300TraySmoke+Rect]::new()
+    $before = [Honk300TraySmoke]::Shell_NotifyIconGetRect([ref] $identifier, [ref] $beforeRect)
+    if ($before -ne 0) { throw "Windows tray icon is not registered (HRESULT $before)" }
+
+    # Remove only the exact fixed-GUID item, then deliver the same registered broadcast Explorer
+    # sends after taskbar recreation. The runtime must re-add and reapply NOTIFYICON_VERSION_4.
+    $data = [Honk300TraySmoke+NotifyIconData]::new()
+    $data.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($data)
+    $data.hWnd = $owner
+    $data.uID = 1
+    $data.uFlags = 0x20 # NIF_GUID
+    $data.guidItem = $guid
+    if (-not [Honk300TraySmoke]::Shell_NotifyIcon(2, [ref] $data)) { # NIM_DELETE
+        throw 'could not remove exact tray icon before recreation probe'
+    }
+    $missingRect = [Honk300TraySmoke+Rect]::new()
+    $missing = [Honk300TraySmoke]::Shell_NotifyIconGetRect([ref] $identifier, [ref] $missingRect)
+    if ($missing -eq 0) { throw 'tray icon remained registered after exact NIM_DELETE' }
+
+    $taskbarCreated = [Honk300TraySmoke]::RegisterWindowMessage('TaskbarCreated')
+    if ($taskbarCreated -eq 0 -or -not [Honk300TraySmoke]::PostMessage(
+        $owner, $taskbarCreated, [IntPtr]::Zero, [IntPtr]::Zero
+    )) {
+        throw 'could not deliver TaskbarCreated to the tray owner'
+    }
+    $after = -1
+    $afterRect = [Honk300TraySmoke+Rect]::new()
+    for ($attempt = 0; $attempt -lt 40; $attempt += 1) {
+        Start-Sleep -Milliseconds 25
+        $after = [Honk300TraySmoke]::Shell_NotifyIconGetRect([ref] $identifier, [ref] $afterRect)
+        if ($after -eq 0) { break }
+    }
+    if ($after -ne 0) { throw "tray icon did not recover after TaskbarCreated (HRESULT $after)" }
+
+    Set-Content -LiteralPath $EvidencePath -Encoding utf8NoBOM -Value @"
+owner=0x$($owner.ToInt64().ToString('X'))
+guid=$guid
+accessible_name=Honk300 controls
+before_rect=$($beforeRect.Left),$($beforeRect.Top),$($beforeRect.Right),$($beforeRect.Bottom)
+missing_hresult=$missing
+taskbar_created_message=$taskbarCreated
+after_rect=$($afterRect.Left),$($afterRect.Top),$($afterRect.Right),$($afterRect.Bottom)
+"@
 }
 
 function Write-TextFileAtomically {
@@ -773,6 +876,7 @@ light_sha256=$lightProofHash
     $runtime = Start-ExactRuntime -Label 'first'
     $firstPid = $runtime.Id
     Wait-ForRuntime -Process $runtime -EvidenceName 'status-start.txt'
+    Test-WindowsTrayRecovery -EvidencePath (Join-Path $evidence 'tray-recovery.txt')
 
     $duplicate = Invoke-ExactBinary -Arguments @('start', '--config', $config, '--no-sound') `
         -EvidenceName 'single-instance.txt'

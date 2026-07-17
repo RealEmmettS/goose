@@ -25,8 +25,16 @@ Supported X11/XWayland and native Wayland reduced-mode sessions expose the share
 
 ## Status
 
-To-Do; blocked on #trayc.
+Active. The pinned pure-Rust StatusNotifier implementation, shared command routing, embedded ARGB
+icon, no-shell terminal selection, deterministic unavailable degradation, and Debian icon ownership
+are implemented. Native hosted D-Bus and X11/Wayland jobs are now the remaining gate.
 
 ## Activity
 
+- 2026-07-17 08:02 — moved To-Do → Active after #wtray closed. Added the hosted private-D-Bus
+  watcher/host protocol test for accessible identity, embedded icon, both menu actions, explicit
+  no-host/missing-watcher failures, and watcher recovery. The compositor smoke now forces and
+  asserts the no-session-bus path independently under both X11 and native Wayland reduced mode.
+  Debian owns the canonical icon under hicolor and removes it with the package. Musl test code
+  cross-checks cleanly; native x64/ARM64 hosted execution is pending CI. (agent: codex)
 - 2026-07-17 04:45 — created from the operator's direct Linux tray request under milestone #v110. (agent: codex)

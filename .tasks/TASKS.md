@@ -7,16 +7,6 @@
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## To-Do
-- [ ] **Windows tray implementation and native qualification** - add an accessible goose tray icon with Configure and graceful Quit, package it correctly, and prove it on the Alienware (needs #trayc) (ms #v110) (owner codex) #wtray
-  - [ ] Implement the Windows notification-area icon and native action routing.
-  - [ ] Preserve terminal restoration, local IPC, permissions, singleton, and animated graceful exit.
-  - [ ] Integrate installer ownership, upgrade, repair, and uninstall behavior.
-  - [ ] Qualify keyboard/accessibility, Explorer restart, immediate restart, DPI, and multi-monitor behavior.
-- [ ] **Linux tray implementation and hosted qualification** - add the same accessible Configure/graceful-Quit controls without overstating X11 or native Wayland capabilities (needs #trayc) (ms #v110) (owner codex) #ltray
-  - [ ] Implement the supported Linux status-notifier path with explicit unavailable degradation.
-  - [ ] Preserve one TUI schema, graceful IPC stop, terminal protection, and X11/Wayland capability boundaries.
-  - [ ] Integrate archive, Debian, install, update, and uninstall ownership.
-  - [ ] Qualify X11 and native Wayland reduced mode in hosted/native Linux jobs and document unavailable desktop-shell cases.
 - [ ] **Publish v1.1.0 cross-platform tray parity** - run the full exact-SHA matrix, publish immutable artifacts, verify updates and stable/latest, and deploy synchronized docs/site changes (needs #wtray, #ltray) (ms #v110) (owner codex) #r110
   - [ ] Synchronize version, ADRs, README, guidance, task records, and both changelogs.
   - [ ] Pass local, cross-target, packaging, security, workflow, and platform-native gates.
@@ -24,13 +14,28 @@
   - [ ] Publish atomically, pass post-release smoke, fresh-download artifacts, verify updates, and finish on clean main.
 
 ## Active
-- [ ] **Shared tray contract and asset pipeline** - extend ADR 0028 into a platform-neutral Configure/graceful-Quit contract and reusable packaged goose icon assets (needs #r103) (ms #v110) (owner codex) #trayc
-  - [ ] Research native tray dependencies and event-loop constraints for supported Windows and Linux targets.
-  - [ ] Define the shared tray command/lifetime contract and terminal-launch behavior in a new ADR.
-  - [ ] Build reusable icon derivation and packaging checks from the canonical goose SVG.
-  - [ ] Add platform-neutral tests that prevent abrupt Quit or a second settings model.
+- [ ] **Linux tray implementation and hosted qualification** - add the same accessible Configure/graceful-Quit controls without overstating X11 or native Wayland capabilities (needs #trayc) (ms #v110) (owner codex) #ltray
+  - [x] Implement the supported Linux status-notifier path with explicit unavailable degradation.
+  - [x] Preserve one TUI schema, graceful IPC stop, terminal protection, and X11/Wayland capability boundaries.
+  - [x] Integrate archive, Debian, install, update, and uninstall ownership.
+  - [ ] Qualify X11 and native Wayland reduced mode in hosted/native Linux jobs and document unavailable desktop-shell cases.
 
 ## Done
+- [x] **Windows tray implementation and native qualification** - added one accessible fixed-GUID goose icon with Configure and graceful Quit, kept packaging ownership embedded, and proved recovery/lifecycle behavior on the Alienware (done 2026-07-17) #wtray
+  - [x] Implement the Windows notification-area icon and native action routing.
+  - [x] Preserve terminal restoration, local IPC, permissions, singleton, and animated graceful exit.
+  - [x] Integrate installer ownership, upgrade, repair, and uninstall behavior.
+  - [x] Qualify keyboard/accessibility, Explorer restart, immediate restart, DPI, and multi-monitor behavior.
+    > Alienware proof covered UI Automation/keyboard access, exact-executable TUI launch and restoration, 3.1-second animated Quit, immediate restart, fixed-GUID TaskbarCreated recovery, and 100% DPI. The host exposes one 1920x1080 display, so live multi-monitor proof is explicitly unavailable; signed-coordinate/topology tests and the native matrix remain mandatory.
+- [x] **Shared tray contract and asset pipeline** - defined the finite native action contract, accepted platform event-loop/dependency boundaries, shared one embedded goose representation, and prevented abrupt Quit or a second settings model (done 2026-07-17) #trayc
+  - [x] Research native tray dependencies and event-loop constraints for supported Windows and Linux targets.
+    > Native Win32 keeps the existing pump; pinned pure-Rust ksni compiles for musl without GTK/AppIndicator dependencies, while absent Linux watcher/host remains explicit.
+  - [x] Define the shared tray command/lifetime contract and terminal-launch behavior in a new ADR.
+    > ADR 0030 makes honk-control::ControlSurfaceCommand finite and routes Quit only through RuntimeCore::begin_graceful_stop.
+  - [x] Build reusable icon derivation and packaging checks from the canonical goose SVG.
+    > Both binaries embed the tracked 36x36 representation; native BGRA/ARGB contrast tests pass and Debian package/icon ownership assertions are wired for Linux CI.
+  - [x] Add platform-neutral tests that prevent abrupt Quit or a second settings model.
+    > Injected Configure/launcher tests and Quit isolation pass; Linux launchers use literal argument vectors without shell interpolation.
 - [x] **Publish v1.0.3 Alienware hardening** - published and independently verified the exact-SHA immutable patch with native/public Windows lifecycle, update-discovery, terminal-safety, signed Mac, Linux, Debian, stable/latest, and site evidence (done 2026-07-17) #r103
   - [x] Synchronize the patch version, ADR/readiness guidance, board evidence, and both changelogs.
   - [x] Pass the complete local, cross-target, packaging, workflow, audit, and native Windows gate.

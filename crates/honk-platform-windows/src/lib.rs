@@ -14,6 +14,10 @@
 
 #![cfg(windows)]
 
+mod tray;
+
+pub use tray::StatusTray;
+
 use honk_engine::collect_window::{
     CollectWindowCloseOrigin, CollectWindowId, CollectWindowKind, CollectWindowRequestId,
     CollectWindowSnapshot,

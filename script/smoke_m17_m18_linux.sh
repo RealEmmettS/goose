@@ -534,7 +534,11 @@ exercise_mode() {
   shift 3
 
   echo "smoke_m17_m18_linux: starting ${label}"
-  HONK300_SMOKE_FRAME="${frame}" "${BIN}" start --config "${CONFIG}" "$@" >"${log}" 2>&1 &
+  # This compositor fixture intentionally has no desktop-shell StatusNotifier host. Use a
+  # deterministic missing bus rather than relying on whatever session state the runner inherited;
+  # the hosted protocol path is exercised separately under a private dbus-run-session.
+  DBUS_SESSION_BUS_ADDRESS="unix:path=${WORK}/missing-session-bus" \
+    HONK300_SMOKE_FRAME="${frame}" "${BIN}" start --config "${CONFIG}" "$@" >"${log}" 2>&1 &
   PID="$!"
   wait_for_status "${log}"
   cat "${STATUS}"
@@ -580,6 +584,7 @@ need_cmd xdpyinfo
 start_x11_server
 exercise_mode "X11 visible overlay" "${WORK}/x11-frame.png" "${WORK}/x11-runtime.log"
 grep -q "overlay mode is X11" "${WORK}/x11-runtime.log"
+grep -q "Linux StatusNotifier controls are unavailable; CLI controls remain active" "${WORK}/x11-runtime.log"
 grep -q "cursor: supported" "${STATUS}"
 grep -q "window: supported" "${STATUS}"
 capture_x11_background_pairs
@@ -595,6 +600,7 @@ unset DISPLAY
 start_sway_headless
 exercise_mode "Wayland reduced mode" "${WORK}/wayland-frame.png" "${WORK}/wayland-runtime.log" --wayland
 grep -q "overlay mode is Wayland" "${WORK}/wayland-runtime.log"
+grep -q "Linux StatusNotifier controls are unavailable; CLI controls remain active" "${WORK}/wayland-runtime.log"
 grep -Eq "cursor: (unsupported|failed)" "${STATUS}"
 grep -Eq "window: (unsupported|failed)" "${STATUS}"
 grep -Eq "collect: (unsupported|failed)" "${STATUS}"

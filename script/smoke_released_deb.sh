@@ -20,6 +20,7 @@ ROOT="$(mktemp -d "${TMPDIR:-/tmp}/honk300-deb-smoke.XXXXXX")"
 PACKAGE="$ROOT/honk300-$ARCHITECTURE.deb"
 LATEST_PACKAGE="$ROOT/latest-honk300-$ARCHITECTURE.deb"
 SIDECAR="$ROOT/honk300-$ARCHITECTURE.deb.sha256"
+PACKAGED_TRAY_ICON=/usr/share/icons/hicolor/36x36/apps/honk300.png
 trap 'sudo dpkg --remove honk300 >/dev/null 2>&1 || true; rm -rf "$ROOT"' EXIT HUP INT TERM
 
 HOME="$ROOT/home"
@@ -76,6 +77,7 @@ install_and_verify() {
   sudo apt-get install --yes "$PACKAGE"
   [ -x /usr/lib/honk300/honk300 ]
   [ "$(cat /usr/lib/honk300/install-source.txt)" = deb ]
+  [ -f "$PACKAGED_TRAY_ICON" ] && [ ! -L "$PACKAGED_TRAY_ICON" ]
   ldd /usr/lib/honk300/honk300 > "$EVIDENCE_DIR/installed-ldd.txt"
   if grep -F 'not found' "$EVIDENCE_DIR/installed-ldd.txt"; then
     printf 'Debian package left a runtime library unresolved\n' >&2
@@ -113,6 +115,7 @@ if dpkg-query --show honk300 >/dev/null 2>&1; then
 fi
 [ -f "$XDG_DATA_HOME/honk300/media/Notes/user-note.txt" ]
 for name in honk300 honk goose; do [ ! -e "/usr/bin/$name" ]; done
+[ ! -e "$PACKAGED_TRAY_ICON" ] && [ ! -L "$PACKAGED_TRAY_ICON" ]
 
 install_and_verify
 /usr/bin/honk300 uninstall --purge
@@ -123,6 +126,7 @@ fi
 [ ! -d "$XDG_DATA_HOME/honk300" ]
 find "$XDG_DATA_HOME/honk300-backups" -type f -name user-note.txt -print -quit | grep -q .
 for name in honk300 honk goose; do [ ! -e "/usr/bin/$name" ]; done
+[ ! -e "$PACKAGED_TRAY_ICON" ] && [ ! -L "$PACKAGED_TRAY_ICON" ]
 
 printf 'published Debian %s %s install, aliases, compositor, update, uninstall, and purge passed\n' \
   "$ARCHITECTURE" "$TAG"

@@ -4,6 +4,12 @@
 //! session detection, local-time sampling, fallback bounds, and terminal-target classifier
 //! out of `honk-engine` while the X11/Wayland presentation backends continue to mature.
 
+#[cfg(target_os = "linux")]
+mod tray;
+
+#[cfg(target_os = "linux")]
+pub use tray::StatusTray;
+
 use honk_engine::{LocalTime, Rect, Vec2};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

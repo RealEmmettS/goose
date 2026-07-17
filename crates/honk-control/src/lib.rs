@@ -16,3 +16,14 @@ pub use protocol::{
     BundleStatus, CapabilityStatus, ControlCommand, ControlResponse, PlatformStatus, ProtocolError,
     RuntimeStatus,
 };
+
+/// A user action emitted by an operating-system control surface.
+///
+/// This is intentionally smaller than [`ControlCommand`]. Native trays and the macOS menu bar
+/// may open the existing configuration TUI or request the existing graceful shutdown, but they
+/// do not gain a second configuration model or a new IPC command namespace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControlSurfaceCommand {
+    Configure,
+    Quit,
+}

@@ -90,10 +90,22 @@ def build_package_tree(
         "Name=Honk300\n"
         "Comment=Desktop goose for your screen\n"
         "Exec=/usr/bin/honk300 start\n"
+        "Icon=honk300\n"
         "Terminal=false\n"
         "Categories=Utility;Game;\n"
         "StartupNotify=false\n",
     )
+    icon_source = (
+        Path(__file__).resolve().parents[1]
+        / "Assets"
+        / "UI"
+        / "honk300-status-goose@2x.png"
+    )
+    icon_destination = (
+        root / "usr" / "share" / "icons" / "hicolor" / "36x36" / "apps" / "honk300.png"
+    )
+    icon_destination.parent.mkdir(parents=True)
+    shutil.copyfile(_regular_file(icon_source, "status icon"), icon_destination)
     license_source = Path(__file__).resolve().parents[1] / "LICENSE"
     documentation = root / "usr" / "share" / "doc" / "honk300"
     documentation.mkdir(parents=True)

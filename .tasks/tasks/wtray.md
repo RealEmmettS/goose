@@ -25,8 +25,22 @@ The installed Global MSI and supported portable/bootstrap paths expose one acces
 
 ## Status
 
-To-Do; blocked on #trayc.
+Done. Native notification-area ownership, exact-executable Configure, animated Quit, TaskbarCreated
+recovery, accessible identity, packaging ownership, and the available Alienware hardware paths are
+proven. The host has one display, so multi-monitor behavior retains the explicit test/native-matrix
+gate rather than a fabricated local claim.
 
 ## Activity
 
+- 2026-07-17 08:02 — moved Active → Done. The amended exact-binary Windows smoke removed the
+  fixed-GUID icon, proved it absent, delivered TaskbarCreated, and verified the same item/rectangle
+  returned. UI Automation found one accessible `Honk300 controls` button; native keyboard menu use
+  opened the full TUI from the exact executable and restored it, while Quit completed the walk-off
+  in 3.1 seconds and immediate singleton restart succeeded. Packaging contracts passed; the icon is
+  embedded in the binary, so no separately owned Windows file or registry integration can orphan.
+  The single-display Alienware records the live multi-monitor hardware waiver. (agent: codex)
+- 2026-07-17 08:25 — moved To-Do → Active after #trayc closed. Implemented retained
+  Shell_NotifyIconW v4 ownership, keyboard/context menus, exact-executable Configure, graceful
+  Quit routing, signed coordinates, and TaskbarCreated re-add; focused Windows tests pass.
+  (agent: codex)
 - 2026-07-17 04:45 — created from the operator's direct Windows tray request under milestone #v110. (agent: codex)

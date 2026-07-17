@@ -9,6 +9,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+honk-control = { path = "../honk-control" }
 honk-engine = { path = "../honk-engine" }
 tiny-skia.workspace = true
 

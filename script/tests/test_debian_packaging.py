@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+STATUS_ICON = ROOT / "Assets" / "UI" / "honk300-status-goose@2x.png"
 SCRIPT = ROOT / "script" / "package_deb.py"
 SPEC = importlib.util.spec_from_file_location("package_deb", SCRIPT)
 assert SPEC and SPEC.loader
@@ -51,6 +52,18 @@ class DebianPackagingTests(unittest.TestCase):
             self.assertIn("libasound2 | libasound2t64", control)
             desktop = (staging / "usr" / "share" / "applications" / "honk300.desktop").read_text()
             self.assertIn("Exec=/usr/bin/honk300 start", desktop)
+            self.assertIn("Icon=honk300", desktop)
+            packaged_icon = (
+                staging
+                / "usr"
+                / "share"
+                / "icons"
+                / "hicolor"
+                / "36x36"
+                / "apps"
+                / "honk300.png"
+            )
+            self.assertEqual(packaged_icon.read_bytes(), STATUS_ICON.read_bytes())
 
     def test_rejects_mismatched_release_identity_and_unsafe_input(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

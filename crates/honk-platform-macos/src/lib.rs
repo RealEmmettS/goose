@@ -123,6 +123,7 @@ mod platform {
         appkit_coordinate_space, appkit_frame_for_world_rect, appkit_point_to_world,
         is_protected_terminal_app, AppKitFrame, DragClassifier,
     };
+    use honk_control::ControlSurfaceCommand;
     use honk_engine::collect_window::{
         CollectWindowCloseOrigin, CollectWindowId, CollectWindowKind, CollectWindowRequestId,
         CollectWindowSnapshot,
@@ -182,12 +183,6 @@ mod platform {
         Denied,
     }
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub enum StatusMenuCommand {
-        Configure,
-        Quit,
-    }
-
     #[derive(Debug, Default)]
     struct StatusMenuTargetIvars {
         configure_requested: Cell<bool>,
@@ -229,12 +224,12 @@ mod platform {
             unsafe { msg_send![super(this), init] }
         }
 
-        fn take_command(&self) -> Option<StatusMenuCommand> {
+        fn take_command(&self) -> Option<ControlSurfaceCommand> {
             if self.ivars().quit_requested.replace(false) {
                 self.ivars().configure_requested.set(false);
-                Some(StatusMenuCommand::Quit)
+                Some(ControlSurfaceCommand::Quit)
             } else if self.ivars().configure_requested.replace(false) {
-                Some(StatusMenuCommand::Configure)
+                Some(ControlSurfaceCommand::Configure)
             } else {
                 None
             }
@@ -326,7 +321,7 @@ mod platform {
             })
         }
 
-        fn take_command(&self) -> Option<StatusMenuCommand> {
+        fn take_command(&self) -> Option<ControlSurfaceCommand> {
             self.target.take_command()
         }
     }
@@ -566,7 +561,7 @@ mod platform {
             autoreleasepool(|_| self.pump_inner())
         }
 
-        pub fn take_status_menu_command(&self) -> Option<StatusMenuCommand> {
+        pub fn take_status_menu_command(&self) -> Option<ControlSurfaceCommand> {
             self.status_menu.take_command()
         }
 
@@ -1914,7 +1909,7 @@ pub use platform::{
     accessibility_state, local_time, main_bundle_release_metadata, open_accessibility_settings,
     open_configuration_tui, presence_state, request_accessibility_prompt, warp_cursor,
     AccessibilityState, CollectWindowController, ForeignWindowWatcher, MacBundleReleaseMetadata,
-    Overlay, StatusMenuCommand,
+    Overlay,
 };
 
 #[cfg(test)]

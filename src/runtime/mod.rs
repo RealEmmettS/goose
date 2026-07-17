@@ -14,6 +14,9 @@ pub mod linux;
 mod core;
 
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+mod control_surface;
+
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use honk_config::BackendCapability;
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use honk_config::{CliOverrides, Config};

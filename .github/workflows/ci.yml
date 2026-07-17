@@ -172,11 +172,16 @@ jobs:
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway swaybg grim
+          sudo apt-get install -y dbus libasound2-dev xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway swaybg grim
       - name: Install Rust targets
         run: rustup target add ${{ matrix.gnu_target }} ${{ matrix.musl_target }}
       - name: Test
         run: cargo test --workspace
+      - name: Linux StatusNotifier hosted protocol
+        run: >-
+          dbus-run-session --
+          cargo test --locked -p honk-platform-linux --test linux_status_notifier --
+          --ignored --test-threads=1
       - name: Linux X11 and Wayland smoke
         run: |
           cargo build --locked --bin honk300
