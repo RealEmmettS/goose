@@ -135,12 +135,13 @@ mod platform {
     use objc2::MainThreadMarker;
     use objc2::{define_class, msg_send, sel, AnyThread, DefinedClass, MainThreadOnly};
     use objc2_app_kit::{
-        NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSBitmapFormat,
-        NSBitmapImageRep, NSColor, NSColorSpace, NSDeviceRGBColorSpace, NSEvent, NSEventMask,
-        NSImage, NSImageAlignment, NSImageCacheMode, NSImageRep, NSImageScaling, NSImageView,
-        NSMenu, NSMenuItem, NSRunningApplication, NSScreenSaverWindowLevel, NSStatusBar,
-        NSStatusItem, NSTextField, NSVariableStatusItemLength, NSView, NSWindow,
-        NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
+        NSAccessibility, NSApplication, NSApplicationActivationPolicy, NSBackingStoreType,
+        NSBitmapFormat, NSBitmapImageRep, NSCellImagePosition, NSColor, NSColorSpace,
+        NSDeviceRGBColorSpace, NSEvent, NSEventMask, NSImage, NSImageAlignment, NSImageCacheMode,
+        NSImageRep, NSImageScaling, NSImageView, NSMenu, NSMenuItem, NSRunningApplication,
+        NSScreenSaverWindowLevel, NSSquareStatusItemLength, NSStatusBar, NSStatusItem, NSTextField,
+        NSVariableStatusItemLength, NSView, NSWindow, NSWindowCollectionBehavior,
+        NSWindowStyleMask, NSWorkspace,
     };
     use objc2_application_services::{
         kAXTrustedCheckOptionPrompt, AXError, AXIsProcessTrusted, AXIsProcessTrustedWithOptions,
@@ -171,6 +172,9 @@ mod platform {
     const MAX_DISPLAYS: usize = 16;
     const DISPLAY_REFRESH_INTERVAL: Duration = Duration::from_millis(500);
     const APPKIT_EVENT_PUMP_INTERVAL: Duration = Duration::from_nanos(16_666_667);
+    const STATUS_ICON_RESOURCE: &str = "honk300-status-goose@2x";
+    const STATUS_ICON_EXTENSION: &str = "png";
+    const STATUS_ICON_SIZE: f64 = 18.0;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum AccessibilityState {
@@ -240,18 +244,42 @@ mod platform {
     struct StatusMenu {
         status_bar: Retained<NSStatusBar>,
         status_item: Retained<NSStatusItem>,
+        _image: Option<Retained<NSImage>>,
         _menu: Retained<NSMenu>,
         target: Retained<StatusMenuTarget>,
     }
 
     impl StatusMenu {
+        fn load_template_image() -> Option<Retained<NSImage>> {
+            let bundle = NSBundle::mainBundle();
+            let path = bundle.pathForResource_ofType(
+                Some(&NSString::from_str(STATUS_ICON_RESOURCE)),
+                Some(&NSString::from_str(STATUS_ICON_EXTENSION)),
+            )?;
+            let image = NSImage::initWithContentsOfFile(NSImage::alloc(), &path)?;
+            image.setSize(NSSize::new(STATUS_ICON_SIZE, STATUS_ICON_SIZE));
+            image.setTemplate(true);
+            Some(image)
+        }
+
         fn new(mtm: MainThreadMarker) -> io::Result<Self> {
             let status_bar = NSStatusBar::systemStatusBar();
             let status_item = status_bar.statusItemWithLength(NSVariableStatusItemLength);
             let button = status_item
                 .button(mtm)
                 .ok_or_else(|| io::Error::other("macOS did not provide a status-item button"))?;
-            button.setTitle(&NSString::from_str("Honk"));
+            let image = Self::load_template_image();
+            if let Some(image) = image.as_deref() {
+                status_item.setLength(NSSquareStatusItemLength);
+                button.setImage(Some(image));
+                button.setImagePosition(NSCellImagePosition::ImageOnly);
+                button.setImageScaling(NSImageScaling::ScaleProportionallyDown);
+                button.setTitle(&NSString::from_str(""));
+            } else {
+                // Keep unbundled development runs usable if their main bundle has no Resources.
+                button.setTitle(&NSString::from_str("Honk"));
+            }
+            button.setAccessibilityLabel(Some(&NSString::from_str("Honk300 controls")));
             button.setToolTip(Some(&NSString::from_str("Honk300 controls")));
 
             let target = StatusMenuTarget::new(mtm);
@@ -292,6 +320,7 @@ mod platform {
             Ok(Self {
                 status_bar,
                 status_item,
+                _image: image,
                 _menu: menu,
                 target,
             })
@@ -1857,6 +1886,25 @@ mod platform {
         fn newly_reconciled_window_inherits_cached_interactive_state() {
             assert!(!ignores_mouse_events_for_interactivity(true));
             assert!(ignores_mouse_events_for_interactivity(false));
+        }
+
+        #[test]
+        fn shared_status_icon_decodes_as_an_appkit_template() {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../Assets/UI/honk300-status-goose@2x.png");
+            let image = NSImage::initWithContentsOfFile(
+                NSImage::alloc(),
+                &NSString::from_str(&path.to_string_lossy()),
+            )
+            .expect("shared status PNG must decode through AppKit");
+
+            assert!(image.size().width > 0.0);
+            assert!(image.size().height > 0.0);
+            assert!(image.representations().firstObject().is_some());
+            image.setSize(NSSize::new(STATUS_ICON_SIZE, STATUS_ICON_SIZE));
+            image.setTemplate(true);
+            assert_eq!(image.size(), NSSize::new(18.0, 18.0));
+            assert!(image.isTemplate());
         }
     }
 }

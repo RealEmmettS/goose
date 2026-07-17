@@ -66,7 +66,7 @@ still build the full installer matrix because matching the `*300` family is an e
 | **Notes** | Copy screened original notepad messages 1:1 for personal-use builds and add **one custom goose-voiced counterpart per original**. |
 | **Config** | **TOML** (`config.toml`), original keys preserved at verified values, versioned + tolerant loader. No `EnableMods` key. |
 | **Modding** | **No external mods** (no DLL/`.so`/`.dylib`, no WASM, no third-party data mods). Autumn becomes a **built-in** season/task. Extensibility = **documented internal seams**. |
-| **Control** | **No Windows/Linux tray and no global quit key.** Starting, stopping, and configuration use the CLI/TUI over a **single-instance + IPC command channel** (`stop` / `do` / `reload`). ADR 0024 adds one macOS-only status item which opens that same TUI or requests the same graceful stop; it is not a second settings model. |
+| **Control** | **No global quit key.** Starting, stopping, and configuration use the CLI/TUI over a **single-instance + IPC command channel** (`stop` / `do` / `reload`). ADRs 0024/0028 add one macOS status item which opens that same TUI or requests the same graceful stop; it is not a second settings model. The shared goose icon and behavior are the contract for later Windows/Linux trays, which are not implemented in v1.0.2. |
 | **Protected windows** | The goose may visually overlay terminal windows, but must never move, focus, type into, ride, drag, collect, or otherwise manipulate terminal windows — even in spicy/default-off modes. |
 | **Default behavior** | Full original **prank, always-on**. `--no-mouse-steal` is opt-in; `pause_on_fullscreen` default on; a **Calm goose** TUI toggle is the opposite pole. |
 | **Config UI** | A **ratatui** Claude-Code/QubeTX-family-style TUI at `<name> config`, toggling every behavior incl. Autumn; **hot-apply where cheap**, restart-note otherwise. |
@@ -89,8 +89,8 @@ by default**: no telemetry, no network on its own, clean uninstall, explicit use
 ### 2.2 Non-Goals (out of scope for v1)
 Bit-for-bit binary compatibility with the original; loading the original .NET/Mono mods; **any
 external mod surface** (DLL/WASM/data); mobile platforms; a windowed GUI settings app; a
-Windows/Linux **system tray** or native preferences model (the macOS-only two-action status item
-is defined by ADR 0024); multi-goose "as a service"; runtime natural-language command parsing (the goose-speak
+native preferences model; Windows/Linux tray implementation in v1.0.2 (the shared future parity
+contract is defined by ADR 0028); multi-goose "as a service"; runtime natural-language command parsing (the goose-speak
 grammar is a fixed, finite phrase map — no model at runtime); networked features.
 
 ### 2.3 Guiding principles
@@ -521,14 +521,15 @@ carrying:
 **Wayland-safe** quit/poke transport. The channel is
 local-only, no network, authenticated to the same user (pipe/socket permissions).
 
-### 8.3 Control paths (one macOS status item, no Windows/Linux tray or global quit key)
+### 8.3 Control paths (one macOS status item; future tray parity; no global quit key)
 - **Start** uses the CLI (`<name>` / `<name> start`) and later the config TUI entry point.
 - **Stop** uses CLI/TUI commands over IPC (`<name> stop` / `honk bad` / `goose no honk`).
 - **Configure** uses `<name> config`; saves hot-apply via IPC `Reload` where possible.
-- **macOS graphical shortcut (ADR 0024):** the visible-while-running **Honk** status item opens
-  the same signed-bundle `<name> config` terminal TUI or converts Quit into the engine-owned
-  graceful-stop intent. It adds no native settings schema/window, running Dock control surface,
-  Windows/Linux tray, or immediate process termination.
+- **macOS graphical shortcut (ADRs 0024 and 0028):** the visible-while-running accessible goose
+  template item opens the same signed-bundle `<name> config` terminal TUI or converts Quit into
+  the engine-owned graceful-stop intent. It adds no native settings schema/window, running Dock
+  control surface, or immediate process termination. Future Windows/Linux trays must reuse this
+  shared icon, accessible naming, TUI launch, and graceful lifecycle rather than diverge.
 
 ---
 
@@ -729,11 +730,13 @@ helper verifies bundle id, signature, and matching Developer ID team before dele
 shared `honk300 install` transaction. Installation remains no-sudo and per-user at
 `~/Applications/Honk300.app`; the exact-tag shell bootstrap stays a secondary terminal path.
 `LSUIElement=true` keeps the product an agent with no native settings window, running Dock control
-surface, or AppleScript `.sdef` commands. ADR 0024 adds one status item while the runtime is alive:
-**Configure Honk300…** opens the existing signed-bundle terminal TUI, and **Quit Honk300** enters
-the existing graceful walk-off. The main-thread AppKit target is retained for the item's lifetime,
-and the packaged launcher is verified before signing and again in the app ZIP and DMG. There is no
-second configuration model or new IPC schema, and Windows/Linux remain tray-free.
+surface, or AppleScript `.sdef` commands. ADRs 0024/0028 add one accessible goose template item
+while the runtime is alive: **Configure Honk300…** opens the existing signed-bundle terminal TUI,
+and **Quit Honk300** enters the existing graceful walk-off. The main-thread AppKit image and weak
+target are retained for the item's lifetime; the canonical SVG, macOS 11-safe PNG representation,
+and launcher are verified before signing and again in the app ZIP and both DMG passes. There is no
+second configuration model or new IPC schema. Windows/Linux trays are later platform work governed
+by the same shared icon and behavior, not a v1.0.2 claim.
 
 Transparent overlay pixels are presented through reusable premultiplied-RGBA AppKit image views
 in the ordinary window backing store so WindowServer capture and screen sharing match the
@@ -827,6 +830,7 @@ being implemented three more times.
 | M18 | `--wayland` layer-shell degraded mode (stop/poke via IPC) | renders on Wayland; mischief self-disables; `goose stop` works |
 | M19 | install/update/uninstall(`--purge`)/setup + packaging **all targets** (Win x64+ARM64 ×4 installers, mac universal2 `.dmg`, Linux x64/ARM gnu+musl) + 3 aliases | installers produce working artifacts w/ autostart + shortcut on every OS/arch |
 | R6 / v1.0.1 (ADRs 0025–0027) | first public stable major release: native macOS qualification, AppKit RGBA repair, shared gait refinement, Developer ID/notarization, graphical per-user DMG, managed Accessibility first run, macOS menu-bar Configure/graceful Quit, native amd64/arm64 Debian packages, rolling latest platform-isolated updates, DMG-first site | physical-Mac product-equivalent renderer, menu/TUI/animated-Quit, denied/non-nag/grant/revoke Accessibility, lifecycle, and performance evidence passes with exact-final-SHA/tooling/display limitations recorded explicitly for forward verification; the full hosted native matrix passes on one exact release SHA; Windows evidence strictly accepts either complete renderer view while only GitHub's exact hosted ARM64 wallpaper signature may use post-success premultiplied-BGRA presenter evidence bound to a visible HWND; immutable tag assets and stable latest links are independently verified before promotion; the failed unpublished v1.0.0 tag remains immutable and later Alienware checks feed forward patch releases |
+| R7 / v1.0.2 (ADR 0028) | forward Mac production patch: shared Quiver goose control-surface source, macOS 11-safe template raster, explicit accessible image-only menu, sealed resource gates, and documented future Windows/Linux tray parity | physical-Mac icon/Configure/TUI/animated-Quit and performance evidence plus full exact-SHA cross-platform candidate, signing/notarization, atomic release, published v1.0.1→v1.0.2 CLI update, and latest-DMG website verification; Windows/Linux tray implementations remain deferred |
 
 Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
 and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus
@@ -882,9 +886,9 @@ durable macOS Accessibility for an un-bundled binary.
 - **C3** — Edition: TR/ND = 2021, WB = 2024. honk300 matches the family at **2021** (1.95
   supports either). The **workspace** is an intentional divergence from the single-crate `*300`
   repos.
-- **C4** — Start, stop, and configuration use the shared CLI/TUI/IPC model. ADR 0024 adds only a
+- **C4** — Start, stop, and configuration use the shared CLI/TUI/IPC model. ADRs 0024/0028 add a
   macOS status-item shortcut to that same TUI and graceful stop; there is no native preferences
-  model, Windows/Linux tray, or global quit key.
+  model or global quit key. Future Windows/Linux trays must reproduce that contract.
 - **C5** — `<name> install` ≠ "PATH + shell-autorun alias." For a GUI app it means autostart +
   shortcut/.desktop/LaunchAgent + `InstallSource` marker; install all three aliases.
 - **C6** — Reconsider `install-path`: dedicated install dirs over `CARGO_HOME`; keep
@@ -970,6 +974,6 @@ intentionally limited.
 
 ### Document control
 - **Historical role:** this plan defined the original implementation sequence; current behavior
-  is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, supplemental
-  hardware-verification task `#v1a`, and the readiness evidence.
+  is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, active v1.0.2 task
+  `#v102`, supplemental hardware-verification task `#v1a`, and the readiness evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

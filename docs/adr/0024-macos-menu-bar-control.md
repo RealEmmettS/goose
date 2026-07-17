@@ -1,6 +1,9 @@
 # ADR 0024 — macOS Menu-Bar Control
 
 - Status: Accepted (2026-07-14)
+- Superseded in part: ADR 0028 replaces only the visible **Honk** title and makes this action
+  behavior the parity contract for later Windows/Linux trays. All macOS lifecycle/control
+  decisions below remain historical and accepted.
 - Relates to: ADR 0004 (local control channel and terminal protection), ADR 0010 (macOS agent
   bundle), ADR 0020 (Developer ID app distribution), and ADR 0022 (Accessibility onboarding).
 - Supersedes: only the macOS portions of ADR 0004 and ADR 0010 that prohibit any menu-bar

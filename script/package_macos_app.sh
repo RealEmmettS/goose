@@ -55,6 +55,10 @@ ditto "$ROOT/THIRD_PARTY_ASSETS.md" "$RESOURCES_DIR/THIRD_PARTY_ASSETS.md"
 ditto "$ROOT/packaging/macos/Configure Honk300.command" \
   "$RESOURCES_DIR/Configure Honk300.command"
 chmod 755 "$RESOURCES_DIR/Configure Honk300.command"
+ditto "$ROOT/Assets/UI/honk300-status-goose.svg" \
+  "$RESOURCES_DIR/honk300-status-goose.svg"
+ditto "$ROOT/Assets/UI/honk300-status-goose@2x.png" \
+  "$RESOURCES_DIR/honk300-status-goose@2x.png"
 
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

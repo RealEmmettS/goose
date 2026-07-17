@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import struct
 import unittest
+import zlib
 from pathlib import Path
 
 
@@ -9,10 +11,71 @@ PACKAGE = (ROOT / "script" / "package_macos_app.sh").read_text(encoding="utf-8")
 HELPER_PACKAGE_PATH = ROOT / "script" / "package_macos_installer_helper.sh"
 HELPER_SOURCE_PATH = ROOT / "packaging" / "macos" / "InstallHonk300" / "main.swift"
 CONFIGURE_LAUNCHER_PATH = ROOT / "packaging" / "macos" / "Configure Honk300.command"
+STATUS_ICON_PATH = ROOT / "Assets" / "UI" / "honk300-status-goose.svg"
+STATUS_ICON_RUNTIME_PATH = ROOT / "Assets" / "UI" / "honk300-status-goose@2x.png"
 HELPER_PACKAGE = HELPER_PACKAGE_PATH.read_text(encoding="utf-8")
 WORKFLOW = (ROOT / ".github" / "workflows" / "macos-packaging.yml").read_text(
     encoding="utf-8"
 )
+
+
+def decode_rgba_png(path: Path) -> tuple[int, int, bytes]:
+    data = path.read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise AssertionError("status icon is not a PNG")
+
+    chunks: dict[bytes, list[bytes]] = {}
+    offset = 8
+    while offset < len(data):
+        length = struct.unpack(">I", data[offset : offset + 4])[0]
+        kind = data[offset + 4 : offset + 8]
+        payload = data[offset + 8 : offset + 8 + length]
+        chunks.setdefault(kind, []).append(payload)
+        offset += 12 + length
+
+    width, height, depth, color_type, compression, filtering, interlace = struct.unpack(
+        ">IIBBBBB", chunks[b"IHDR"][0]
+    )
+    if (depth, color_type, compression, filtering, interlace) != (8, 6, 0, 0, 0):
+        raise AssertionError("status icon must be a non-interlaced 8-bit RGBA PNG")
+
+    raw = zlib.decompress(b"".join(chunks[b"IDAT"]))
+    stride = width * 4
+    previous = bytearray(stride)
+    pixels = bytearray()
+    position = 0
+    for _ in range(height):
+        filter_kind = raw[position]
+        position += 1
+        scanline = bytearray(raw[position : position + stride])
+        position += stride
+        for index, value in enumerate(scanline):
+            left = scanline[index - 4] if index >= 4 else 0
+            above = previous[index]
+            upper_left = previous[index - 4] if index >= 4 else 0
+            if filter_kind == 1:
+                predictor = left
+            elif filter_kind == 2:
+                predictor = above
+            elif filter_kind == 3:
+                predictor = (left + above) // 2
+            elif filter_kind == 4:
+                estimate = left + above - upper_left
+                distances = (
+                    abs(estimate - left),
+                    abs(estimate - above),
+                    abs(estimate - upper_left),
+                )
+                predictor = (left, above, upper_left)[distances.index(min(distances))]
+            elif filter_kind == 0:
+                predictor = 0
+            else:
+                raise AssertionError(f"unsupported PNG filter {filter_kind}")
+            scanline[index] = (value + predictor) & 0xFF
+        pixels.extend(scanline)
+        previous = scanline
+
+    return width, height, bytes(pixels)
 
 
 class MacosPackagingTests(unittest.TestCase):
@@ -27,6 +90,14 @@ class MacosPackagingTests(unittest.TestCase):
             PACKAGE,
         )
         self.assertIn('chmod 755 "$RESOURCES_DIR/Configure Honk300.command"', PACKAGE)
+        self.assertIn(
+            'ditto "$ROOT/Assets/UI/honk300-status-goose.svg"',
+            PACKAGE,
+        )
+        self.assertIn(
+            'ditto "$ROOT/Assets/UI/honk300-status-goose@2x.png"',
+            PACKAGE,
+        )
         self.assertNotIn('"$ROOT/Assets"', PACKAGE)
         self.assertIn("MACOS_SIGN_IDENTITY", PACKAGE)
         self.assertIn('codesign --force --options runtime --sign - "$BIN"', PACKAGE)
@@ -50,6 +121,40 @@ class MacosPackagingTests(unittest.TestCase):
             PACKAGE.index('chmod 755 "$RESOURCES_DIR/Configure Honk300.command"'),
             PACKAGE.index('codesign --force --options runtime --sign - "$BIN"'),
         )
+
+    def test_status_icon_is_shared_monochrome_source_sealed_before_signing(self) -> None:
+        self.assertTrue(STATUS_ICON_PATH.is_file())
+        self.assertTrue(STATUS_ICON_RUNTIME_PATH.is_file())
+        self.assertEqual(STATUS_ICON_RUNTIME_PATH.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+        width, height, pixels = decode_rgba_png(STATUS_ICON_RUNTIME_PATH)
+        self.assertEqual((width, height), (36, 36))
+        alpha = pixels[3::4]
+        self.assertEqual(min(alpha), 0)
+        self.assertEqual(max(alpha), 255)
+        self.assertLess(sum(value > 0 for value in alpha), len(alpha) // 2)
+        self.assertTrue(
+            all(
+                pixels[index : index + 3] == b"\0\0\0"
+                for index in range(0, len(pixels), 4)
+            )
+        )
+        icon = STATUS_ICON_PATH.read_text(encoding="utf-8")
+        self.assertIn('<svg xmlns="http://www.w3.org/2000/svg"', icon)
+        self.assertIn("Honk300 status and tray goose", icon)
+        self.assertEqual(icon.count("<path "), 2)
+        self.assertNotIn("gradient", icon.lower())
+        self.assertNotIn("<rect", icon.lower())
+        icon_copy = PACKAGE.index(
+            'ditto "$ROOT/Assets/UI/honk300-status-goose.svg"'
+        )
+        binary_sign = PACKAGE.index(
+            'codesign --force --options runtime --sign - "$BIN"'
+        )
+        self.assertLess(icon_copy, binary_sign)
+        runtime_copy = PACKAGE.index(
+            'ditto "$ROOT/Assets/UI/honk300-status-goose@2x.png"'
+        )
+        self.assertLess(runtime_copy, binary_sign)
 
     def test_release_emits_signed_notarized_stapled_app_and_primary_dmg(self) -> None:
         self.assertIn("honk300-universal2.app.zip", WORKFLOW)
@@ -89,6 +194,44 @@ class MacosPackagingTests(unittest.TestCase):
         self.assertIn('test -d "$mount/Install Honk300.app"', WORKFLOW)
         self.assertIn(
             'test -x "$mount/Honk300.app/Contents/Resources/Configure Honk300.command"',
+            WORKFLOW,
+        )
+        self.assertIn(
+            'test -f "$mount/Honk300.app/Contents/Resources/honk300-status-goose.svg"',
+            WORKFLOW,
+        )
+        self.assertIn(
+            'test -f "$mount/Honk300.app/Contents/Resources/honk300-status-goose@2x.png"',
+            WORKFLOW,
+        )
+        self.assertEqual(
+            WORKFLOW.count(
+                'test -f "$mount/Honk300.app/Contents/Resources/honk300-status-goose.svg"'
+            ),
+            2,
+        )
+        self.assertEqual(
+            WORKFLOW.count(
+                'test -f "$mount/Honk300.app/Contents/Resources/honk300-status-goose@2x.png"'
+            ),
+            2,
+        )
+        self.assertIn(
+            'status_icon="$app/Contents/Resources/honk300-status-goose.svg"',
+            WORKFLOW,
+        )
+        self.assertIn('test -f "$status_icon"', WORKFLOW)
+        self.assertIn(
+            'status_icon_runtime="$app/Contents/Resources/honk300-status-goose@2x.png"',
+            WORKFLOW,
+        )
+        self.assertIn('test -f "$status_icon_runtime"', WORKFLOW)
+        self.assertIn(
+            'test -f "$extracted/Honk300.app/Contents/Resources/honk300-status-goose.svg"',
+            WORKFLOW,
+        )
+        self.assertIn(
+            'test -f "$extracted/Honk300.app/Contents/Resources/honk300-status-goose@2x.png"',
             WORKFLOW,
         )
         self.assertIn('test -f "$mount/Read Me.txt"', WORKFLOW)

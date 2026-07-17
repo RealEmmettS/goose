@@ -8,7 +8,8 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.0.1 is the first public stable release.** M0-M19 are implemented
+**Current stage: v1.0.2 is the active production-patch target; v1.0.1 remains the first public
+stable release until publication completes.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -62,9 +63,12 @@ bypasses, rolls Unix signals back explicitly, checks machine-wide Windows paths 
 and kills every unaccepted deferred helper. ADR 0023 adds stable rolling-latest links, exact-tag
 platform/provenance-isolated updates, and native amd64/arm64 Debian package ownership. ADR 0024
 adds one macOS-only status item whose Configure action launches the existing terminal TUI and
-whose Quit action enters the shared graceful walk-off; it adds no native settings model or
-Windows/Linux tray. ADR 0025 established the first stable v1 release and makes later Alienware
-hands-on checks post-release input to forward patches. ADR 0027 keeps the failed unpublished
+whose Quit action enters the shared graceful walk-off; it adds no native settings model. ADR
+0028 replaces its text title with the shared accessible goose template icon and makes those
+Configure/TUI and graceful-Quit semantics the parity contract for later Windows/Linux trays;
+v1.0.2 does not implement or claim those future surfaces. ADR 0025 established the first stable
+v1 release and makes later Alienware hands-on checks post-release input to forward patches. ADR
+0027 keeps the failed unpublished
 `v1.0.0` tag immutable, makes `v1.0.1` the first public target, and permits either complete
 renderer view in Windows qualification without weakening channel/alpha checks. Candidate
 `29384134561` proved the complete signed/notarized/stapled Mac
@@ -109,8 +113,9 @@ and double-premultiplied evidence. Exact candidate `29401457634`, same-SHA main 
 `29401961540` attempt 2, atomic release `29403056159`, and post-release smoke `29403596212`
 passed at `de8da8a9dd049286787d20e167bb115ce8afc107`. Stable/latest is v1.0.1; independent
 fresh Mac trust/update checks and the DMG-first production site passed. Completed release evidence
-is in `docs/readiness/v1.0.1-readiness.md` and done task `#m20q`; supplemental hardware checks are
-To-Do task `#v1a` and may only lead to forward patches.
+is in `docs/readiness/v1.0.1-readiness.md` and done task `#m20q`. The v1.0.2 menu-icon patch is
+tracked by `docs/readiness/v1.0.2-readiness.md` and active task `#v102`; supplemental hardware
+checks remain To-Do task `#v1a` and may only lead to later forward patches.
 
 ## Read these first (source-of-truth pointers)
 
@@ -156,7 +161,8 @@ To-Do task `#v1a` and may only lead to forward patches.
   existing configuration TUI and graceful shutdown; ADR 0025 records the first stable v1 intent
   and post-release hardware-verification boundary; ADR 0026 records the strict hosted Windows
   ARM64 compositor-evidence boundary without claiming a DWM screenshot; ADR 0027 records the
-  immutable v1.0.0 failure, v1.0.1 fix-forward, and pose-complete Windows oracle.
+  immutable v1.0.0 failure, v1.0.1 fix-forward, and pose-complete Windows oracle; ADR 0028 records
+  the shared goose control-surface icon and future tray behavior parity contract.
 
 ## Big-picture architecture (original → planned port)
 
@@ -226,9 +232,11 @@ To-Do task `#v1a` and may only lead to forward patches.
   an ambient bypass, machine-wide paths are checked across sessions, reboot-deferred MSI results
   fail closed, and every pre-READY helper error kills and waits for the child.
 - Starting, stopping, and configuration remain **CLI/TUI over local IPC** on every platform.
-  macOS alone adds a visible-while-running status item whose Configure action launches that same
-  TUI and whose Quit action requests the same graceful walk-off. There is no native preferences
-  model, Windows/Linux tray, or global quit key.
+  macOS adds a visible-while-running, image-only goose status item whose Configure action launches
+  that same TUI and whose Quit action requests the same graceful walk-off. There is no native
+  preferences model or global quit key. Windows/Linux trays are future work and must reuse the
+  shared icon, accessible naming, TUI launch, local-control boundary, and graceful exit from ADR
+  0028 rather than inventing a second settings model or abrupt termination.
 - Terminal windows are protected: the goose may visually overlay them, but must never move,
   focus, type into, drag, ride, collect, or otherwise manipulate terminal windows, including in
   spicy/default-off modes.
@@ -277,6 +285,8 @@ To-Do task `#v1a` and may only lead to forward patches.
   evidence boundary live in `docs/adr/0026-hosted-windows-arm64-compositor-evidence.md`.
 - The immutable v1.0.0 failure, v1.0.1 fix-forward, and complete side/top-down Windows evidence
   live in `docs/adr/0027-v1-0-1-fix-forward-and-windows-pose-evidence.md`.
+- The shared goose menu/tray icon and Configure/TUI plus graceful-Quit parity contract live in
+  `docs/adr/0028-shared-goose-control-surface-and-tray-parity.md`.
 
 ## Task management system
 
@@ -310,9 +320,10 @@ Relevant skills: `tasks-start`, `tasks-management`, `tasks-update`, `tasks-memor
 - **macOS needs a real `.app` bundle** (stable bundle-id) for a durable Accessibility grant;
   a bare `~/.cargo/bin` binary can't hold one. The bundle remains an LSUIElement agent/permission
   identity with no native preferences window, running Dock control surface, or AppleScript
-  `.sdef` command surface. Its one macOS status item may only launch the existing terminal TUI or
-  request engine-owned graceful shutdown; keep its target retained and all AppKit access on the
-  main thread.
+  `.sdef` command surface. Its one macOS status item uses the sealed shared goose template image,
+  an independent **Honk300 controls** accessibility label, and only launches the existing terminal
+  TUI or requests engine-owned graceful shutdown. Keep its image and weak target retained and all
+  AppKit access on the main thread. Future Windows/Linux trays must preserve those semantics.
 - **macOS permission prompting is a managed-install privilege.** Record the owner-only
   per-update marker before opening native UI; if eligibility or secure state fails, retain the
   existing denied/degraded runtime without prompting. A denied managed app enters the engine's
@@ -331,7 +342,7 @@ family's local gate:
 - `cargo build --release`
 - Windows host only: `pwsh -File script/smoke_windows_overlay.ps1 -Binary target/release/honk300.exe -EvidenceDirectory target/windows-overlay-evidence`
 - Linux host only: `HONK300_BIN="$PWD/target/release/honk300" bash script/smoke_m17_m18_linux.sh`
-- `dist plan --tag=v1.0.1`
+- `dist plan --tag=v1.0.2`
 - `cargo audit --version 0.22.2`
 
 Release packaging uses **cargo-dist** for portable archives plus project-owned atomic release,

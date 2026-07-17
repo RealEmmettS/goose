@@ -3,35 +3,37 @@
 ## TL;DR
 
 Honk300 is a Rust 1.95, cross-platform procedural desktop goose for Windows, macOS, X11, and
-native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.0.1 is now
-the first public stable release and completed native macOS qualification: it fixes AppKit pixel presentation,
-refine shared walking and exposed-edge lifecycle, add the safely gated user-close reaction, meet
-runtime budgets, prove denied/granted Accessibility, ship a Developer ID-signed/notarized
-per-user DMG with a macOS-only Configure/graceful-Quit menu-bar item, add native Debian packages
-and platform-isolated rolling updates, publishes atomically, and makes the independently verified
-stable-latest DMG the recommended macOS download at `thegoose.app`.
+native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.0.1 is the
+first public stable release and completed native macOS qualification, shared gait/edge lifecycle,
+Developer ID/notarized DMG delivery, Debian packages, rolling updates, and atomic publication.
+v1.0.2 is the active forward patch: it replaces the temporary Mac menu title with a shared,
+accessible goose template icon, seals a macOS 11-safe runtime representation, records the exact
+Configure/TUI and animated-Quit behavior future Windows/Linux trays must mimic, and repeats the
+physical-Mac plus complete hosted release path before advancing `thegoose.app` latest downloads.
 
 ## Status
 
-- Closure branch/worktree: `codex/v1.0.1` in the legacy-named `.worktrees/macos-v0.3.3`
-  directory (the release target changed after the worktree was created).
+- Patch branch/worktree: `codex/v1.0.1` in the legacy-named `.worktrees/macos-v0.3.3` directory;
+  its exact v1.0.2 candidate commit will be fast-forwarded to default branch `main` after candidate
+  qualification.
 - Stable/latest is public v1.0.1 at exact release commit
   `de8da8a9dd049286787d20e167bb115ce8afc107`. The immutable v1.0.0 tag failed closed before
   draft creation and remains unpublished and untouched.
-- Completed release card: `#m20q`; completed native Mac evidence is retained under `#m16r`, and
-  supplemental post-release hardware checks are visible as To-Do card `#v1a`. The live shared
-  task board is tracked under `.tasks/`.
-- Version: 1.0.1 in source.
+- Active patch card: `#v102`; completed v1.0.1 release card: `#m20q`; completed native Mac evidence
+  is retained under `#m16r`; supplemental Alienware/Linux checks remain To-Do card `#v1a`. The
+  live shared task board is tracked under `.tasks/`.
+- Version: 1.0.2 in source; v1.0.1 remains stable/latest until atomic publication completes.
 - Release evidence: candidate `29401457634`, same-SHA main CI `29401961540` attempt 2, atomic
   publication `29403056159`, and post-release smoke `29403596212` passed. The latest GitHub
   Release contains 22 payloads plus sidecars/manifest for 47 assets and is bound to the exact
   commit above.
-- macOS control: ADR 0024 adds a visible-while-running **Honk** status item. Configure opens the
-  signed bundle's existing terminal TUI, and Quit requests the same engine-owned walk-off used by
-  CLI/TUI stop. There is no second settings schema/window, running Dock control surface,
-  AppleScript API, or Windows/Linux tray. A local packaged-app smoke exposed the full accessible
-  menu, opened/restored the complete TUI, and completed animated Quit in four seconds. Later exact
-  CLI/TUI checks passed on final source; full live-menu repetition is forward hardware verification.
+- macOS control: ADRs 0024/0028 define a visible-while-running image-only goose status item with
+  an independent **Honk300 controls** accessibility name. Configure opens the signed bundle's
+  existing terminal TUI; Quit requests the same engine-owned walk-off used by CLI/TUI stop. The
+  canonical Quiver SVG and deterministic 36×36 PNG are sealed and checked across every app/DMG
+  shape, with a resilient text fallback only for malformed/unbundled development runs. Future
+  Windows/Linux trays must mimic this icon, TUI launch, same-user boundary, and graceful exit, but
+  v1.0.2 does not implement them.
 - Renderer: AppKit/CoreGraphics RGBA regressions pass. The reusable AppKit image-view presenter
   now produces opaque, black-rectangle-free WindowServer captures in normal motion and readable
   dark-mode notes. The product-equivalent signed candidate passed live capture and the exact final
@@ -130,6 +132,17 @@ stable-latest DMG the recommended macOS download at `thegoose.app`.
   `honk300 1.0.1`, cargo-dist v1.0.1 planning, 103 Python packaging/workflow contracts,
   retained Windows replay, Python/PowerShell syntax, actionlint, credential scan, and diff
   validation pass. Partial entrance attempts 3–5 reject and complete top-down attempts 6–12 pass.
+- Focused v1.0.2 source gate: formatting, strict workspace Clippy, 406 unit tests and seven
+  renderer goldens, optimized `honk300 1.0.2`, cargo-dist v1.0.2 planning, 104 Python packaging/
+  workflow contracts, pinned audit, actionlint, Python/shell/PowerShell parsing, secret scan, and
+  diff validation pass. Both Windows targets cross-check from macOS; all four Linux platform
+  targets cross-check, while complete Linux audio/root-binary qualification correctly remains on
+  native hosted runners because this Mac has no Linux ALSA sysroot.
+- Update rehearsal: all three command aliases produced PID/binary/receipt-stable v1.0.1 latest
+  no-ops. A separate real published v1.0.1 install converged through the locally rendered signed
+  v1.0.2 shell transaction with exact aliases/receipt, repeat install, and purge. The real CLI
+  forward update remains the first post-publication check because update discovery intentionally
+  trusts only the atomic public latest manifest.
 - Historical v1.0.0 retarget gate: the affected identity paths passed 107 root tests, 22 native
   Mac platform tests, a release binary reporting 1.0.0, cargo-dist v1.0.0 planning, 95 packaging/
   workflow contracts, workflow and script syntax, local link/tree validation, and the live board
@@ -170,7 +183,8 @@ stable-latest DMG the recommended macOS download at `thegoose.app`.
 11. Offer native amd64/arm64 Debian packages with real package-manager ownership while preserving
     the per-user no-sudo shell path for other Linux users.
 12. Give graphical macOS users a visible Configure/Quit path without adding a native settings
-    model, abrupt termination, or a tray to Windows/Linux.
+    model or abrupt termination; keep its shared icon and behavior reusable for later qualified
+    Windows/Linux trays.
 
 ## Architecture
 
@@ -187,29 +201,32 @@ stable-latest DMG the recommended macOS download at `thegoose.app`.
 - `.github/workflows/release.yml`: candidate-first and atomic immutable release orchestration.
 - `.github/workflows/macos-packaging.yml`: universal app/helper signing, app+DMG notarization,
   stapling, validation, and evidence.
+- `Assets/UI`: canonical shared goose control-surface source, AppKit runtime representation, and
+  provenance/export/accessibility guidance.
 - `packaging/macos`: native graphical helper source, signed terminal-TUI launcher, and DMG
   instructions.
 - `docs/adr`: durable decisions. ADR 0020 is current for macOS distribution; ADR 0018 remains
   current for atomic publication, ADR 0023 governs rolling latest and Debian lifecycle, and ADR
-  0024 governs the macOS-only menu-bar bridge. ADR 0025 records the first stable v1 intent and
+  0024 governs the macOS menu-bar bridge. ADR 0025 records the first stable v1 intent and
   post-release Alienware verification boundary. ADR 0026 defines the narrow GitHub-hosted Windows
   ARM64 presenter-evidence path without claiming full DWM composition. ADR 0027 records the
-  immutable v1.0.0 failure, v1.0.1 fix-forward, and strict side/top-down evidence profiles.
+  immutable v1.0.0 failure, v1.0.1 fix-forward, and strict side/top-down evidence profiles. ADR
+  0028 defines the shared icon and future tray Configure/TUI plus graceful-Quit parity contract.
 
 ## Verification Source Of Truth
 
-- Completed release evidence and explicit forward-verification waivers:
-  `docs/readiness/v1.0.1-readiness.md`.
+- Active v1.0.2 patch and release evidence: `docs/readiness/v1.0.2-readiness.md`; completed v1.0.1
+  evidence remains release history in `docs/readiness/v1.0.1-readiness.md`.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
-- Board handoff and activity: `.tasks/tasks/m20q.md`.
+- Board handoff and activity: `.tasks/tasks/v102.md` and `.tasks/tasks/v1a.md`.
 - Canonical product plan: `honk300_plan.md`.
 - Required local gate: fmt, workspace clippy with warnings denied, workspace tests, release build,
-  universal Apple builds, `dist plan --tag=v1.0.1`, complete Python contracts, cargo-audit
+  universal Apple builds, `dist plan --tag=v1.0.2`, complete Python contracts, cargo-audit
   0.22.2, actionlint, and diff check.
 
 ## Current Workspace Tree
 
-Generated 2026-07-15. Build output, Git internals, worktree internals, private credential storage,
+Generated 2026-07-17. Build output, Git internals, worktree internals, private credential storage,
 Python bytecode caches, and
 Finder metadata are excluded; every project source/document/configuration path is included.
 
@@ -271,6 +288,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── m20q.md
 │   │   ├── p4d.md
 │   │   ├── r5d.md
+│   │   ├── v102.md
 │   │   └── v1a.md
 │   └── vendor
 │       ├── animated-brand-mark.js
@@ -320,6 +338,10 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── Pat1.wav
 │   │   ├── Pat2.wav
 │   │   └── Pat3.wav
+│   ├── UI
+│   │   ├── README.md
+│   │   ├── honk300-status-goose.svg
+│   │   └── honk300-status-goose@2x.png
 │   └── Text
 │       └── NotepadMessages
 │           ├── custom
@@ -452,13 +474,15 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── 0025-first-stable-v1-release.md
 │   │   ├── 0026-hosted-windows-arm64-compositor-evidence.md
 │   │   ├── 0027-v1-0-1-fix-forward-and-windows-pose-evidence.md
+│   │   ├── 0028-shared-goose-control-surface-and-tray-parity.md
 │   │   └── README.md
 │   ├── agents
 │   │   └── handoff
 │   │       ├── 2026-07-13-001-macos-v0-3-3-qualification-release.md
 │   │       ├── 2026-07-14-001-macos-v0-3-3-alienware-resume.md
 │   │       ├── 2026-07-14-002-alienware-post-v1-verification.md
-│   │       └── 2026-07-15-001-alienware-post-v1.0.1-verification.md
+│   │       ├── 2026-07-15-001-alienware-post-v1.0.1-verification.md
+│   │       └── 2026-07-17-001-alienware-post-v1.0.2-verification.md
 │   ├── art-reference
 │   │   ├── goose-side-alt.svg
 │   │   ├── goose-side-head-left.svg
@@ -469,7 +493,8 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── macos-handson-checklist.md
 │   │   ├── v0.3.1-readiness.md
 │   │   ├── v0.3.2-readiness.md
-│   │   └── v1.0.1-readiness.md
+│   │   ├── v1.0.1-readiness.md
+│   │   └── v1.0.2-readiness.md
 │   ├── research
 │   │   └── native-wayland-capability-path.md
 │   ├── superpowers
@@ -578,5 +603,5 @@ Finder metadata are excluded; every project source/document/configuration path i
     ├── corporate.wxs
     └── install-source-msi-corporate.txt
 
-78 directories, 285 files
+79 directories, 292 files
 ```

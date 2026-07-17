@@ -27,6 +27,7 @@ objc2-application-services = { version = "0.3.2", default-features = false, feat
     "libc",
 ] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [
+    "NSAccessibilityProtocols",
     "libc",
     "objc2-core-foundation",
     "objc2-core-graphics",

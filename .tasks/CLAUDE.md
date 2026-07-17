@@ -24,8 +24,8 @@
 
 | Project | Status | Source |
 |---|---|---|
-| Honk300 | v1.0.1 first-public-stable fix-forward and signed distribution active | `#m20q` |
-| Desktop Goose site | DMG-first rollout follows verified v1.0.1 publication | `/Users/realemmetts/Downloads/temp_git/desktop-goose-site` |
+| Honk300 | v1.0.2 Mac menu-icon production patch and exact release active | `#v102` |
+| Desktop Goose site | Progressive DMG-first latest rollout follows the complete stable manifest | `/Users/realemmetts/Downloads/temp_git/desktop-goose-site` |
 | Post-v1 hardware verification | Alienware plus later Mac/Linux defense-in-depth; forward patches only | `#v1a` |
 
 ## Preferences

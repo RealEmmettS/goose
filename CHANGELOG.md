@@ -25,14 +25,38 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-07-17
+
+### Added
+- **Shared goose control-surface icon (ADR 0028)** - added a Quiver-generated, transparent,
+  two-path monochrome SVG as the canonical future macOS/Windows/Linux menu/tray source, with
+  prompt/generation provenance, deterministic export guidance, an accessible-name contract, and
+  an AppKit-safe 36×36 RGBA representation. v1.0.2 implements only the macOS item; future Windows
+  notification-area and Linux desktop surfaces must reuse the same Configure/TUI and engine-owned
+  graceful-Quit behavior rather than create another settings model or immediate exit.
+
 ### Changed
-- **v1.0.1 publication closure (2026-07-15)** - recorded the exact candidate, same-SHA main CI,
+- **Accessible image-only macOS status item** - replaced the visible `Honk` title in production
+  bundles with the 18-point goose template image, square item sizing, proportional scaling, and an
+  independent `Honk300 controls` accessibility label/tooltip. The Rust owner retains both image
+  and AppKit's weak action target. Missing or undecodable resources keep the variable-width
+  `Honk` development fallback without preventing Configure or Quit from launching.
+- **v1.0.1 publication closure carried forward** - retained the exact candidate, same-SHA main CI,
   atomic publication, post-release native smoke, independent Developer ID/notarization/stapling/
-  Gatekeeper and v0.3.2 upgrade checks, and the DMG-first `thegoose.app` production deployment.
-  The immutable public release remains bound to
-  `de8da8a9dd049286787d20e167bb115ce8afc107`; this documentation-only closure leaves product
-  bytes, tags, and release assets unchanged and moves supplemental Alienware/Mac observations to
-  forward-patch card `#v1a`.
+  Gatekeeper, v0.3.2 upgrade, and DMG-first site evidence without mutating its immutable tag or
+  assets. Physical-Mac follow-up additionally proved the published menu/TUI, same-process
+  Accessibility grant, readable dark note, 5.415-second animated Quit/restart, and two passing
+  process-specific 60-second CPU/RSS profiles; one-display, absent-Ghostty, and hardened-runtime
+  leak-attach limitations remain explicit.
+
+### Fixed
+- **Old-macOS icon decoder dependency** - the runtime now loads a sealed PNG representation rather
+  than depending on raw SVG decoding across the macOS 11+ support range. Native AppKit tests
+  require a nonzero representation, 18-point size, and template state.
+- **Release-shape icon enforcement** - macOS packaging copies the canonical SVG and runtime PNG
+  before signing and fails closed unless both survive the staged app, extracted final app ZIP,
+  initial DMG mount, and final notarized/stapled DMG remount. The updater regression now explicitly
+  recognizes v1.0.1→v1.0.2 as a forward in-place update.
 
 ## [1.0.1] - 2026-07-15
 

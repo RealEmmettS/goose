@@ -43,7 +43,7 @@ observations into claimed passes.
 - [ ] Alienware x64 paired-DWM and lifecycle smoke passes from the published executable.
 - [ ] Windows Global MSI and portable update/uninstall behavior passes on real hardware.
 - [ ] Windows renderer/movement/reaction/audio/TUI/terminal/multi-monitor observations are logged.
-- [ ] Deferred Mac exact-SHA profile/menu/contact/lifecycle/terminal checks are run or remain
+- [~] Deferred Mac exact-SHA profile/menu/contact/lifecycle/terminal checks are run or remain
   explicitly unavailable without changing prior claims.
 - [ ] Any Linux real-hardware evidence keeps X11, XWayland, and native Wayland capability claims
   distinct.
@@ -51,6 +51,15 @@ observations into claimed passes.
 
 ## Activity
 
+- 2026-07-17 02:10 - fresh published v1.0.1 DMG/app trust, graphical install, receipt/aliases,
+  menu Configure into the complete 120×30 TUI, same-process Accessibility grant, semantic dark-
+  mode note contrast, animated 5.415-second menu Quit, and immediate restart passed on the physical
+  M2. Two isolated 60-second profiles measured 7.80% and 8.60% median CPU, at most 14.66 MiB RSS,
+  and no positive growth on the heavily loaded host. The one-display Mac cannot supply live
+  multi-monitor/hot-plug evidence, Ghostty is absent, and hardened runtime blocks `leaks` attachment
+  to the exact signed release; those limitations remain explicit. Remaining beak-contact,
+  fault-injection, and broader terminal observations stay open rather than becoming inferred
+  passes. (agent: codex)
 - 2026-07-15 03:15 - created as the verification-only continuation for the Alienware and later
   native hardware. It owns accepted closure waivers from `#m20q`/`#m16r`; it does not authorize
   changing published tags, weakening gates, or undoing the Mac-specific implementation (agent:

@@ -18,8 +18,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 > CI smoke proof for hosted Mac bundle checks and Linux desktop behavior. The installed Mac app
 > now has a calm, non-nagging permission handoff. One unchanged signed copy passed denied,
 > repeat-denied, granted, and revoked behavior on the physical Mac; a later fresh-release repeat
-> remains visible follow-up work. While running, the Mac app also
-> has a Honk menu that opens the same terminal settings screen or starts its animated goodbye.
+> remains visible follow-up work. While running, the Mac app also has a small goose menu that
+> opens the same terminal settings screen or starts its animated goodbye.
 > Every desktop now stages the
 > Goose's arrival and departure beyond a real screen edge, and a person closing its note or meme
 > can provoke a safely bounded annoyed reaction. The Windows/Linux installer
@@ -31,7 +31,31 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Added
+- **The Mac menu now looks like the Goose.** A compact goose silhouette replaces the temporary
+  word in the menu bar, automatically follows the Mac's light, dark, and highlighted appearances,
+  and still has a clear spoken label for people using accessibility tools. The original artwork
+  is saved as one shared source so later Windows and Linux tray work can look and behave the same.
+  This update does not pretend those other trays already exist.
+
+### Improved
+- **The menu remains the same simple control, just more polished.** Configure still opens the one
+  real terminal settings screen, closing that screen leaves the Goose running, and Quit still
+  sends it walking completely offscreen before the process ends. Those learned reactions are now
+  written down as requirements for every future tray, which prevents another operating system
+  from gaining a separate settings model or a jarring instant disappearance.
+- **The icon is safer on older Macs.** The app includes a small transparent image format that Macs
+  have supported for years while keeping the reusable vector original for future platforms. If a
+  developer copy somehow lacks the artwork, the old word appears instead and the app remains
+  controllable. This keeps a cosmetic problem from blocking startup.
+
 ### Behind the scenes
+- **Every finished Mac download must contain the menu artwork.** Release checks now look for both
+  the reusable source and the Mac-ready image before signing, after packing the app, and in both
+  inspections of the finished disk image. A missing icon stops publication instead of quietly
+  shipping the developer fallback. Follow-up checks on the physical Mac also confirmed the real
+  settings screen, permission transition, readable dark note, animated goodbye, quick restart,
+  and low process-specific memory and processor use.
 - **The first stable release and its download page are live and independently checked.** The
   complete cross-platform rehearsal, ordinary follow-up checks, Apple trust checks, fresh Mac
   install and update, and the public download page all passed before the release board closed.

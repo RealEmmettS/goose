@@ -6,7 +6,8 @@
 - [ ] **Post-v1 Alienware and supplemental native verification** - fresh-download the published stable artifacts, repeat Windows hardware and deferred Mac/Linux checks, and fix any finding only in a forward patch without mutating published tags or weakening Mac/platform contracts (owner next-agent) #v1a
   - [ ] Verify published SHA, manifest, hashes, stable latest aliases, and all Windows x64 install/update/uninstall paths on the Alienware.
   - [ ] Run the exact Windows layered-overlay lifecycle smoke and visually inspect side/top-down, movement, reactions, notes/memes, audio, terminal protection, and multi-monitor behavior.
-  - [ ] When Mac hardware is next available, repeat the deferred exact-SHA live profile, menu, beak-contact, lifecycle/update/rollback, terminal matrix, and any available multi-monitor/Ghostty checks.
+  - [~] When Mac hardware is next available, repeat the deferred exact-SHA live profile, menu, beak-contact, lifecycle/update/rollback, terminal matrix, and any available multi-monitor/Ghostty checks.
+    > Published v1.0.1 trust/install, menu→120×30 TUI, same-process permission grant, readable dark note, 5.415-second animated Quit/restart, and two 60-second process profiles passed on 2026-07-17. Beak-contact/rollback/broader terminal checks remain supplemental; live multi-monitor and Ghostty remain honestly unavailable on this host.
   - [ ] Record Linux real-hardware observations where available without overstating native Wayland reduced-mode capabilities.
   - [ ] Ship findings only as reviewed forward patch releases; never move or replace v1.0.0/v1.0.1 tags or assets.
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
@@ -15,6 +16,14 @@
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## Active
+- [ ] **v1.0.2 macOS production patch — shared goose menu icon and exact release** - replace the text status item with a reusable accessible goose template icon, repeat physical-Mac/package verification, publish the immutable patch, and advance the DMG-first latest channel without implementing Windows/Linux trays yet (owner codex) #v102
+  - [x] Generate and normalize the shared Quiver goose SVG with a deterministic AppKit raster representation and recorded provenance.
+  - [x] Integrate the image-only macOS status item with explicit accessibility naming, retained lifetime, proportional scaling, and a safe text fallback.
+  - [x] Seal and require both icon resources in the staged app, final app ZIP, and both DMG verification mounts.
+  - [ ] Prove the packaged icon, Configure-to-TUI path, permission-wait availability, and animated graceful Quit on this physical Mac.
+  - [ ] Complete focused Rust, universal-app, packaging, signing/notarization, and release gates on one exact v1.0.2 SHA.
+  - [ ] Publish v1.0.2 as stable/latest, fresh-download and verify its DMG/app, update from the installed v1.0.1 app, and confirm the website resolves the new DMG.
+  - [ ] Synchronize ADR 0028, readiness, README, guides, both changelogs, project memory, board, and Alienware handoff; push the final closure state.
 
 ## Done
 - [x] **v1.0.1 first public stable release — native qualification, signed distribution, and DMG-first site** - preserved the immutable failed-before-draft v1.0.0 tag, fixed its pose-only Windows qualifier, published the first public stable major Developer ID-signed and notarized release, and promoted its DMG on the website (done 2026-07-15) #m20q
