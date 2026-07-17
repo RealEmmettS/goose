@@ -387,6 +387,9 @@ pub fn classify_protected_window(class_name: &str, title: &str) -> Option<Protec
         "alacritty",
         "wezterm",
         "mintty",
+        "visual studio code",
+        "codex",
+        "chatgpt",
     ]
     .iter()
     .any(|needle| title.contains(needle));
@@ -1832,6 +1835,9 @@ mod tests {
             ("GLFW30", "Alacritty"),
             ("Chrome_WidgetWin_1", "Ubuntu - WSL"),
             ("ApplicationFrameWindow", "PowerShell 7"),
+            ("Chrome_WidgetWin_1", "goose - Visual Studio Code"),
+            ("Chrome_WidgetWin_1", "Codex"),
+            ("Chrome_WidgetWin_1", "ChatGPT"),
             ("Notepad", "notes.txt - Notepad"),
         ] {
             let protected = classify_protected_window(class_name, title);

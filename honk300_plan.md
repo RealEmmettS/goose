@@ -66,8 +66,8 @@ still build the full installer matrix because matching the `*300` family is an e
 | **Notes** | Copy screened original notepad messages 1:1 for personal-use builds and add **one custom goose-voiced counterpart per original**. |
 | **Config** | **TOML** (`config.toml`), original keys preserved at verified values, versioned + tolerant loader. No `EnableMods` key. |
 | **Modding** | **No external mods** (no DLL/`.so`/`.dylib`, no WASM, no third-party data mods). Autumn becomes a **built-in** season/task. Extensibility = **documented internal seams**. |
-| **Control** | **No global quit key.** Starting, stopping, and configuration use the CLI/TUI over a **single-instance + IPC command channel** (`stop` / `do` / `reload`). ADRs 0024/0028 add one macOS status item which opens that same TUI or requests the same graceful stop; it is not a second settings model. The shared goose icon and behavior are the contract for later Windows/Linux trays, which are not implemented in v1.0.2. |
-| **Protected windows** | The goose may visually overlay terminal windows, but must never move, focus, type into, ride, drag, collect, or otherwise manipulate terminal windows — even in spicy/default-off modes. |
+| **Control** | **No global quit key.** Starting, stopping, and configuration use the CLI/TUI over a **single-instance + IPC command channel** (`stop` / `do` / `reload`). ADRs 0024/0028 add one macOS status item which opens that same TUI or requests the same graceful stop; it is not a second settings model. The shared goose icon and behavior are the locked contract for the separately planned v1.1.0 Windows/Linux trays. |
+| **Protected windows** | The goose may visually overlay terminal windows, but must never move, focus, type into, ride, drag, collect, or otherwise manipulate terminal windows — even in spicy/default-off modes. ADR 0029 conservatively includes Codex and Visual Studio Code surfaces across platforms. |
 | **Default behavior** | Full original **prank, always-on**. `--no-mouse-steal` is opt-in; `pause_on_fullscreen` default on; a **Calm goose** TUI toggle is the opposite pole. |
 | **Config UI** | A **ratatui** Claude-Code/QubeTX-family-style TUI at `<name> config`, toggling every behavior incl. Autumn; **hot-apply where cheap**, restart-note otherwise. |
 | **Linux** | **X11-first** (runs under XWayland). **Native Wayland** behind an opt-in `--wayland` flag (reduced mischief). |
@@ -89,8 +89,8 @@ by default**: no telemetry, no network on its own, clean uninstall, explicit use
 ### 2.2 Non-Goals (out of scope for v1)
 Bit-for-bit binary compatibility with the original; loading the original .NET/Mono mods; **any
 external mod surface** (DLL/WASM/data); mobile platforms; a windowed GUI settings app; a
-native preferences model; Windows/Linux tray implementation in v1.0.2 (the shared future parity
-contract is defined by ADR 0028); multi-goose "as a service"; runtime natural-language command parsing (the goose-speak
+native preferences model; Windows/Linux tray implementation before the separately scoped v1.1.0
+parity release (the shared contract is defined by ADR 0028); multi-goose "as a service"; runtime natural-language command parsing (the goose-speak
 grammar is a fixed, finite phrase map — no model at runtime); networked features.
 
 ### 2.3 Guiding principles
@@ -831,6 +831,7 @@ being implemented three more times.
 | M19 | install/update/uninstall(`--purge`)/setup + packaging **all targets** (Win x64+ARM64 ×4 installers, mac universal2 `.dmg`, Linux x64/ARM gnu+musl) + 3 aliases | installers produce working artifacts w/ autostart + shortcut on every OS/arch |
 | R6 / v1.0.1 (ADRs 0025–0027) | first public stable major release: native macOS qualification, AppKit RGBA repair, shared gait refinement, Developer ID/notarization, graphical per-user DMG, managed Accessibility first run, macOS menu-bar Configure/graceful Quit, native amd64/arm64 Debian packages, rolling latest platform-isolated updates, DMG-first site | physical-Mac product-equivalent renderer, menu/TUI/animated-Quit, denied/non-nag/grant/revoke Accessibility, lifecycle, and performance evidence passes with exact-final-SHA/tooling/display limitations recorded explicitly for forward verification; the full hosted native matrix passes on one exact release SHA; Windows evidence strictly accepts either complete renderer view while only GitHub's exact hosted ARM64 wallpaper signature may use post-success premultiplied-BGRA presenter evidence bound to a visible HWND; immutable tag assets and stable latest links are independently verified before promotion; the failed unpublished v1.0.0 tag remains immutable and later Alienware checks feed forward patch releases |
 | R7 / v1.0.2 (ADR 0028) | forward Mac production patch: shared Quiver goose control-surface source, macOS 11-safe template raster, explicit accessible image-only menu, sealed resource gates, and documented future Windows/Linux tray parity | physical-Mac icon/Configure/TUI/animated-Quit and performance evidence plus full exact-SHA cross-platform candidate, signing/notarization, atomic release, published v1.0.1→v1.0.2 CLI update, and latest-DMG website verification; Windows/Linux tray implementations remain deferred |
+| R8 / v1.0.3 (ADR 0029) | Alienware-derived patch: native Windows update invocation and receipt refresh, coexisting Global/Corporate lifecycle ownership, deferred-parent timing, Corporate failure/retry semantics, and conservative integrated-terminal protection | physical Windows compositor/Corporate lifecycle and forced-failure evidence, real Windows PowerShell update/receipt tests, complete exact-SHA cross-platform release gate, and public Global update verification; no tray implementation |
 
 Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
 and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus
@@ -901,7 +902,8 @@ durable macOS Accessibility for an un-bundled binary.
   the TUI's hot-apply; a **ratatui** config TUI replaces any tray/GUI settings.
 - **C12** — Terminal windows are protected from all goose mischief, including default-off spicy
   behaviors; overlay rendering may cover them visually, but platform backends must never move,
-  focus, type into, ride, drag, collect, or otherwise manipulate them.
+  focus, type into, ride, drag, collect, or otherwise manipulate them. Codex and Visual Studio
+  Code surfaces receive this conservative protection across platforms under ADR 0029.
 - **C13** — Build **every OS + arch** (Win x64+ARM64, mac universal2, Linux x64/ARM gnu+musl);
   arch is a build axis, capability is an OS axis.
 
@@ -975,5 +977,6 @@ intentionally limited.
 ### Document control
 - **Historical role:** this plan defined the original implementation sequence; current behavior
   is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, completed stable
-  v1.0.2 task `#v102`, supplemental hardware-verification task `#v1a`, and the readiness evidence.
+  v1.0.2 task `#v102`, completed hardware-verification task `#v1a`, active v1.0.3 release task `#r103`,
+  and the readiness evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

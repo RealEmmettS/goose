@@ -1934,6 +1934,8 @@ pub fn is_protected_terminal_app(wm_class: Option<&str>, app_name: Option<&str>)
                     | "blackbox"
                     | "ptyxis"
                     | "rio"
+                    | "code"
+                    | "codex"
             )
         })
 }
@@ -2205,6 +2207,8 @@ mod tests {
             (Some("wezterm"), Some("WezTerm")),
             (Some("xfce4-terminal"), Some("Terminal")),
             (Some("org.gnome.Ptyxis"), Some("Ptyxis")),
+            (Some("code"), Some("Visual Studio Code")),
+            (Some("codex"), Some("Codex")),
         ] {
             assert!(
                 is_protected_terminal_app(class, name),
@@ -2218,7 +2222,6 @@ mod tests {
         for (class, name) in [
             (Some("firefox"), Some("Firefox")),
             (Some("org.gnome.Nautilus"), Some("Files")),
-            (Some("code"), Some("Visual Studio Code")),
         ] {
             assert!(
                 !is_protected_terminal_app(class, name),

@@ -39,6 +39,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   This update does not pretend those other trays already exist.
 
 ### Improved
+- **Per-user Windows upgrades recover cleanly from a failed attempt.** The previous working copy
+  stays intact until the new copy is fully installed, so retrying or removing the app does not
+  inherit broken ownership records.
+- **Development terminals receive the same safety treatment across desktops.** The Goose now
+  recognizes Codex and Visual Studio Code surfaces on Windows and Linux and leaves them alone,
+  which protects integrated terminal work from window pranks.
 - **The menu remains the same simple control, just more polished.** Configure still opens the one
   real terminal settings screen, closing that screen leaves the Goose running, and Quit still
   sends it walking completely offscreen before the process ends. Those learned reactions are now
@@ -50,6 +56,17 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   controllable. This keeps a cosmetic problem from blocking startup.
 
 ### Fixed
+- **Checking for updates now works in built-in Windows shells.** Download addresses and file
+  locations are passed safely, and response text is decoded consistently, so update discovery no
+  longer stops at a command-parsing error.
+- **Two supported Windows installs no longer confuse each other's maintenance commands.** The
+  copy whose command you invoked keeps its own update and removal identity, even when both the
+  all-users and per-user editions exist.
+- **Background removal helpers no longer fail just because the original command already closed.**
+  A normal timing race is treated as completion while real failures still stop safely.
+- **Windows update records stay current without taking ownership of unfamiliar files.** A record
+  created by the official all-users installer is refreshed only after the new app is verified;
+  missing, damaged, unrelated, or redirected records are left untouched.
 - **Windows command startup no longer mistakes a brief pause for an empty request.** If the Goose
   and a command connect just before the command bytes arrive, it now waits for the rest of the
   existing short deadline instead of rejecting an action that it actually received. It still

@@ -25,6 +25,34 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-07-17
+
+### Changed
+- **Corporate MSI retry semantics (ADR 0029)** - schedules old-product removal after the new
+  per-user installation commits. An injected mid-upgrade failure now leaves the old product and
+  bytes untouched; retry and uninstall complete without the reproduced orphaned component client.
+  The machine-wide Global MSI keeps its existing transactional schedule.
+- **Conservative integrated-terminal protection** - Windows now protects Visual Studio Code,
+  Codex, and the observed ChatGPT-titled Codex desktop surface from window mischief. Linux adds
+  equivalent `code`/`codex` application-token coverage, matching the existing macOS policy while
+  leaving ordinary applications eligible.
+
+### Fixed
+- **Native Windows update discovery and download** - keeps URI/output values outside PowerShell
+  command source, uses non-interactive stop-on-error requests, decodes Windows PowerShell 5.1 byte
+  responses as UTF-8, and preserves exact-tag size/SHA verification. Both installed v0.3.1 and
+  exact portable v1.0.2 reproduced the old parser failure; rebuilt source passes live discovery
+  and a quoted-path exact download.
+- **Coexisting Global/Corporate lifecycle identity** - the marker beside the invoked executable
+  now wins before registry fallback, and Corporate uninstall discovery searches current-user then
+  machine registration while retaining exact product/publisher/ProductCode/root validation.
+- **Deferred Windows parent completion** - a helper now treats an already-exited parent as a
+  successful wait without suppressing genuine lookup/wait failures.
+- **PowerShell-bootstrap receipt freshness** - after an exact-path/version-verified direct Global
+  MSI update, only a complete regular non-reparse receipt proving the expected schema, channel,
+  layout, and root is atomically refreshed to the new release identity. Missing, malformed,
+  foreign, mismatched, and reparse receipts remain untouched.
+
 ## [1.0.2] - 2026-07-17
 
 ### Added

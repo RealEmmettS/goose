@@ -10,16 +10,18 @@ shared gait/edge lifecycle, Developer ID/notarized DMG delivery, Debian packages
 and atomic publication while replacing the temporary Mac menu title with a shared accessible
 goose icon. The icon's sealed macOS 11-safe representation and exact Configure/TUI plus animated-
 Quit behavior are the contract future Windows/Linux trays must mimic.
+The current source is the v1.0.3 Alienware hardening candidate under ADR 0029; v1.0.2 remains the
+public stable/latest release until the exact-SHA patch gate completes.
 
 ## Status
 
-- Default branch `main` contains the exact v1.0.2 release source; the immutable tag peels to
+- Default branch `main` contains the post-release v1.0.2 closure; the immutable tag peels to
   `964305869e9ec28768c789465db1b6317dfa3f6f`. The unpublished v1.0.0 tag and prior public v1.0.1
   release remain untouched history.
-- Completed release cards: v1.0.2 `#v102`, v1.0.1 `#m20q`, and native Mac evidence `#m16r`.
-  Supplemental Alienware/Linux checks remain To-Do card `#v1a`; the shared board lives under
-  `.tasks/`.
-- Version: 1.0.2 in source and public stable/latest.
+- Completed release/evidence cards: v1.0.2 `#v102`, v1.0.1 `#m20q`, native Mac evidence `#m16r`,
+  and Alienware verification `#v1a`. The v1.0.3 release `#r103` is active; Windows/Linux tray work
+  remains blocked behind that separate public patch. The shared board lives under `.tasks/`.
+- Version: 1.0.3 in candidate source; 1.0.2 remains public stable/latest.
 - v1.0.2 release evidence: replacement candidate `29565557915`, same-SHA main CI `29566294408`,
   atomic publication `29566759574`, and post-release smoke `29567257622` all passed at the exact
   commit. The immutable GitHub Release contains 22 payloads plus sidecars/manifest for 47 assets.
@@ -61,8 +63,8 @@ Quit behavior are the contract future Windows/Linux trays must mimic.
   MSI completion, and reaps every deferred helper that has not completed its exact READY handoff.
   Native candidate transactions, final scoped cleanup, a fresh published v0.3.2-to-v1.0.1
   update, and the real public v1.0.1-to-v1.0.2 CLI update passed. All three aliases converge and
-  repeat as PID/binary/receipt-stable no-ops. Fault-injection and broader interaction repetition
-  remain supplemental verification under `#v1a`.
+  repeat as PID/binary/receipt-stable no-ops. The completed `#v1a` pass records later Windows
+  fault-injection and broader interaction repetition without changing the Mac contracts.
 - Packaging/candidate: a universal x86_64/arm64 installer helper targeting macOS 11.0 in both
   slices and a fail-closed signing/notarization workflow are in-tree. Candidate run
   `29384134561` at source `39087949731f9a8326d0661182fa4a2dbe89c61b` passed the complete
@@ -217,16 +219,18 @@ Quit behavior are the contract future Windows/Linux trays must mimic.
   ARM64 presenter-evidence path without claiming full DWM composition. ADR 0027 records the
   immutable v1.0.0 failure, v1.0.1 fix-forward, and strict side/top-down evidence profiles. ADR
   0028 defines the shared icon and future tray Configure/TUI plus graceful-Quit parity contract.
+  ADR 0029 defines the Windows updater/lifecycle, Corporate retry, and integrated-terminal
+  hardening found on the Alienware.
 
 ## Verification Source Of Truth
 
-- Completed v1.0.2 release evidence: `docs/readiness/v1.0.2-readiness.md`; v1.0.1 remains prior
-  immutable release history in `docs/readiness/v1.0.1-readiness.md`.
+- Active v1.0.3 release evidence: `docs/readiness/v1.0.3-readiness.md`; completed v1.0.2 and v1.0.1
+  readiness reports remain immutable-release history.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
 - Board handoff and activity: `.tasks/tasks/v102.md` and `.tasks/tasks/v1a.md`.
 - Canonical product plan: `honk300_plan.md`.
 - Required local gate: fmt, workspace clippy with warnings denied, workspace tests, release build,
-  universal Apple builds, `dist plan --tag=v1.0.2`, complete Python contracts, cargo-audit
+  universal Apple builds, `dist plan --tag=v1.0.3`, complete Python contracts, cargo-audit
   0.22.2, actionlint, and diff check.
 
 ## Current Workspace Tree
@@ -269,6 +273,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   ├── CLAUDE.md
 │   ├── MILESTONES.md
 │   ├── TASKS.md
+│   ├── .board-version.json
 │   ├── board-server.mjs
 │   ├── config.json
 │   ├── dashboard.html
@@ -281,6 +286,8 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   └── projects
 │   │       └── .gitkeep
 │   ├── milestones
+│   │   ├── v103.md
+│   │   └── v110.md
 │   ├── secure
 │   │   └── README.md
 │   ├── tasks
@@ -293,8 +300,13 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── m20q.md
 │   │   ├── p4d.md
 │   │   ├── r5d.md
+│   │   ├── ltray.md
+│   │   ├── r103.md
+│   │   ├── r110.md
+│   │   ├── trayc.md
 │   │   ├── v102.md
-│   │   └── v1a.md
+│   │   ├── v1a.md
+│   │   └── wtray.md
 │   └── vendor
 │       ├── animated-brand-mark.js
 │       ├── anime.min.js
@@ -480,6 +492,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── 0026-hosted-windows-arm64-compositor-evidence.md
 │   │   ├── 0027-v1-0-1-fix-forward-and-windows-pose-evidence.md
 │   │   ├── 0028-shared-goose-control-surface-and-tray-parity.md
+│   │   ├── 0029-windows-lifecycle-and-terminal-hardening.md
 │   │   └── README.md
 │   ├── agents
 │   │   └── handoff
@@ -499,7 +512,8 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── v0.3.1-readiness.md
 │   │   ├── v0.3.2-readiness.md
 │   │   ├── v1.0.1-readiness.md
-│   │   └── v1.0.2-readiness.md
+│   │   ├── v1.0.2-readiness.md
+│   │   └── v1.0.3-readiness.md
 │   ├── research
 │   │   └── native-wayland-capability-path.md
 │   ├── superpowers
@@ -509,6 +523,7 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │       └── 2026-07-13-macos-accessibility-first-run-design.md
 │   └── thinking
 │       ├── 2026-06-27-m9-collect-window-plan.md
+│       ├── 2026-07-17-alienware-v1.0.2-verification.md
 │       ├── 2026-07-06-active-task-resolution-plan.md
 │       └── 2026-07-07-b9e-spicy-behaviors-plan.md
 ├── honk300_plan.md

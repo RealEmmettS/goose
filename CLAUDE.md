@@ -9,7 +9,8 @@ Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of 
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
 **Current stage: v1.0.2 is the public stable/latest release at exact source commit
-`964305869e9ec28768c789465db1b6317dfa3f6f`.** M0-M19 are implemented
+`964305869e9ec28768c789465db1b6317dfa3f6f`; v1.0.3 is the in-flight Alienware hardening
+candidate under ADR 0029 and `#r103`.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -116,8 +117,9 @@ passed at `de8da8a9dd049286787d20e167bb115ce8afc107`. v1.0.2 replacement candida
 post-release smoke `29567257622` then passed at
 `964305869e9ec28768c789465db1b6317dfa3f6f`. Public Mac trust, graphical install,
 v1.0.1→v1.0.2 managed update, menu/TUI/graceful-Quit, and the DMG-first production site passed.
-Completed v1.0.2 evidence is in `docs/readiness/v1.0.2-readiness.md` and done task `#v102`;
-supplemental hardware checks remain To-Do task `#v1a` and may only lead to later forward patches.
+Completed v1.0.2 evidence is in `docs/readiness/v1.0.2-readiness.md`; hardware task `#v1a` is
+done, and the active forward v1.0.3 gate is in `docs/readiness/v1.0.3-readiness.md`. Tray work
+remains blocked until that patch is public.
 
 ## Read these first (source-of-truth pointers)
 
@@ -164,7 +166,9 @@ supplemental hardware checks remain To-Do task `#v1a` and may only lead to later
   and post-release hardware-verification boundary; ADR 0026 records the strict hosted Windows
   ARM64 compositor-evidence boundary without claiming a DWM screenshot; ADR 0027 records the
   immutable v1.0.0 failure, v1.0.1 fix-forward, and pose-complete Windows oracle; ADR 0028 records
-  the shared goose control-surface icon and future tray behavior parity contract.
+  the shared goose control-surface icon and future tray behavior parity contract; ADR 0029 records
+  the Alienware-derived Windows lifecycle, update, Corporate retry, and integrated-terminal
+  hardening contract.
 
 ## Big-picture architecture (original → planned port)
 
@@ -241,7 +245,9 @@ supplemental hardware checks remain To-Do task `#v1a` and may only lead to later
   0028 rather than inventing a second settings model or abrupt termination.
 - Terminal windows are protected: the goose may visually overlay them, but must never move,
   focus, type into, drag, ride, collect, or otherwise manipulate terminal windows, including in
-  spicy/default-off modes.
+  spicy/default-off modes. Conservatively treat Codex and Visual Studio Code surfaces as terminal
+  windows across platforms, including the ChatGPT-titled Codex desktop surface observed on
+  Windows.
 
 ## Architecture decision records
 
@@ -289,6 +295,8 @@ supplemental hardware checks remain To-Do task `#v1a` and may only lead to later
   live in `docs/adr/0027-v1-0-1-fix-forward-and-windows-pose-evidence.md`.
 - The shared goose menu/tray icon and Configure/TUI plus graceful-Quit parity contract live in
   `docs/adr/0028-shared-goose-control-surface-and-tray-parity.md`.
+- The Windows update/lifecycle, Corporate retry, and integrated-terminal hardening contract lives
+  in `docs/adr/0029-windows-lifecycle-and-terminal-hardening.md`.
 
 ## Task management system
 
@@ -348,7 +356,7 @@ family's local gate:
 - `cargo build --release`
 - Windows host only: `pwsh -File script/smoke_windows_overlay.ps1 -Binary target/release/honk300.exe -EvidenceDirectory target/windows-overlay-evidence`
 - Linux host only: `HONK300_BIN="$PWD/target/release/honk300" bash script/smoke_m17_m18_linux.sh`
-- `dist plan --tag=v1.0.2`
+- `dist plan --tag=v1.0.3`
 - `cargo audit --version 0.22.2`
 
 Release packaging uses **cargo-dist** for portable archives plus project-owned atomic release,

@@ -80,28 +80,45 @@ impl InstallSource {
 
 pub fn detect_install_source() -> InstallSource {
     #[cfg(windows)]
-    if let Some(source) = read_windows_install_source_marker() {
-        return source;
+    {
+        windows_install_source_precedence(
+            read_file_install_source_marker(),
+            read_windows_install_source_marker(),
+            classify_current_exe_install_source(),
+        )
     }
 
-    if let Some(source) = read_file_install_source_marker() {
-        return source;
-    }
+    #[cfg(not(windows))]
+    {
+        if let Some(source) = read_file_install_source_marker() {
+            return source;
+        }
 
-    // A macOS bundle install is authoritative from the running executable's own location: the
-    // `~/.local/bin` aliases resolve (via `current_exe`) into `…/honk300.app/Contents/MacOS`, so
-    // `update` can pick the DMG replacement path. Anything else on macOS (shell/cargo-home/bare)
-    // falls through to the shell-installer path like Linux.
-    if cfg!(target_os = "macos") && current_exe_is_app_bundle() {
-        return InstallSource::MacApp;
-    }
+        // A macOS bundle install is authoritative from the running executable's own location: the
+        // `~/.local/bin` aliases resolve (via `current_exe`) into `…/honk300.app/Contents/MacOS`, so
+        // `update` can pick the DMG replacement path. Anything else on macOS (shell/cargo-home/bare)
+        // falls through to the shell-installer path like Linux.
+        if cfg!(target_os = "macos") && current_exe_is_app_bundle() {
+            return InstallSource::MacApp;
+        }
 
-    classify_current_exe_install_source()
+        classify_current_exe_install_source()
+    }
+}
+
+#[cfg(any(test, windows))]
+fn windows_install_source_precedence(
+    file_marker: Option<InstallSource>,
+    registry_marker: Option<InstallSource>,
+    classified_path: InstallSource,
+) -> InstallSource {
+    file_marker.or(registry_marker).unwrap_or(classified_path)
 }
 
 /// True when the running executable lives inside a `*.app` bundle. Kept non-`cfg` (and exercised
 /// on every host) so it never reads as dead code on non-macOS builds; the `cfg!` guard above keeps
 /// the `MacApp` verdict macOS-only in practice.
+#[cfg(not(windows))]
 fn current_exe_is_app_bundle() -> bool {
     std::env::current_exe()
         .ok()
@@ -110,6 +127,7 @@ fn current_exe_is_app_bundle() -> bool {
         .unwrap_or(false)
 }
 
+#[cfg(any(test, not(windows)))]
 fn path_is_in_app_bundle(path: &Path) -> bool {
     path.ancestors()
         .any(|ancestor| ancestor.extension().and_then(|ext| ext.to_str()) == Some("app"))
@@ -1270,7 +1288,8 @@ fn read_windows_install_source_marker() -> Option<InstallSource> {
     use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
     use winreg::RegKey;
 
-    // Machine-wide installers are authoritative even if an older per-user/manual marker remains.
+    // This is a fallback for older layouts without an adjacent marker. The marker next to the
+    // running executable wins first so supported Global and Corporate installs can coexist.
     for hive in [HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER] {
         let root = RegKey::predef(hive);
         let Ok(key) = root.open_subkey("Software\\Honk300") else {
@@ -1364,6 +1383,27 @@ struct WindowsUninstallIdentity {
     install_location: PathBuf,
     uninstall_command: String,
     windows_installer: bool,
+}
+
+#[cfg(any(test, windows))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WindowsUninstallHive {
+    CurrentUser,
+    LocalMachine,
+}
+
+#[cfg(any(test, windows))]
+fn windows_uninstall_hive_order(source: InstallSource) -> &'static [WindowsUninstallHive] {
+    match source {
+        InstallSource::MsiGlobal | InstallSource::ExeGlobal => {
+            &[WindowsUninstallHive::LocalMachine]
+        }
+        InstallSource::MsiCorporate | InstallSource::ExeCorporate => &[
+            WindowsUninstallHive::CurrentUser,
+            WindowsUninstallHive::LocalMachine,
+        ],
+        _ => &[],
+    }
 }
 
 #[cfg(any(test, windows))]
@@ -1735,6 +1775,13 @@ fn windows_managed_uninstall_invocation(
 }
 
 #[cfg(any(test, windows))]
+fn windows_wait_for_parent_script(parent_pid: u32) -> String {
+    format!(
+        "$ErrorActionPreference='Stop'; $process = Get-Process -Id {parent_pid} -ErrorAction SilentlyContinue; if ($null -ne $process) {{ $process.WaitForExit() }}; exit 0"
+    )
+}
+
+#[cfg(any(test, windows))]
 fn powershell_literal(value: &str) -> String {
     value.replace('\'', "''")
 }
@@ -1946,9 +1993,7 @@ fn wait_for_windows_parent_exit(parent_pid: u32) -> io::Result<()> {
     use std::os::windows::process::CommandExt;
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let script = format!(
-        "$process = Get-Process -Id {parent_pid} -ErrorAction SilentlyContinue; if ($null -ne $process) {{ $process.WaitForExit() }}"
-    );
+    let script = windows_wait_for_parent_script(parent_pid);
     let status = std::process::Command::new(system_windows_powershell_path()?)
         .args([
             "-NoProfile",
@@ -2109,42 +2154,43 @@ fn find_windows_managed_uninstall(
     };
     use winreg::RegKey;
 
-    let hive = match source {
-        InstallSource::MsiGlobal | InstallSource::ExeGlobal => HKEY_LOCAL_MACHINE,
-        InstallSource::MsiCorporate | InstallSource::ExeCorporate => HKEY_CURRENT_USER,
-        _ => return Ok(None),
-    };
-    let root = RegKey::predef(hive);
-    for view in [KEY_WOW64_64KEY, KEY_WOW64_32KEY] {
-        let uninstall = match root.open_subkey_with_flags(
-            "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-            KEY_READ | view,
-        ) {
-            Ok(key) => key,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
-            Err(error) => return Err(error),
-        };
-        for key_name in uninstall.enum_keys().flatten() {
-            let Ok(key) = uninstall.open_subkey_with_flags(&key_name, KEY_READ) else {
-                continue;
+    for hive in windows_uninstall_hive_order(source) {
+        let root = RegKey::predef(match hive {
+            WindowsUninstallHive::CurrentUser => HKEY_CURRENT_USER,
+            WindowsUninstallHive::LocalMachine => HKEY_LOCAL_MACHINE,
+        });
+        for view in [KEY_WOW64_64KEY, KEY_WOW64_32KEY] {
+            let uninstall = match root.open_subkey_with_flags(
+                "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+                KEY_READ | view,
+            ) {
+                Ok(key) => key,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+                Err(error) => return Err(error),
             };
-            let identity = WindowsUninstallIdentity {
-                key_name,
-                display_name: key.get_value("DisplayName").unwrap_or_default(),
-                publisher: key.get_value("Publisher").unwrap_or_default(),
-                install_location: key
-                    .get_value::<String, _>("InstallLocation")
-                    .map(PathBuf::from)
-                    .unwrap_or_default(),
-                uninstall_command: key.get_value("UninstallString").unwrap_or_default(),
-                windows_installer: key
-                    .get_value::<u32, _>("WindowsInstaller")
-                    .unwrap_or_default()
-                    != 0,
-            };
-            if let Some(plan) = validate_windows_uninstall_identity(source, current_exe, &identity)
-            {
-                return Ok(Some((plan, identity.install_location)));
+            for key_name in uninstall.enum_keys().flatten() {
+                let Ok(key) = uninstall.open_subkey_with_flags(&key_name, KEY_READ) else {
+                    continue;
+                };
+                let identity = WindowsUninstallIdentity {
+                    key_name,
+                    display_name: key.get_value("DisplayName").unwrap_or_default(),
+                    publisher: key.get_value("Publisher").unwrap_or_default(),
+                    install_location: key
+                        .get_value::<String, _>("InstallLocation")
+                        .map(PathBuf::from)
+                        .unwrap_or_default(),
+                    uninstall_command: key.get_value("UninstallString").unwrap_or_default(),
+                    windows_installer: key
+                        .get_value::<u32, _>("WindowsInstaller")
+                        .unwrap_or_default()
+                        != 0,
+                };
+                if let Some(plan) =
+                    validate_windows_uninstall_identity(source, current_exe, &identity)
+                {
+                    return Ok(Some((plan, identity.install_location)));
+                }
             }
         }
     }
@@ -3509,6 +3555,52 @@ mod tests {
     }
 
     #[test]
+    fn windows_adjacent_marker_wins_when_global_and_corporate_installs_coexist() {
+        assert_eq!(
+            windows_install_source_precedence(
+                Some(InstallSource::MsiCorporate),
+                Some(InstallSource::MsiGlobal),
+                InstallSource::MsiCorporate,
+            ),
+            InstallSource::MsiCorporate
+        );
+        assert_eq!(
+            windows_install_source_precedence(
+                None,
+                Some(InstallSource::MsiGlobal),
+                InstallSource::Unknown,
+            ),
+            InstallSource::MsiGlobal
+        );
+        assert_eq!(
+            windows_install_source_precedence(None, None, InstallSource::MsiCorporate),
+            InstallSource::MsiCorporate
+        );
+    }
+
+    #[test]
+    fn corporate_uninstall_searches_user_then_machine_registration() {
+        assert_eq!(
+            windows_uninstall_hive_order(InstallSource::MsiCorporate),
+            &[
+                WindowsUninstallHive::CurrentUser,
+                WindowsUninstallHive::LocalMachine,
+            ]
+        );
+        assert_eq!(
+            windows_uninstall_hive_order(InstallSource::ExeCorporate),
+            &[
+                WindowsUninstallHive::CurrentUser,
+                WindowsUninstallHive::LocalMachine,
+            ]
+        );
+        assert_eq!(
+            windows_uninstall_hive_order(InstallSource::MsiGlobal),
+            &[WindowsUninstallHive::LocalMachine]
+        );
+    }
+
+    #[test]
     fn windows_managed_uninstall_helper_is_hidden_and_never_deletes_install_root() {
         let plan = WindowsManagedUninstall::Msi {
             product_code: "{01234567-89AB-CDEF-0123-456789ABCDEF}".into(),
@@ -3537,6 +3629,15 @@ mod tests {
         assert!(!invocation.script.contains("1641"));
         assert!(!invocation.script.contains("3010"));
         assert!(!invocation.script.contains("Remove-Item -Recurse"));
+    }
+
+    #[test]
+    fn windows_parent_wait_treats_an_already_exited_parent_as_success() {
+        let script = windows_wait_for_parent_script(4242);
+        assert!(script.contains("$ErrorActionPreference='Stop'"));
+        assert!(script.contains("-ErrorAction SilentlyContinue"));
+        assert!(script.contains("$process.WaitForExit()"));
+        assert!(script.ends_with("exit 0"));
     }
 
     fn test_dir(name: &str) -> PathBuf {

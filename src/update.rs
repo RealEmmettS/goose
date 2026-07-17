@@ -4,6 +4,8 @@ use crate::install::{system_windows_msiexec_path, system_windows_powershell_path
 #[cfg(not(windows))]
 use honk_control::LifecycleLease;
 use sha2::{Digest, Sha256};
+#[cfg(any(test, windows))]
+use std::ffi::OsString;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -108,8 +110,71 @@ struct WindowsUpdateHelperRequest<'a> {
     lifecycle_expected_size: u64,
     installed_executable: &'a Path,
     expected_version: &'a str,
+    bootstrap_receipt: Option<WindowsBootstrapReceiptRefresh<'a>>,
     system_msiexec: &'a Path,
     system_powershell: &'a Path,
+}
+
+#[cfg(any(test, windows))]
+#[derive(Clone, Copy)]
+struct WindowsBootstrapReceiptRefresh<'a> {
+    receipt_path: &'a Path,
+    install_root: &'a Path,
+    release_tag: &'a str,
+    release_commit: &'a str,
+    release_target: &'a str,
+    artifact_name: &'a str,
+}
+
+#[cfg(windows)]
+struct WindowsUpdateDownloads<'a> {
+    artifact_path: &'a Path,
+    artifact: &'a ReleaseArtifact,
+    lifecycle_archive_path: &'a Path,
+    lifecycle_artifact: &'a ReleaseArtifact,
+}
+
+#[cfg(any(test, windows))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WindowsWebRequestInvocation {
+    args: Vec<OsString>,
+    environment: Vec<(&'static str, OsString)>,
+}
+
+#[cfg(any(test, windows))]
+fn windows_fetch_text_invocation(url: &str) -> WindowsWebRequestInvocation {
+    WindowsWebRequestInvocation {
+        args: vec![
+            "-NoProfile".into(),
+            "-NonInteractive".into(),
+            "-ExecutionPolicy".into(),
+            "Bypass".into(),
+            "-Command".into(),
+            "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; $response=Invoke-WebRequest -UseBasicParsing -Uri $env:HONK300_INTERNAL_WEB_REQUEST_URI -Headers @{ 'User-Agent' = 'honk300' }; $content=$response.Content; if ($content -is [byte[]]) { $content=[Text.Encoding]::UTF8.GetString($content) }; [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); [Console]::Out.Write([string]$content)".into(),
+        ],
+        environment: vec![("HONK300_INTERNAL_WEB_REQUEST_URI", url.into())],
+    }
+}
+
+#[cfg(any(test, windows))]
+fn windows_download_invocation(url: &str, path: &Path) -> WindowsWebRequestInvocation {
+    WindowsWebRequestInvocation {
+        args: vec![
+            "-NoProfile".into(),
+            "-NonInteractive".into(),
+            "-ExecutionPolicy".into(),
+            "Bypass".into(),
+            "-Command".into(),
+            "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; Invoke-WebRequest -UseBasicParsing -Uri $env:HONK300_INTERNAL_WEB_REQUEST_URI -OutFile $env:HONK300_INTERNAL_WEB_REQUEST_OUT -Headers @{ 'User-Agent' = 'honk300' }".into(),
+        ],
+        environment: vec![
+            ("HONK300_INTERNAL_WEB_REQUEST_URI", url.into()),
+            (
+                "HONK300_INTERNAL_WEB_REQUEST_OUT",
+                path.as_os_str().to_os_string(),
+            ),
+        ],
+    }
 }
 
 #[cfg(any(test, windows))]
@@ -127,6 +192,67 @@ function Open-HonkPinnedFile([string] $Path, [int64] $ExpectedSize, [string] $Ex
     $stream.Position=0
     return $stream
   } catch { $stream.Dispose(); throw }
+}
+"#;
+
+#[cfg(any(test, windows))]
+const WINDOWS_BOOTSTRAP_RECEIPT_HELPER: &str = r#"
+function Update-HonkBootstrapReceipt(
+  [string] $ReceiptPath,
+  [string] $InstallRoot,
+  [string] $Version,
+  [string] $Tag,
+  [string] $Commit,
+  [string] $Target,
+  [string] $ArtifactName,
+  [string] $ArtifactHash
+) {
+  if (-not (Test-Path -LiteralPath $ReceiptPath)) { return }
+  $receiptDirectory=Split-Path -Parent $ReceiptPath
+  if (-not (Test-Path -LiteralPath $receiptDirectory -PathType Container)) { return }
+  $directoryItem=Get-Item -LiteralPath $receiptDirectory -Force -ErrorAction Stop
+  if (-not $directoryItem.PSIsContainer -or (($directoryItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { return }
+  $receiptItem=Get-Item -LiteralPath $ReceiptPath -Force -ErrorAction Stop
+  if ($receiptItem.PSIsContainer -or (($receiptItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { return }
+  try { $receipt=Get-Content -LiteralPath $ReceiptPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop } catch { return }
+  $required=@('schema','version','tag','commit','channel','layout','target','artifact','install_root','aliases','autostart')
+  foreach ($property in $required) { if ($receipt.PSObject.Properties.Name -notcontains $property) { return } }
+  if ($receipt.schema -ne 'honk300.install.v1' -or $receipt.channel -ne 'powershell-global-msi' -or $receipt.layout -ne 'windows-global-msi') { return }
+  try {
+    $actualRoot=[IO.Path]::GetFullPath([string]$receipt.install_root).TrimEnd([char[]]'\/')
+    $expectedRoot=[IO.Path]::GetFullPath($InstallRoot).TrimEnd([char[]]'\/')
+  } catch { return }
+  if (-not [string]::Equals($actualRoot,$expectedRoot,[StringComparison]::OrdinalIgnoreCase)) { return }
+  if ($null -eq $receipt.artifact -or $receipt.artifact.PSObject.Properties.Name -notcontains 'name' -or $receipt.artifact.PSObject.Properties.Name -notcontains 'sha256') { return }
+  $receipt.version=$Version
+  $receipt.tag=$Tag
+  $receipt.commit=$Commit
+  $receipt.target=$Target
+  $receipt.artifact.name=$ArtifactName
+  $receipt.artifact.sha256=$ArtifactHash
+  $transactionId=[guid]::NewGuid().ToString('N')
+  $receiptTemp=Join-Path $receiptDirectory ('.install-receipt.' + $transactionId + '.tmp')
+  $receiptBackup=Join-Path $receiptDirectory ('.install-receipt.' + $transactionId + '.bak')
+  $tempOwned=$false
+  $backupOwned=$false
+  try {
+    $bytes=[Text.UTF8Encoding]::new($false).GetBytes((($receipt | ConvertTo-Json -Depth 5) + [Environment]::NewLine))
+    $stream=[IO.File]::Open($receiptTemp,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+    $tempOwned=$true
+    try { $stream.Write($bytes,0,$bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
+    [IO.File]::Replace($receiptTemp,$ReceiptPath,$receiptBackup)
+    $tempOwned=$false
+    $backupOwned=$true
+  } finally {
+    if ($tempOwned -and (Test-Path -LiteralPath $receiptTemp -PathType Leaf)) {
+      $tempItem=Get-Item -LiteralPath $receiptTemp -Force
+      if (($tempItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) { Remove-Item -LiteralPath $receiptTemp -Force }
+    }
+    if ($backupOwned -and (Test-Path -LiteralPath $receiptBackup -PathType Leaf)) {
+      $backupItem=Get-Item -LiteralPath $receiptBackup -Force
+      if (($backupItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) { Remove-Item -LiteralPath $receiptBackup -Force }
+    }
+  }
 }
 "#;
 
@@ -264,6 +390,7 @@ fn windows_update_helper_invocation(
         lifecycle_expected_size,
         installed_executable,
         expected_version,
+        bootstrap_receipt,
         system_msiexec,
         system_powershell,
     } = request;
@@ -312,19 +439,49 @@ fn windows_update_helper_invocation(
     let expected_hash = powershell_literal(&expected_hash.to_ascii_lowercase());
     let lifecycle_expected_hash = powershell_literal(&lifecycle_expected_hash.to_ascii_lowercase());
     let expected_version = powershell_literal(strip_prerelease_metadata(expected_version));
+    let (
+        refresh_bootstrap_receipt,
+        receipt_path,
+        install_root,
+        release_tag,
+        release_commit,
+        release_target,
+        artifact_name,
+    ) = match bootstrap_receipt {
+        Some(refresh) => (
+            "$true",
+            powershell_literal(&refresh.receipt_path.to_string_lossy()),
+            powershell_literal(&refresh.install_root.to_string_lossy()),
+            powershell_literal(refresh.release_tag),
+            powershell_literal(refresh.release_commit),
+            powershell_literal(refresh.release_target),
+            powershell_literal(refresh.artifact_name),
+        ),
+        None => (
+            "$false",
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+        ),
+    };
     let delegate_reacquires = if strategy == UpdateStrategy::PowerShell {
         "$true"
     } else {
         "$false"
     };
     let pinned_file_helper = WINDOWS_PINNED_FILE_HELPER;
+    let bootstrap_receipt_helper = WINDOWS_BOOTSTRAP_RECEIPT_HELPER;
     let restart_manager_probe = WINDOWS_RESTART_MANAGER_PROBE;
     let script = format!(
         "$ErrorActionPreference='Stop'; \
          {pinned_file_helper} \
+         {bootstrap_receipt_helper} \
          $artifact='{artifact_literal}'; $expectedHash='{expected_hash}'; $expectedSize=[int64]{expected_size}; \
          $lifecycleArchive='{lifecycle_archive_literal}'; $lifecycleExpectedHash='{lifecycle_expected_hash}'; $lifecycleExpectedSize=[int64]{lifecycle_expected_size}; \
-         $artifactOwned=$false; $lifecycleOwned=$false; $artifactStream=$null; $lifecycleStream=$null; $lease=$null; $leaseRoot=$null; $delegateReacquires={delegate_reacquires}; \
+         $artifactOwned=$false; $lifecycleOwned=$false; $artifactStream=$null; $lifecycleStream=$null; $lease=$null; $leaseRoot=$null; $delegateReacquires={delegate_reacquires}; $refreshBootstrapReceipt={refresh_bootstrap_receipt}; \
          try {{ \
            $artifactStream=Open-HonkPinnedFile $artifact $expectedSize $expectedHash 'verified update artifact'; \
            $artifactOwned=$true; \
@@ -356,7 +513,8 @@ fn windows_update_helper_invocation(
            $versionOutput=(& '{installed_literal}' --version | Select-Object -Last 1); \
            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($versionOutput)) {{ throw 'installed honk300 version check failed' }}; \
            $reported=($versionOutput.Trim().Split()[-1] -replace '[+-].*$',''); \
-           if ($reported -ne '{expected_version}') {{ throw \"installed honk300 version $reported does not match {expected_version}\" }} \
+           if ($reported -ne '{expected_version}') {{ throw \"installed honk300 version $reported does not match {expected_version}\" }}; \
+           if ($refreshBootstrapReceipt) {{ Update-HonkBootstrapReceipt -ReceiptPath '{receipt_path}' -InstallRoot '{install_root}' -Version '{expected_version}' -Tag '{release_tag}' -Commit '{release_commit}' -Target '{release_target}' -ArtifactName '{artifact_name}' -ArtifactHash $expectedHash }} \
          }} finally {{ \
            if ($null -ne $lease) {{ try {{ $lease.StandardInput.Close(); if (-not $lease.WaitForExit(10000)) {{ $lease.Kill(); $lease.WaitForExit() }} }} finally {{ $lease.Dispose() }} }}; \
            if ($null -ne $lifecycleStream) {{ $lifecycleStream.Dispose() }}; \
@@ -592,12 +750,15 @@ pub fn run() -> Result<(), DynError> {
         verify_manifest_artifact(&lifecycle_temp_path, lifecycle_artifact)?;
         schedule_windows_update(
             plan.strategy,
-            &temp_path,
-            artifact,
-            &lifecycle_temp_path,
-            lifecycle_artifact,
+            WindowsUpdateDownloads {
+                artifact_path: &temp_path,
+                artifact,
+                lifecycle_archive_path: &lifecycle_temp_path,
+                lifecycle_artifact,
+            },
             &installed_executable,
-            &latest,
+            &manifest,
+            target,
         )?;
         println!(
             "honk300: verified update handoff scheduled; installation and exact-path verification begin after this process exits."
@@ -784,18 +945,42 @@ fn prepare_temp_artifact_path(path: &Path) -> Result<(), DynError> {
 #[cfg(windows)]
 fn schedule_windows_update(
     strategy: UpdateStrategy,
-    artifact_path: &Path,
-    artifact: &ReleaseArtifact,
-    lifecycle_archive_path: &Path,
-    lifecycle_artifact: &ReleaseArtifact,
+    downloads: WindowsUpdateDownloads<'_>,
     installed_executable: &Path,
-    expected_version: &str,
+    manifest: &ReleaseManifest,
+    target: ReleaseTarget,
 ) -> Result<(), DynError> {
     use std::os::windows::process::CommandExt;
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let WindowsUpdateDownloads {
+        artifact_path,
+        artifact,
+        lifecycle_archive_path,
+        lifecycle_artifact,
+    } = downloads;
     let powershell = system_windows_powershell_path()?;
     let msiexec = system_windows_msiexec_path()?;
+    let receipt_path = (strategy == UpdateStrategy::MsiGlobal)
+        .then(|| std::env::var_os("LOCALAPPDATA"))
+        .flatten()
+        .map(PathBuf::from)
+        .map(|root| root.join("honk300").join("install-receipt.json"));
+    let install_root = installed_executable
+        .parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf);
+    let bootstrap_receipt = match (&receipt_path, &install_root) {
+        (Some(receipt_path), Some(install_root)) => Some(WindowsBootstrapReceiptRefresh {
+            receipt_path,
+            install_root,
+            release_tag: &manifest.tag,
+            release_commit: &manifest.commit,
+            release_target: target.triple(),
+            artifact_name: &artifact.name,
+        }),
+        _ => None,
+    };
     let invocation = windows_update_helper_invocation(WindowsUpdateHelperRequest {
         current_pid: std::process::id(),
         strategy,
@@ -806,7 +991,8 @@ fn schedule_windows_update(
         lifecycle_expected_hash: &lifecycle_artifact.sha256,
         lifecycle_expected_size: lifecycle_artifact.size,
         installed_executable,
-        expected_version,
+        expected_version: &manifest.version,
+        bootstrap_receipt,
         system_msiexec: &msiexec,
         system_powershell: &powershell,
     });
@@ -1058,17 +1244,13 @@ fn fetch_text_with_system_tool(url: &str) -> Result<String, DynError> {
     use std::os::windows::process::CommandExt;
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let output = Command::new(system_windows_powershell_path()?)
-        .args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            "param($uri) (Invoke-WebRequest -UseBasicParsing -Uri $uri -Headers @{ 'User-Agent' = 'honk300' }).Content",
-        ])
-        .arg(url)
-        .creation_flags(CREATE_NO_WINDOW)
-        .output()?;
+    let invocation = windows_fetch_text_invocation(url);
+    let mut command = Command::new(system_windows_powershell_path()?);
+    command.args(invocation.args);
+    for (name, value) in invocation.environment {
+        command.env(name, value);
+    }
+    let output = command.creation_flags(CREATE_NO_WINDOW).output()?;
     if output.status.success() {
         Ok(String::from_utf8(output.stdout)?)
     } else {
@@ -1101,18 +1283,13 @@ fn download_with_system_tool(url: &str, path: &Path) -> Result<(), DynError> {
     use std::os::windows::process::CommandExt;
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let status = Command::new(system_windows_powershell_path()?)
-        .args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            "param($uri, $out) Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $out -Headers @{ 'User-Agent' = 'honk300' }",
-        ])
-        .arg(url)
-        .arg(path)
-        .creation_flags(CREATE_NO_WINDOW)
-        .status()?;
+    let invocation = windows_download_invocation(url, path);
+    let mut command = Command::new(system_windows_powershell_path()?);
+    command.args(invocation.args);
+    for (name, value) in invocation.environment {
+        command.env(name, value);
+    }
+    let status = command.creation_flags(CREATE_NO_WINDOW).status()?;
     if status.success() {
         Ok(())
     } else {
@@ -1543,6 +1720,45 @@ mod tests {
     }
 
     #[test]
+    fn windows_web_requests_keep_url_and_output_path_out_of_command_text() {
+        let url = "https://example.invalid/release manifest.json?value='goose'";
+        let output = Path::new(r"C:\Users\goose\AppData\Local\Temp\honk 'latest'.json");
+
+        let fetch = windows_fetch_text_invocation(url);
+        assert_eq!(
+            fetch.environment,
+            vec![("HONK300_INTERNAL_WEB_REQUEST_URI", OsString::from(url))]
+        );
+        assert!(fetch.args.iter().all(|argument| argument != url));
+        let fetch_script = fetch
+            .args
+            .iter()
+            .find(|argument| argument.to_string_lossy().contains("Invoke-WebRequest"))
+            .unwrap()
+            .to_string_lossy();
+        assert!(fetch_script.contains("$content -is [byte[]]"));
+        assert!(fetch_script.contains("[Text.Encoding]::UTF8.GetString($content)"));
+        assert!(fetch_script.contains("[Console]::OutputEncoding"));
+
+        let download = windows_download_invocation(url, output);
+        assert_eq!(
+            download.environment,
+            vec![
+                ("HONK300_INTERNAL_WEB_REQUEST_URI", OsString::from(url)),
+                (
+                    "HONK300_INTERNAL_WEB_REQUEST_OUT",
+                    output.as_os_str().to_os_string()
+                ),
+            ]
+        );
+        assert!(download.args.iter().all(|argument| argument != url));
+        assert!(download
+            .args
+            .iter()
+            .all(|argument| argument != output.as_os_str()));
+    }
+
+    #[test]
     fn compute_sha256_matches_empty_file() {
         let dir = std::env::temp_dir().join(format!("honk300-update-hash-{}", std::process::id()));
         let _ = fs::create_dir_all(&dir);
@@ -1580,6 +1796,8 @@ mod tests {
         let lifecycle_archive =
             Path::new(r"C:\Users\goose\AppData\Local\Temp\honk300-portable.zip");
         let installed = Path::new(r"C:\Program Files\honk300\bin\honk300.exe");
+        let receipt = Path::new(r"C:\Users\goose\AppData\Local\honk300\install-receipt.json");
+        let install_root = Path::new(r"C:\Program Files\honk300");
         let hash = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
         let invocation = windows_update_helper_invocation(WindowsUpdateHelperRequest {
             current_pid: 4242,
@@ -1592,6 +1810,14 @@ mod tests {
             lifecycle_expected_size: 4321,
             installed_executable: installed,
             expected_version: "0.3.0",
+            bootstrap_receipt: Some(WindowsBootstrapReceiptRefresh {
+                receipt_path: receipt,
+                install_root,
+                release_tag: "v0.3.0",
+                release_commit: "0123456789abcdef0123456789abcdef01234567",
+                release_target: "x86_64-pc-windows-msvc",
+                artifact_name: "honk300-0.3.0-x86_64-pc-windows-msvc-Global.msi",
+            }),
             system_msiexec: Path::new(r"C:\Windows\System32\msiexec.exe"),
             system_powershell: Path::new(
                 r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
@@ -1640,6 +1866,22 @@ mod tests {
         assert!(invocation.script.contains("/i"));
         assert!(invocation.script.contains(&installed.to_string_lossy()[..]));
         assert!(invocation.script.contains("--version"));
+        assert!(invocation.script.contains("Update-HonkBootstrapReceipt"));
+        assert!(invocation.script.contains("powershell-global-msi"));
+        assert!(invocation.script.contains("windows-global-msi"));
+        assert!(invocation.script.contains("[IO.File]::Replace"));
+        assert!(invocation.script.contains("[IO.FileMode]::CreateNew"));
+        assert!(invocation
+            .script
+            .contains("[IO.FileAttributes]::ReparsePoint"));
+        assert!(invocation.script.contains("$refreshBootstrapReceipt=$true"));
+        assert!(
+            invocation.script.find("$reported -ne").unwrap()
+                < invocation
+                    .script
+                    .find("Update-HonkBootstrapReceipt -ReceiptPath")
+                    .unwrap()
+        );
         assert!(invocation.script.contains("Remove-Item -LiteralPath"));
         assert!(invocation
             .script
@@ -1666,12 +1908,14 @@ mod tests {
             lifecycle_expected_size: 4321,
             installed_executable: installed,
             expected_version: "0.3.0",
+            bootstrap_receipt: None,
             system_msiexec: Path::new(r"C:\Windows\System32\msiexec.exe"),
             system_powershell: Path::new(
                 r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
             ),
         });
         assert!(delegated.script.contains("$delegateReacquires=$true"));
+        assert!(delegated.script.contains("$refreshBootstrapReceipt=$false"));
         assert!(!delegated
             .script
             .contains("HONK300_INTERNAL_LIFECYCLE_LEASE_HELD"));
@@ -1722,6 +1966,95 @@ mod tests {
             );
             break;
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_bootstrap_receipt_refresh_updates_only_exact_owned_receipts() {
+        let root =
+            std::env::temp_dir().join(format!("honk300 receipt 'fixture-{}", std::process::id()));
+        let receipt_directory = root.join("state");
+        let receipt_path = receipt_directory.join("install-receipt.json");
+        let install_root = root.join("Program Files").join("honk300");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&receipt_directory).unwrap();
+
+        let original = serde_json::json!({
+            "schema": "honk300.install.v1",
+            "version": "1.0.1",
+            "tag": "v1.0.1",
+            "commit": "1111111111111111111111111111111111111111",
+            "channel": "powershell-global-msi",
+            "layout": "windows-global-msi",
+            "target": "x86_64-pc-windows-msvc",
+            "artifact": {
+                "name": "old.msi",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "install_root": install_root.to_string_lossy(),
+            "aliases": ["honk300.exe", "honk.exe", "goose.exe"],
+            "autostart": { "enabled": false, "owner": "msi" }
+        });
+        fs::write(&receipt_path, serde_json::to_vec_pretty(&original).unwrap()).unwrap();
+
+        let invoke = || {
+            let script = format!(
+                "$ErrorActionPreference='Stop'\n{}\nUpdate-HonkBootstrapReceipt -ReceiptPath '{}' -InstallRoot '{}' -Version '1.0.3' -Tag 'v1.0.3' -Commit '3333333333333333333333333333333333333333' -Target 'x86_64-pc-windows-msvc' -ArtifactName 'honk300-1.0.3-x86_64-pc-windows-msvc-Global.msi' -ArtifactHash 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'",
+                WINDOWS_BOOTSTRAP_RECEIPT_HELPER,
+                powershell_literal(&receipt_path.to_string_lossy()),
+                powershell_literal(&install_root.to_string_lossy()),
+            );
+            let output = Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    &script,
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "receipt helper failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(
+                output.stderr.is_empty(),
+                "receipt helper emitted PowerShell errors: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+
+        invoke();
+        let refreshed: serde_json::Value =
+            serde_json::from_slice(&fs::read(&receipt_path).unwrap()).unwrap();
+        assert_eq!(refreshed["version"], "1.0.3");
+        assert_eq!(refreshed["tag"], "v1.0.3");
+        assert_eq!(
+            refreshed["commit"],
+            "3333333333333333333333333333333333333333"
+        );
+        assert_eq!(
+            refreshed["artifact"]["name"],
+            "honk300-1.0.3-x86_64-pc-windows-msvc-Global.msi"
+        );
+        assert_eq!(refreshed["autostart"], original["autostart"]);
+
+        let malformed = b"{ this belongs to somebody else";
+        fs::write(&receipt_path, malformed).unwrap();
+        invoke();
+        assert_eq!(fs::read(&receipt_path).unwrap(), malformed);
+
+        let mut foreign = original.clone();
+        foreign["channel"] = "foreign-channel".into();
+        let foreign_bytes = serde_json::to_vec_pretty(&foreign).unwrap();
+        fs::write(&receipt_path, &foreign_bytes).unwrap();
+        invoke();
+        assert_eq!(fs::read(&receipt_path).unwrap(), foreign_bytes);
+
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

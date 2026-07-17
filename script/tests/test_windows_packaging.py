@@ -74,7 +74,8 @@ class WindowsPackagingTests(unittest.TestCase):
         for definition in (GLOBAL_WIX, CORPORATE_WIX):
             self.assertNotIn("<Component Id='LegalNotices' Guid='*'>", definition)
             self.assertIn("InstallerVersion='500'", definition)
-            self.assertIn("Schedule='afterInstallInitialize'", definition)
+        self.assertIn("Schedule='afterInstallInitialize'", GLOBAL_WIX)
+        self.assertIn("Schedule='afterInstallFinalize'", CORPORATE_WIX)
 
     def test_every_msi_uses_the_same_custom_license_rtf(self) -> None:
         self.assertTrue(MSI_LICENSE.is_file())

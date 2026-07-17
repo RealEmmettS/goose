@@ -21,8 +21,12 @@
             InstallScope='perUser'
             SummaryCodepage='1252'/>
 
+        <!-- Keep the previous per-user product outside the new install transaction. A failed
+             pre-finalize upgrade then leaves the old component clients untouched, so a clean
+             retry cannot inherit rollback-restored orphan clients. The shared component GUIDs
+             and feature paths remain stable as required for this late schedule. -->
         <MajorUpgrade
-            Schedule='afterInstallInitialize'
+            Schedule='afterInstallFinalize'
             DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
 
         <Media Id='1' Cabinet='media1.cab' EmbedCab='yes'/>

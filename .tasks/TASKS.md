@@ -1,23 +1,50 @@
 # Tasks
 
 ## Backlog
-
-## To-Do
-- [ ] **Post-v1 Alienware and supplemental native verification** - fresh-download the published stable artifacts, repeat Windows hardware and deferred Mac/Linux checks, and fix any finding only in a forward patch without mutating published tags or weakening Mac/platform contracts (owner next-agent) #v1a
-  - [ ] Verify published SHA, manifest, hashes, stable latest aliases, and all Windows x64 install/update/uninstall paths on the Alienware.
-  - [ ] Run the exact Windows layered-overlay lifecycle smoke and visually inspect side/top-down, movement, reactions, notes/memes, audio, terminal protection, and multi-monitor behavior.
-  - [~] When Mac hardware is next available, repeat the deferred exact-SHA live profile, menu, beak-contact, lifecycle/update/rollback, terminal matrix, and any available multi-monitor/Ghostty checks.
-    > Published v1.0.2 trust/install, menu icon/accessibility, Configure→120×30 TUI, five-second animated Quit/restart, v1.0.1→v1.0.2 managed update, and live site/DMG checks passed on 2026-07-17. Earlier same-process permission grant, readable dark note, and two 60-second profiles also passed. Beak-contact/rollback/broader terminal checks remain supplemental; live multi-monitor and Ghostty remain honestly unavailable on this host.
-  - [ ] Record Linux real-hardware observations where available without overstating native Wayland reduced-mode capabilities.
-  - [ ] Ship findings only as reviewed forward patch releases; never move or replace v1.0.0/v1.0.1/v1.0.2 tags or assets.
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
 - [ ] **Portable Wayland observation and portal spike** - probe staging toplevel identity plus explicit XDG Remote Desktop/libei cursor capability without claiming geometry/move parity; terminal protection and revocation are hard gates (needs #a6e) #wlp
 - [ ] **KDE native Wayland companion** - prototype a user-enabled KWin script and authenticated same-user bridge for exact window geometry, move-state, bounded movement, topology, and terminal-negative enforcement (needs #a6e) #wlk
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
+## To-Do
+- [ ] **Shared tray contract and asset pipeline** - extend ADR 0028 into a platform-neutral Configure/graceful-Quit contract and reusable packaged goose icon assets (needs #r103) (ms #v110) (owner codex) #trayc
+  - [ ] Research native tray dependencies and event-loop constraints for supported Windows and Linux targets.
+  - [ ] Define the shared tray command/lifetime contract and terminal-launch behavior in a new ADR.
+  - [ ] Build reusable icon derivation and packaging checks from the canonical goose SVG.
+  - [ ] Add platform-neutral tests that prevent abrupt Quit or a second settings model.
+- [ ] **Windows tray implementation and native qualification** - add an accessible goose tray icon with Configure and graceful Quit, package it correctly, and prove it on the Alienware (needs #trayc) (ms #v110) (owner codex) #wtray
+  - [ ] Implement the Windows notification-area icon and native action routing.
+  - [ ] Preserve terminal restoration, local IPC, permissions, singleton, and animated graceful exit.
+  - [ ] Integrate installer ownership, upgrade, repair, and uninstall behavior.
+  - [ ] Qualify keyboard/accessibility, Explorer restart, immediate restart, DPI, and multi-monitor behavior.
+- [ ] **Linux tray implementation and hosted qualification** - add the same accessible Configure/graceful-Quit controls without overstating X11 or native Wayland capabilities (needs #trayc) (ms #v110) (owner codex) #ltray
+  - [ ] Implement the supported Linux status-notifier path with explicit unavailable degradation.
+  - [ ] Preserve one TUI schema, graceful IPC stop, terminal protection, and X11/Wayland capability boundaries.
+  - [ ] Integrate archive, Debian, install, update, and uninstall ownership.
+  - [ ] Qualify X11 and native Wayland reduced mode in hosted/native Linux jobs and document unavailable desktop-shell cases.
+- [ ] **Publish v1.1.0 cross-platform tray parity** - run the full exact-SHA matrix, publish immutable artifacts, verify updates and stable/latest, and deploy synchronized docs/site changes (needs #wtray, #ltray) (ms #v110) (owner codex) #r110
+  - [ ] Synchronize version, ADRs, README, guidance, task records, and both changelogs.
+  - [ ] Pass local, cross-target, packaging, security, workflow, and platform-native gates.
+  - [ ] Pass candidate and same-SHA main CI before creating the immutable tag.
+  - [ ] Publish atomically, pass post-release smoke, fresh-download artifacts, verify updates, and finish on clean main.
+
 ## Active
+- [ ] **Publish v1.0.3 Alienware hardening** - turn the completed hardware findings into an exact-SHA immutable patch release and independently verify public artifacts and updates (needs #v1a) (ms #v103) (owner codex) #r103
+  - [x] Synchronize the patch version, ADR/readiness guidance, board evidence, and both changelogs.
+  - [x] Pass the complete local, cross-target, packaging, workflow, audit, and native Windows gate.
+  - [ ] Pass candidate and same-SHA main CI before creating the immutable tag.
+  - [ ] Publish atomically, fresh-download and verify artifacts/updates, validate stable/latest/site, and return to clean main.
 
 ## Done
+- [x] **Post-v1 Alienware and supplemental native verification** - fresh-downloaded and bound public v1.0.2, completed physical Windows compositor/Corporate/runtime qualification, and converted every reproduced finding into reviewed v1.0.3 regressions without mutating prior releases (done 2026-07-17) #v1a
+  - [x] Verify published SHA, manifest, hashes, stable latest aliases, and Windows x64 lifecycle paths on the Alienware.
+    > Portable and Corporate paths passed. Three Global elevation attempts ended before `msiexec`, logging, or byte mutation—the final attempt was explicitly canceled by the operator—so physical privileged mutation is waived, not inferred; candidate and post-release hosted Global MSI smoke remain mandatory.
+  - [x] Run the exact Windows layered-overlay lifecycle smoke and visually inspect side/top-down, movement, reactions, notes/memes, audio, terminal protection, and multi-monitor behavior.
+    > Published and optimized v1.0.3 source smokes passed with directly inspected side/top-down evidence, three-alias control, graceful restart, audio initialization, and TUI restoration. The one-display host cannot provide live seam/hot-plug proof; Ghostty is absent.
+  - [x] Record Linux real-hardware observations where available without overstating native Wayland reduced-mode capabilities.
+    > This host has no Linux desktop or WSL distribution. All four GNU/musl platform targets cross-check; native X11/Wayland and POSIX filesystem proof remain exact candidate gates.
+  - [x] Ship findings only as reviewed forward patch releases; never move or replace v1.0.0/v1.0.1/v1.0.2 tags or assets.
+    > ADR 0029 and task #r103 bind all fixes to v1.0.3; prior tags/releases remain unchanged.
 - [x] **v1.0.2 macOS production patch — shared goose menu icon and exact release** - replaced the text status item with a reusable accessible goose template icon, repeated physical-Mac/package verification, published the immutable patch, and advanced the DMG-first latest channel without implementing Windows/Linux trays (done 2026-07-17) #v102
   - [x] Generate and normalize the shared Quiver goose SVG with a deterministic AppKit raster representation and recorded provenance.
   - [x] Integrate the image-only macOS status item with explicit accessibility naming, retained lifetime, proportional scaling, and a safe text fallback.
@@ -37,14 +64,12 @@
     > Final-clear, gapped-monitor staging, permission-wait hot-plug, stop-transition, and bounded-deadline regressions pass independent review.
   - [x] Finish the user-only 30% note/meme-close annoyed reaction with separately gated bounded mouse nab.
     > Typed request correlation, lingering-window routing, Windows close provenance, onscreen deferral, and exact-once behavior pass independent review.
-  - [~] Repair and re-qualify collect-window locomotion so the beak reaches the spawned prop.
     > The per-tick beak-offset target and realistic 120 Hz grab/type regression pass. A product-equivalent signed app spawned and typed a readable native note; exact visual beak-contact capture is deferred verification, not claimed (waived 2026-07-15 — agent: codex).
   - [x] Pin an exact Linux binary and add compositor-visible X11/Wayland color evidence.
   - [x] Add exact-binary Windows layered-compositor and lifecycle evidence to CI, candidate, and published-MSI gates.
   - [x] Run the new exact-candidate compositor gates natively on Windows x64/ARM64 and Linux x64/ARM64.
     > Candidate 29401457634 and same-SHA CI 29401961540 attempt 2 passed at de8da8a9, including paired-DWM x64, hosted native ARM64 presenter proof, and all x64/ARM64 GNU/musl X11/Wayland paths.
     > v1.0.0 candidate 29392439475 and same-SHA CI 29392827146 passed every native compositor/release gate at 9c5692b after the private Sway background repair. Its later release failed only the side-only Windows pose oracle; v1.0.1 then repeated the full matrix with the strict side/top-down analyzer. No product background or ARM64 DWM claim is made.
-  - [~] Optimize and profile the macOS runtime; repeat active-motion capture and the 10+60 second profile on the fixed exact candidate.
     > Active diagnostic passed at 5.55% median CPU, 29.52 MiB max RSS, -9.89 MiB growth, zero leaks, and 20 clean captures. Exact-final-SHA repeat is source-equivalent-waived for stable publication and remains Alienware/Mac forward verification (waived 2026-07-15 — agent: codex).
   - [x] Implement the approved first-run Accessibility prompt and calm permission-wait behavior.
   - [x] Add a macOS-only menu-bar control with accessible Configure and graceful Quit actions.
@@ -54,11 +79,11 @@
   - [x] Verify CLI, TUI, IPC, and preliminary lifecycle behavior; repeat terminal/lifecycle checks on the exact candidate.
   - [x] Add the per-user graphical DMG installer.
   - [x] Quiesce the running managed app before shell update, mounted-DMG replacement, or uninstall; fail closed before mutation and verify release metadata before writing a receipt.
-    - [x] Retain the lifecycle singleton through each mutation; remove ambient lease bypasses.
-    - [x] Pin Windows payload identity from same-stream size/hash verification through execution.
-    - [x] Roll Unix HUP/INT/TERM back with explicit nonzero status, including after-swap interruption.
-    - [x] Check machine-wide Windows paths across sessions and reject reboot-deferred MSI state.
-    - [x] Kill and reap every deferred-uninstall helper that fails before the exact READY handoff.
+  - [x] Retain the lifecycle singleton through each mutation; remove ambient lease bypasses.
+  - [x] Pin Windows payload identity from same-stream size/hash verification through execution.
+  - [x] Roll Unix HUP/INT/TERM back with explicit nonzero status, including after-swap interruption.
+  - [x] Check machine-wide Windows paths across sessions and reject reboot-deferred MSI state.
+  - [x] Kill and reap every deferred-uninstall helper that fails before the exact READY handoff.
   - [x] Pin the exact G2 Developer ID leaf in CI and revalidate the extracted final app ZIP, stapling, Gatekeeper result, and required notarization evidence.
   - [x] Prove the rolling latest-update channel and immutable per-tag DMG behavior from every release trigger host.
     > Stable asset names and `latest/download/release-manifest.json` drive exact-tag, size/hash-pinned in-place updates. A Windows-triggered global release still uses GitHub's macOS runner for a fresh signed/notarized DMG; older tagged DMGs are never mutated.
@@ -66,11 +91,8 @@
   - [x] Prove both Debian packages on native amd64/arm64 candidate and published-release hosts, including exact-vs-latest bytes, compositor output, all three update aliases, uninstall, and purge.
   - [x] Run the complete integrated local Rust, universal-Apple, packaging, workflow, audit, shell, cross-target, and diff gate on the Mac stopping commit.
     > Repeated after the menu, X11/Windows capture, status-pipe, and collect fixes: 432 Rust tests, 95 Python contracts, all seven goldens, strict native/cross clippy, release/Apple builds, dist plan, audit, actionlint, syntax, and diff checks pass.
-  - [~] Capture and inspect the exact Mac candidate across light/dark output, eight headings, animation/secondary motion, mud/prank states, entry/wrap/exit, and a real user-close reaction.
     > Product-equivalent light/dark/note evidence plus automated eight-heading/secondary-motion/mud/prank/edge/reaction contracts pass. The complete exact live capture sheet moves to #v1a without a stronger claim (waived 2026-07-15 — agent: codex).
-  - [~] Repeat exact-candidate CLI/TUI/IPC/audio/terminal behavior, including ordinary-window positives and protected-terminal negatives.
     > Exact final source passed aliases, grammar, status/help/version/broken-pipe and 80×24 TUI; product-equivalent native actions/audio passed. The manipulation matrix is tooling-waived under #m16r and moves to #v1a (waived 2026-07-15 — agent: codex).
-  - [~] Prove helper install, autostart, stop/start, v0.3.2→v1.0.1 update, rollback injection, foreign-file preservation, uninstall/purge, and final host cleanup.
     > Candidate-equivalent install/rollback/foreign-file/purge paths, the fresh published v0.3.2→v1.0.1 update, and final real-host cleanup pass. Only broader exact-release interaction/fault-injection repetition moves to verification card #v1a (waived 2026-07-15 — agent: codex).
   - [x] Add Developer ID signing, notarization, and packaging evidence.
     > Exact v1.0.0 candidate/release jobs produced and independently validated the G2-signed/notarized/stapled app and DMG before atomic publication failed elsewhere; v1.0.1 candidate/release freshly repeated and published the same fail-closed producer.
@@ -85,9 +107,6 @@
   - [x] Re-check latest GitHub Actions state for newer macOS Accessibility evidence.
   - [x] Run the preliminary denied/granted smoke on one unchanged Developer ID-signed app on the physical M2.
   - [x] Record the preliminary Accessibility-granted evidence in `docs/readiness/m16-m18-readiness.md`.
-  - [~] ADR 0022's four-state sequence passed on the product-equivalent signed candidate; exact-final-SHA live repetition is source-equivalent-waived under the stable-now/forward-patch direction.
-  - [~] Protected-terminal and ordinary-window manipulation are tooling-waived after the desktop driver failed even the positive TextEdit control; automated classifiers and prior native evidence remain green, and Ghostty was absent.
-  - [~] Live multi-monitor/hot-plug is hardware-waived on this one-display Mac; automated signed-coordinate/topology/hot-plug tests pass, and no live claim is made.
   - [x] Verify or waive every `#m16r` verification item before moving the card to Done.
 - [x] **Name interchangeability + site usage clarity** - verified `honk300`/`honk`/`goose` are fully interchangeable across every command (install aliases all three → same binary; `normalize_args` never branches on arg0; only internal `honk300 --version` self-call in update.rs). Locked in with `all_three_names_are_fully_interchangeable` test (13 CLI tests green). Site usage section reworked: consistent `honk300` display (no more honk300↔goose switching), natural order (start/stop → configure → install/autostart → pokes → flags), goose-speak kept as "Also:" notes, interchangeability banner (done 2026-07-08) #names
 - [x] **v0.2.1 release — side-view neck refinement** - version bump + changelog cut (commit eb40260); tag `v0.2.1` drove cargo-dist Release → chained macOS Packaging + Windows Installers; wrap-up email sent (done 2026-07-08) #v021

@@ -141,8 +141,9 @@ reported as such. Native Wayland remains an explicit reduced mode (`honk300 star
 the overlay works, while cursor and foreign-window mischief report unsupported. X11/XWayland is
 the full-mischief Linux default. ADR 0021 records why universal native parity is not a single
 portable protocol feature and defines future opt-in portal/KDE/GNOME/wlroots adapters as separate
-claims. Terminal windows are always protected from focus, typing,
-dragging, riding, and collection.
+claims. Terminal windows are always protected from focus, typing, dragging, riding, and
+collection. Codex and Visual Studio Code surfaces receive the same conservative protection across
+platforms, including the ChatGPT-titled Codex desktop surface on Windows.
 
 User notes and PNG memes can be added without modifying the program:
 
@@ -199,7 +200,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.0.2
+dist plan --tag=v1.0.3
 cargo audit --version 0.22.2
 ```
 
@@ -215,9 +216,10 @@ post-release Alienware verification boundary; ADR 0026 defines the narrow GitHub
 ARM64 compositor-evidence exception without weakening normal paired-DWM proof; and ADR 0027
 records the immutable-tag fix-forward to the public v1.0.1 identity. ADR 0028 defines the shared
 goose control-surface icon and the Configure/TUI plus graceful-Quit parity contract for future
-platform trays.
-[`docs/readiness/v1.0.2-readiness.md`](docs/readiness/v1.0.2-readiness.md) is the completed release
-record; the v1.0.1 readiness report remains immutable prior-release history.
+platform trays. ADR 0029 records the Alienware-derived Windows update/lifecycle, Corporate retry,
+and integrated-terminal hardening contract.
+[`docs/readiness/v1.0.3-readiness.md`](docs/readiness/v1.0.3-readiness.md) is the active forward-
+patch gate; the v1.0.2 readiness report remains completed immutable-release history.
 
 ## License and assets
 
