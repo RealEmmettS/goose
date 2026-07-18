@@ -8,16 +8,15 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.2.0](https://github.com/RealEmmettS/goose/releases/tag/v1.2.0),
-published from exact commit `fcbb6337830a14cb187c93cfe3e499a3f2f73945`. Its candidate, same-SHA
-main, atomic 47-asset publication, signed/notarized/stapled Mac, Windows x64/ARM64, Debian, and
-managed-Mac public-byte gates passed. The public Linux shell smoke then exposed a foreign
-autostart ownership regression; v1.2.1 is the immutable fix-forward candidate.
+**Current stable release:** [v1.2.1](https://github.com/RealEmmettS/goose/releases/tag/v1.2.1),
+published from exact commit `c001fd1d08e5b9ac145bc62525a59866172d33f6`. It fixes foreign
+macOS/Linux login-start ownership; fresh public Linux installs then passed install, launch, X11,
+and dual-monitor Wayland proof before a formatting-only receipt assertion stopped the rollback
+smoke. v1.2.2 is the immutable test-harness fix-forward.
 
-**Next release candidate:** v1.2.1 preserves the v1.2.0 provenance-preserving updater, bounded
-props, graceful/forced lifecycle, configurable login start, and windowless Windows app launch,
-while treating unrelated macOS/Linux startup entries as preserved foreign state instead of
-mistaking their mere existence for Honk300-owned autostart.
+**Next release candidate:** v1.2.2 preserves v1.2.1 product behavior and changes the public
+macOS/Linux lifecycle smoke to parse the installation receipt as JSON, so bootstrap-formatted and
+runtime-pretty-printed forms receive the same semantic verification.
 
 ## Install
 
@@ -269,7 +268,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.2.1
+dist plan --tag=v1.2.2
 cargo audit --version 0.22.2
 ```
 
@@ -294,10 +293,9 @@ owned bounded windows and defines monitor-relative image fitting, graceful versu
 and the one provenance-owned login-start setting. ADR 0033 makes Windows app/login/background
 launch windowless while preserving normal intentional CLI behavior, and moves every full-desktop
 compositor surface to disposable CI; product startup performs no calibration.
-[`docs/readiness/v1.2.1-readiness.md`](docs/readiness/v1.2.1-readiness.md) tracks the immutable
-fix-forward candidate, same-SHA main, publication, and public-byte qualification. The v1.2.0
-report records its successful publication and failed Linux shell public-byte gate; earlier
-reports remain immutable-release history.
+[`docs/readiness/v1.2.2-readiness.md`](docs/readiness/v1.2.2-readiness.md) tracks the semantic
+receipt-verifier fix-forward through candidate, same-SHA main, publication, and public-byte
+qualification. The v1.2.0/v1.2.1 reports preserve their immutable release evidence.
 
 ## License and assets
 

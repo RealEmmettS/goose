@@ -32,6 +32,8 @@ XDG_DATA_HOME="$ROOT/data"
 XDG_CONFIG_HOME="$ROOT/config"
 export HOME XDG_DATA_HOME XDG_CONFIG_HOME
 mkdir -p "$HOME" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
+PYTHON3="$(command -v python3 || true)"
+[ -n "$PYTHON3" ] || { printf 'python3 is required for semantic receipt verification\n' >&2; exit 1; }
 PATH="/usr/bin:/bin:/usr/sbin:/sbin"
 export PATH
 
@@ -81,11 +83,22 @@ verify_install() {
   reported="$($BINARY --version | awk '{print $NF}' | sed 's/[+-].*$//')"
   [ "$reported" = "$VERSION" ] || { printf 'installed version mismatch: %s\n' "$reported" >&2; exit 1; }
   require_file "$RECEIPT"
-  grep -F '"schema": "honk300.install.v2"' "$RECEIPT" >/dev/null
-  grep -F '"release_track": "stable"' "$RECEIPT" >/dev/null
-  grep -F '"active_release": ' "$RECEIPT" >/dev/null
-  grep -F "\"tag\": \"$TAG\"" "$RECEIPT" >/dev/null
-  grep -F '"autostart": { "enabled": false, "owner": "honk300-installer" }' "$RECEIPT" >/dev/null
+  "$PYTHON3" - "$RECEIPT" "$TAG" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as receipt_file:
+    receipt = json.load(receipt_file)
+
+assert receipt["schema"] == "honk300.install.v2"
+assert receipt["release_track"] == "stable"
+assert isinstance(receipt["active_release"], str) and receipt["active_release"]
+assert receipt["tag"] == sys.argv[2]
+assert receipt["autostart"] == {
+    "enabled": False,
+    "owner": "honk300-installer",
+}
+PY
 
   for link in \
     "$HOME/.local/bin/honk300" \

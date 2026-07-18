@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Latest — July 2026
 
 ### Fixed
+- **Release checks now recognize the same installation record in either valid layout.** The Mac
+  and Linux public-install test reads the record's actual values instead of depending on spaces
+  and line breaks, which lets the full update and rollback safety check finish reliably.
 - **An unrelated startup file no longer prevents the Goose from launching.** Mac and Linux
   terminal installs now turn on start-at-login only when the existing startup entry genuinely
   belongs to the Goose. Unfamiliar files remain untouched and count as the Goose's setting being

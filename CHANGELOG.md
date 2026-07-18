@@ -26,6 +26,15 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-07-18
+
+### Fixed
+- **Semantic post-release receipt verification** - the live macOS/Linux installer smoke now
+  parses the v2 receipt as JSON instead of requiring the bootstrap's original single-line
+  formatting. This preserves the complete install/start/X11/Wayland/rollback gate after runtime
+  legitimately rewrites the same receipt as pretty-printed JSON; product behavior is unchanged
+  from v1.2.1.
+
 ## [1.2.1] - 2026-07-18
 
 ### Fixed

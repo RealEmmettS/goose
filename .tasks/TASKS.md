@@ -9,8 +9,8 @@
 ## To-Do
 
 ## Active
-- [ ] **Close the v1.2.1 provenance-preserving updater fix-forward** - preserve immutable v1.2.0, qualify/publish its foreign-autostart correction, verify public bytes, and clean every branch (owner codex) (needs #u31) #r120
-  - [x] Synchronize v1.2.1 version, readiness, board, public guidance, and both changelogs.
+- [ ] **Close the v1.2.2 provenance-preserving updater fix-forward** - preserve immutable v1.2.0/v1.2.1, qualify the semantic receipt verifier, verify every public byte, and clean every branch (owner codex) (needs #u31) #r120
+  - [x] Synchronize v1.2.2 version, readiness, board, public guidance, and both changelogs.
   - [x] Pass the complete v1.2.0 local, cross-target, packaging, audit, and exact-candidate gate.
     > Candidate 29649872307 attempt 2 passed at fcbb6337830a14cb187c93cfe3e499a3f2f73945.
   - [x] Diagnose the reported Windows white-screen event and retire full-desktop calibration from local/product execution.
@@ -28,9 +28,13 @@
   - [~] Publish v1.2.0 atomically and preserve its public-byte failure as immutable evidence.
     > Atomic run 29650650643 published 47 assets. Public run 29651013524 passed Mac, Debian, and Windows but both Linux shell jobs caught the same foreign-autostart receipt defect.
   - [~] Fix forward as v1.2.1 and repeat candidate, same-SHA main, publication, public-byte, latest, and site gates.
-    > Foreign files, symlinks, and directories are now preserved and treated as Honk300 autostart off; enabling still refuses ownership conflicts.
+    > v1.2.1 candidate/main/publication passed. Public Linux install/start/X11/Wayland passed, then a compact-JSON harness assertion stopped rollback closure after runtime pretty-printing.
   - [x] Pass the v1.2.1 noninteractive local, cross-target, audit, parser, and package preflight.
     > 434 Rust tests, 83 focused contracts with two POSIX skips, strict native/musl Clippy, ARM64 Windows check, RustSec, actionlint, cargo-dist, shell/PowerShell parsing, and package-list preflight pass without launching the app.
+  - [~] Ship v1.2.2's semantic receipt verifier and repeat the exact candidate/main/public/latest/site closure.
+    > Product code is unchanged from v1.2.1; the smoke now parses schema, track, active release, tag, and autostart values as JSON rather than matching whitespace.
+  - [x] Pass the v1.2.2 noninteractive local, cross-target, audit, parser, and package preflight.
+    > Semantic verifier contracts, 434 Rust tests, strict native/musl Clippy, locked build, ARM64 Windows check, RustSec, actionlint, cargo-dist, and parser gates pass without launching the app.
   - [ ] Return to clean main and remove every non-main local and remote branch after preserving merged work.
 - [ ] **Provenance-preserving slot-based self-updater** - implement synchronous same-origin updates, atomic Windows release slots, DMG-managed Mac updates, and release qualification (owner codex) #u31
   - [x] Record ADR 0031 and the versioned receipt/provenance contract.
