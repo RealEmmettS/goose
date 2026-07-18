@@ -383,7 +383,7 @@ jobs:
           receipt = json.loads(Path('$extracted/usr/lib/honk300/install-receipt.json').read_text())
           assert receipt['schema'] == 'honk300.install.v2'
           assert receipt['origin'] == 'deb'
-          assert receipt['target'] == '$triple'
+          assert receipt['target'] == '$target'
           assert receipt['active_release'] == '/usr/lib/honk300'
           PY
             test "$(dpkg-deb --field "$output" Package)" = honk300

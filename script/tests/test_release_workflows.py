@@ -63,6 +63,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("--draft=false --latest", assembly)
         self.assertNotIn("--clobber", assembly)
 
+    def test_debian_receipt_assertion_uses_the_loop_target(self) -> None:
+        self.assertIn("assert receipt['target'] == '$target'", RELEASE)
+        self.assertNotIn("assert receipt['target'] == '$triple'", RELEASE)
+
     def test_candidate_preflight_assembles_without_consuming_a_tag_or_release(self) -> None:
         for workflow in (RELEASE, WINDOWS, MACOS):
             self.assertIn("candidate:", workflow)

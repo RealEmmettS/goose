@@ -507,6 +507,8 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
             "HONK300_WINDOWS_SMOKE_TRAY_QUIT_TOKEN",
             "Honk300SmokeTrayQuit-$Token",
             "native tray Quit did not take the graceful runtime path",
+            "native tray Quit=unavailable-host-waiver",
+            "tray_availability=$trayAvailability",
             "-Arguments @($verb, '--force')",
             "forced stop command received; stopping immediately",
             "--force unexpectedly ran the graceful walk-off path",

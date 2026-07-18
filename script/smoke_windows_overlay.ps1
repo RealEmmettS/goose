@@ -294,7 +294,7 @@ guid=$guid
 accessible_name=Honk300 controls
 runtime_message=$($runtimeMessage.Trim())
 "@
-        return
+        return 'unavailable'
     }
 
     $identifier = [Honk300TraySmoke+NotifyIdentifier]::new()
@@ -389,7 +389,7 @@ recovery_hresult=$after
 recovery_poll_attempts=$recoveryPollAttempts
 runtime_message=$runtimeMessage
 "@
-        return
+        return 'recovery-unobservable'
     }
 
     Set-Content -LiteralPath $EvidencePath -Encoding utf8NoBOM -Value @"
@@ -404,6 +404,7 @@ taskbar_created_message=$taskbarCreated
 recovery_poll_attempts=$recoveryPollAttempts
 after_rect=$($afterRect.Left),$($afterRect.Top),$($afterRect.Right),$($afterRect.Bottom)
 "@
+    return 'available'
 }
 
 function Write-TextFileAtomically {
@@ -1304,6 +1305,7 @@ $runtime = $null
 $runtimeSuspended = $false
 $firstPid = $null
 $visualPassed = $false
+$trayAvailability = 'unknown'
 $captureMode = 'paired-dwm'
 $presenterRectTolerancePixels = 3
 $rendererPresentPath = Join-Path $work 'renderer-present.bgra'
@@ -1406,7 +1408,7 @@ result=visible-bounded-aspect-preserved-and-uncropped
         $runtime = Start-ExactRuntime -Label 'first'
         $firstPid = $runtime.Id
         Wait-ForRuntime -Process $runtime -EvidenceName 'status-start.txt'
-        Test-WindowsTrayRecovery `
+        $trayAvailability = Test-WindowsTrayRecovery `
             -EvidencePath (Join-Path $evidence 'tray-recovery.txt') `
             -RuntimeStderrPath (Join-Path $evidence 'first-runtime.stderr.log')
         $duplicate = Invoke-ExactBinary -Arguments @('start', '--config', $config, '--no-sound') `
@@ -1529,7 +1531,7 @@ light_sha256=$lightProofHash
     $runtime = Start-ExactRuntime -Label 'first'
     $firstPid = $runtime.Id
     Wait-ForRuntime -Process $runtime -EvidenceName 'status-start.txt'
-    Test-WindowsTrayRecovery `
+    $trayAvailability = Test-WindowsTrayRecovery `
         -EvidencePath (Join-Path $evidence 'tray-recovery.txt') `
         -RuntimeStderrPath (Join-Path $evidence 'first-runtime.stderr.log')
 
@@ -1757,48 +1759,61 @@ light_sha256=$lightProofHash
         }
     }
 
-    $trayQuitToken = [Guid]::NewGuid().ToString('N')
-    $runtime = Start-ExactRuntime -Label 'graceful-tray-quit' `
-        -SmokeTrayQuitToken $trayQuitToken
-    Wait-ForRuntime -Process $runtime -EvidenceName 'graceful-tray-quit-status.txt'
-    Wait-ForVisibleGoose -Process $runtime | Out-Null
-    Invoke-WindowsTrayQuit -Process $runtime -Token $trayQuitToken
-    if (-not $runtime.WaitForExit(15000)) { throw 'native tray Quit did not finish its walk-off' }
-    $trayLog = Get-Content -LiteralPath `
-        (Join-Path $evidence 'graceful-tray-quit-runtime.stdout.log') -Raw
-    if ($trayLog -notmatch '(?m)^honk300: goose walked home; stopping\.\s*$') {
-        throw 'native tray Quit did not take the graceful runtime path'
+    if ($trayAvailability -eq 'unavailable') {
+        if (-not $AllowUnavailableTrayHost) {
+            throw 'native tray Quit cannot be waived on a host that requires notification-area controls'
+        }
+        $gracefulResults.Add('native tray Quit=unavailable-host-waiver')
     }
-    $gracefulResults.Add('native tray Quit=graceful')
-    $runtime = $null
+    else {
+        $trayQuitToken = [Guid]::NewGuid().ToString('N')
+        $runtime = Start-ExactRuntime -Label 'graceful-tray-quit' `
+            -SmokeTrayQuitToken $trayQuitToken
+        Wait-ForRuntime -Process $runtime -EvidenceName 'graceful-tray-quit-status.txt'
+        Wait-ForVisibleGoose -Process $runtime | Out-Null
+        Invoke-WindowsTrayQuit -Process $runtime -Token $trayQuitToken
+        if (-not $runtime.WaitForExit(15000)) { throw 'native tray Quit did not finish its walk-off' }
+        $trayLog = Get-Content -LiteralPath `
+            (Join-Path $evidence 'graceful-tray-quit-runtime.stdout.log') -Raw
+        if ($trayLog -notmatch '(?m)^honk300: goose walked home; stopping\.\s*$') {
+            throw 'native tray Quit did not take the graceful runtime path'
+        }
+        $gracefulResults.Add('native tray Quit=graceful')
+        $runtime = $null
+    }
     Set-Content -LiteralPath (Join-Path $evidence 'graceful-matrix.txt') `
         -Encoding utf8NoBOM -Value ($gracefulResults -join "`n")
 
     $forceResults = [System.Collections.Generic.List[string]]::new()
-    $runtime = Start-ExactRuntime -Label 'force-modal-tray-goose-quit'
-    Wait-ForRuntime -Process $runtime -EvidenceName 'force-modal-tray-goose-quit-status.txt'
-    Wait-ForVisibleGoose -Process $runtime | Out-Null
-    Open-WindowsTrayMenu | Out-Null
-    Start-Sleep -Milliseconds 250
-    $modalStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $modalForceOutput = Invoke-ExactClient -Client $clients['goose'] `
-        -Arguments @('quit', '--force') -EvidenceName 'force-modal-tray-goose-quit-command.txt'
-    if ($modalForceOutput -notmatch '(?m)^honk300: command accepted\.\s*$') {
-        throw 'goose quit --force did not receive an accepted result while the native tray menu was modal'
+    if ($trayAvailability -eq 'unavailable') {
+        $forceResults.Add('goose quit --force with modal native tray menu=unavailable-host-waiver')
     }
-    if (-not $runtime.WaitForExit(5000)) {
-        throw 'goose quit --force did not bypass the modal native tray menu'
+    else {
+        $runtime = Start-ExactRuntime -Label 'force-modal-tray-goose-quit'
+        Wait-ForRuntime -Process $runtime -EvidenceName 'force-modal-tray-goose-quit-status.txt'
+        Wait-ForVisibleGoose -Process $runtime | Out-Null
+        Open-WindowsTrayMenu | Out-Null
+        Start-Sleep -Milliseconds 250
+        $modalStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+        $modalForceOutput = Invoke-ExactClient -Client $clients['goose'] `
+            -Arguments @('quit', '--force') -EvidenceName 'force-modal-tray-goose-quit-command.txt'
+        if ($modalForceOutput -notmatch '(?m)^honk300: command accepted\.\s*$') {
+            throw 'goose quit --force did not receive an accepted result while the native tray menu was modal'
+        }
+        if (-not $runtime.WaitForExit(5000)) {
+            throw 'goose quit --force did not bypass the modal native tray menu'
+        }
+        $modalStopwatch.Stop()
+        $modalLog = Get-Content -LiteralPath `
+            (Join-Path $evidence 'force-modal-tray-goose-quit-runtime.stdout.log') -Raw
+        if ($modalLog -match '(?m)^honk300: goose walked home; stopping\.\s*$') {
+            throw 'goose quit --force unexpectedly walked off while the native tray menu was modal'
+        }
+        $forceResults.Add(
+            "goose quit --force with modal native tray menu=immediate elapsed_ms=$($modalStopwatch.ElapsedMilliseconds)"
+        )
+        $runtime = $null
     }
-    $modalStopwatch.Stop()
-    $modalLog = Get-Content -LiteralPath `
-        (Join-Path $evidence 'force-modal-tray-goose-quit-runtime.stdout.log') -Raw
-    if ($modalLog -match '(?m)^honk300: goose walked home; stopping\.\s*$') {
-        throw 'goose quit --force unexpectedly walked off while the native tray menu was modal'
-    }
-    $forceResults.Add(
-        "goose quit --force with modal native tray menu=immediate elapsed_ms=$($modalStopwatch.ElapsedMilliseconds)"
-    )
-    $runtime = $null
 
     foreach ($name in @('honk300', 'honk', 'goose')) {
         foreach ($verb in @('stop', 'quit', 'exit')) {
@@ -1835,6 +1850,7 @@ sha256=$initialHash
 first_pid=$firstPid
 visual_capture=$captureMode
 lifecycle=offscreen-walk-in,status,single-instance,reload,all-alias-all-synonym-graceful,graceful-native-tray-quit,all-alias-all-synonym-force
+tray_availability=$trayAvailability
 "@
     Write-Output "Windows layered-overlay $captureMode and lifecycle smoke passed for $resolvedBinary ($initialHash)"
 }

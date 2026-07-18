@@ -1,6 +1,6 @@
 use honk_control::ControlSurfaceCommand;
 use std::collections::VecDeque;
-use std::ffi::c_void;
+use std::ffi::{c_void, OsStr};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
 use tiny_skia::Pixmap;
@@ -286,9 +286,26 @@ fn enqueue_menu_selection(selection: usize) {
 }
 
 fn register_smoke_tray_quit_message() -> windows::core::Result<u32> {
-    let Some(token) = std::env::var_os("HONK300_WINDOWS_SMOKE_TRAY_QUIT_TOKEN") else {
+    let token = std::env::var_os("HONK300_WINDOWS_SMOKE_TRAY_QUIT_TOKEN");
+    let Some(message_name) = smoke_tray_quit_message_name(token.as_deref())? else {
         return Ok(0);
     };
+    let message_name = wide(&message_name);
+    let message = unsafe { RegisterWindowMessageW(PCWSTR(message_name.as_ptr())) };
+    if message == 0 {
+        Err(Error::from_win32())
+    } else {
+        Ok(message)
+    }
+}
+
+fn smoke_tray_quit_message_name(token: Option<&OsStr>) -> windows::core::Result<Option<String>> {
+    let Some(token) = token else {
+        return Ok(None);
+    };
+    if token.is_empty() {
+        return Ok(None);
+    }
     let token = token
         .to_str()
         .filter(|token| {
@@ -298,13 +315,7 @@ fn register_smoke_tray_quit_message() -> windows::core::Result<u32> {
                     .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
         })
         .ok_or_else(|| failure("invalid Windows tray smoke token"))?;
-    let message_name = wide(&format!("Honk300SmokeTrayQuit-{token}"));
-    let message = unsafe { RegisterWindowMessageW(PCWSTR(message_name.as_ptr())) };
-    if message == 0 {
-        Err(Error::from_win32())
-    } else {
-        Ok(message)
-    }
+    Ok(Some(format!("Honk300SmokeTrayQuit-{token}")))
 }
 
 fn point_from_callback(value: WPARAM) -> POINT {
@@ -412,10 +423,12 @@ fn failure(message: impl AsRef<str>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::{
-        command_for_menu_selection, compose_tray_bgra, point_from_callback, write_utf16,
-        CONFIGURE_COMMAND_ID, QUIT_COMMAND_ID, STATUS_ICON_PNG,
+        command_for_menu_selection, compose_tray_bgra, point_from_callback,
+        smoke_tray_quit_message_name, write_utf16, CONFIGURE_COMMAND_ID, QUIT_COMMAND_ID,
+        STATUS_ICON_PNG,
     };
     use honk_control::ControlSurfaceCommand;
+    use std::ffi::OsStr;
     use tiny_skia::Pixmap;
     use windows::Win32::Foundation::WPARAM;
 
@@ -465,5 +478,25 @@ mod tests {
         );
         assert_eq!(command_for_menu_selection(0), None);
         assert_eq!(command_for_menu_selection(usize::MAX), None);
+    }
+
+    #[test]
+    fn smoke_tray_quit_hook_ignores_absent_or_empty_environment_but_rejects_bad_tokens() {
+        assert_eq!(smoke_tray_quit_message_name(None).unwrap(), None);
+        assert_eq!(
+            smoke_tray_quit_message_name(Some(OsStr::new(""))).unwrap(),
+            None
+        );
+        assert_eq!(
+            smoke_tray_quit_message_name(Some(OsStr::new("0123456789abcdef0123456789abcdef")))
+                .unwrap()
+                .as_deref(),
+            Some("Honk300SmokeTrayQuit-0123456789abcdef0123456789abcdef")
+        );
+        assert!(smoke_tray_quit_message_name(Some(OsStr::new("too-short"))).is_err());
+        assert!(
+            smoke_tray_quit_message_name(Some(OsStr::new("0123456789abcdef0123456789abcde_")))
+                .is_err()
+        );
     }
 }
