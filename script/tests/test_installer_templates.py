@@ -445,6 +445,7 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertIn("Wait-CheckedProcess", takeover_smoke)
         self.assertIn("progress.log", takeover_smoke)
         self.assertIn("Capture-TakeoverTimeout $Label", takeover_smoke)
+        self.assertIn('Capture-TakeoverTimeout "$Label-cleanup-failed"', takeover_smoke)
         self.assertIn("Get-CimInstance Win32_Process", takeover_smoke)
         self.assertIn("$_.Name -like 'MSI*.tmp'", takeover_smoke)
         self.assertIn(".slot-transaction.json", takeover_smoke)

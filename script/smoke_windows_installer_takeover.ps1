@@ -238,6 +238,7 @@ function Finish-ConflictingOwnerCleanup([string] $Root, [string] $Origin, [strin
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
     Wait-CheckedProcess $process "$Label cleanup retry" -KillTree
     if ($process.ExitCode -ne 0) {
+        Capture-TakeoverTimeout "$Label-cleanup-failed"
         throw "$Label cleanup retry failed with $($process.ExitCode): $(Get-Content -LiteralPath $stdout -Raw)"
     }
     $lines = @(Get-Content -LiteralPath $stdout | Where-Object { $_.Trim() })

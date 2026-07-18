@@ -2906,21 +2906,33 @@ pub(crate) fn retry_windows_owner_cleanup(
     if !journal.exists() {
         return Ok(false);
     }
-    let (active_origin, _) = active_windows_slot_identity(root)?;
+    let (active_origin, _) = active_windows_slot_identity(root)
+        .map_err(|error| format!("could not validate the active Windows owner: {error}"))?;
     if !windows_origins_share_registration(active_origin, expected_origin) {
         return Err("pending Windows owner cleanup belongs to a different active origin".into());
     }
-    let powershell = system_windows_powershell_path()?;
-    let msiexec = system_windows_msiexec_path()?;
-    let owners = pending_windows_registered_owners(active_origin, root)?;
+    let powershell = system_windows_powershell_path()
+        .map_err(|error| format!("could not resolve system Windows PowerShell: {error}"))?;
+    let msiexec = system_windows_msiexec_path()
+        .map_err(|error| format!("could not resolve system Windows Installer: {error}"))?;
+    let owners = pending_windows_registered_owners(active_origin, root)
+        .map_err(|error| format!("could not discover conflicting Windows owners: {error}"))?;
     for owner in owners {
         let invocation = windows_owner_uninstall_invocation(&owner, &msiexec);
         let status = std::process::Command::new(&powershell)
             .args(&invocation.args)
             .creation_flags(CREATE_NO_WINDOW)
-            .status()?;
+            .status()
+            .map_err(|error| {
+                format!(
+                    "could not launch the protected conflicting-owner cleanup helper {}: {error}",
+                    powershell.display()
+                )
+            })?;
         if !status.success() {
-            let remaining = refresh_windows_owner_cleanup_journal(root)?;
+            let remaining = refresh_windows_owner_cleanup_journal(root).map_err(|error| {
+                format!("conflicting-owner cleanup failed and its journal could not be refreshed: {error}")
+            })?;
             return Err(format!(
                 "the selected Windows slot remains active, but conflicting owner {} could not be retired (exit {}); cleanup_pending with {remaining} owner(s). Assisted command: {}",
                 owner.registration,
@@ -2930,7 +2942,8 @@ pub(crate) fn retry_windows_owner_cleanup(
             .into());
         }
     }
-    let remaining = refresh_windows_owner_cleanup_journal(root)?;
+    let remaining = refresh_windows_owner_cleanup_journal(root)
+        .map_err(|error| format!("could not verify conflicting-owner cleanup: {error}"))?;
     if remaining != 0 {
         return Err(format!(
             "the selected Windows slot remains active, but {remaining} conflicting owner(s) are still registered; cleanup_pending"
