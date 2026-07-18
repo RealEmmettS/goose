@@ -9,6 +9,7 @@ fi
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 ANALYZER="${ROOT}/script/analyze_linux_overlay_capture.py"
+BACKGROUND_READY_CHECKER="${ROOT}/script/check_linux_background_ready.py"
 if [ -n "${HONK300_BIN:-}" ]; then
   BIN="${HONK300_BIN}"
   BUILD_BIN=0
@@ -359,24 +360,8 @@ wait_for_wayland_background() {
   for _ in $(seq 1 80); do
     if grim -o "${WAYLAND_FIRST_OUTPUT}" "${first_capture}" >/dev/null 2>&1 \
       && grim -o "${WAYLAND_SECOND_OUTPUT}" "${second_capture}" >/dev/null 2>&1 \
-      && python3 - "${expected}" "${first_capture}" "${second_capture}" <<'PY'
-import sys
-from PIL import Image
-
-expected_hex, *paths = sys.argv[1:]
-expected = tuple(bytes.fromhex(expected_hex))
-for path in paths:
-    image = Image.open(path).convert("RGB")
-    step = max(1, min(image.size) // 64)
-    samples = [
-        image.getpixel((x, y))
-        for y in range(0, image.height, step)
-        for x in range(0, image.width, step)
-    ]
-    matching = sum(pixel == expected for pixel in samples)
-    if not samples or matching / len(samples) < 0.90:
-        raise SystemExit(1)
-PY
+      && python3 "${BACKGROUND_READY_CHECKER}" --color "${expected}" --minimum 0.90 \
+        "${first_capture}" "${second_capture}" >/dev/null 2>&1
     then
       return 0
     fi

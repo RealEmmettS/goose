@@ -22,6 +22,13 @@ assert BACKGROUND_SPEC and BACKGROUND_SPEC.loader
 BACKGROUND = importlib.util.module_from_spec(BACKGROUND_SPEC)
 sys.modules[BACKGROUND_SPEC.name] = BACKGROUND
 BACKGROUND_SPEC.loader.exec_module(BACKGROUND)
+READY_PATH = ROOT / "script" / "check_linux_background_ready.py"
+READY_SPEC = importlib.util.spec_from_file_location("linux_background_ready", READY_PATH)
+assert READY_SPEC and READY_SPEC.loader
+READY = importlib.util.module_from_spec(READY_SPEC)
+sys.modules[READY_SPEC.name] = READY
+sys.modules["analyze_linux_overlay_capture"] = ANALYZER
+READY_SPEC.loader.exec_module(READY)
 
 
 def png_chunk(kind: bytes, payload: bytes) -> bytes:
@@ -59,6 +66,17 @@ def valid_pair(width: int = 200, height: int = 160) -> tuple[list[tuple[int, int
 
 
 class LinuxOverlayAnalyzerTests(unittest.TestCase):
+    def test_dependency_free_background_ready_check_requires_ninety_percent_exact_rgb(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            expected = (0x20, 0x30, 0x40)
+            mostly_expected = [expected] * 95 + [(0, 0, 0)] * 5
+            mostly_wrong = [expected] * 89 + [(0, 0, 0)] * 11
+            write_png(root / "ready.png", 10, 10, mostly_expected)
+            write_png(root / "not-ready.png", 10, 10, mostly_wrong)
+            self.assertGreaterEqual(READY.sampled_fraction(root / "ready.png", expected), 0.90)
+            self.assertLess(READY.sampled_fraction(root / "not-ready.png", expected), 0.90)
+
     def test_accepts_proven_small_top_down_pose_but_still_requires_warm_articulation(self) -> None:
         common = {
             "label": "candidate-top-down",
@@ -192,7 +210,8 @@ class LinuxOverlaySmokeContractTests(unittest.TestCase):
             'swaymsg output "${WAYLAND_FIRST_OUTPUT}" bg "${image}" tile',
             'swaymsg output "${WAYLAND_SECOND_OUTPUT}" bg "${image}" tile',
             "wait_for_wayland_background",
-            "matching / len(samples) < 0.90",
+            "check_linux_background_ready.py",
+            "--minimum 0.90",
             "Wayland background did not settle",
             "validate_wayland_capture_baseline",
             "wayland-baseline-first-dark.png",
@@ -203,6 +222,7 @@ class LinuxOverlaySmokeContractTests(unittest.TestCase):
             self.assertIn(required, smoke)
         self.assertNotIn("output * bg", smoke)
         self.assertNotIn('bg "${color}" solid_color', smoke)
+        self.assertNotIn("from PIL import Image", smoke)
         self.assertNotIn(
             'swaymsg output "${WAYLAND_SECOND_OUTPUT}" bg "${image}" tile >/dev/null\n  sleep 0.20',
             smoke,
