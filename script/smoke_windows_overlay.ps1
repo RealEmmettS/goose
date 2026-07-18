@@ -313,7 +313,31 @@ runtime_message=$($runtimeMessage.Trim())
         if ($before -eq 0) { break }
     }
     if ($before -ne 0) {
-        throw "Windows tray icon is not registered (HRESULT $before after $initialRegistrationPollAttempts polls)"
+        $runtimeMessage = if (Test-Path -LiteralPath $RuntimeStderrPath) {
+            (Get-Content -LiteralPath $RuntimeStderrPath -Raw).Trim()
+        } else {
+            '<runtime stderr unavailable>'
+        }
+        $independentRegistrationProbe = [Honk300TraySmoke]::ProbeNotificationAreaRecovery()
+        if ($independentRegistrationProbe) {
+            throw "Windows tray icon did not materialize even though an independent stock-icon fixed-GUID registration/recovery probe succeeded (HRESULT $before after $initialRegistrationPollAttempts polls; runtime: $runtimeMessage)"
+        }
+        if (-not $AllowUnobservableTrayRecoveryHost) {
+            throw "tray registration is unobservable and this host has no explicit waiver (HRESULT $before after $initialRegistrationPollAttempts polls; independent fixed-GUID registration/recovery probe failed; runtime: $runtimeMessage)"
+        }
+        Set-Content -LiteralPath $EvidencePath -Encoding utf8NoBOM -Value @"
+availability=registration-unobservable
+reason=independent stock-icon fixed-GUID registration/recovery probe also failed on the explicitly waived host
+owner=0x$($owner.ToInt64().ToString('X'))
+guid=$guid
+accessible_name=Honk300 controls
+independent_shell_probe=$($independentProbe.ToString().ToLowerInvariant())
+independent_registration_probe=$($independentRegistrationProbe.ToString().ToLowerInvariant())
+registration_hresult=$before
+initial_registration_poll_attempts=$initialRegistrationPollAttempts
+runtime_message=$runtimeMessage
+"@
+        return 'registration-unobservable'
     }
     if (-not $independentProbe) {
         throw 'Honk300 registered its icon but the independent Shell_NotifyIconW control probe failed'

@@ -531,6 +531,16 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
         self.assertIn("continuously absent GUID state", smoke)
         self.assertIn("deletion_settle_polls=$deletionSettlePolls", smoke)
         self.assertIn("ProbeNotificationAreaRecovery", smoke)
+        self.assertIn(
+            "$independentRegistrationProbe = [Honk300TraySmoke]::ProbeNotificationAreaRecovery()",
+            smoke,
+        )
+        self.assertIn("if ($independentRegistrationProbe)", smoke)
+        self.assertIn("availability=registration-unobservable", smoke)
+        self.assertIn(
+            "independent_registration_probe=$($independentRegistrationProbe", smoke
+        )
+        self.assertIn("return 'registration-unobservable'", smoke)
         self.assertIn("independent_recovery_probe=$($independentRecoveryProbe", smoke)
         self.assertIn("if ($independentRecoveryProbe)", smoke)
         self.assertIn("if (-not $AllowUnobservableTrayRecoveryHost)", smoke)
@@ -741,6 +751,7 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
         self.assertIn("-AllowUnobservableTrayRecoveryHost:", released_smoke)
         self.assertIn("-AllowUnobservableTrayRecoveryHost", installers)
         self.assertIn("-AllowUnobservableTrayRecoveryHost:", post_release)
+        self.assertNotIn("-AllowUnobservableTrayRecoveryHost", ci)
         self.assertIn("windows-11-arm", post_release)
         self.assertIn("-TargetTriple '${{ matrix.triple }}'", post_release)
         self.assertIn(

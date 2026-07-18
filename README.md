@@ -14,8 +14,10 @@ provenance-preserving updater release with semantic receipt verification across 
 pretty-printed forms. Candidate, same-SHA main, atomic publication, and all eight fresh-public-byte
 macOS, Windows, Debian, and shell-managed Linux jobs passed before promotion.
 
-This source tree is preparing v1.2.3's command-first managed-installation patch. Until that
-immutable release completes every gate, the links below continue to resolve to v1.2.2.
+The immutable v1.2.3 tag passed candidate and same-SHA main qualification but failed closed before
+draft publication when one hosted Windows shell could not expose a tray rectangle. This source
+tree is preparing the v1.2.4 fix-forward. Until it completes every gate, the links below continue
+to resolve to v1.2.2.
 
 ## Install
 
@@ -286,7 +288,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.2.3
+dist plan --tag=v1.2.4
 cargo audit --version 0.22.2
 ```
 
@@ -313,11 +315,14 @@ launch windowless while preserving normal intentional CLI behavior, and moves ev
 compositor surface to disposable CI; product startup performs no calibration. ADR 0034 makes the
 official managed commands the recommended fresh install while retaining native-package ownership,
 same-origin updates, authoritative fresh intent, and raw Cargo's unmanaged boundary.
+ADR 0035 permits one narrow hosted x64 observation fallback only when an independent fixed-GUID
+tray probe fails identically; ordinary Windows CI still proves actual registration and recovery.
 [`docs/readiness/v1.2.2-readiness.md`](docs/readiness/v1.2.2-readiness.md) records the completed
 semantic receipt-verifier fix-forward, candidate, same-SHA main, publication, and public-byte
 qualification. The v1.2.0/v1.2.1 reports preserve their immutable release evidence.
-[`docs/readiness/v1.2.3-readiness.md`](docs/readiness/v1.2.3-readiness.md) tracks the active
-command-first candidate and release gate.
+[`docs/readiness/v1.2.3-readiness.md`](docs/readiness/v1.2.3-readiness.md) preserves the immutable
+failed-before-publication evidence. [`docs/readiness/v1.2.4-readiness.md`](docs/readiness/v1.2.4-readiness.md)
+tracks the active command-first fix-forward and release gate.
 
 ## License and assets
 

@@ -55,6 +55,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   advanced command from leaving two competing copies.
 
 ### Fixed
+- **A flaky hosted Windows desktop check no longer blocks an otherwise verified release.** The
+  exception is allowed only when the test can still find the Goose's real control owner and a
+  separate ordinary tray icon fails the same Windows check. The suite continues testing the real
+  tray menu, graceful goodbye, immediate force quit, rendering, and download identity, while the
+  normal Windows lane still requires the complete visible tray proof. This keeps the release gate
+  honest without treating a broken hosted desktop shell as a product regression.
 - **Opening the all-users Windows installer now records the choice the user actually made.** It
   no longer carries forward an older PowerShell-install label, so the next update stays with the
   most recently chosen official installer.

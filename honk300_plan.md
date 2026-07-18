@@ -879,6 +879,7 @@ being implemented three more times.
 | R10.3 / v1.2.1 (ADRs 0031–0033) | immutable fix-forward for macOS/Linux foreign login-start ownership: installer receipts enable autostart only for marker-owned entries; foreign files, symlinks, and directories are preserved and treated as disabled | focused ownership/mutation tests plus complete candidate, same-SHA main, signed Mac, Linux shell, Debian, Windows, atomic publication, stable/latest, and post-release public-byte gates |
 | R10.4 / v1.2.2 (ADRs 0031–0033) | immutable test-harness fix-forward: public macOS/Linux smoke parses v2 receipts semantically after runtime formatting changes | both compact and pretty JSON receipt regressions plus complete candidate, same-SHA main, publication, and fresh-public-byte rollback matrix |
 | R10.5 / v1.2.3 (ADR 0034) | command-first official bootstrap recommendation, managed fresh-intent takeover, Mac shell Accessibility parity, Windows PowerShell/MSI origin correction, and explicit Linux cross-scope refusal | five Windows managed-channel transitions on x64/ARM64, signed Mac shell↔DMG takeover, shell/DEB collision safety, complete candidate/main/public-byte matrix, and command-first production site |
+| R10.6 / v1.2.4 (ADR 0035) | immutable fix-forward after v1.2.3 failed before publication on one hosted Windows tray-rectangle observation | exact owner plus independent fixed-GUID hosted-shell evidence, strict unwaived Windows CI, remaining native tray/lifecycle proof, and complete candidate/main/public-byte matrix |
 
 Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
 and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus
@@ -1028,6 +1029,6 @@ intentionally limited.
   is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, completed stable
   v1.0.2 task `#v102`, completed hardware-verification task `#v1a`, completed v1.0.3 release task
   `#r103`, completed tray tasks `#trayc`/`#wtray`/`#ltray`, completed v1.1.0 release task `#r110`,
-  completed v1.2.2 closure tasks `#u31`/`#r120`, active v1.2.3 task `#cli123`, and the readiness
-  evidence.
+  completed v1.2.2 closure tasks `#u31`/`#r120`, immutable failed-before-publication v1.2.3,
+  active v1.2.4 fix-forward task `#cli123`, and the readiness evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

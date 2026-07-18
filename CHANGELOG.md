@@ -26,6 +26,21 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-07-18
+
+### Changed
+- **Immutable v1.2.3 fix-forward publication** - the v1.2.3 tag remains unchanged and
+  unpublished after its atomic release gate failed before draft creation. v1.2.4 carries the
+  same command-first managed-installation implementation plus the qualification correction below.
+
+### Fixed
+- **Fail-closed hosted Windows tray qualification (ADR 0035)** - an explicitly opted-in
+  GitHub-hosted Windows Server lane may now record fixed-GUID tray registration as unobservable
+  only when Honk300's exact tray-owner window exists and an independent stock-icon
+  registration/recovery probe also fails. The process-owned native menu Quit, force-menu,
+  compositor, lifecycle, PE, and artifact-identity gates still run; ordinary x64 Windows CI keeps
+  requiring observable initial registration and TaskbarCreated recovery without the waiver.
+
 ## [1.2.3] - 2026-07-18
 
 ### Added

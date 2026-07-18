@@ -45,3 +45,4 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0032 — Owned Props, Explicit Lifecycle, And Login Autostart](./0032-owned-props-lifecycle-and-login-autostart.md)
 - [0033 — Windowless Windows App Launch And Disposable-Desktop Qualification](./0033-windowless-windows-app-launch-and-disposable-desktop-qualification.md)
 - [0034 — Command-First Managed Installation](./0034-command-first-managed-installation.md)
+- [0035 — Hosted Windows Tray Registration Qualification Boundary](./0035-hosted-windows-tray-registration-qualification-boundary.md)
