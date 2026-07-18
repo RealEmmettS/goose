@@ -26,6 +26,16 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-07-18
+
+### Fixed
+- **Windows PowerShell hashing compatibility** - the public bootstrap and CLI update coordinator
+  now compute SHA-256 directly through the pinned .NET cryptography and file-stream APIs instead
+  of depending on `Get-FileHash`. This retains regular-file, reparse-point, same-stream, size, and
+  digest checks while supporting managed Windows PowerShell environments where that optional
+  cmdlet is unavailable. Public v1.2.5 remains immutable; its six Mac/Linux/Debian public-byte
+  lanes passed, while both Windows lanes exposed this bootstrap failure after the MSI completed.
+
 ## [1.2.5] - 2026-07-18
 
 ### Fixed

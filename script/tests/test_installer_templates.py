@@ -272,6 +272,12 @@ class InstallerTemplateTests(unittest.TestCase):
             self.assertIn(token, POWERSHELL)
         self.assertIn("[IO.FileShare]::Read", POWERSHELL)
         self.assertIn("$sha.ComputeHash($stream)", POWERSHELL)
+        self.assertIn("function Get-VerifiedFileSha256", POWERSHELL)
+        self.assertIn(
+            "$installedLauncherHash = Get-VerifiedFileSha256 $installedLauncher 'installed app launcher'",
+            POWERSHELL,
+        )
+        self.assertNotIn("Get-FileHash", POWERSHELL)
         self.assertIn("$stream.Length -ne $ExpectedSize", POWERSHELL)
         self.assertIn("msiexec.exe", POWERSHELL)
         self.assertIn("[Environment+SpecialFolder]::System", POWERSHELL)

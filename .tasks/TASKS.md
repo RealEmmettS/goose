@@ -9,13 +9,15 @@
 ## To-Do
 
 ## Active
-- [ ] **Publish v1.2.5 command-first managed installation verifier fix-forward** - preserve immutable v1.2.3/v1.2.4, then close the full public-byte gate for the official versionless CLI bootstrap while preserving exact updater provenance and authoritative fresh-installer takeover (owner codex) #cli123
+- [ ] **Publish v1.2.6 command-first managed installation compatibility fix-forward** - preserve immutable v1.2.3–v1.2.5, then close the full public-byte gate for the official versionless CLI bootstrap while preserving exact updater provenance and authoritative fresh-installer takeover (owner codex) #cli123
   - [x] Record the command-first managed-channel contract in ADR 0034 and synchronize public/project guidance.
   - [x] Distinguish updater-delegated Mac shell transport from a deliberate fresh shell install.
   - [x] Prove official bootstrap/native-package takeover in both directions without granting raw Cargo managed status.
   - [x] Pass v1.2.3 local, candidate, and same-SHA main qualification; preserve its failed-before-publication tag.
   - [x] Pass v1.2.4 local, candidate, same-SHA main, and atomic publication; preserve its public Mac verifier failure.
-  - [ ] Pass v1.2.5 local, candidate, same-SHA main, atomic publication, and all eight fresh-public-byte jobs.
+  - [~] Pass v1.2.5 local, candidate, same-SHA main, atomic publication, and all eight fresh-public-byte jobs.
+    > Candidate/main/publication and six Mac/Linux/Debian public lanes passed; both Windows lanes exposed the missing Get-FileHash dependency after MSI completion.
+  - [ ] Pass v1.2.6 local, candidate, same-SHA main, atomic publication, and all eight fresh-public-byte jobs.
   - [ ] Update the production website to recommend the versionless commands and retain native packages as alternatives.
   - [ ] Close the board, merge to main, and remove all temporary local and remote branches.
 

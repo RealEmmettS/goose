@@ -881,6 +881,7 @@ being implemented three more times.
 | R10.5 / v1.2.3 (ADR 0034) | command-first official bootstrap recommendation, managed fresh-intent takeover, Mac shell Accessibility parity, Windows PowerShell/MSI origin correction, and explicit Linux cross-scope refusal | five Windows managed-channel transitions on x64/ARM64, signed Mac shell↔DMG takeover, shell/DEB collision safety, complete candidate/main/public-byte matrix, and command-first production site |
 | R10.6 / v1.2.4 (ADR 0035) | immutable fix-forward after v1.2.3 failed before publication on one hosted Windows tray-rectangle observation | exact owner plus independent fixed-GUID hosted-shell evidence, strict unwaived Windows CI, remaining native tray/lifecycle proof, and complete candidate/main/public-byte matrix |
 | R10.7 / v1.2.5 (ADRs 0034–0035) | immutable verifier-only fix-forward after the public Mac DMG takeover produced a valid native app autostart writer identity | semantic receipt validation for both exact managed writers plus the complete candidate/main/public-byte matrix |
+| R10.8 / v1.2.6 (ADRs 0031, 0034–0035) | immutable Windows bootstrap compatibility fix-forward after public v1.2.5 proved `Get-FileHash` can be absent from supported system PowerShell | direct .NET SHA-256 for the public bootstrap and CLI coordinator, exact regular-file/reparse/size/hash contracts, and the complete candidate/main/public-byte matrix |
 
 Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
 and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus
@@ -1031,5 +1032,6 @@ intentionally limited.
   v1.0.2 task `#v102`, completed hardware-verification task `#v1a`, completed v1.0.3 release task
   `#r103`, completed tray tasks `#trayc`/`#wtray`/`#ltray`, completed v1.1.0 release task `#r110`,
   completed v1.2.2 closure tasks `#u31`/`#r120`, immutable failed-before-publication v1.2.3,
-  public v1.2.4, active v1.2.5 verifier fix-forward task `#cli123`, and the readiness evidence.
+  public v1.2.5, active v1.2.6 Windows compatibility fix-forward task `#cli123`, and the readiness
+  evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

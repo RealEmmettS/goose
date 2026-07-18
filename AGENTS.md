@@ -8,13 +8,14 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.2.4 is the public stable/latest release at exact source commit
-`03ae458a880c6b0faf1c1cf96fb28a69ac2936f2`; candidate `29660728786`, same-SHA main CI
-`29661048121`, and atomic publication `29661340294` passed under ADRs 0034–0035. Its public Mac
-install, signature, and metadata verification succeeded, but post-release run `29661686919`
-exposed an overly strict receipt-owner assertion after DMG takeover. v1.2.5 is the active
-verifier-only fix-forward under task `#cli123`; it is not complete until the full
-candidate/main/publication/public-byte matrix passes.** M0-M19 are implemented
+**Current stage: v1.2.5 is the public stable/latest release at exact source commit
+`76e970a0242e49617528b69ec87202bbc5171854`; candidate `29662126045`, same-SHA main CI
+`29662448054`, and atomic publication `29662746481` passed under ADRs 0034–0035. Public-byte run
+`29663081572` passed both signed Mac, both Linux shell, and both Debian lanes, then exposed that
+the Windows PowerShell bootstrap still depended on an unavailable `Get-FileHash` cmdlet after
+its MSI completed. v1.2.6 is the active .NET-hashing compatibility fix-forward under task
+`#cli123`; it is not complete until the full candidate/main/publication/public-byte matrix
+passes.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -400,7 +401,7 @@ family's local gate:
 - `cargo build --release`
 - Windows local lifecycle only, and only when the operator welcomes visible testing: `pwsh -File script/smoke_windows_overlay.ps1 -Binary target/release/honk300.exe -EvidenceDirectory target/windows-overlay-evidence -LifecycleOnly`. Full paired-color compositor proof is disposable-CI-only; `-AllowInteractiveDesktopObscuration` is intentionally rejected locally.
 - Linux host only: `HONK300_BIN="$PWD/target/release/honk300" bash script/smoke_m17_m18_linux.sh`
-- `dist plan --tag=v1.2.5`
+- `dist plan --tag=v1.2.6`
 - `cargo audit --version 0.22.2`
 
 Release packaging uses **cargo-dist** for portable archives plus project-owned atomic release,

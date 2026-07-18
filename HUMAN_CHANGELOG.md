@@ -55,6 +55,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   advanced command from leaving two competing copies.
 
 ### Fixed
+- **The official Windows command no longer depends on an optional PowerShell hashing command.**
+  It now checks downloaded and installed files with Windows' built-in cryptography libraries,
+  keeping the same tamper protection on machines where that PowerShell command is missing. This
+  matters because the convenient one-line installer should work anywhere the supported Windows
+  PowerShell runtime works, not only on systems with one extra command available.
 - **The Mac public-release checker now recognizes both legitimate installation writers.** The
   terminal installer and graphical app use different internal owner labels for the same protected
   start-at-login setting. The checker still requires the setting to stay off around an unrelated

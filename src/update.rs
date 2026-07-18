@@ -182,6 +182,16 @@ function Open-HonkPinnedFile([string] $Path, [int64] $ExpectedSize, [string] $Ex
     return $stream
   } catch { $stream.Dispose(); throw }
 }
+function Get-HonkFileSha256([string] $Path, [string] $Label) {
+  $item=Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+  if ($item.PSIsContainer -or (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { throw "$Label is not a regular file" }
+  $stream=[IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+  try {
+    $sha=[Security.Cryptography.SHA256]::Create()
+    try { $digest=$sha.ComputeHash($stream) } finally { $sha.Dispose() }
+    return [BitConverter]::ToString($digest).Replace('-','').ToLowerInvariant()
+  } finally { $stream.Dispose() }
+}
 "#;
 
 #[cfg(any(test, windows))]
@@ -377,8 +387,8 @@ fn windows_update_helper_invocation(
            if ($null -ne $lifecycleStream) {{ $lifecycleStream.Dispose() }}; \
            if ($null -ne $artifactStream) {{ $artifactStream.Dispose() }}; \
            if ($null -ne $leaseRoot -and (Test-Path -LiteralPath $leaseRoot -PathType Container)) {{ Remove-Item -LiteralPath $leaseRoot -Recurse -Force }}; \
-           if ($artifactOwned -and (Test-Path -LiteralPath $artifact -PathType Leaf)) {{ $cleanup=Get-Item -LiteralPath $artifact -Force; if (($cleanup.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and $cleanup.Length -eq $expectedSize -and (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant() -eq $expectedHash) {{ Remove-Item -LiteralPath $artifact -Force }} }}; \
-           if ($lifecycleOwned -and (Test-Path -LiteralPath $lifecycleArchive -PathType Leaf)) {{ $cleanup=Get-Item -LiteralPath $lifecycleArchive -Force; if (($cleanup.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and $cleanup.Length -eq $lifecycleExpectedSize -and (Get-FileHash -LiteralPath $lifecycleArchive -Algorithm SHA256).Hash.ToLowerInvariant() -eq $lifecycleExpectedHash) {{ Remove-Item -LiteralPath $lifecycleArchive -Force }} }} \
+           if ($artifactOwned -and (Test-Path -LiteralPath $artifact -PathType Leaf)) {{ $cleanup=Get-Item -LiteralPath $artifact -Force; if (($cleanup.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and $cleanup.Length -eq $expectedSize -and (Get-HonkFileSha256 $artifact 'verified update artifact cleanup') -eq $expectedHash) {{ Remove-Item -LiteralPath $artifact -Force }} }}; \
+           if ($lifecycleOwned -and (Test-Path -LiteralPath $lifecycleArchive -PathType Leaf)) {{ $cleanup=Get-Item -LiteralPath $lifecycleArchive -Force; if (($cleanup.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and $cleanup.Length -eq $lifecycleExpectedSize -and (Get-HonkFileSha256 $lifecycleArchive 'verified lifecycle archive cleanup') -eq $lifecycleExpectedHash) {{ Remove-Item -LiteralPath $lifecycleArchive -Force }} }} \
          }}"
     );
     WindowsUpdateHelperInvocation {
@@ -2107,7 +2117,8 @@ mod tests {
         assert!(invocation
             .script
             .contains(&lifecycle_archive.to_string_lossy()[..]));
-        assert!(invocation.script.contains("Get-FileHash"));
+        assert!(invocation.script.contains("function Get-HonkFileSha256"));
+        assert!(!invocation.script.contains("Get-FileHash"));
         assert!(invocation.script.contains(hash));
         assert!(invocation
             .script
