@@ -200,7 +200,7 @@ try {
     ) | Where-Object { Test-Path -LiteralPath $_ }
     # PowerShell unwraps zero or one pipeline results even when the function builds an array.
     # Re-wrap the invocation so StrictMode can always inspect Count on a real array.
-    if (@(Get-HonkRegistrations).Count -ne 0 -or $activeState.Count -ne 0) {
+    if (@(Get-HonkRegistrations).Count -ne 0 -or @($activeState).Count -ne 0) {
         throw 'disposable runner is not clean; refusing to disturb a pre-existing Honk300 install'
     }
 

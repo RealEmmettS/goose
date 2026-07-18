@@ -301,8 +301,20 @@ runtime_message=$($runtimeMessage.Trim())
     $identifier.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($identifier)
     $identifier.guidItem = $guid
     $beforeRect = [Honk300TraySmoke+Rect]::new()
-    $before = [Honk300TraySmoke]::Shell_NotifyIconGetRect([ref] $identifier, [ref] $beforeRect)
-    if ($before -ne 0) { throw "Windows tray icon is not registered (HRESULT $before)" }
+    $before = -1
+    $initialRegistrationPollAttempts = 0
+    # NIM_ADD succeeds before Explorer necessarily materializes the fixed-GUID rectangle. Keep
+    # the initial proof just as strict as recovery, but give the Server 2022 shell the same
+    # bounded ten-second observation window instead of sampling it once.
+    for ($attempt = 0; $attempt -lt 400; $attempt += 1) {
+        Start-Sleep -Milliseconds 25
+        $initialRegistrationPollAttempts = $attempt + 1
+        $before = [Honk300TraySmoke]::Shell_NotifyIconGetRect([ref] $identifier, [ref] $beforeRect)
+        if ($before -eq 0) { break }
+    }
+    if ($before -ne 0) {
+        throw "Windows tray icon is not registered (HRESULT $before after $initialRegistrationPollAttempts polls)"
+    }
     if (-not $independentProbe) {
         throw 'Honk300 registered its icon but the independent Shell_NotifyIconW control probe failed'
     }
@@ -382,6 +394,7 @@ accessible_name=Honk300 controls
 independent_shell_probe=$($independentProbe.ToString().ToLowerInvariant())
 independent_recovery_probe=$($independentRecoveryProbe.ToString().ToLowerInvariant())
 before_rect=$($beforeRect.Left),$($beforeRect.Top),$($beforeRect.Right),$($beforeRect.Bottom)
+initial_registration_poll_attempts=$initialRegistrationPollAttempts
 missing_hresult=$missing
 deletion_settle_polls=$deletionSettlePolls
 taskbar_created_message=$taskbarCreated
@@ -398,6 +411,7 @@ guid=$guid
 accessible_name=Honk300 controls
 independent_shell_probe=$($independentProbe.ToString().ToLowerInvariant())
 before_rect=$($beforeRect.Left),$($beforeRect.Top),$($beforeRect.Right),$($beforeRect.Bottom)
+initial_registration_poll_attempts=$initialRegistrationPollAttempts
 missing_hresult=$missing
 deletion_settle_polls=$deletionSettlePolls
 taskbar_created_message=$taskbarCreated

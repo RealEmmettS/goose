@@ -431,7 +431,9 @@ class InstallerTemplateTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("@(Get-HonkRegistrations).Count", takeover_smoke)
+        self.assertIn("@($activeState).Count", takeover_smoke)
         self.assertNotIn("if ((Get-HonkRegistrations).Count", takeover_smoke)
+        self.assertNotIn("$activeState.Count", takeover_smoke)
 
         self.assertIn("PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
         self.assertIn("Installed AND PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
