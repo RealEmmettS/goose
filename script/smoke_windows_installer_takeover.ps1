@@ -35,12 +35,47 @@ function Write-TakeoverProgress([string] $Message) {
     Add-Content -LiteralPath $progressPath -Value $line -Encoding utf8
 }
 
+function Capture-TakeoverTimeout([string] $Label) {
+    $safeLabel = (($Label -replace '[^A-Za-z0-9.-]', '-').Trim('-').ToLowerInvariant())
+    try {
+        Get-CimInstance Win32_Process | Where-Object {
+            $_.Name -in @('msiexec.exe', 'honk300.exe', 'honk300-app.exe') -or
+            $_.CommandLine -like '*honk300*'
+        } | Select-Object ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine |
+            ConvertTo-Json -Depth 4 |
+            Set-Content -LiteralPath (Join-Path $evidence "$safeLabel.processes.json") -Encoding utf8
+    } catch {
+        Add-Content -LiteralPath $progressPath -Value "timeout process capture failed: $($_.Exception.Message)" -Encoding utf8
+    }
+    try {
+        @($globalRoot, $corporateRoot) | Where-Object { Test-Path -LiteralPath $_ } |
+            ForEach-Object { Get-ChildItem -LiteralPath $_ -Force -Recurse -ErrorAction SilentlyContinue } |
+            Select-Object FullName, Mode, Length, LinkTarget |
+            ConvertTo-Json -Depth 4 |
+            Set-Content -LiteralPath (Join-Path $evidence "$safeLabel.filesystem.json") -Encoding utf8
+        foreach ($rootName in @(
+            [pscustomobject]@{ Name = 'global'; Root = $globalRoot },
+            [pscustomobject]@{ Name = 'corporate'; Root = $corporateRoot }
+        )) {
+            foreach ($journal in @('.slot-transaction.json', '.slot-committed.json', 'install-receipt.json', '.owner-cleanup-pending.json')) {
+                $source = Join-Path $rootName.Root $journal
+                if (Test-Path -LiteralPath $source -PathType Leaf) {
+                    Copy-Item -LiteralPath $source -Destination (Join-Path $evidence "$safeLabel.$($rootName.Name).$($journal.TrimStart('.'))")
+                }
+            }
+        }
+    } catch {
+        Add-Content -LiteralPath $progressPath -Value "timeout filesystem capture failed: $($_.Exception.Message)" -Encoding utf8
+    }
+}
+
 function Wait-CheckedProcess(
     [Diagnostics.Process] $Process,
     [string] $Label,
     [switch] $KillTree
 ) {
     if (-not $Process.WaitForExit($ChildTimeoutSeconds * 1000)) {
+        Capture-TakeoverTimeout $Label
         try { $Process.Kill([bool]$KillTree) } catch {}
         try { $Process.WaitForExit() } catch {}
         throw "$Label timed out after $ChildTimeoutSeconds seconds"
