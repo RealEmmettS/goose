@@ -441,6 +441,11 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertNotIn("if ((Get-HonkRegistrations).Count", takeover_smoke)
         self.assertNotIn("$activeState.Count", takeover_smoke)
 
+        slot_smoke = (ROOT / "script" / "smoke_windows_slot_update.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("__wsa -r $root -o $Origin -c $Commit -a $artifact -l $launcherHash", slot_smoke)
+
         self.assertIn("PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
         self.assertIn("Installed AND PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
 

@@ -61,7 +61,7 @@ function Invoke-Activation([string] $Origin, [string] $Commit) {
 }
 
 function Invoke-CompactActivation([string] $Origin, [string] $Commit) {
-    & $binaryPath __wsa -r $root -o $Origin -c $Commit -a $artifact -u false
+    & $binaryPath __wsa -r $root -o $Origin -c $Commit -a $artifact -l $launcherHash -u false
     return $LASTEXITCODE
 }
 
