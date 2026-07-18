@@ -45,18 +45,19 @@
                             <File Id='LicenseFile' Name='LICENSE' DiskId='1' Source='$(var.SourceRoot)\LICENSE' KeyPath='yes'/>
                             <File Id='ThirdPartyAssetsFile' Name='THIRD_PARTY_ASSETS.md' DiskId='1' Source='$(var.SourceRoot)\THIRD_PARTY_ASSETS.md'/>
                         </Component>
-                        <Directory Id='Bin' Name='bin'>
-                            <Component Id='Path' Guid='103257E6-F862-4C5B-A921-104C5ACFA761' KeyPath='yes' Permanent='yes'>
-                                <Environment
-                                    Id='PATH'
-                                    Name='PATH'
-                                    Value='[Bin]'
-                                    Permanent='no'
-                                    Part='last'
-                                    Action='set'
-                                    System='no'/>
-                            </Component>
-                        </Directory>
+                        <!-- The slot transaction exclusively owns the neutral bin junction. Keep
+                             integration metadata in the real application root so MSI never creates,
+                             registers, or holds the selector path as an ordinary directory. -->
+                        <Component Id='Path' Guid='103257E6-F862-4C5B-A921-104C5ACFA761' KeyPath='yes' Permanent='yes'>
+                            <Environment
+                                Id='PATH'
+                                Name='PATH'
+                                Value='[APPLICATIONFOLDER]bin'
+                                Permanent='no'
+                                Part='last'
+                                Action='set'
+                                System='no'/>
+                        </Component>
                         <Directory Id='Channels' Name='channels'>
                             <Directory Id='MsiCorporateChannel' Name='msi-corporate'>
                                 <Directory Id='MsiCorporateReleases' Name='releases'>
@@ -104,8 +105,8 @@
                 <Shortcut
                     Id='StartMenuShortcut'
                     Name='Honk300'
-                    Target='[Bin]honk300-app.exe'
-                    WorkingDirectory='Bin'/>
+                    Target='[APPLICATIONFOLDER]bin\honk300-app.exe'
+                    WorkingDirectory='APPLICATIONFOLDER'/>
                 <RemoveFolder Id='RemoveApplicationProgramsFolder' On='uninstall'/>
                 <RegistryValue Root='HKCU' Key='Software\Honk300' Name='StartMenuShortcut' Type='integer' Value='1' KeyPath='yes'/>
             </Component>
@@ -118,7 +119,7 @@
                     Key='Software\Microsoft\Windows\CurrentVersion\Run'
                     Name='Honk300'
                     Type='string'
-                    Value='"[Bin]honk300-app.exe"'
+                    Value='"[APPLICATIONFOLDER]bin\honk300-app.exe"'
                     KeyPath='yes'/>
             </Component>
         </DirectoryRef>
