@@ -55,12 +55,13 @@ function Invoke-Activation([string] $Origin, [string] $Commit) {
         --target $TargetTriple `
         --artifact-name 'honk300-installer.exe' `
         --artifact-path $artifact `
-        --payload-sha256 $hash
+        --payload-sha256 $hash `
+        --autostart false
     return $LASTEXITCODE
 }
 
 function Invoke-CompactActivation([string] $Origin, [string] $Commit) {
-    & $binaryPath __wsa -r $root -o $Origin -c $Commit -a $artifact
+    & $binaryPath __wsa -r $root -o $Origin -c $Commit -a $artifact -u false
     return $LASTEXITCODE
 }
 

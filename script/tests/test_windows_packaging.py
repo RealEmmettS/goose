@@ -19,6 +19,9 @@ CARGO_TOML = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
 WINDOWS_WORKFLOW = (
     ROOT / ".github" / "workflows" / "windows-installers.yml"
 ).read_text(encoding="utf-8")
+WINDOWS_SLOT_SMOKE = (ROOT / "script" / "smoke_windows_slot_update.ps1").read_text(
+    encoding="utf-8"
+)
 MSI_LICENSE = ROOT / "wix" / "honk300-license.rtf"
 MSI_LICENSE_REFERENCE = (
     "<WixVariable Id='WixUILicenseRtf' "
@@ -179,6 +182,10 @@ class WindowsPackagingTests(unittest.TestCase):
         self.assertIn('Name: "autostart"', GLOBAL_INNO)
         self.assertIn("Flags: unchecked", GLOBAL_INNO)
         self.assertIn("HKEY_LOCAL_MACHINE", INSTALL_RS)
+
+    def test_slot_smoke_supplies_required_autostart_state_to_both_protocols(self) -> None:
+        self.assertIn("--autostart false", WINDOWS_SLOT_SMOKE)
+        self.assertIn("-u false", WINDOWS_SLOT_SMOKE)
 
 
 if __name__ == "__main__":
