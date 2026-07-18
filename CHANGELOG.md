@@ -80,7 +80,8 @@ All notable changes to this project are documented here. Format based on
   the active root's persisted PATH. Permanent MSI components can no longer leave an older
   machine-wide command ahead of a newly authoritative Corporate install. Registration validation
   accepts Windows Installer's protected-machine inventory for a per-user Corporate MSI without
-  weakening the HKLM-only Global or HKCU-only Corporate EXE boundaries.
+  weakening the HKLM-only Global or HKCU-only Corporate EXE boundaries, and coordinator argument
+  quoting normalizes Windows Installer's trailing root separator before elevation.
 - **Transactional receipt rollback** - preserves the prior protected receipt when activation
   fails before its backup is created, restores source markers with the selector, and retains an
   already-existing same-version Linux slot during injected post-activation rollback.

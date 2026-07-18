@@ -2876,8 +2876,11 @@ fn windows_owner_retirement_invocation(
     owner: &WindowsRegisteredOwner,
 ) -> WindowsPostExitInvocation {
     // Start-Process joins ArgumentList into one Windows command line. Preserve explicit quotes
-    // around the root so Program Files remains one argv value in the elevated coordinator.
-    let quoted_root = format!("\"{}\"", active_root.display());
+    // around the root so Program Files remains one argv value in the elevated coordinator. MSI
+    // directory properties retain a trailing backslash; remove only that redundant separator so
+    // it cannot escape the closing quote under CommandLineToArgvW parsing.
+    let root = active_root.to_string_lossy();
+    let quoted_root = format!("\"{}\"", root.trim_end_matches(['\\', '/']));
     let elevation = if owner.uninstall.requires_elevation() {
         " -Verb RunAs"
     } else {
@@ -6299,7 +6302,7 @@ mod tests {
         };
         let invocation = windows_owner_retirement_invocation(
             Path::new(r"C:\Users\user\AppData\Local\Programs\honk300\bin\honk300.exe"),
-            Path::new(r"C:\Users\user\AppData\Local\Programs\honk300"),
+            Path::new(r"C:\Users\user\AppData\Local\Programs\honk300\"),
             InstallSource::MsiCorporate,
             &owner,
         );
@@ -6313,6 +6316,9 @@ mod tests {
         assert!(invocation
             .script
             .contains(r#"'"C:\Users\user\AppData\Local\Programs\honk300"'"#));
+        assert!(!invocation
+            .script
+            .contains(r#"C:\Users\user\AppData\Local\Programs\honk300\"'"#));
         assert!(!invocation.script.contains("unins000.exe"));
         assert_eq!(invocation.script.matches("Start-Process").count(), 1);
     }
