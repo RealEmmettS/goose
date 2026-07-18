@@ -1032,6 +1032,6 @@ intentionally limited.
   v1.0.2 task `#v102`, completed hardware-verification task `#v1a`, completed v1.0.3 release task
   `#r103`, completed tray tasks `#trayc`/`#wtray`/`#ltray`, completed v1.1.0 release task `#r110`,
   completed v1.2.2 closure tasks `#u31`/`#r120`, immutable failed-before-publication v1.2.3,
-  public v1.2.5, active v1.2.6 Windows compatibility fix-forward task `#cli123`, and the readiness
-  evidence.
+  immutable public v1.2.4/v1.2.5 evidence, completed v1.2.6 Windows compatibility fix-forward
+  task `#cli123`, and the readiness evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

@@ -9,19 +9,20 @@
 ## To-Do
 
 ## Active
-- [ ] **Publish v1.2.6 command-first managed installation compatibility fix-forward** - preserve immutable v1.2.3–v1.2.5, then close the full public-byte gate for the official versionless CLI bootstrap while preserving exact updater provenance and authoritative fresh-installer takeover (owner codex) #cli123
+
+## Done
+- [x] **Publish v1.2.6 command-first managed installation compatibility fix-forward** - completed exact candidate/main/release/public-byte qualification for the official versionless CLI bootstrap while preserving exact updater provenance and authoritative fresh-installer takeover (done 2026-07-18) (owner codex) #cli123
   - [x] Record the command-first managed-channel contract in ADR 0034 and synchronize public/project guidance.
   - [x] Distinguish updater-delegated Mac shell transport from a deliberate fresh shell install.
   - [x] Prove official bootstrap/native-package takeover in both directions without granting raw Cargo managed status.
   - [x] Pass v1.2.3 local, candidate, and same-SHA main qualification; preserve its failed-before-publication tag.
   - [x] Pass v1.2.4 local, candidate, same-SHA main, and atomic publication; preserve its public Mac verifier failure.
   - [~] Pass v1.2.5 local, candidate, same-SHA main, atomic publication, and all eight fresh-public-byte jobs.
-    > Candidate/main/publication and six Mac/Linux/Debian public lanes passed; both Windows lanes exposed the missing Get-FileHash dependency after MSI completion.
-  - [ ] Pass v1.2.6 local, candidate, same-SHA main, atomic publication, and all eight fresh-public-byte jobs.
-  - [ ] Update the production website to recommend the versionless commands and retain native packages as alternatives.
-  - [ ] Close the board, merge to main, and remove all temporary local and remote branches.
-
-## Done
+    > Candidate/main/publication and six Mac/Linux/Debian public lanes passed; both Windows lanes exposed the missing Get-FileHash dependency after MSI completion and were fixed forward immutably.
+  - [x] Pass v1.2.6 local, candidate, same-SHA main, atomic publication, and all eight fresh-public-byte jobs.
+    > Candidate 29663447227, main 29663774278, release 29664104522, and public 29664433689 passed at c0ddb2c2c7cd4334040e324c72187eb6f3d4a644.
+  - [x] Update the production website to recommend the versionless commands and retain native packages as alternatives.
+  - [x] Close the board, merge to main, and remove all temporary local and remote branches.
 - [x] **Close the v1.2.2 provenance-preserving updater fix-forward** - preserved immutable v1.2.0/v1.2.1, qualified the semantic receipt verifier, verified every public byte, and cleaned every branch (done 2026-07-18) (needs #u31) #r120
   - [x] Synchronize v1.2.2 version, readiness, board, public guidance, and both changelogs.
   - [x] Pass the complete v1.2.0 local, cross-target, packaging, audit, and exact-candidate gate.

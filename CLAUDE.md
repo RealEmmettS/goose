@@ -8,14 +8,13 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.2.5 is the public stable/latest release at exact source commit
-`76e970a0242e49617528b69ec87202bbc5171854`; candidate `29662126045`, same-SHA main CI
-`29662448054`, and atomic publication `29662746481` passed under ADRs 0034–0035. Public-byte run
-`29663081572` passed both signed Mac, both Linux shell, and both Debian lanes, then exposed that
-the Windows PowerShell bootstrap still depended on an unavailable `Get-FileHash` cmdlet after
-its MSI completed. v1.2.6 is the active .NET-hashing compatibility fix-forward under task
-`#cli123`; it is not complete until the full candidate/main/publication/public-byte matrix
-passes.** M0-M19 are implemented
+**Current stage: v1.2.6 is the public stable/latest release at exact source commit
+`c0ddb2c2c7cd4334040e324c72187eb6f3d4a644`; candidate `29663447227`, same-SHA main CI
+`29663774278`, atomic publication `29664104522`, and all-eight-lane fresh-public-byte run
+`29664433689` passed under ADRs 0031 and 0034–0035. The immutable release has 47 assets and 22
+manifest payloads; exact-tag/latest manifest and command-first bootstrap bytes match. Production
+browser QA confirmed v1.2.6, every advertised platform command and native alternative, an empty
+warning/error console, and a bounded mobile layout. Task `#cli123` is complete.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as

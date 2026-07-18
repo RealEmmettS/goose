@@ -8,16 +8,17 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.2.5](https://github.com/RealEmmettS/goose/releases/tag/v1.2.5),
-published from exact commit `76e970a0242e49617528b69ec87202bbc5171854`. It makes the official
+**Current stable release:** [v1.2.6](https://github.com/RealEmmettS/goose/releases/tag/v1.2.6),
+published from exact commit `c0ddb2c2c7cd4334040e324c72187eb6f3d4a644`. It makes the official
 versionless PowerShell/shell bootstrap the recommended managed install while native packages
 remain supported alternatives and updates preserve their proven origin.
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
 successfully. Its public Mac/Linux/Debian lanes passed, while Windows exposed that the bootstrap
-still assumed `Get-FileHash` existed. This source tree is preparing v1.2.6 with a direct .NET
-SHA-256 implementation for both the bootstrap and CLI update coordinator.
+still assumed `Get-FileHash` existed. v1.2.6 replaces that optional dependency with direct .NET
+SHA-256 and passed the complete candidate, same-SHA main, atomic publication, and eight-lane
+fresh-public-byte matrix on Windows, macOS, and Linux.
 
 ## Install
 
@@ -323,8 +324,9 @@ qualification. The v1.2.0/v1.2.1 reports preserve their immutable release eviden
 [`docs/readiness/v1.2.3-readiness.md`](docs/readiness/v1.2.3-readiness.md) preserves the immutable
 failed-before-publication evidence. [`docs/readiness/v1.2.4-readiness.md`](docs/readiness/v1.2.4-readiness.md)
 records the public release and failed Mac verifier assertion.
-[`docs/readiness/v1.2.6-readiness.md`](docs/readiness/v1.2.6-readiness.md) tracks the active
-verifier-only fix-forward.
+[`docs/readiness/v1.2.6-readiness.md`](docs/readiness/v1.2.6-readiness.md) records the completed
+Windows compatibility fix-forward, public-byte matrix, latest-alias audit, and production-site
+qualification.
 
 ## License and assets
 
