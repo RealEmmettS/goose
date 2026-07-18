@@ -9,7 +9,9 @@
 ## To-Do
 
 ## Active
-- [ ] **Close the v1.2.2 provenance-preserving updater fix-forward** - preserve immutable v1.2.0/v1.2.1, qualify the semantic receipt verifier, verify every public byte, and clean every branch (owner codex) (needs #u31) #r120
+
+## Done
+- [x] **Close the v1.2.2 provenance-preserving updater fix-forward** - preserved immutable v1.2.0/v1.2.1, qualified the semantic receipt verifier, verified every public byte, and cleaned every branch (done 2026-07-18) (needs #u31) #r120
   - [x] Synchronize v1.2.2 version, readiness, board, public guidance, and both changelogs.
   - [x] Pass the complete v1.2.0 local, cross-target, packaging, audit, and exact-candidate gate.
     > Candidate 29649872307 attempt 2 passed at fcbb6337830a14cb187c93cfe3e499a3f2f73945.
@@ -31,21 +33,20 @@
     > v1.2.1 candidate/main/publication passed. Public Linux install/start/X11/Wayland passed, then a compact-JSON harness assertion stopped rollback closure after runtime pretty-printing.
   - [x] Pass the v1.2.1 noninteractive local, cross-target, audit, parser, and package preflight.
     > 434 Rust tests, 83 focused contracts with two POSIX skips, strict native/musl Clippy, ARM64 Windows check, RustSec, actionlint, cargo-dist, shell/PowerShell parsing, and package-list preflight pass without launching the app.
-  - [~] Ship v1.2.2's semantic receipt verifier and repeat the exact candidate/main/public/latest/site closure.
-    > Product code is unchanged from v1.2.1; the smoke now parses schema, track, active release, tag, and autostart values as JSON rather than matching whitespace.
+  - [x] Ship v1.2.2's semantic receipt verifier and repeat the exact candidate/main/public/latest/site closure.
+    > Candidate 29653156436, main CI 29653528229, atomic release 29653833434, and all-eight-lane public run 29654151526 passed at bbbe86367d185fe8910af6326a7d51c04b282aec.
   - [x] Pass the v1.2.2 noninteractive local, cross-target, audit, parser, and package preflight.
     > Semantic verifier contracts, 434 Rust tests, strict native/musl Clippy, locked build, ARM64 Windows check, RustSec, actionlint, cargo-dist, and parser gates pass without launching the app.
-  - [ ] Return to clean main and remove every non-main local and remote branch after preserving merged work.
-- [ ] **Provenance-preserving slot-based self-updater** - implement synchronous same-origin updates, atomic Windows release slots, DMG-managed Mac updates, and release qualification (owner codex) #u31
+  - [x] Return to clean main and remove every non-main local and remote branch after preserving merged work.
+    > Every deleted tip was an ancestor of main; the stale worktree, two local branches, three release branches, and protected starting archive were removed. Only main remains.
+- [x] **Provenance-preserving slot-based self-updater** - implemented synchronous same-origin updates, atomic Windows release slots, DMG-managed Mac updates, and complete release qualification (done 2026-07-18) (owner codex) #u31
   - [x] Record ADR 0031 and the versioned receipt/provenance contract.
   - [x] Implement synchronous CLI/JSON results and fail-closed origin resolution.
   - [x] Implement Windows immutable release slots, stable junctions, and safe legacy migration/takeover.
   - [x] Preserve DMG, Debian, shell, and PowerShell update origins without cross-channel conversion.
   - [x] Update installers, unversioned release artifacts, workflows, and public guidance.
-  - [~] Pass focused fault tests and the complete local/release qualification gate.
-    > v1.2.0 candidate/main/publication and every public-byte path except Linux shell passed. v1.2.1 owns the symmetric shell regression and full repeated closure gate.
-
-## Done
+  - [x] Pass focused fault tests and the complete local/release qualification gate.
+    > v1.2.2 completed candidate, same-SHA main, atomic publication, all platform-native packaging, exact/latest identity, production-site, and eight-lane fresh-public-byte proof.
 - [x] **Publish v1.1.0 cross-platform tray parity** - published and independently verified the immutable Windows/Linux tray-parity release across the complete Windows, macOS, Linux, Debian, stable/latest, and production-site matrix (done 2026-07-17) #r110
   - [x] Synchronize version, ADRs, README, guidance, task records, and both changelogs.
   - [x] Pass local, cross-target, packaging, security, workflow, and platform-native gates.

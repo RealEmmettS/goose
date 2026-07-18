@@ -8,15 +8,11 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.2.1](https://github.com/RealEmmettS/goose/releases/tag/v1.2.1),
-published from exact commit `c001fd1d08e5b9ac145bc62525a59866172d33f6`. It fixes foreign
-macOS/Linux login-start ownership; fresh public Linux installs then passed install, launch, X11,
-and dual-monitor Wayland proof before a formatting-only receipt assertion stopped the rollback
-smoke. v1.2.2 is the immutable test-harness fix-forward.
-
-**Next release candidate:** v1.2.2 preserves v1.2.1 product behavior and changes the public
-macOS/Linux lifecycle smoke to parse the installation receipt as JSON, so bootstrap-formatted and
-runtime-pretty-printed forms receive the same semantic verification.
+**Current stable release:** [v1.2.2](https://github.com/RealEmmettS/goose/releases/tag/v1.2.2),
+published from exact commit `bbbe86367d185fe8910af6326a7d51c04b282aec`. It completes the
+provenance-preserving updater release with semantic receipt verification across both compact and
+pretty-printed forms. Candidate, same-SHA main, atomic publication, and all eight fresh-public-byte
+macOS, Windows, Debian, and shell-managed Linux jobs passed before promotion.
 
 ## Install
 
@@ -293,8 +289,8 @@ owned bounded windows and defines monitor-relative image fitting, graceful versu
 and the one provenance-owned login-start setting. ADR 0033 makes Windows app/login/background
 launch windowless while preserving normal intentional CLI behavior, and moves every full-desktop
 compositor surface to disposable CI; product startup performs no calibration.
-[`docs/readiness/v1.2.2-readiness.md`](docs/readiness/v1.2.2-readiness.md) tracks the semantic
-receipt-verifier fix-forward through candidate, same-SHA main, publication, and public-byte
+[`docs/readiness/v1.2.2-readiness.md`](docs/readiness/v1.2.2-readiness.md) records the completed
+semantic receipt-verifier fix-forward, candidate, same-SHA main, publication, and public-byte
 qualification. The v1.2.0/v1.2.1 reports preserve their immutable release evidence.
 
 ## License and assets

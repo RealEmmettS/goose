@@ -1022,5 +1022,5 @@ intentionally limited.
   is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, completed stable
   v1.0.2 task `#v102`, completed hardware-verification task `#v1a`, completed v1.0.3 release task
   `#r103`, completed tray tasks `#trayc`/`#wtray`/`#ltray`, completed v1.1.0 release task `#r110`,
-  active v1.2.2 closure tasks `#u31`/`#r120`, and the readiness evidence.
+  completed v1.2.2 closure tasks `#u31`/`#r120`, and the readiness evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

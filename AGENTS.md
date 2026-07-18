@@ -8,10 +8,10 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.2.1 is the public stable/latest release at exact source commit
-`c001fd1d08e5b9ac145bc62525a59866172d33f6`; its public Linux product paths passed before a
-formatting-only receipt assertion stopped rollback verification, so v1.2.2 is the immutable
-test-harness fix-forward under ADRs 0031–0033 and `#r120`.** M0-M19 are implemented
+**Current stage: v1.2.2 is the public stable/latest release at exact source commit
+`bbbe86367d185fe8910af6326a7d51c04b282aec`; candidate `29653156436`, same-SHA main CI
+`29653528229`, atomic publication `29653833434`, and fresh-public-byte run `29654151526` passed
+under ADRs 0031–0033 and completed tasks `#u31`/`#r120`.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as

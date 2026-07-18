@@ -3,12 +3,11 @@
 ## TL;DR
 
 Honk300 is a Rust 1.95, cross-platform procedural desktop goose for Windows, macOS, X11, and
-native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.2.1 is the
+native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.2.2 is the
 public stable/latest release at exact source commit
-`c001fd1d08e5b9ac145bc62525a59866172d33f6`; its public Linux product paths passed before a
-formatting-only receipt assertion stopped rollback verification, so v1.2.2 is the immutable
-test-harness fix-forward under
-ADRs 0031–0033 and `#r120`. The project retains v1.0.1's native macOS qualification,
+`bbbe86367d185fe8910af6326a7d51c04b282aec`; its complete candidate, same-SHA main, atomic
+publication, and fresh-public-byte matrices passed under ADRs 0031–0033 and completed tasks
+`#u31`/`#r120`. The project retains v1.0.1's native macOS qualification,
 shared gait/edge lifecycle, Developer ID/notarized DMG delivery, Debian packages, rolling updates,
 and atomic publication while extending the shared accessible goose control from macOS to native
 Windows notification-area and compatible Linux StatusNotifier owners. Configure launches the
@@ -22,14 +21,13 @@ full-desktop compositor surfaces disposable-CI-only.
 
 ## Status
 
-- Default branch `main` contains the exact published v1.2.1 source plus the in-flight v1.2.2
-  fix-forward. Prior public tags/releases remain untouched history.
+- Default branch `main` contains the exact published v1.2.2 source plus release-closure records.
+  Prior public tags/releases remain untouched history.
 - Completed release/evidence cards: v1.0.3 `#r103`, v1.0.2 `#v102`, v1.0.1 `#m20q`, native Mac
   evidence `#m16r`, Alienware verification `#v1a`, and tray implementation `#trayc`/`#wtray`/
-  `#ltray`. v1.1.0 publication task `#r110` is complete; v1.2.x updater-release tasks
-  `#u31` and `#r120` are active. The shared board lives under `.tasks/`.
-- Version: 1.2.2 in fix-forward source; 1.2.1 remains public stable/latest until complete
-  qualification and atomic publication.
+  `#ltray`. v1.1.0 publication task `#r110` and v1.2.x updater-release tasks `#u31`/`#r120` are
+  complete. The shared board lives under `.tasks/`.
+- Version: 1.2.2, public stable/latest.
 - v1.2.0 release evidence: candidate `29649872307` attempt 2, same-SHA main CI `29650347708`,
   and atomic publication `29650650643` passed at exact commit
   `fcbb6337830a14cb187c93cfe3e499a3f2f73945`. Public-byte run `29651013524` passed both Mac,
@@ -40,6 +38,10 @@ full-desktop compositor surfaces disposable-CI-only.
   Public run `29652868306` proved the corrected Linux install/start/X11/Wayland paths on x64 and
   ARM64, then failed only because its rollback verifier matched one compact JSON line after
   runtime had pretty-printed the same valid receipt. v1.2.2 parses the values semantically.
+- v1.2.2 release evidence: candidate `29653156436`, same-SHA main CI `29653528229`, atomic
+  publication `29653833434`, and post-release public-byte run `29654151526` all passed at exact
+  commit `bbbe86367d185fe8910af6326a7d51c04b282aec`. The immutable release has 47 unique assets;
+  exact-tag/latest recommended bytes and the manifest-driven production site agree.
 - v1.1.0 release evidence: candidate `29588487072`, same-SHA main CI `29589048598`, atomic
   publication `29589698302`, and post-release smoke `29590274819` all passed at the exact commit.
   The immutable GitHub Release contains 22 payloads plus sidecars/manifest for 47 assets.
@@ -260,10 +262,11 @@ full-desktop compositor surfaces disposable-CI-only.
 
 ## Verification Source Of Truth
 
-- In-flight v1.2.2 harness fix-forward gate: `docs/readiness/v1.2.2-readiness.md`; v1.2.0 and
+- Completed v1.2.2 harness fix-forward gate: `docs/readiness/v1.2.2-readiness.md`; v1.2.0 and
   v1.2.1 reports preserve their immutable publication/public-byte evidence.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
-- Board handoff and activity: `.tasks/tasks/v102.md` and `.tasks/tasks/v1a.md`.
+- Board handoff and activity: `.tasks/tasks/u31.md`, `.tasks/tasks/r120.md`, `.tasks/tasks/v102.md`,
+  and `.tasks/tasks/v1a.md`.
 - Canonical product plan: `honk300_plan.md`.
 - Required local gate: fmt, workspace clippy with warnings denied, workspace tests, release build,
   universal Apple builds, `dist plan --tag=v1.2.2`, complete Python contracts, cargo-audit
