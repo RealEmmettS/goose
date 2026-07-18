@@ -21,7 +21,8 @@ PACKAGE="$ROOT/honk300-$ARCHITECTURE.deb"
 LATEST_PACKAGE="$ROOT/latest-honk300-$ARCHITECTURE.deb"
 SIDECAR="$ROOT/honk300-$ARCHITECTURE.deb.sha256"
 PACKAGED_TRAY_ICON=/usr/share/icons/hicolor/36x36/apps/honk300.png
-trap 'sudo dpkg --remove honk300 >/dev/null 2>&1 || true; rm -rf "$ROOT"' EXIT HUP INT TERM
+COLLISION_ALIAS=""
+trap 'sudo dpkg --remove honk300 >/dev/null 2>&1 || true; [ -z "$COLLISION_ALIAS" ] || rm -f "$COLLISION_ALIAS"; rm -rf "$ROOT"' EXIT HUP INT TERM
 
 HOME="$ROOT/home"
 XDG_DATA_HOME="$ROOT/data"
@@ -73,6 +74,36 @@ dpkg-deb --info "$PACKAGE" > "$EVIDENCE_DIR/package-info.txt"
 dpkg-deb --contents "$PACKAGE" > "$EVIDENCE_DIR/package-contents.txt"
 printf 'package_sha256=%s\n' "$actual" > "$EVIDENCE_DIR/package-identity.txt"
 
+prove_preinst_collision_refusal() {
+  system_home="$(getent passwd "$(id -u)" | awk -F: 'NR == 1 { print $6 }')"
+  [ -n "$system_home" ] && [ -d "$system_home" ] || {
+    printf 'could not resolve the current account home from the password database\n' >&2
+    exit 1
+  }
+  COLLISION_ALIAS="$system_home/.local/bin/honk300"
+  [ ! -e "$COLLISION_ALIAS" ] && [ ! -L "$COLLISION_ALIAS" ] || {
+    printf 'preinst collision fixture would replace an existing path: %s\n' "$COLLISION_ALIAS" >&2
+    exit 1
+  }
+  mkdir -p "$(dirname "$COLLISION_ALIAS")"
+  ln -s "$system_home/.local/share/honk300/install/current/bin/honk300" "$COLLISION_ALIAS"
+  set +e
+  sudo apt-get install --yes "$PACKAGE" > "$EVIDENCE_DIR/preinst-collision.log" 2>&1
+  collision_status=$?
+  set -e
+  [ "$collision_status" -ne 0 ] || {
+    printf 'Debian preinst unexpectedly accepted an active shell alias\n' >&2
+    exit 1
+  }
+  grep -F "run '$COLLISION_ALIAS uninstall' as that user" \
+    "$EVIDENCE_DIR/preinst-collision.log" >/dev/null
+  [ "$(readlink "$COLLISION_ALIAS")" = "$system_home/.local/share/honk300/install/current/bin/honk300" ]
+  [ "$(dpkg-query -W -f='${Status}' honk300 2>/dev/null || true)" != 'install ok installed' ]
+  [ ! -e /usr/lib/honk300/honk300 ]
+  rm -f "$COLLISION_ALIAS"
+  COLLISION_ALIAS=""
+}
+
 install_and_verify() {
   sudo apt-get install --yes "$PACKAGE"
   [ -x /usr/lib/honk300/honk300 ]
@@ -103,7 +134,32 @@ PY
   dpkg-query --search /usr/lib/honk300/honk300 | grep -F 'honk300: /usr/lib/honk300/honk300'
 }
 
+prove_preinst_collision_refusal
 install_and_verify
+
+if [ -z "$LOCAL_PACKAGE" ]; then
+  SHELL_INSTALLER="$ROOT/honk300-installer.sh"
+  SHELL_SIDECAR="$SHELL_INSTALLER.sha256"
+  curl --proto '=https' --tlsv1.2 -fsSL "$BASE/honk300-installer.sh" -o "$SHELL_INSTALLER"
+  curl --proto '=https' --tlsv1.2 -fsSL "$BASE/honk300-installer.sh.sha256" -o "$SHELL_SIDECAR"
+  shell_expected="$(awk 'NR == 1 { print $1 }' "$SHELL_SIDECAR" | tr 'A-F' 'a-f')"
+  [ "$(sha256sum "$SHELL_INSTALLER" | awk '{ print $1 }')" = "$shell_expected" ]
+  set +e
+  HOME="$ROOT/shell-home" \
+  XDG_DATA_HOME="$ROOT/shell-data" \
+  XDG_CONFIG_HOME="$ROOT/shell-config" \
+    sh "$SHELL_INSTALLER" > "$EVIDENCE_DIR/shell-deb-collision.log" 2>&1
+  shell_collision_status=$?
+  set -e
+  [ "$shell_collision_status" -ne 0 ] || {
+    printf 'shell bootstrap unexpectedly accepted an installed Debian owner\n' >&2
+    exit 1
+  }
+  grep -F "sudo dpkg --remove honk300" "$EVIDENCE_DIR/shell-deb-collision.log" >/dev/null
+  [ ! -e "$ROOT/shell-data/honk300/install" ]
+  [ "$(dpkg-query -W -f='${Status}' honk300)" = 'install ok installed' ]
+fi
+
 binary_before="$(sha256sum /usr/lib/honk300/honk300 | awk '{ print $1 }')"
 HONK300_BIN=/usr/lib/honk300/honk300 \
 HONK300_EVIDENCE_DIR="$EVIDENCE_DIR" \

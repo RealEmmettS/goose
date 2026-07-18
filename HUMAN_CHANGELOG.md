@@ -33,7 +33,35 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Added
+- **The easiest install is now one official command on every platform.** Windows shows the
+  PowerShell command first, while Mac and Linux show the terminal command first. These are real
+  managed installers that check the exact download, remember their ownership, and verify every
+  Goose command name, so the convenient path keeps the same safety as the downloadable packages.
+- **Release checks now prove that choosing another official installer really changes ownership.**
+  Windows tests move through the PowerShell, all-users, workplace, and executable installers while
+  an older Goose is still running. Mac tests move between the terminal and disk-image choices,
+  and Linux checks refuse unsafe package collisions before touching the active copy.
+
+### Improved
+- **A fresh Mac terminal install now means what the user just asked for.** Running the public
+  command deliberately makes the terminal installer the current choice. An ordinary update still
+  remembers whether the app originally came from the graphical disk image or the terminal, and
+  both managed choices keep the same calm permission onboarding. Macs updating from the previous
+  release also retain that choice even though their older updater predates the new signal.
+- **Downloadable installers remain first-class options.** The graphical Mac download, Windows
+  installer choices, and Debian packages still handle their own future updates and removal. A
+  raw developer build cannot silently take ownership away from one of them, which prevents an
+  advanced command from leaving two competing copies.
+
 ### Fixed
+- **Opening the all-users Windows installer now records the choice the user actually made.** It
+  no longer carries forward an older PowerShell-install label, so the next update stays with the
+  most recently chosen official installer.
+- **Linux stops before mixing a personal terminal install with a system package.** Either path
+  now identifies the existing owner and gives the exact removal-and-retry instruction. The
+  system package checks every Goose command name and never deletes another user's files, which
+  keeps the current working copy safe until the user completes the channel change.
 - **Release checks now recognize the same installation record in either valid layout.** The Mac
   and Linux public-install test reads the record's actual values instead of depending on spaces
   and line breaks, which lets the full update and rollback safety check finish reliably.

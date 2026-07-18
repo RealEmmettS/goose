@@ -7,7 +7,9 @@ native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tre
 public stable/latest release at exact source commit
 `bbbe86367d185fe8910af6326a7d51c04b282aec`; its complete candidate, same-SHA main, atomic
 publication, and fresh-public-byte matrices passed under ADRs 0031–0033 and completed tasks
-`#u31`/`#r120`. The project retains v1.0.1's native macOS qualification,
+`#u31`/`#r120`. v1.2.3 is active under ADR 0034 and task `#cli123`; it makes the official
+versionless bootstraps the recommended managed fresh install while retaining DMG/MSI/EXE/DEB
+ownership and exact update provenance. The project retains v1.0.1's native macOS qualification,
 shared gait/edge lifecycle, Developer ID/notarized DMG delivery, Debian packages, rolling updates,
 and atomic publication while extending the shared accessible goose control from macOS to native
 Windows notification-area and compatible Linux StatusNotifier owners. Configure launches the
@@ -23,11 +25,13 @@ full-desktop compositor surfaces disposable-CI-only.
 
 - Default branch `main` contains the exact published v1.2.2 source plus release-closure records.
   Prior public tags/releases remain untouched history.
+- Active branch `codex/cli-first-install-v1.2.3` contains the unreleased command-first lifecycle
+  patch. It must not be described as public until the full immutable release gate completes.
 - Completed release/evidence cards: v1.0.3 `#r103`, v1.0.2 `#v102`, v1.0.1 `#m20q`, native Mac
   evidence `#m16r`, Alienware verification `#v1a`, and tray implementation `#trayc`/`#wtray`/
   `#ltray`. v1.1.0 publication task `#r110` and v1.2.x updater-release tasks `#u31`/`#r120` are
   complete. The shared board lives under `.tasks/`.
-- Version: 1.2.2, public stable/latest.
+- Source version: 1.2.3 candidate; public stable/latest remains 1.2.2.
 - v1.2.0 release evidence: candidate `29649872307` attempt 2, same-SHA main CI `29650347708`,
   and atomic publication `29650650643` passed at exact commit
   `fcbb6337830a14cb187c93cfe3e499a3f2f73945`. Public-byte run `29651013524` passed both Mac,
@@ -258,18 +262,21 @@ full-desktop compositor surfaces disposable-CI-only.
   transactional latest-intent takeover, and truthful cleanup-pending results. ADR 0032 defines
   owned monitor-relative props, graceful versus immediate-force lifecycle, and the single
   receipt-owned login-start config. ADR 0033 defines the GUI-subsystem Windows app launcher,
-  no-console background boundary, and disposable-CI-only full-desktop qualification.
+  no-console background boundary, and disposable-CI-only full-desktop qualification. ADR 0034
+  defines command-first managed installation, native alternatives, fresh-versus-update intent,
+  scope-conflict behavior, and raw Cargo's unmanaged boundary.
 
 ## Verification Source Of Truth
 
 - Completed v1.2.2 harness fix-forward gate: `docs/readiness/v1.2.2-readiness.md`; v1.2.0 and
   v1.2.1 reports preserve their immutable publication/public-byte evidence.
+- Active v1.2.3 command-first gate: `docs/readiness/v1.2.3-readiness.md` and board task `#cli123`.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
-- Board handoff and activity: `.tasks/tasks/u31.md`, `.tasks/tasks/r120.md`, `.tasks/tasks/v102.md`,
-  and `.tasks/tasks/v1a.md`.
+- Board handoff and activity: `.tasks/tasks/cli123.md`, `.tasks/tasks/u31.md`,
+  `.tasks/tasks/r120.md`, `.tasks/tasks/v102.md`, and `.tasks/tasks/v1a.md`.
 - Canonical product plan: `honk300_plan.md`.
 - Required local gate: fmt, workspace clippy with warnings denied, workspace tests, release build,
-  universal Apple builds, `dist plan --tag=v1.2.2`, complete Python contracts, cargo-audit
+  universal Apple builds, `dist plan --tag=v1.2.3`, complete Python contracts, cargo-audit
   0.22.2, actionlint, and diff check.
 
 ## Current Workspace Tree

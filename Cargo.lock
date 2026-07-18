@@ -1287,7 +1287,7 @@ dependencies = [
 
 [[package]]
 name = "honk300"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "clap",
  "honk-config",

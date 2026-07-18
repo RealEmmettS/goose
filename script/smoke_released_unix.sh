@@ -79,11 +79,12 @@ grep -F "TAG=\"$TAG\"" "$INSTALLER" >/dev/null
 grep -F "VERSION=\"$VERSION\"" "$INSTALLER" >/dev/null
 
 verify_install() {
+  expected_origin="$1"
   [ -x "$BINARY" ] || { printf 'installed binary is missing: %s\n' "$BINARY" >&2; exit 1; }
   reported="$($BINARY --version | awk '{print $NF}' | sed 's/[+-].*$//')"
   [ "$reported" = "$VERSION" ] || { printf 'installed version mismatch: %s\n' "$reported" >&2; exit 1; }
   require_file "$RECEIPT"
-  "$PYTHON3" - "$RECEIPT" "$TAG" <<'PY'
+  "$PYTHON3" - "$RECEIPT" "$TAG" "$expected_origin" <<'PY'
 import json
 import sys
 
@@ -92,6 +93,8 @@ with open(sys.argv[1], encoding="utf-8") as receipt_file:
 
 assert receipt["schema"] == "honk300.install.v2"
 assert receipt["release_track"] == "stable"
+assert receipt["origin"] == sys.argv[3]
+assert receipt["installer_family"] == {"shell": "shell", "mac-app": "dmg"}[sys.argv[3]]
 assert isinstance(receipt["active_release"], str) and receipt["active_release"]
 assert receipt["tag"] == sys.argv[2]
 assert receipt["autostart"] == {
@@ -153,8 +156,40 @@ snapshot_state() {
 
 for pass in 1 2; do
   sh "$INSTALLER"
-  verify_install
+  verify_install shell
 done
+
+if [ "$OS" = Darwin ]; then
+  DMG="$ROOT/honk300-universal2.dmg"
+  DMG_SIDECAR="$DMG.sha256"
+  curl --proto '=https' --tlsv1.2 -fsSL "$BASE/honk300-universal2.dmg" -o "$DMG"
+  curl --proto '=https' --tlsv1.2 -fsSL "$BASE/honk300-universal2.dmg.sha256" -o "$DMG_SIDECAR"
+  dmg_expected="$(awk 'NR == 1 { print $1 }' "$DMG_SIDECAR" | tr 'A-F' 'a-f')"
+  [ "$(file_sha256 "$DMG" | tr 'A-F' 'a-f')" = "$dmg_expected" ] || {
+    printf 'DMG checksum mismatch\n' >&2
+    exit 1
+  }
+  (
+    mount="$ROOT/dmg-mount"
+    mkdir -p "$mount"
+    hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$DMG" >/dev/null
+    trap 'hdiutil detach "$mount" >/dev/null 2>&1 || true' EXIT HUP INT TERM
+    "$mount/Honk300.app/Contents/MacOS/honk300" install
+  )
+  verify_install mac-app
+
+  # Released v1.2.2-and-earlier clients use the established update-temp filename without the new
+  # hint. That narrow receipt-validated bridge and the current hinted path must both retain DMG
+  # provenance. A later deliberate public shell install has neither signal and becomes the owner.
+  LEGACY_INSTALLER="$ROOT/honk300-update-$TAG-123-honk300-installer.sh"
+  cp "$INSTALLER" "$LEGACY_INSTALLER"
+  sh "$LEGACY_INSTALLER"
+  verify_install mac-app
+  HONK300_UPDATE_ORIGIN=mac-app sh "$INSTALLER"
+  verify_install mac-app
+  sh "$INSTALLER"
+  verify_install shell
+fi
 
 if [ "$OS" = Linux ] && [ "${HONK300_RUN_LINUX_OVERLAY_SMOKE:-false}" = true ]; then
   EVIDENCE_DIR="${HONK300_LINUX_EVIDENCE_DIR:-}"
@@ -184,7 +219,7 @@ fault_status=$?
 set -e
 [ "$fault_status" -ne 0 ] || { printf 'fault injection unexpectedly succeeded\n' >&2; exit 1; }
 
-verify_install
+verify_install shell
 snapshot_state "$AFTER_STATE"
 if ! cmp "$BEFORE_STATE" "$AFTER_STATE"; then
   printf 'complete managed integration state was not restored after fault\n' >&2

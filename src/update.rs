@@ -734,7 +734,7 @@ fn run_inner(report: &mut UpdateReport, json: bool) -> Result<(), DynError> {
         } else {
             None
         };
-        run_installer(plan.strategy, &temp_path, json)?;
+        run_installer(plan.strategy, source, &temp_path, json)?;
         let activated_executable = strategy_owned_executable(plan.strategy, source, target)?;
         verify_post_install(&activated_executable, &latest)?;
         remove_verified_temp_artifact(&temp_path, artifact)?;
@@ -1527,6 +1527,7 @@ fn checksum_verdict(expected: &str, actual: &str) -> Result<(), String> {
 #[cfg(not(windows))]
 fn run_installer(
     strategy: UpdateStrategy,
+    source: InstallSource,
     path: &Path,
     suppress_stdout: bool,
 ) -> Result<(), DynError> {
@@ -1557,7 +1558,9 @@ fn run_installer(
         }
         UpdateStrategy::Shell => {
             let mut command = Command::new("sh");
-            command.arg(path);
+            command
+                .arg(path)
+                .env("HONK300_UPDATE_ORIGIN", shell_update_origin(source)?);
             command
         }
         UpdateStrategy::Deb => unreachable!("handled before the platform installer match"),
@@ -1573,6 +1576,19 @@ fn run_installer(
             status.code().unwrap_or(-1)
         )
         .into())
+    }
+}
+
+#[cfg(any(test, not(windows)))]
+fn shell_update_origin(source: InstallSource) -> Result<&'static str, DynError> {
+    match source {
+        InstallSource::MacApp => Ok("mac-app"),
+        InstallSource::Shell => Ok("shell"),
+        _ => Err(format!(
+            "{} provenance cannot delegate to the managed shell updater",
+            source.marker_value()
+        )
+        .into()),
     }
 }
 
@@ -1870,6 +1886,23 @@ mod tests {
             ] {
                 assert!(select_update_plan(source, target).is_err());
             }
+        }
+    }
+
+    #[test]
+    fn shell_delegate_carries_only_the_proven_update_origin() {
+        assert_eq!(
+            shell_update_origin(InstallSource::MacApp).unwrap(),
+            "mac-app"
+        );
+        assert_eq!(shell_update_origin(InstallSource::Shell).unwrap(), "shell");
+        for source in [
+            InstallSource::Deb,
+            InstallSource::PowerShell,
+            InstallSource::ManualLocal,
+            InstallSource::Unknown,
+        ] {
+            assert!(shell_update_origin(source).is_err());
         }
     }
 

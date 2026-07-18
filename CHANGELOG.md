@@ -26,6 +26,38 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-07-18
+
+### Added
+- **Command-first managed installation (ADR 0034)** - the stable versionless PowerShell command
+  is now the recommended Windows install and the stable versionless shell command is recommended
+  on macOS/Linux. Each bootstrap still resolves immutable exact-tag payloads, verifies their
+  recorded identity, writes a protected v2 receipt, and verifies the three public aliases.
+- **Managed-channel takeover qualification** - candidate and public-byte gates now exercise
+  Global MSI → PowerShell → Global MSI plus all Global/Corporate MSI/EXE transitions on both
+  Windows architectures while an old process remains mapped. Signed Mac gates exercise shell →
+  DMG → DMG-preserving update → shell; Debian packaging proves user-shell collision refusal.
+
+### Changed
+- **Fresh Mac intent is distinct from update transport** - an ordinary public shell invocation
+  becomes the new shell owner, while `honk300 update` supplies an allowlisted internal hint that
+  is revalidated against the protected receipt before preserving DMG or shell provenance. Both
+  exact managed app receipts retain the same Accessibility onboarding eligibility. A narrow,
+  receipt-validated temporary-filename bridge preserves the owner for already-released clients
+  that predate the hint.
+- **Native packages are supported alternatives** - the signed DMG, four Windows MSI/EXE
+  families, and architecture-matched Debian packages remain full lifecycle owners. Raw Cargo,
+  source-tree, and portable binaries remain unmanaged and cannot retire another installer owner.
+
+### Fixed
+- **Fresh Global MSI origin takeover** - a directly launched Global MSI no longer inherits a
+  previous PowerShell origin from the registry. Only the verified PowerShell bootstrap passes
+  `HONK300ORIGIN=powershell`, so later updates preserve the user's actual latest install choice.
+- **Linux cross-scope collision safety** - the no-sudo shell bootstrap validates and refuses an
+  existing Debian owner before staging. Debian `preinst` checks all three managed aliases for
+  every account home in the password database and refuses before package commit, giving an exact
+  owned-uninstall-and-retry command without deleting user files as root.
+
 ## [1.2.2] - 2026-07-18
 
 ### Fixed

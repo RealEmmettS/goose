@@ -77,8 +77,8 @@ still build the full installer matrix because matching the `*300` family is an e
 | **Config UI** | A **ratatui** Claude-Code/QubeTX-family-style TUI at `<name> config`, toggling every behavior incl. Autumn; **hot-apply where cheap**, restart-note otherwise. |
 | **Linux** | **X11-first** (runs under XWayland). **Native Wayland** behind an opt-in `--wayland` flag (reduced mischief). |
 | **Targets** | **Every OS + arch we advertise:** Windows x64 **and ARM64**, macOS Intel **and Apple Silicon** (universal2), Linux x64 **and ARM** (gnu + musl). |
-| **Packaging** | Windows-first 4-installer matrix (Global/Corporate × MSI/EXE) **built per-arch** + shell/PowerShell installers + a Developer ID-signed/notarized macOS universal DMG with per-user helper + native amd64/arm64 Debian packages + Linux `.desktop`. Every general release builds the complete platform set in GitHub Actions and publishes stable unversioned latest links backed by immutable tags. **No crates.io** (`crates-publish.yml` dropped). |
-| **macOS first run** | Only the exact receipted app at `~/Applications/Honk300.app` may request Accessibility automatically. It records an owner-only prompt marker before opening UI, asks at most once per installed update, waits calmly at a safe screen edge while denied, and detects grants/revocations in the same process. Development, bare, source-tree, and mounted-DMG launches retain non-prompting degraded behavior. |
+| **Packaging** | Advertise the versionless official PowerShell bootstrap on Windows and shell bootstrap on macOS/Linux. Keep the per-arch Global/Corporate MSI/EXE matrix, Developer ID-signed/notarized universal DMG, native amd64/arm64 Debian packages, portable archives, and checksums as managed alternatives. Every release builds the complete set and advances stable names only after immutable-tag qualification. Raw Cargo is unmanaged; **no crates.io**. |
+| **macOS first run** | Only the exact DMG- or shell-receipted app at `~/Applications/Honk300.app` may request Accessibility automatically. It records an owner-only prompt marker before opening UI, asks at most once per installed update, waits calmly at a safe screen edge while denied, and detects grants/revocations in the same process. Development, bare, source-tree, and mounted-DMG launches retain non-prompting degraded behavior. |
 
 ---
 
@@ -741,7 +741,7 @@ retire or outrank a machine-wide PATH
 without an administrator grant. If that grant is denied, the new slot remains staged/selected but
 the operation is nonzero `cleanup_pending`; it never claims the public command has switched.
 
-### 13.3 macOS: universal2 Developer ID app + graphical per-user DMG
+### 13.3 macOS: command-first universal2 Developer ID app + graphical per-user DMG
 A real `.app` bundle with a **stable bundle-id** (`dev.emmetts.honk300`) is **mandatory** for
 durable Accessibility grants (mischief features). Ship a **universal2** binary (Intel + Apple
 Silicon) in one `.app`. ADR 0020 requires Developer ID signing for team `M9D5379H93`, hardened
@@ -749,12 +749,15 @@ runtime, secure timestamps, App Store Connect API-key notarization, stapling, an
 validation. Release workflows fail closed when credentials are absent; there is no ad-hoc public
 fallback.
 
-The recommended `honk300-universal2.dmg` contains the app, a separately signed universal
+The recommended versionless shell command installs the exact-tag signed universal app directly
+at `~/Applications/Honk300.app`. The graphical `honk300-universal2.dmg` alternative contains that
+same app, a separately signed universal
 x86_64/arm64 `Install Honk300.app` targeting macOS 11.0, and concise instructions—never a
 misleading `/Applications` symlink. The
 helper verifies bundle id, signature, and matching Developer ID team before delegating to the
-shared `honk300 install` transaction. Installation remains no-sudo and per-user at
-`~/Applications/Honk300.app`; the exact-tag shell bootstrap stays a secondary terminal path.
+shared `honk300 install` transaction. Both installations remain no-sudo and per-user. A fresh
+shell invocation writes shell ownership; a fresh DMG install writes DMG ownership; updater use of
+the shell artifact preserves the already-proven owner.
 `LSUIElement=true` keeps the product an agent with no native settings window, running Dock control
 surface, or AppleScript `.sdef` commands. ADRs 0024/0028 add one accessible goose template item
 while the runtime is alive: **Configure Honk300…** opens the existing signed-bundle terminal TUI,
@@ -797,7 +800,9 @@ for **each arch** (x64 + ARM, gnu + musl). Each release also assembles native
 packages own `/usr/lib/honk300`, all three `/usr/bin` aliases, release metadata, and a desktop
 entry; personal media remains in user XDG storage. CLI update/remove proves `dpkg` ownership and
 uses `sudo` or `pkexec` only for the machine-wide package, while the shell path remains per-user
-and no-sudo. Default runs X11/XWayland; `--wayland` opts into the degraded layer-shell mode.
+and no-sudo. Cross-scope shell/DEB conversion refuses before mutation with an exact
+uninstall-and-retry command rather than leaving two competing owners. Default runs X11/XWayland;
+`--wayland` opts into the degraded layer-shell mode.
 
 ### 13.5 In-binary `install / uninstall / update / setup`
 Use the family's atomic-write + marker-block + symlink-resolution machinery as historical input,
@@ -873,6 +878,7 @@ being implemented three more times.
 | R10.2 / v1.2.0 (ADR 0033) | separate console CLI and GUI-subsystem Windows app launcher, independently hashed slot ownership, no-console login/background start, and disposable-CI-only full-desktop compositor surfaces | PE-subsystem/header checks, all-four-installer shortcut/Run/receipt/repair/uninstall proof, no-shell launch contract, randomized process-owned tray-Quit routing, and native x64/ARM64 disposable runner gates |
 | R10.3 / v1.2.1 (ADRs 0031–0033) | immutable fix-forward for macOS/Linux foreign login-start ownership: installer receipts enable autostart only for marker-owned entries; foreign files, symlinks, and directories are preserved and treated as disabled | focused ownership/mutation tests plus complete candidate, same-SHA main, signed Mac, Linux shell, Debian, Windows, atomic publication, stable/latest, and post-release public-byte gates |
 | R10.4 / v1.2.2 (ADRs 0031–0033) | immutable test-harness fix-forward: public macOS/Linux smoke parses v2 receipts semantically after runtime formatting changes | both compact and pretty JSON receipt regressions plus complete candidate, same-SHA main, publication, and fresh-public-byte rollback matrix |
+| R10.5 / v1.2.3 (ADR 0034) | command-first official bootstrap recommendation, managed fresh-intent takeover, Mac shell Accessibility parity, Windows PowerShell/MSI origin correction, and explicit Linux cross-scope refusal | five Windows managed-channel transitions on x64/ARM64, signed Mac shell↔DMG takeover, shell/DEB collision safety, complete candidate/main/public-byte matrix, and command-first production site |
 
 Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
 and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus
@@ -1022,5 +1028,6 @@ intentionally limited.
   is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, completed stable
   v1.0.2 task `#v102`, completed hardware-verification task `#v1a`, completed v1.0.3 release task
   `#r103`, completed tray tasks `#trayc`/`#wtray`/`#ltray`, completed v1.1.0 release task `#r110`,
-  completed v1.2.2 closure tasks `#u31`/`#r120`, and the readiness evidence.
+  completed v1.2.2 closure tasks `#u31`/`#r120`, active v1.2.3 task `#cli123`, and the readiness
+  evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

@@ -18,15 +18,16 @@
 |---|---|
 | Honk300 | Cross-platform Rust desktop goose, with `honk300`, `honk`, and `goose` command names. |
 | M16.1 | Native macOS host and Accessibility readiness gate. |
-| DMG | Recommended macOS disk-image distribution after Developer ID signing and notarization. |
+| Managed bootstrap | The official versionless PowerShell or shell installer; unlike raw Cargo, it records ownership and participates in takeover/update transactions. |
+| DMG | Optional graphical macOS installer that remains a fully managed update channel. |
 
 ## Projects
 
 | Project | Status | Source |
 |---|---|---|
-| Honk300 | v1.0.2 stable/latest; exact release task complete | `#v102` |
-| Desktop Goose site | Progressive DMG-first latest rollout live against v1.0.2 | `/Users/realemmetts/Downloads/temp_git/desktop-goose-site` |
-| Post-v1 hardware verification | Alienware plus later Mac/Linux defense-in-depth; forward patches only | `#v1a` |
+| Honk300 | v1.2.2 stable/latest; v1.2.3 command-first installation patch active | `#cli123` |
+| Desktop Goose site | Manifest-driven latest rollout; command-first copy pending v1.2.3 publication | `C:\Users\hey\git\desktop-goose-site` |
+| Post-v1 hardware verification | Alienware plus hosted/native Mac and Linux defense-in-depth; forward patches only | `#v1a` |
 
 ## Preferences
 

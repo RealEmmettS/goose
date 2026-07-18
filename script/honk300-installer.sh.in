@@ -326,6 +326,37 @@ ensure_path_marker() {
 
 json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 
+receipt_proves_update_origin() {
+  receipt="$1"
+  root="$2"
+  origin="$3"
+  [ -f "$receipt" ] && [ ! -L "$receipt" ] || return 1
+  grep -F '"install_root": "'"$(json_escape "$root")"'"' "$receipt" >/dev/null 2>&1 || return 1
+  if grep -F '"schema": "honk300.install.v2"' "$receipt" >/dev/null 2>&1; then
+    case "$origin" in
+      mac-app)
+        grep -F '"origin": "mac-app"' "$receipt" >/dev/null 2>&1 \
+          && grep -F '"installer_family": "dmg"' "$receipt" >/dev/null 2>&1
+        ;;
+      shell)
+        grep -F '"origin": "shell"' "$receipt" >/dev/null 2>&1 \
+          && grep -F '"installer_family": "shell"' "$receipt" >/dev/null 2>&1
+        ;;
+      *) return 1 ;;
+    esac
+    return $?
+  fi
+  grep -F '"schema": "honk300.install.v1"' "$receipt" >/dev/null 2>&1 || return 1
+  case "$origin" in
+    mac-app)
+      grep -F '"channel": "dmg"' "$receipt" >/dev/null 2>&1 \
+        || grep -F '"channel": "mac-app"' "$receipt" >/dev/null 2>&1
+      ;;
+    shell) grep -F '"channel": "shell"' "$receipt" >/dev/null 2>&1 ;;
+    *) return 1 ;;
+  esac
+}
+
 write_receipt() {
   receipt="$1"
   layout="$2"
@@ -442,13 +473,6 @@ if [ "$OS" = Darwin ]; then
   INSTALL_FAMILY=shell
   INSTALL_EDITION=global
   INSTALL_SCOPE=user
-  if [ -f "$RECEIPT" ] && [ ! -L "$RECEIPT" ]; then
-    if grep -F '"origin": "mac-app"' "$RECEIPT" >/dev/null 2>&1 \
-       || grep -F '"channel": "dmg"' "$RECEIPT" >/dev/null 2>&1; then
-      INSTALL_ORIGIN=mac-app
-      INSTALL_FAMILY=dmg
-    fi
-  fi
 elif [ "$OS" = Linux ]; then
   if [ "$ARCH" = x86_64 ]; then arch_name=x86_64; else arch_name=aarch64; fi
   libc="${HONK300_LIBC:-}"
@@ -478,6 +502,64 @@ elif [ "$OS" = Linux ]; then
 else
   die "unsupported operating system: $OS"
 fi
+
+UPDATE_ORIGIN="${HONK300_UPDATE_ORIGIN:-}"
+if [ "$OS" = Darwin ] && [ -z "$UPDATE_ORIGIN" ]; then
+  # v1.2.2 and earlier already-released updaters invoke the exact-tag script by this owned temp
+  # filename but cannot supply HONK300_UPDATE_ORIGIN. Keep that immutable-client bridge narrow:
+  # the established name must match and the current receipt must independently prove its owner.
+  case "$(basename "$0")" in
+    honk300-update-*-honk300-installer.sh)
+      if receipt_proves_update_origin "$RECEIPT" "$DEST" mac-app; then
+        UPDATE_ORIGIN=mac-app
+      elif receipt_proves_update_origin "$RECEIPT" "$DEST" shell; then
+        UPDATE_ORIGIN=shell
+      fi
+      ;;
+  esac
+fi
+case "$OS:$UPDATE_ORIGIN" in
+  Darwin:)
+    # A public `curl | sh` is a deliberate fresh shell install and therefore becomes the new
+    # owner. Only the updater sets this transport hint, after Rust has already validated the
+    # protected receipt and exact managed app path.
+    ;;
+  Darwin:mac-app)
+    receipt_proves_update_origin "$RECEIPT" "$DEST" mac-app \
+      || die "macOS updater could not validate the existing DMG-owned app receipt"
+    INSTALL_ORIGIN=mac-app
+    INSTALL_FAMILY=dmg
+    ;;
+  Darwin:shell)
+    receipt_proves_update_origin "$RECEIPT" "$DEST" shell \
+      || die "macOS updater could not validate the existing shell-owned app receipt"
+    ;;
+  Linux:)
+    # The no-sudo user bootstrap cannot silently remove a machine-owned Debian package. Refuse
+    # before staging so the package remains authoritative until the user explicitly removes it.
+    if has dpkg-query && [ "$(dpkg-query -W -f='${Status}' honk300 2>/dev/null || true)" = "install ok installed" ]; then
+      if [ ! -L /usr/lib/honk300/install-source.txt ] \
+         && [ "$(cat /usr/lib/honk300/install-source.txt 2>/dev/null || true)" = deb ] \
+         && [ -f /usr/lib/honk300/install-receipt.json ] \
+         && [ ! -L /usr/lib/honk300/install-receipt.json ] \
+         && grep -F '"origin": "deb"' /usr/lib/honk300/install-receipt.json >/dev/null 2>&1 \
+         && grep -F '"installer_family": "deb"' /usr/lib/honk300/install-receipt.json >/dev/null 2>&1 \
+         && dpkg-query --search /usr/lib/honk300/honk300 2>/dev/null | grep -Fx 'honk300: /usr/lib/honk300/honk300' >/dev/null 2>&1; then
+        die "the Debian package currently owns Honk300; run 'sudo dpkg --remove honk300' and then rerun this command to switch to the no-sudo shell channel"
+      fi
+      die "a Honk300 Debian registration exists but its ownership could not be validated; repair or remove it with the system package manager before installing the shell channel"
+    fi
+    if [ -e /usr/lib/honk300/honk300 ] \
+       || [ -L /usr/bin/honk300 ] || [ -L /usr/bin/honk ] || [ -L /usr/bin/goose ]; then
+      die "a system Honk300 installation exists without validated package ownership; remove or repair it before installing the shell channel"
+    fi
+    ;;
+  Linux:shell)
+    receipt_proves_update_origin "$RECEIPT" "$DEST" shell \
+      || die "Linux updater could not validate the existing shell-owned receipt"
+    ;;
+  *) die "unsupported managed update origin: $UPDATE_ORIGIN" ;;
+esac
 
 [ ! -L "$DEST" ] || die "refusing to replace symlinked install root: $DEST"
 [ ! -e "$DEST" ] || [ -d "$DEST" ] || die "install root is not a directory: $DEST"

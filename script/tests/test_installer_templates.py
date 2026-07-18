@@ -231,6 +231,30 @@ class InstallerTemplateTests(unittest.TestCase):
             SHELL,
         )
 
+    def test_shell_bootstrap_separates_fresh_intent_from_update_transport(self) -> None:
+        self.assertIn('UPDATE_ORIGIN="${HONK300_UPDATE_ORIGIN:-}"', SHELL)
+        self.assertIn('Darwin:mac-app)', SHELL)
+        self.assertIn('Darwin:shell)', SHELL)
+        self.assertIn('Linux:shell)', SHELL)
+        self.assertIn('receipt_proves_update_origin "$RECEIPT" "$DEST" mac-app', SHELL)
+        self.assertIn('INSTALL_ORIGIN=mac-app', SHELL)
+        self.assertIn('INSTALL_FAMILY=dmg', SHELL)
+        self.assertIn('honk300-update-*-honk300-installer.sh)', SHELL)
+        self.assertIn('UPDATE_ORIGIN=mac-app', SHELL)
+        self.assertIn('unsupported managed update origin', SHELL)
+        mac_fresh = SHELL[SHELL.index('Darwin:)'):SHELL.index('Darwin:mac-app)')]
+        self.assertNotIn('INSTALL_ORIGIN=mac-app', mac_fresh)
+
+    def test_shell_bootstrap_refuses_machine_package_collision_before_staging(self) -> None:
+        collision = SHELL.index('the Debian package currently owns Honk300')
+        staging = SHELL.index('TEMP_ROOT="$(mktemp -d')
+        self.assertLess(collision, staging)
+        self.assertIn("dpkg-query --search /usr/lib/honk300/honk300", SHELL)
+        self.assertIn("sudo dpkg --remove honk300", SHELL)
+        self.assertIn("[ -L /usr/bin/honk ]", SHELL)
+        self.assertIn("[ -L /usr/bin/goose ]", SHELL)
+        self.assertIn("repair or remove it with the system package manager", SHELL)
+
     def test_powershell_bootstrap_installs_only_verified_global_msi(self) -> None:
         for token in [
             "__VERSION__",
@@ -466,6 +490,10 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertIn("$_.Name -like 'MSI*.tmp'", takeover_smoke)
         self.assertIn(".slot-transaction.json", takeover_smoke)
         self.assertIn("ReadLineAsync()", takeover_smoke)
+        self.assertIn("PowerShell bootstrap takeover", takeover_smoke)
+        self.assertIn("global-msi-to-powershell", takeover_smoke)
+        self.assertIn("powershell-to-global-msi", takeover_smoke)
+        self.assertIn("HONK300ORIGIN=$Origin", takeover_smoke)
         self.assertNotIn("if ((Get-HonkRegistrations).Count", takeover_smoke)
         self.assertNotIn("$activeState.Count", takeover_smoke)
 
@@ -474,8 +502,9 @@ class InstallerTemplateTests(unittest.TestCase):
         )
         self.assertIn("__wsa -r $root -o $Origin -c $Commit -a $artifact -l $launcherHash", slot_smoke)
 
-        self.assertIn("PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
-        self.assertIn("Installed AND PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
+        self.assertNotIn("PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
+        self.assertNotIn("PreviousInstallSource", WIX_GLOBAL)
+        self.assertIn("<Property Id='HONK300ORIGIN' Value='msi-global' Secure='yes'/>", WIX_GLOBAL)
         self.assertIn('--origin &quot;msi-global&quot;', WIX_GLOBAL)
         self.assertNotIn('__windows-slot-uninstall --root &quot;[APPLICATIONFOLDER]\\&quot; --origin &quot;[HONK300ORIGIN]&quot;', WIX_GLOBAL)
 

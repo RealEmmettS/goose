@@ -277,9 +277,15 @@ fn receipt_matches(
         return Ok(true);
     }
     let artifact = value.get("artifact").and_then(Value::as_object);
+    let managed_origin = matches!(
+        (
+            value.get("origin").and_then(Value::as_str),
+            value.get("installer_family").and_then(Value::as_str)
+        ),
+        (Some("mac-app"), Some("dmg")) | (Some("shell"), Some("shell"))
+    );
     Ok(schema == Some(RECEIPT_SCHEMA_V2)
-        && value.get("origin").and_then(Value::as_str) == Some("mac-app")
-        && value.get("installer_family").and_then(Value::as_str) == Some("dmg")
+        && managed_origin
         && value.get("edition").and_then(Value::as_str) == Some("global")
         && value.get("scope").and_then(Value::as_str) == Some("user")
         && value.get("release_track").and_then(Value::as_str) == Some("stable")
@@ -539,6 +545,37 @@ mod tests {
             &fixture.metadata
         )
         .expect("v2 managed receipt")
+        .managed());
+    }
+
+    #[test]
+    fn protected_v2_shell_app_receipt_preserves_accessibility_eligibility() {
+        let fixture = ManagedFixture::new();
+        let app = fixture.home().join("Applications/Honk300.app");
+        fixture.rewrite_receipt(|value| {
+            value["schema"] = json!("honk300.install.v2");
+            value["channel"] = json!("shell");
+            value["origin"] = json!("shell");
+            value["installer_family"] = json!("shell");
+            value["edition"] = json!("global");
+            value["scope"] = json!("user");
+            value["release_track"] = json!("stable");
+            value["target"] = json!("universal2-apple-darwin");
+            value["owned_root"] = json!(app.to_string_lossy());
+            value["active_release"] = json!(app.to_string_lossy());
+            value["artifact"] = json!({
+                "name": "honk300-universal2.app.zip",
+                "sha256": "0".repeat(64),
+                "size": 1
+            });
+        });
+
+        assert!(AccessibilityOnboarding::detect(
+            fixture.home(),
+            &fixture.executable,
+            &fixture.metadata
+        )
+        .expect("v2 managed shell receipt")
         .managed());
     }
 

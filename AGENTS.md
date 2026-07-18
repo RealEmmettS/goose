@@ -11,7 +11,9 @@ Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of 
 **Current stage: v1.2.2 is the public stable/latest release at exact source commit
 `bbbe86367d185fe8910af6326a7d51c04b282aec`; candidate `29653156436`, same-SHA main CI
 `29653528229`, atomic publication `29653833434`, and fresh-public-byte run `29654151526` passed
-under ADRs 0031–0033 and completed tasks `#u31`/`#r120`.** M0-M19 are implemented
+under ADRs 0031–0033 and completed tasks `#u31`/`#r120`. v1.2.3 command-first managed
+installation is active under ADR 0034 and task `#cli123`; it is not public until its complete
+candidate/main/publication/public-byte gate passes.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -193,11 +195,12 @@ are done.
   ship.
 - Linux: **X11-first** (runs under XWayland); native Wayland behind an opt-in `--wayland`
   flag (reduced mischief).
-- Packaging: Windows recommends the x64/ARM64 machine-wide Global MSI. macOS recommends the
-  Developer ID-signed, notarized, stapled universal DMG and installs per-user into
-  `~/Applications`; the shell bootstrap remains a secondary terminal path. Debian/Ubuntu
-  recommends the native architecture-matched `.deb`; other Linux systems use the per-user
-  no-sudo shell bootstrap. Corporate/EXE/portable artifacts remain secondary. **No crates.io.**
+- Packaging: recommend the stable versionless official bootstrap on every platform: PowerShell
+  `irm ... | iex` on Windows and the no-sudo `curl ... | sh` bootstrap on macOS/Linux. The Mac
+  bootstrap installs the real signed universal app in `~/Applications`; the graphical DMG,
+  x64/ARM64 Global/Corporate MSI/EXE packages, and architecture-matched Debian packages remain
+  supported native alternatives. Raw Cargo/source/portable installs are unmanaged and never
+  retire another installer owner. **No crates.io.**
 - Every general stable tag builds the complete platform set in GitHub Actions, including a fresh
   GitHub-macOS-produced signed/notarized/stapled app and DMG plus both Debian packages regardless
   of the operator's trigger host. Stable unversioned `latest/download` names advance only after
@@ -209,7 +212,7 @@ are done.
 - Release-mode macOS artifacts must fail closed without Developer ID and App Store Connect API
   credentials. No ad-hoc release fallback, `codesign --deep` signing, or DMG `/Applications`
   symlink is permitted.
-- Automatic macOS Accessibility UI is limited to the exact receipted app at
+- Automatic macOS Accessibility UI is limited to the exact DMG- or shell-receipted app at
   `~/Applications/Honk300.app`. It prompts at most once per installed update, waits calmly at a
   safe screen edge while denied, and handles grants/revocations in the same process. Development,
   bare, source-tree, and mounted-DMG launches must not open permission UI automatically.
@@ -330,6 +333,9 @@ are done.
   qualification live in
   `docs/adr/0033-windowless-windows-app-launch-and-disposable-desktop-qualification.md`; it
   supersedes ADR 0032's Windows startup command and interactive-local calibration notice.
+- Command-first managed installation, native-package alternatives, fresh-intent takeover, and
+  unmanaged Cargo boundaries live in `docs/adr/0034-command-first-managed-installation.md`; it
+  supersedes only the package-first recommendations in ADRs 0020, 0023, and 0031.
 
 ## Task management system
 
@@ -390,7 +396,7 @@ family's local gate:
 - `cargo build --release`
 - Windows local lifecycle only, and only when the operator welcomes visible testing: `pwsh -File script/smoke_windows_overlay.ps1 -Binary target/release/honk300.exe -EvidenceDirectory target/windows-overlay-evidence -LifecycleOnly`. Full paired-color compositor proof is disposable-CI-only; `-AllowInteractiveDesktopObscuration` is intentionally rejected locally.
 - Linux host only: `HONK300_BIN="$PWD/target/release/honk300" bash script/smoke_m17_m18_linux.sh`
-- `dist plan --tag=v1.2.2`
+- `dist plan --tag=v1.2.3`
 - `cargo audit --version 0.22.2`
 
 Release packaging uses **cargo-dist** for portable archives plus project-owned atomic release,

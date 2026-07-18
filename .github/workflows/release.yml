@@ -711,6 +711,56 @@ jobs:
               assert checksum.read_text(encoding='utf-8') == artifact['sha256'] + ' *' + artifact['name'] + '\n'
           PY
 
+      - name: Prove shell and Debian fresh-intent scope collisions fail before mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          alias="$HOME/.local/bin/honk300"
+          evidence="target/install-scope-collision-evidence"
+          mkdir -p "$evidence"
+          test ! -e "$alias" && test ! -L "$alias"
+          mkdir -p "$(dirname "$alias")"
+          trap 'sudo dpkg --remove honk300 >/dev/null 2>&1 || true; rm -f "$alias"' EXIT
+          ln -s "$HOME/.local/share/honk300/install/current/bin/honk300" "$alias"
+          set +e
+          sudo apt-get install --yes "$PWD/release-assets/honk300-amd64.deb" \
+            > "$evidence/debian-preinst-collision.log" 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -F "run '$alias uninstall' as that user" \
+            "$evidence/debian-preinst-collision.log" >/dev/null
+          test "$(readlink "$alias")" = "$HOME/.local/share/honk300/install/current/bin/honk300"
+          test "$(dpkg-query -W -f='${Status}' honk300 2>/dev/null || true)" != 'install ok installed'
+          rm -f "$alias"
+
+          sudo apt-get install --yes "$PWD/release-assets/honk300-amd64.deb"
+          smoke="$(mktemp -d)"
+          set +e
+          HOME="$smoke/home" \
+          XDG_DATA_HOME="$smoke/data" \
+          XDG_CONFIG_HOME="$smoke/config" \
+          HONK300_TEST_LOCAL_DIR="$PWD/release-assets" \
+            sh release-assets/honk300-installer.sh \
+            > "$evidence/shell-deb-collision.log" 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -F 'sudo dpkg --remove honk300' "$evidence/shell-deb-collision.log" >/dev/null
+          test ! -e "$smoke/data/honk300/install"
+          test "$(dpkg-query -W -f='${Status}' honk300)" = 'install ok installed'
+          sudo dpkg --remove honk300
+          trap - EXIT
+
+      - name: Preserve fresh-intent scope-collision evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualification-install-scope-collisions
+          path: target/install-scope-collision-evidence
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Smoke shell installer twice without sudo
         shell: bash
         run: |

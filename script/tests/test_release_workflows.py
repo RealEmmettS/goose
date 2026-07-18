@@ -106,6 +106,18 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("contents: read", RELEASE)
         self.assertIn("contents: write", RELEASE)
 
+    def test_signed_macos_candidate_proves_shell_and_dmg_channel_takeover(self) -> None:
+        for required in (
+            "Qualify shell and DMG fresh-intent takeover on the signed app",
+            "honk300-update-$TAG-123-honk300-installer.sh",
+            "HONK300_UPDATE_ORIGIN=mac-app",
+            'test "$(receipt_origin)" = mac-app',
+            'test "$(receipt_origin)" = shell',
+            '"$root/mount/Honk300.app/Contents/MacOS/honk300" install',
+            "codesign --verify --deep --strict",
+        ):
+            self.assertIn(required, MACOS)
+
     def test_release_portable_jobs_cover_native_host_prerequisites(self) -> None:
         self.assertIn("command -v sha256sum", RELEASE)
         self.assertIn("shasum -a 256 -c -", RELEASE)
@@ -177,6 +189,12 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertIn(required, RELEASE)
         assembly = RELEASE[RELEASE.index("assemble-and-publish:") :]
         self.assertIn("- qualify-debian-packages", assembly)
+        self.assertIn(
+            "Prove shell and Debian fresh-intent scope collisions fail before mutation",
+            assembly,
+        )
+        self.assertIn("target/install-scope-collision-evidence", assembly)
+        self.assertIn("qualification-install-scope-collisions", assembly)
 
     def test_windows_cargo_dist_zips_are_native_qualified_before_assembly(self) -> None:
         portable = RELEASE[RELEASE.index("qualify-windows-portable:") :]
@@ -223,8 +241,8 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def test_windows_takeover_matrix_runs_for_candidate_main_and_public_bytes(self) -> None:
         for required in (
             "smoke_windows_installer_takeover.ps1",
-            "real x64 four-family takeover ordering",
-            "real native ARM64 four-family takeover ordering",
+            "real x64 managed-channel takeover ordering",
+            "real native ARM64 managed-channel takeover ordering",
             "qualification-windows-installer-takeover-${{ matrix.triple }}",
             "qualification-windows-installer-takeover-aarch64-pc-windows-msvc",
         ):
@@ -238,13 +256,15 @@ class ReleaseWorkflowTests(unittest.TestCase):
         ):
             self.assertIn(required, CI)
         for required in (
-            "Download exact public four-family installers and qualify takeover",
+            "Download exact public managed installers and qualify takeover",
             "honk300-$triple-corporate.msi",
             "honk300-$triple-setup.exe",
             "honk300-$triple-corporate-setup.exe",
             "latest alias does not identify exact $tag bytes",
             "smoke_windows_installer_takeover.ps1",
             "post-release-windows-takeover-$triple",
+            "honk300-installer.ps1",
+            "-PowerShellInstaller $powerShellInstaller",
         ):
             self.assertIn(required, POST_RELEASE)
         self.assertIn("timeout-minutes: 30", POST_RELEASE)

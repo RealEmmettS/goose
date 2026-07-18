@@ -18,6 +18,19 @@ SPEC.loader.exec_module(PACKAGE_DEB)
 
 
 class DebianPackagingTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "target"
+            link = Path(directory) / "link"
+            target.write_bytes(b"probe")
+            try:
+                link.symlink_to(target)
+            except OSError as error:
+                raise unittest.SkipTest(
+                    f"Debian package-tree tests require local symlink creation: {error}"
+                ) from error
+
     def test_package_tree_has_stable_aliases_identity_and_desktop_entry(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
@@ -56,6 +69,14 @@ class DebianPackagingTests(unittest.TestCase):
             self.assertIn("Package: honk300\n", control)
             self.assertIn("Architecture: amd64\n", control)
             self.assertIn("libasound2 | libasound2t64", control)
+            preinst = staging / "DEBIAN" / "preinst"
+            self.assertTrue(preinst.stat().st_mode & stat.S_IXUSR)
+            preinst_text = preinst.read_text()
+            self.assertIn("awk -F: '{ print $6 }' /etc/passwd", preinst_text)
+            self.assertIn("for name in honk300 honk goose", preinst_text)
+            self.assertIn("*/honk300/install/current/bin/honk300", preinst_text)
+            self.assertIn("$alias uninstall", preinst_text)
+            self.assertNotIn("rm ", preinst_text)
             desktop = (staging / "usr" / "share" / "applications" / "honk300.desktop").read_text()
             self.assertIn("Exec=/usr/bin/honk300 start", desktop)
             self.assertIn("Icon=honk300", desktop)

@@ -394,6 +394,78 @@ jobs:
           jq -e '.status == "Accepted" and (.id | length > 0)' \
             target/notarization-evidence/dmg-submit.json >/dev/null
 
+      - name: Qualify shell and DMG fresh-intent takeover on the signed app
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/honk300-mac-channel-takeover"
+          home="$root/home"
+          installer="$root/honk300-installer.sh"
+          receipt="$home/Library/Application Support/honk300/install-receipt.json"
+          app_zip="$PWD/target/release-artifacts/honk300-universal2.app.zip"
+          dmg="$PWD/target/release-artifacts/honk300-universal2.dmg"
+          rm -rf "$root"
+          mkdir -p "$home" "$root/mount"
+          python3 - "$installer" "$TAG" "$COMMIT" "$app_zip" <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+
+          output, tag, commit, app_zip = map(pathlib.Path, sys.argv[1:])
+          tag = str(tag)
+          commit = str(commit)
+          version = tag.removeprefix("v")
+          template = pathlib.Path("script/honk300-installer.sh.in").read_text()
+          replacements = {
+              "__VERSION__": version,
+              "__TAG__": tag,
+              "__COMMIT__": commit,
+              "__SHA_MAC_APP__": hashlib.sha256(app_zip.read_bytes()).hexdigest(),
+              "__SHA_LINUX_X64_GNU__": "0" * 64,
+              "__SHA_LINUX_ARM64_GNU__": "0" * 64,
+              "__SHA_LINUX_X64_MUSL__": "0" * 64,
+              "__SHA_LINUX_ARM64_MUSL__": "0" * 64,
+          }
+          for key, value in replacements.items():
+              template = template.replace(key, value)
+          if "__" in template:
+              raise SystemExit("rendered Mac installer retains a placeholder")
+          output.write_text(template)
+          output.chmod(0o755)
+          PY
+          receipt_origin() {
+            python3 - "$receipt" <<'PY'
+          import json
+          import pathlib
+          import sys
+          print(json.loads(pathlib.Path(sys.argv[1]).read_text())["origin"])
+          PY
+          }
+          HOME="$home" HONK300_TEST_LOCAL_DIR="$PWD/target/release-artifacts" sh "$installer"
+          test "$(receipt_origin)" = shell
+
+          hdiutil attach -readonly -nobrowse -mountpoint "$root/mount" "$dmg" >/dev/null
+          trap 'hdiutil detach "$root/mount" >/dev/null 2>&1 || true' EXIT
+          HOME="$home" "$root/mount/Honk300.app/Contents/MacOS/honk300" install
+          hdiutil detach "$root/mount"
+          trap - EXIT
+          test "$(receipt_origin)" = mac-app
+
+          legacy_installer="$root/honk300-update-$TAG-123-honk300-installer.sh"
+          cp "$installer" "$legacy_installer"
+          HOME="$home" HONK300_TEST_LOCAL_DIR="$PWD/target/release-artifacts" \
+            sh "$legacy_installer"
+          test "$(receipt_origin)" = mac-app
+          HOME="$home" HONK300_TEST_LOCAL_DIR="$PWD/target/release-artifacts" \
+            HONK300_UPDATE_ORIGIN=mac-app sh "$installer"
+          test "$(receipt_origin)" = mac-app
+          HOME="$home" HONK300_TEST_LOCAL_DIR="$PWD/target/release-artifacts" sh "$installer"
+          test "$(receipt_origin)" = shell
+          codesign --verify --deep --strict "$home/Applications/Honk300.app"
+
       - name: Preserve notarization evidence for this workflow run
         if: ${{ always() }}
         uses: actions/upload-artifact@v6

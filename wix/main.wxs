@@ -41,10 +41,6 @@
         <Property Id='ApplicationFolderName' Value='honk300'/>
         <Property Id='HONK300ORIGIN' Value='msi-global' Secure='yes'/>
         <Property Id='HONK300AUTOSTART' Value='false' Secure='yes'/>
-        <Property Id='PREVIOUSHONK300ORIGIN'>
-            <RegistrySearch Id='PreviousInstallSource' Root='HKLM' Key='Software\Honk300' Name='InstallSource' Type='raw'/>
-        </Property>
-        <SetProperty Id='HONK300ORIGIN' Value='[PREVIOUSHONK300ORIGIN]' After='AppSearch'>Installed AND PREVIOUSHONK300ORIGIN</SetProperty>
 
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>

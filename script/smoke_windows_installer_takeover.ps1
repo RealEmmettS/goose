@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory = $true)] [string] $CorporateMsi,
     [Parameter(Mandatory = $true)] [string] $GlobalExe,
     [Parameter(Mandatory = $true)] [string] $CorporateExe,
+    [string] $PowerShellInstaller,
     [Parameter(Mandatory = $true)] [string] $ExpectedVersion,
     [string] $EvidenceDirectory = 'target/windows-installer-takeover-evidence',
     [ValidateRange(30, 600)] [int] $ChildTimeoutSeconds = 180,
@@ -20,6 +21,11 @@ $globalMsiPath = (Resolve-Path -LiteralPath $GlobalMsi).Path
 $corporateMsiPath = (Resolve-Path -LiteralPath $CorporateMsi).Path
 $globalExePath = (Resolve-Path -LiteralPath $GlobalExe).Path
 $corporateExePath = (Resolve-Path -LiteralPath $CorporateExe).Path
+$powerShellInstallerPath = if ([string]::IsNullOrWhiteSpace($PowerShellInstaller)) {
+    $null
+} else {
+    (Resolve-Path -LiteralPath $PowerShellInstaller).Path
+}
 $evidence = [IO.Path]::GetFullPath((Join-Path (Get-Location) $EvidenceDirectory))
 $globalRoot = Join-Path $env:ProgramFiles 'honk300'
 $corporateRoot = Join-Path $env:LOCALAPPDATA 'Programs\honk300'
@@ -203,14 +209,32 @@ function Read-PeSubsystem([string] $Path) {
     return [BitConverter]::ToUInt16($bytes, $optional + 68)
 }
 
-function Install-Msi([string] $Path, [string] $Label) {
+function Install-Msi([string] $Path, [string] $Label, [string] $Origin = '') {
     $logName = (($Label -replace '[^A-Za-z0-9.-]', '-').Trim('-').ToLowerInvariant()) + '.msi.log'
     $logPath = Join-Path $evidence $logName
-    Invoke-Checked $msiexec @('/i', "`"$Path`"", '/qn', '/norestart', '/l*v', "`"$logPath`"") $Label
+    $arguments = @('/i', "`"$Path`"", '/qn', '/norestart', '/l*v', "`"$logPath`"")
+    if (-not [string]::IsNullOrWhiteSpace($Origin)) {
+        $arguments += "HONK300ORIGIN=$Origin"
+    }
+    Invoke-Checked $msiexec $arguments $Label
 }
 
 function Install-Exe([string] $Path, [string] $Label) {
     Invoke-Checked $Path @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') $Label
+}
+
+function Install-PowerShellChannel([string] $Label) {
+    if ($null -eq $powerShellInstallerPath) {
+        # Producer qualification exercises the exact MSI transaction underneath the rendered
+        # public bootstrap. Post-release qualification passes the real downloaded script below.
+        Install-Msi $globalMsiPath $Label 'powershell'
+        return
+    }
+    $systemPowerShell = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) `
+        'WindowsPowerShell\v1.0\powershell.exe'
+    Invoke-Checked $systemPowerShell @(
+        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', "`"$powerShellInstallerPath`""
+    ) $Label
 }
 
 function Start-HeldOldProcess([string] $Binary) {
@@ -288,7 +312,7 @@ function Assert-PublicPathOwner([string] $Root, [string] $Origin) {
     $machineHasGlobal = (& $contains $machine $globalBin)
     $userHasActive = (& $contains $user $activeBin)
     $userHasCorporate = (& $contains $user $corporateBin)
-    if ($Origin -in @('msi-global', 'exe-global')) {
+    if ($Origin -in @('msi-global', 'exe-global', 'powershell')) {
         if (-not $machineHasActive -or $userHasCorporate) {
             Capture-TakeoverTimeout "$Origin-path-ownership-failed"
             throw "$Origin does not exclusively own the persisted public PATH (machine_has_active=$machineHasActive; user_has_corporate=$userHasCorporate)"
@@ -359,6 +383,16 @@ try {
 
     Install-Msi $globalMsiPath 'Global MSI baseline'
     Assert-Active $globalRoot 'msi-global'
+
+    $held = Start-HeldOldProcess (Join-Path $globalRoot 'bin\honk300.exe')
+    Install-PowerShellChannel 'PowerShell bootstrap takeover'
+    Finish-ConflictingOwnerCleanup $globalRoot 'powershell' 'global-msi-to-powershell'
+    Stop-HeldOldProcess
+
+    $held = Start-HeldOldProcess (Join-Path $globalRoot 'bin\honk300.exe')
+    Install-Msi $globalMsiPath 'Fresh Global MSI retakes PowerShell channel'
+    Finish-ConflictingOwnerCleanup $globalRoot 'msi-global' 'powershell-to-global-msi'
+    Stop-HeldOldProcess
 
     $held = Start-HeldOldProcess (Join-Path $globalRoot 'bin\honk300.exe')
     Install-Exe $globalExePath 'Global EXE takeover'

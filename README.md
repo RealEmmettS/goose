@@ -14,18 +14,31 @@ provenance-preserving updater release with semantic receipt verification across 
 pretty-printed forms. Candidate, same-SHA main, atomic publication, and all eight fresh-public-byte
 macOS, Windows, Debian, and shell-managed Linux jobs passed before promotion.
 
+This source tree is preparing v1.2.3's command-first managed-installation patch. Until that
+immutable release completes every gate, the links below continue to resolve to v1.2.2.
+
 ## Install
 
 ### Windows
 
-The machine-wide Global MSI is the recommended Windows install. It adds Honk300 to Program
-Files, the machine PATH, the all-users Start Menu, and Add/Remove Programs.
+The recommended Windows install is the official versionless PowerShell bootstrap:
+
+```powershell
+irm https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.ps1 | iex
+```
+
+It discovers the current stable release, downloads and verifies its exact Global-MSI and
+lifecycle bytes, installs the managed PowerShell channel under Program Files, and verifies the
+three public commands. It may request the normal Windows administrator approval; its app,
+shortcut, and login-start paths use the windowless launcher and do not open a background console.
+
+For native package deployment, use the Global MSI directly:
 
 - [Global MSI for x64 (most Windows PCs)](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-x86_64-pc-windows-msvc.msi)
 - [Global MSI for ARM64 (Windows on ARM)](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-aarch64-pc-windows-msvc.msi)
 
 The MSI owns repair, upgrade, rollback, and uninstall. Corporate per-user packages, EXE
-installers, portable archives, checksums, and the PowerShell bootstrap remain under each
+installers, portable archives, and checksums remain under each
 [GitHub release](https://github.com/RealEmmettS/goose/releases/latest) for administrators and
 compatibility.
 
@@ -57,12 +70,19 @@ control available.
 
 ### macOS
 
-The signed and notarized universal DMG is the recommended install for both Apple Silicon and
-Intel Macs:
+The recommended Apple Silicon/Intel install is the official versionless terminal bootstrap:
+
+```sh
+curl --proto '=https' --tlsv1.2 -fsSL https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.sh | sh
+```
+
+It installs the real signed universal `Honk300.app` without `sudo` at
+`~/Applications/Honk300.app`, creates the three command aliases, and retains normal managed
+Accessibility onboarding. For a graphical install, use the signed and notarized universal DMG:
 
 - [Download the latest Honk300 DMG](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-universal2.dmg)
 
-The DMG remains the fresh graphical install. A receipted app at
+The DMG remains the fresh graphical alternative. A receipted app at
 `~/Applications/Honk300.app` updates synchronously with the exact-tag signed app ZIP while
 preserving the same bundle and Accessibility identity. Mounted-DMG, foreign, read-only, and
 unreceipted launches use the latest DMG as an assisted reinstall and do not claim update success.
@@ -95,16 +115,21 @@ The app and graphical helper use hardened Developer ID signatures. The app seale
 and the DMG are Apple-notarized and stapled, and release checks publish SHA-256 values for every
 artifact. Every general release uses GitHub's macOS runners to produce a fresh signed/notarized
 DMG even when the release was initiated from Windows or Linux. The stable link above advances to
-the newest complete release; each tag and its DMG bytes remain immutable. The terminal bootstrap
-remains a supported secondary install:
+the newest complete release; each tag and its DMG bytes remain immutable.
+
+### Linux
+
+The recommended Linux install is the no-sudo official versionless bootstrap:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -fsSL https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.sh | sh
 ```
 
-### Linux
+The bootstrap is stamped for one exact release. It detects the architecture and libc, downloads
+that exact-tag payload, verifies its embedded SHA-256, stages on the destination filesystem, and
+rolls back the payload and owned integrations if installation fails. It does not use `sudo`.
 
-On Debian or Ubuntu, install the native package for the machine architecture:
+On Debian or Ubuntu, the architecture-matched native package remains an alternative:
 
 - [Debian/Ubuntu x64 package](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-amd64.deb)
 - [Debian/Ubuntu ARM64 package](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-arm64.deb)
@@ -113,20 +138,12 @@ The package installs machine-wide under `/usr/lib/honk300`, provides all three c
 `/usr/bin`, and can request `sudo` or a graphical administrator prompt for install, update, and
 removal. Configuration and personal memes/notes remain in the current user's XDG directories.
 
-For other Linux distributions, or for a no-sudo per-user install, use the terminal bootstrap:
-
-```sh
-curl --proto '=https' --tlsv1.2 -fsSL https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.sh | sh
-```
-
-The bootstrap is stamped for one exact release. It detects the OS, architecture, and Linux libc,
-downloads that exact-tag payload, verifies its embedded SHA-256, stages on the destination
-filesystem, and rolls back the payload and owned integrations if installation fails. It does not
-use `sudo`.
-
 Shell-managed Linux installs use immutable release directories and an atomic `current` symlink.
 Debian installs remain dpkg-owned and update only with the matching architecture package; the two
-origins never convert into one another during `update`.
+origins never convert into one another during `update`. Because changing between a per-user shell
+install and a machine-owned Debian package crosses an authority boundary, a fresh installer stops
+before mutation and gives the exact uninstall-and-retry command instead of leaving two competing
+owners.
 
 - Linux: managed payload under `${XDG_DATA_HOME:-~/.local/share}/honk300/install`; receipt,
   desktop entry, and user media stay in the corresponding XDG user directories; aliases under
@@ -143,6 +160,11 @@ While Honk300 is running, desktops with a StatusNotifier watcher and host show t
 shell command. The icon is embedded in portable binaries, and Debian packages also own its
 hicolor-theme copy. Sessions without a compatible host or session bus log the explicit non-fatal
 reason while overlays, CLI/TUI/IPC, and supported mischief continue independently.
+
+The commands above are product-owned managed installers. Raw `cargo install`, a source-tree
+binary, or a portable copy is an advanced unmanaged path: it cannot retire an MSI/EXE/DMG/DEB
+owner and is not treated as an installation channel by `honk300 update`. Honk300 is intentionally
+not published to crates.io.
 
 ## Use
 
@@ -264,7 +286,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.2.2
+dist plan --tag=v1.2.3
 cargo audit --version 0.22.2
 ```
 
@@ -288,10 +310,14 @@ and matching Mac/Linux update ownership. ADR 0032 replaces external Windows Note
 owned bounded windows and defines monitor-relative image fitting, graceful versus forced stop,
 and the one provenance-owned login-start setting. ADR 0033 makes Windows app/login/background
 launch windowless while preserving normal intentional CLI behavior, and moves every full-desktop
-compositor surface to disposable CI; product startup performs no calibration.
+compositor surface to disposable CI; product startup performs no calibration. ADR 0034 makes the
+official managed commands the recommended fresh install while retaining native-package ownership,
+same-origin updates, authoritative fresh intent, and raw Cargo's unmanaged boundary.
 [`docs/readiness/v1.2.2-readiness.md`](docs/readiness/v1.2.2-readiness.md) records the completed
 semantic receipt-verifier fix-forward, candidate, same-SHA main, publication, and public-byte
 qualification. The v1.2.0/v1.2.1 reports preserve their immutable release evidence.
+[`docs/readiness/v1.2.3-readiness.md`](docs/readiness/v1.2.3-readiness.md) tracks the active
+command-first candidate and release gate.
 
 ## License and assets
 

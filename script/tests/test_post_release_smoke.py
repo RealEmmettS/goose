@@ -46,6 +46,7 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn('"$PYTHON3" - "$RECEIPT" "$TAG"', UNIX_SMOKE)
         self.assertIn('receipt["schema"] == "honk300.install.v2"', UNIX_SMOKE)
         self.assertIn('receipt["tag"] == sys.argv[2]', UNIX_SMOKE)
+        self.assertIn('receipt["origin"] == sys.argv[3]', UNIX_SMOKE)
         self.assertIn('receipt["autostart"] == {', UNIX_SMOKE)
         self.assertNotIn(
             'grep -F \'"autostart": { "enabled": false', UNIX_SMOKE
@@ -64,6 +65,21 @@ class PostReleaseSmokeTests(unittest.TestCase):
             self.assertIn(owned_state, UNIX_SMOKE)
         self.assertNotIn("-maxdepth", UNIX_SMOKE)
         self.assertIn('"$DEST.previous."*', UNIX_SMOKE)
+
+    def test_macos_public_smoke_proves_shell_and_dmg_channel_takeover(self) -> None:
+        for required in (
+            "honk300-universal2.dmg",
+            '"$mount/Honk300.app/Contents/MacOS/honk300" install',
+            "verify_install mac-app",
+            "honk300-update-$TAG-123-honk300-installer.sh",
+            "HONK300_UPDATE_ORIGIN=mac-app",
+            "verify_install shell",
+        ):
+            self.assertIn(required, UNIX_SMOKE)
+        self.assertLess(
+            UNIX_SMOKE.index("HONK300_UPDATE_ORIGIN=mac-app"),
+            UNIX_SMOKE.rindex('sh "$INSTALLER"'),
+        )
 
     def test_windows_smoke_forces_mid_install_failure_and_proves_old_version_returns(self) -> None:
         self.assertIn("Honk300ForceRollback", WINDOWS_SMOKE)
@@ -113,6 +129,10 @@ class PostReleaseSmokeTests(unittest.TestCase):
             "/usr/bin/goose uninstall",
             "/usr/bin/honk300 uninstall --purge",
             "dpkg-query --search /usr/lib/honk300/honk300",
+            "prove_preinst_collision_refusal",
+            "preinst-collision.log",
+            "shell-deb-collision.log",
+            "sudo dpkg --remove honk300",
         ):
             self.assertIn(required, DEBIAN_SMOKE)
 

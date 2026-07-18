@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import struct
 import sys
 import tempfile
@@ -262,7 +263,8 @@ class LinuxOverlaySmokeContractTests(unittest.TestCase):
                 BACKGROUND.read_color(command)
             BACKGROUND.write_ready(ready, "#d8e6f4")
             self.assertEqual(ready.read_text(encoding="ascii"), "#d8e6f4\n")
-            self.assertEqual(ready.stat().st_mode & 0o777, 0o600)
+            if os.name != "nt":
+                self.assertEqual(ready.stat().st_mode & 0o777, 0o600)
 
 
 if __name__ == "__main__":

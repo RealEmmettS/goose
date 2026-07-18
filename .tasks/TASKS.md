@@ -9,6 +9,13 @@
 ## To-Do
 
 ## Active
+- [ ] **Publish v1.2.3 command-first managed installation** - make the official versionless CLI bootstrap the recommended install on every platform while preserving exact updater provenance and authoritative fresh-installer takeover (owner codex) #cli123
+  - [x] Record the command-first managed-channel contract in ADR 0034 and synchronize public/project guidance.
+  - [x] Distinguish updater-delegated Mac shell transport from a deliberate fresh shell install.
+  - [ ] Prove official bootstrap/native-package takeover in both directions without granting raw Cargo managed status.
+  - [ ] Pass local, candidate, same-SHA main, atomic publication, and fresh-public-byte qualification.
+  - [ ] Update the production website to recommend the versionless commands and retain native packages as alternatives.
+  - [ ] Close the board, merge to main, and remove all temporary local and remote branches.
 
 ## Done
 - [x] **Close the v1.2.2 provenance-preserving updater fix-forward** - preserved immutable v1.2.0/v1.2.1, qualified the semantic receipt verifier, verified every public byte, and cleaned every branch (done 2026-07-18) (needs #u31) #r120

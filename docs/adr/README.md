@@ -44,3 +44,4 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0031 — Provenance-Preserving Slot Self-Update](./0031-provenance-preserving-slot-self-update.md)
 - [0032 — Owned Props, Explicit Lifecycle, And Login Autostart](./0032-owned-props-lifecycle-and-login-autostart.md)
 - [0033 — Windowless Windows App Launch And Disposable-Desktop Qualification](./0033-windowless-windows-app-launch-and-disposable-desktop-qualification.md)
+- [0034 — Command-First Managed Installation](./0034-command-first-managed-installation.md)
