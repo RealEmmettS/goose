@@ -182,7 +182,7 @@
             Execute='commit'
             Impersonate='no'
             Return='check'/>
-        <CustomAction Id='UninstallWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='__windows-slot-uninstall --root &quot;[APPLICATIONFOLDER]\&quot; --origin &quot;[HONK300ORIGIN]&quot;' Execute='deferred' Impersonate='no' Return='check'/>
+        <CustomAction Id='UninstallWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='__windows-slot-uninstall --root &quot;[APPLICATIONFOLDER]\&quot; --origin &quot;msi-global&quot;' Execute='deferred' Impersonate='no' Return='check'/>
         <InstallExecuteSequence>
             <Custom Action='RollbackWindowsSlot' After='RemoveExistingProducts'>NOT REMOVE~=&quot;ALL&quot;</Custom>
             <Custom Action='ActivateWindowsSlot' After='RollbackWindowsSlot'>NOT REMOVE~=&quot;ALL&quot;</Custom>

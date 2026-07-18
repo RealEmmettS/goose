@@ -2205,6 +2205,14 @@ fn windows_origins_share_registration(left: InstallSource, right: InstallSource)
 }
 
 #[cfg(any(test, windows))]
+fn windows_package_owns_active_slot(
+    package_origin: InstallSource,
+    active_origin: InstallSource,
+) -> bool {
+    windows_origins_share_registration(package_origin, active_origin)
+}
+
+#[cfg(any(test, windows))]
 fn windows_owner_conflicts(
     active_origin: InstallSource,
     active_root: &Path,
@@ -2965,7 +2973,9 @@ fn windows_slot_uninstall(root: &Path, origin: InstallSource) -> Result<(), DynE
     }
     let value: serde_json::Value = serde_json::from_slice(&fs::read(&receipt)?)?;
     let executable = root.join("bin").join("honk300.exe");
-    if validated_receipt_source(&value, &executable) != Some(origin) {
+    if !validated_receipt_source(&value, &executable)
+        .is_some_and(|active| windows_package_owns_active_slot(origin, active))
+    {
         // A newer cross-channel install owns the neutral selectors. This uninstaller may retire
         // only its registration and inactive payloads; it must not deactivate the latest intent.
         return Ok(());
@@ -5249,6 +5259,26 @@ mod tests {
         assert!(!is_windows_installer_custom_action_path(Path::new(
             r"C:\Windows\Temp\MSIE15D.tmp"
         )));
+    }
+
+    #[test]
+    fn windows_package_uninstall_never_adopts_a_conflicting_active_origin() {
+        assert!(windows_package_owns_active_slot(
+            InstallSource::MsiGlobal,
+            InstallSource::MsiGlobal
+        ));
+        assert!(windows_package_owns_active_slot(
+            InstallSource::MsiGlobal,
+            InstallSource::PowerShell
+        ));
+        assert!(!windows_package_owns_active_slot(
+            InstallSource::MsiGlobal,
+            InstallSource::ExeGlobal
+        ));
+        assert!(!windows_package_owns_active_slot(
+            InstallSource::MsiGlobal,
+            InstallSource::MsiCorporate
+        ));
     }
 
     #[cfg(windows)]

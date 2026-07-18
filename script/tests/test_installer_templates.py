@@ -460,6 +460,8 @@ class InstallerTemplateTests(unittest.TestCase):
 
         self.assertIn("PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
         self.assertIn("Installed AND PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
+        self.assertIn('--origin &quot;msi-global&quot;', WIX_GLOBAL)
+        self.assertNotIn('__windows-slot-uninstall --root &quot;[APPLICATIONFOLDER]\\&quot; --origin &quot;[HONK300ORIGIN]&quot;', WIX_GLOBAL)
 
 
 if __name__ == "__main__":
