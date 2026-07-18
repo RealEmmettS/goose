@@ -1974,6 +1974,35 @@ pub fn run_windows_slot_protocol() -> Result<bool, DynError> {
 }
 
 #[cfg(windows)]
+pub fn reject_uncommanded_windows_installer_helper() -> Result<(), DynError> {
+    let executable = std::env::current_exe()?;
+    if is_windows_installer_custom_action_path(&executable) {
+        return Err(
+            "Windows Installer extracted the Honk300 slot helper without a recognized internal command; refusing to start the desktop app"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn is_windows_installer_custom_action_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("tmp"))
+        && path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .and_then(|value| value.get(..3))
+            .is_some_and(|value| value.eq_ignore_ascii_case("msi"))
+        && path
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| value.eq_ignore_ascii_case("installer"))
+}
+
+#[cfg(windows)]
 fn parse_internal_short_args(
     args: &[std::ffi::OsString],
 ) -> Result<std::collections::HashMap<String, std::ffi::OsString>, DynError> {
@@ -5190,6 +5219,23 @@ mod tests {
             assert_eq!(source.marker_value(), marker);
         }
         assert_eq!(InstallSource::from_marker("cargo"), InstallSource::Unknown);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_installer_temp_helper_can_never_fall_through_to_app_startup() {
+        assert!(is_windows_installer_custom_action_path(Path::new(
+            r"C:\Windows\Installer\MSIE15D.tmp"
+        )));
+        assert!(is_windows_installer_custom_action_path(Path::new(
+            r"C:\Windows\Installer\msi123.tmp"
+        )));
+        assert!(!is_windows_installer_custom_action_path(Path::new(
+            r"C:\Program Files\honk300\honk300.exe"
+        )));
+        assert!(!is_windows_installer_custom_action_path(Path::new(
+            r"C:\Windows\Temp\MSIE15D.tmp"
+        )));
     }
 
     #[cfg(windows)]

@@ -42,6 +42,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     #[cfg(windows)]
+    install::reject_uncommanded_windows_installer_helper()?;
+
+    #[cfg(windows)]
     if std::env::var_os("HONK300_INTERNAL_WINDOWS_UNINSTALL").as_deref()
         == Some(std::ffi::OsStr::new("1"))
     {
