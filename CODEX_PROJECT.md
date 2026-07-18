@@ -5,22 +5,30 @@
 Honk300 is a Rust 1.95, cross-platform procedural desktop goose for Windows, macOS, X11, and
 native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.1.0 is the
 public stable/latest release at exact source commit
-`e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`. It retains v1.0.1's native macOS qualification,
+`e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`; v1.2.0 is the in-flight provenance-preserving
+self-updater and owned-lifecycle candidate under ADRs 0031–0033 and `#r120`. The project retains v1.0.1's native macOS qualification,
 shared gait/edge lifecycle, Developer ID/notarized DMG delivery, Debian packages, rolling updates,
 and atomic publication while extending the shared accessible goose control from macOS to native
 Windows notification-area and compatible Linux StatusNotifier owners. Configure launches the
 existing exact-executable terminal TUI and Quit uses the engine-owned animated walk-off on all
 three tray-capable platforms. ADR 0029 records the completed Alienware-derived Windows lifecycle/
-update hardening; ADR 0030 records the completed tray-parity contract.
+update hardening; ADR 0030 records the completed tray-parity contract; ADR 0031 records protected
+v2 receipts, synchronous same-origin updates, immutable slots, and latest-intent takeover; ADR
+0032 records owned monitor-bounded props, explicit graceful/force behavior, and the receipt-owned
+login-start config. ADR 0033 records the windowless Windows app/login launcher and makes
+full-desktop compositor surfaces disposable-CI-only.
 
 ## Status
 
-- Default branch `main` contains the post-release v1.1.0 closure; the immutable tag peels to
-  `e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`. Prior public tags/releases remain untouched history.
+- Default branch `main` contains the post-release v1.1.0 closure; release work is isolated on
+  `codex/release-v1.2.0` until its exact candidate passes. Prior public tags/releases remain
+  untouched history.
 - Completed release/evidence cards: v1.0.3 `#r103`, v1.0.2 `#v102`, v1.0.1 `#m20q`, native Mac
   evidence `#m16r`, Alienware verification `#v1a`, and tray implementation `#trayc`/`#wtray`/
-  `#ltray`. v1.1.0 publication task `#r110` is complete. The shared board lives under `.tasks/`.
-- Version: 1.1.0 in source and public stable/latest distribution.
+  `#ltray`. v1.1.0 publication task `#r110` is complete; v1.2.0 updater/release tasks `#u31` and
+  `#r120` are active. The shared board lives under `.tasks/`.
+- Version: 1.2.0 in candidate source; 1.1.0 remains public stable/latest until qualification and
+  atomic publication complete.
 - v1.1.0 release evidence: candidate `29588487072`, same-SHA main CI `29589048598`, atomic
   publication `29589698302`, and post-release smoke `29590274819` all passed at the exact commit.
   The immutable GitHub Release contains 22 payloads plus sidecars/manifest for 47 assets.
@@ -51,6 +59,15 @@ update hardening; ADR 0030 records the completed tray-parity contract.
   making a normal horizontal approach stall. The beak-offset source correction and focused
   realistic 120 Hz regression now pass. The product-equivalent signed candidate spawned and typed
   a readable dark-mode note; an exact visual beak-contact frame remains forward verification.
+- v1.2.0 lifecycle/props: normal launch and stop remain full offscreen locomotion states; only
+  `stop|quit|exit --force` uses immediate IPC. Windows note props are process-owned native edit
+  windows rather than Notepad, and Windows/macOS use one 48%-of-monitor, aspect-preserving,
+  no-crop/no-upscale fit. Login start is a default-off lifecycle config reconciled through the
+  install receipt's one existing platform owner, with fresh installer intent taking precedence
+  over stale config. Windows shortcuts/login startup use an independently hashed GUI-subsystem
+  launcher which starts only the exact sibling runtime with `CREATE_NO_WINDOW`; public CLI aliases
+  remain console programs for intentional terminal use, and product startup performs no screen
+  calibration.
 - Performance: bounded capture-safe surfaces reduced the post-transient regression from 40.45%
   to 12.00% median CPU during unlocked visible motion. The Device-RGB alpha-last bitmap now feeds
   a stable standard-sRGB window destination, leaving final display-profile composition to
@@ -223,17 +240,22 @@ update hardening; ADR 0030 records the completed tray-parity contract.
   0028 defines the shared icon and Configure/TUI plus graceful-Quit parity contract. ADR 0029
   defines the Windows updater/lifecycle, Corporate retry, and integrated-terminal hardening found
   on the Alienware. ADR 0030 defines native Windows/Linux tray ownership, recovery, exact-
-  executable launching, package ownership, and unavailable-host boundaries.
+  executable launching, package ownership, and unavailable-host boundaries. ADR 0031 defines
+  protected v2 installation identity, synchronous same-origin updates, immutable release slots,
+  transactional latest-intent takeover, and truthful cleanup-pending results. ADR 0032 defines
+  owned monitor-relative props, graceful versus immediate-force lifecycle, and the single
+  receipt-owned login-start config. ADR 0033 defines the GUI-subsystem Windows app launcher,
+  no-console background boundary, and disposable-CI-only full-desktop qualification.
 
 ## Verification Source Of Truth
 
-- Completed v1.1.0 release gate: `docs/readiness/v1.1.0-readiness.md`; v1.0.3, v1.0.2, and v1.0.1
-  readiness reports remain immutable-release history.
+- In-flight v1.2.0 release gate: `docs/readiness/v1.2.0-readiness.md`; the completed v1.1.0 and
+  earlier readiness reports remain immutable-release history.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
 - Board handoff and activity: `.tasks/tasks/v102.md` and `.tasks/tasks/v1a.md`.
 - Canonical product plan: `honk300_plan.md`.
 - Required local gate: fmt, workspace clippy with warnings denied, workspace tests, release build,
-  universal Apple builds, `dist plan --tag=v1.1.0`, complete Python contracts, cargo-audit
+  universal Apple builds, `dist plan --tag=v1.2.0`, complete Python contracts, cargo-audit
   0.22.2, actionlint, and diff check.
 
 ## Current Workspace Tree
@@ -522,7 +544,8 @@ Finder metadata are excluded; every project source/document/configuration path i
 │   │   ├── v1.0.1-readiness.md
 │   │   ├── v1.0.2-readiness.md
 │   │   ├── v1.0.3-readiness.md
-│   │   └── v1.1.0-readiness.md
+│   │   ├── v1.1.0-readiness.md
+│   │   └── v1.2.0-readiness.md
 │   ├── research
 │   │   └── native-wayland-capability-path.md
 │   ├── superpowers

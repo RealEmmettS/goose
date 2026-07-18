@@ -13,6 +13,10 @@ on:
         required: false
         default: false
         type: boolean
+      same_sha_main:
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       tag:
@@ -27,6 +31,11 @@ on:
         description: "Build and verify before the tag exists"
         required: true
         default: true
+        type: boolean
+      same_sha_main:
+        description: "Qualification-only main build may reuse the current Cargo version tag"
+        required: true
+        default: false
         type: boolean
 
 permissions:
@@ -81,6 +90,7 @@ jobs:
         shell: pwsh
         env:
           CANDIDATE: ${{ inputs.candidate }}
+          SAME_SHA_MAIN: ${{ inputs.same_sha_main }}
         run: |
           git fetch --force --tags origin
           $head = (git rev-parse HEAD).Trim()
@@ -91,7 +101,7 @@ jobs:
           # zero under GitHub's fail-on-native-error PowerShell wrapper.
           $tagExists = [bool](git tag --list "${{ inputs.tag }}")
           if ($env:CANDIDATE -eq 'true') {
-            if ($tagExists) {
+            if ($tagExists -and $env:SAME_SHA_MAIN -ne 'true') {
               throw "Candidate tag already exists; use release mode or a new patch version"
             }
           } else {
@@ -162,8 +172,32 @@ jobs:
           python script/verify_binary_architecture.py `
             --format pe `
             --machine $machine `
+            --subsystem 3 `
             target/${{ matrix.triple }}/release/honk300.exe
+          python script/verify_binary_architecture.py `
+            --format pe `
+            --machine $machine `
+            --subsystem 2 `
+            target/${{ matrix.triple }}/release/honk300-app.exe
           if ($LASTEXITCODE -ne 0) { throw 'exact build PE identity check failed' }
+
+      - name: Qualify immutable Windows slot activation with a live old process
+        if: ${{ matrix.triple == 'x86_64-pc-windows-msvc' }}
+        shell: pwsh
+        run: >-
+          ./script/smoke_windows_slot_update.ps1
+          -Binary target/${{ matrix.triple }}/release/honk300.exe
+          -TargetTriple ${{ matrix.triple }}
+          -EvidenceDirectory target/windows-slot-update-evidence
+
+      - name: Upload Windows slot update evidence
+        if: ${{ always() && matrix.triple == 'x86_64-pc-windows-msvc' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualification-windows-slot-update-${{ matrix.triple }}
+          path: target/windows-slot-update-evidence
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Qualify exact x64 layered overlay and lifecycle
         if: ${{ matrix.triple == 'x86_64-pc-windows-msvc' }}
@@ -192,9 +226,14 @@ jobs:
           if (-not (Test-Path $light))  { throw "light.exe not found at $light" }
           $binDir = "target\${{ matrix.triple }}\release"
           $sourceRoot = (Get-Location).Path
+          $payloadSha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk300.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
           New-Item -ItemType Directory -Force -Path target\wix | Out-Null
           & $candle -arch ${{ matrix.wix_arch }} `
             "-dVersion=${{ steps.tag.outputs.version }}" `
+            "-dTag=${{ inputs.tag }}" `
+            "-dCommit=${{ inputs.commit }}" `
+            "-dTargetTriple=${{ matrix.triple }}" `
+            "-dPayloadSha256=$payloadSha256" `
             "-dCargoTargetBinDir=$binDir" `
             "-dSourceRoot=$sourceRoot" `
             -out target\wix\corporate.wixobj `
@@ -202,6 +241,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "corporate candle failed with exit $LASTEXITCODE" }
           & $candle -arch ${{ matrix.wix_arch }} `
             "-dVersion=${{ steps.tag.outputs.version }}" `
+            "-dTag=${{ inputs.tag }}" `
+            "-dCommit=${{ inputs.commit }}" `
+            "-dTargetTriple=${{ matrix.triple }}" `
+            "-dPayloadSha256=$payloadSha256" `
             "-dCargoTargetBinDir=$binDir" `
             "-dSourceRoot=$sourceRoot" `
             -out target\wix\global.wixobj `
@@ -222,6 +265,7 @@ jobs:
         shell: pwsh
         run: |
           $source = (Resolve-Path 'target/${{ matrix.triple }}/release/honk300.exe').Path
+          $launcherSource = (Resolve-Path 'target/${{ matrix.triple }}/release/honk300-app.exe').Path
           $msi = (Resolve-Path 'target/wix/honk300-${{ matrix.triple }}.msi').Path
           $stage = Join-Path $env:RUNNER_TEMP 'honk300-${{ matrix.triple }}-msi-identity'
           Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
@@ -235,19 +279,27 @@ jobs:
           $payloads = @(Get-ChildItem -LiteralPath $stage -Recurse -Filter honk300.exe -File)
           if ($payloads.Count -ne 1) { throw "MSI expected one honk300.exe, got $($payloads.Count)" }
           $payload = $payloads[0].FullName
+          $launchers = @(Get-ChildItem -LiteralPath $stage -Recurse -Filter honk300-app.exe -File)
+          if ($launchers.Count -ne 1) { throw "MSI expected one honk300-app.exe, got $($launchers.Count)" }
+          $launcher = $launchers[0].FullName
           $machine = if ('${{ matrix.triple }}' -eq 'aarch64-pc-windows-msvc') { '0xAA64' } else { '0x8664' }
-          python script/verify_binary_architecture.py --format pe --machine $machine $payload
+          python script/verify_binary_architecture.py --format pe --machine $machine --subsystem 3 $payload
+          python script/verify_binary_architecture.py --format pe --machine $machine --subsystem 2 $launcher
           if ($LASTEXITCODE -ne 0) { throw 'MSI payload PE identity check failed' }
           $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
           $payloadHash = (Get-FileHash -LiteralPath $payload -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($payloadHash -ne $sourceHash) { throw 'MSI payload does not match exact qualified build' }
+          $launcherSourceHash = (Get-FileHash -LiteralPath $launcherSource -Algorithm SHA256).Hash.ToLowerInvariant()
+          $launcherHash = (Get-FileHash -LiteralPath $launcher -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($launcherHash -ne $launcherSourceHash) { throw 'MSI app launcher does not match exact qualified build' }
           $evidence = 'target/windows-msi-identity-${{ matrix.triple }}'
           New-Item -ItemType Directory -Force -Path $evidence | Out-Null
           @(
             'triple=${{ matrix.triple }}',
             "pe_machine=$machine",
             "source_sha256=$sourceHash",
-            "msi_payload_sha256=$payloadHash"
+            "msi_payload_sha256=$payloadHash",
+            "launcher_sha256=$launcherHash"
           ) | Set-Content -LiteralPath (Join-Path $evidence 'identity.txt') -Encoding utf8
 
       - name: Upload MSI payload identity evidence
@@ -269,8 +321,12 @@ jobs:
       - name: Build Global EXE installer
         shell: pwsh
         run: |
+          $payloadSha256 = (Get-FileHash -LiteralPath 'target\${{ matrix.triple }}\release\honk300.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
           & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" `
             "/DMyAppVersion=${{ steps.tag.outputs.version }}" `
+            "/DReleaseTag=${{ inputs.tag }}" `
+            "/DReleaseCommit=${{ inputs.commit }}" `
+            "/DPayloadSha256=$payloadSha256" `
             "/DTargetTriple=${{ matrix.triple }}" `
             "/DSourceBinDir=..\target\${{ matrix.triple }}\release" `
             "/DInnoArchitecturesAllowed=${{ matrix.inno_arch }}" `
@@ -282,8 +338,12 @@ jobs:
       - name: Build Corporate EXE installer
         shell: pwsh
         run: |
+          $payloadSha256 = (Get-FileHash -LiteralPath 'target\${{ matrix.triple }}\release\honk300.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
           & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" `
             "/DMyAppVersion=${{ steps.tag.outputs.version }}" `
+            "/DReleaseTag=${{ inputs.tag }}" `
+            "/DReleaseCommit=${{ inputs.commit }}" `
+            "/DPayloadSha256=$payloadSha256" `
             "/DTargetTriple=${{ matrix.triple }}" `
             "/DSourceBinDir=..\target\${{ matrix.triple }}\release" `
             "/DInnoArchitecturesAllowed=${{ matrix.inno_arch }}" `
@@ -292,7 +352,29 @@ jobs:
             throw "Corporate EXE installer output missing"
           }
 
-      - name: Smoke Global MSI upgrade, repair, downgrade refusal, and uninstall
+      - name: Qualify real x64 four-family takeover ordering
+        if: ${{ matrix.triple == 'x86_64-pc-windows-msvc' }}
+        shell: pwsh
+        run: |
+          ./script/smoke_windows_installer_takeover.ps1 `
+            -GlobalMsi target/wix/honk300-${{ matrix.triple }}.msi `
+            -CorporateMsi target/wix/honk300-${{ matrix.triple }}-corporate.msi `
+            -GlobalExe inno/Output/honk300-${{ matrix.triple }}-setup.exe `
+            -CorporateExe inno/Output/honk300-${{ matrix.triple }}-corporate-setup.exe `
+            -ExpectedVersion '${{ steps.tag.outputs.version }}' `
+            -EvidenceDirectory target/windows-installer-takeover-evidence-${{ matrix.triple }} `
+            -AllowMachineMutation
+
+      - name: Upload real x64 installer takeover evidence
+        if: ${{ always() && matrix.triple == 'x86_64-pc-windows-msvc' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualification-windows-installer-takeover-${{ matrix.triple }}
+          path: target/windows-installer-takeover-evidence-${{ matrix.triple }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Smoke Global MSI legacy migration, slot repair, and uninstall
         if: ${{ matrix.triple == 'x86_64-pc-windows-msvc' }}
         shell: pwsh
         run: |
@@ -307,7 +389,7 @@ jobs:
           }
           $msiexec = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) 'msiexec.exe'
           function Invoke-Msi([string] $mode, [string] $path) {
-            $process = Start-Process $msiexec -ArgumentList @($mode, "`"$path`"", '/qn', '/norestart') -Wait -PassThru
+            $process = Start-Process $msiexec -ArgumentList @($mode, "`"$path`"", '/qn', '/norestart') -WindowStyle Hidden -Wait -PassThru
             if ($process.ExitCode -notin @(0, 3010)) {
               throw "MSI $mode $path failed with $($process.ExitCode)"
             }
@@ -322,22 +404,39 @@ jobs:
           Invoke-Msi '/i' $msi
           $reported = (& $binary --version | Select-Object -Last 1).Trim()
           if ($reported -notmatch "${{ steps.tag.outputs.version }}$") { throw "Upgrade mismatch: $reported" }
-          python script/verify_binary_architecture.py --format pe --machine 0x8664 $binary
+          python script/verify_binary_architecture.py --format pe --machine 0x8664 --subsystem 3 $binary
           if ($LASTEXITCODE -ne 0) { throw 'installed x64 PE identity check failed' }
           $sourceHash = (Get-FileHash -LiteralPath 'target/${{ matrix.triple }}/release/honk300.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
           $installedHash = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($installedHash -ne $sourceHash) { throw 'installed MSI binary does not match exact qualified build' }
+          $launcher = Join-Path $env:ProgramFiles 'honk300\bin\honk300-app.exe'
+          python script/verify_binary_architecture.py --format pe --machine 0x8664 --subsystem 2 $launcher
+          if ($LASTEXITCODE -ne 0) { throw 'installed x64 app launcher is not GUI-subsystem PE' }
+          $sourceLauncherHash = (Get-FileHash -LiteralPath 'target/${{ matrix.triple }}/release/honk300-app.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          $installedLauncherHash = (Get-FileHash -LiteralPath $launcher -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($installedLauncherHash -ne $sourceLauncherHash) { throw 'installed MSI app launcher does not match exact qualified build' }
 
           Invoke-Msi '/fa' $msi
-          $downgrade = Start-Process $msiexec -ArgumentList @('/i', "`"$oldMsi`"", '/qn', '/norestart') -Wait -PassThru
-          if ($downgrade.ExitCode -in @(0, 3010)) { throw 'Downgrade unexpectedly succeeded' }
-          $afterDowngrade = (& $binary --version | Select-Object -Last 1).Trim()
-          if ($afterDowngrade -notmatch "${{ steps.tag.outputs.version }}$") {
-            throw "Rejected downgrade changed the installed version: $afterDowngrade"
+          $receipt = Join-Path $env:ProgramFiles 'honk300\install-receipt.json'
+          $receiptValue = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
+          if ($receiptValue.schema -ne 'honk300.install.v2' -or $receiptValue.origin -ne 'msi-global') {
+            throw 'slot receipt did not preserve Global MSI provenance'
+          }
+          if ($receiptValue.app_launcher.path -ne $launcher -or $receiptValue.app_launcher.sha256 -ne $installedLauncherHash) {
+            throw 'slot receipt did not bind the exact windowless app launcher'
+          }
+          if (-not (Test-Path (Join-Path $env:ProgramFiles 'honk300\current') -PathType Container)) {
+            throw 'stable current junction is missing'
+          }
+          foreach ($alias in @('honk300.exe','honk.exe','goose.exe')) {
+            $aliasPath = Join-Path $env:ProgramFiles "honk300\bin\$alias"
+            $aliasVersion = (& $aliasPath --version | Select-Object -Last 1).Trim()
+            if ($aliasVersion -notmatch "${{ steps.tag.outputs.version }}$") { throw "$alias was not activated" }
           }
 
           Invoke-Msi '/x' $msi
           if (Test-Path $binary -PathType Leaf) { throw "MSI uninstall left the executable behind" }
+          if (Test-Path $launcher -PathType Leaf) { throw "MSI uninstall left the app launcher behind" }
 
       - name: Stage exact ARM64 MSI and build for native qualification
         if: ${{ matrix.triple == 'aarch64-pc-windows-msvc' }}
@@ -347,8 +446,16 @@ jobs:
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item -LiteralPath 'target/${{ matrix.triple }}/release/honk300.exe' `
             -Destination (Join-Path $stage 'honk300.exe')
+          Copy-Item -LiteralPath 'target/${{ matrix.triple }}/release/honk300-app.exe' `
+            -Destination (Join-Path $stage 'honk300-app.exe')
           Copy-Item -LiteralPath 'target/wix/honk300-${{ matrix.triple }}.msi' `
             -Destination (Join-Path $stage 'honk300-${{ matrix.triple }}.msi')
+          Copy-Item -LiteralPath 'target/wix/honk300-${{ matrix.triple }}-corporate.msi' `
+            -Destination (Join-Path $stage 'honk300-${{ matrix.triple }}-corporate.msi')
+          Copy-Item -LiteralPath 'inno/Output/honk300-${{ matrix.triple }}-setup.exe' `
+            -Destination (Join-Path $stage 'honk300-${{ matrix.triple }}-setup.exe')
+          Copy-Item -LiteralPath 'inno/Output/honk300-${{ matrix.triple }}-corporate-setup.exe' `
+            -Destination (Join-Path $stage 'honk300-${{ matrix.triple }}-corporate-setup.exe')
 
       - name: Upload exact ARM64 MSI and build for native qualification
         if: ${{ matrix.triple == 'aarch64-pc-windows-msvc' }}
@@ -406,6 +513,7 @@ jobs:
         shell: pwsh
         env:
           CANDIDATE: ${{ inputs.candidate }}
+          SAME_SHA_MAIN: ${{ inputs.same_sha_main }}
         run: |
           git fetch --force --tags origin
           $head = (git rev-parse HEAD).Trim()
@@ -414,7 +522,7 @@ jobs:
           }
           $tagExists = [bool](git tag --list "${{ inputs.tag }}")
           if ($env:CANDIDATE -eq 'true') {
-            if ($tagExists) {
+            if ($tagExists -and $env:SAME_SHA_MAIN -ne 'true') {
               throw "Candidate tag already exists; use release mode or a new patch version"
             }
           } else {
@@ -438,6 +546,7 @@ jobs:
             throw "Expected a native ARM64 Windows runner, got '$env:PROCESSOR_ARCHITECTURE'"
           }
           $binary = 'target/qualification-input-aarch64-pc-windows-msvc/honk300.exe'
+          $launcher = 'target/qualification-input-aarch64-pc-windows-msvc/honk300-app.exe'
           if (-not (Test-Path -LiteralPath $binary -PathType Leaf)) {
             throw "Exact packaged ARM64 executable is missing: $binary"
           }
@@ -445,8 +554,51 @@ jobs:
           if (-not (Test-Path -LiteralPath $msi -PathType Leaf)) {
             throw "Exact packaged ARM64 MSI is missing: $msi"
           }
-          python script/verify_binary_architecture.py --format pe --machine 0xAA64 $binary
-          if ($LASTEXITCODE -ne 0) { throw 'ARM64 build PE identity check failed' }
+          python script/verify_binary_architecture.py --format pe --machine 0xAA64 --subsystem 3 $binary
+          if ($LASTEXITCODE -ne 0) { throw 'ARM64 CLI PE identity check failed' }
+          python script/verify_binary_architecture.py --format pe --machine 0xAA64 --subsystem 2 $launcher
+          if ($LASTEXITCODE -ne 0) { throw 'ARM64 app-launcher PE identity check failed' }
+
+      - name: Qualify all four slot origins with a live native ARM64 process
+        shell: pwsh
+        run: >-
+          ./script/smoke_windows_slot_update.ps1
+          -Binary target/qualification-input-aarch64-pc-windows-msvc/honk300.exe
+          -AppLauncher target/qualification-input-aarch64-pc-windows-msvc/honk300-app.exe
+          -TargetTriple aarch64-pc-windows-msvc
+          -EvidenceDirectory target/windows-slot-update-evidence-arm64
+
+      - name: Qualify real native ARM64 four-family takeover ordering
+        shell: pwsh
+        run: |
+          $stage = 'target/qualification-input-aarch64-pc-windows-msvc'
+          $version = ('${{ inputs.tag }}').TrimStart('v')
+          ./script/smoke_windows_installer_takeover.ps1 `
+            -GlobalMsi (Join-Path $stage 'honk300-aarch64-pc-windows-msvc.msi') `
+            -CorporateMsi (Join-Path $stage 'honk300-aarch64-pc-windows-msvc-corporate.msi') `
+            -GlobalExe (Join-Path $stage 'honk300-aarch64-pc-windows-msvc-setup.exe') `
+            -CorporateExe (Join-Path $stage 'honk300-aarch64-pc-windows-msvc-corporate-setup.exe') `
+            -ExpectedVersion $version `
+            -EvidenceDirectory target/windows-installer-takeover-evidence-arm64 `
+            -AllowMachineMutation
+
+      - name: Upload native ARM64 slot transaction evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualification-windows-slot-update-aarch64-pc-windows-msvc
+          path: target/windows-slot-update-evidence-arm64
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload native ARM64 installer takeover evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: qualification-windows-installer-takeover-aarch64-pc-windows-msvc
+          path: target/windows-installer-takeover-evidence-arm64
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Qualify exact native ARM64 MSI rollback, identity, overlay, and lifecycle
         shell: pwsh

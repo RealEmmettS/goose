@@ -14,17 +14,27 @@ use honk_control::{
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 pub fn run(config_path: PathBuf) -> Result<()> {
+    run_with_save_hook(config_path, |_| Ok(()))
+}
+
+pub fn run_with_save_hook<F>(config_path: PathBuf, save_hook: F) -> Result<()>
+where
+    F: Fn(&Config) -> std::result::Result<(), String> + Send + Sync + 'static,
+{
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_time()
         .build()?;
-    runtime.block_on(run_async(config_path))
+    runtime.block_on(run_async(config_path, Arc::new(save_hook)))
 }
 
-async fn run_async(config_path: PathBuf) -> Result<()> {
+type ConfigSaveHook = Arc<dyn Fn(&Config) -> std::result::Result<(), String> + Send + Sync>;
+
+async fn run_async(config_path: PathBuf, save_hook: ConfigSaveHook) -> Result<()> {
     terminal::install_panic_hook()?;
     let loaded = load_tui_config(config_path)?;
     let mut app = AppState::new(loaded.config, loaded.path);
@@ -69,8 +79,11 @@ async fn run_async(config_path: PathBuf) -> Result<()> {
             if let Some(command) = app.take_pending_command() {
                 let snapshot = app.clone();
                 let tx = command_result_tx.clone();
+                let save_hook = Arc::clone(&save_hook);
                 app.set_status("working...".into(), false);
-                spawn_blocking_operation(tx, move || handle_command(&snapshot, command));
+                spawn_blocking_operation(tx, move || {
+                    handle_command(&snapshot, command, save_hook.as_ref())
+                });
                 command_busy = true;
             }
         }
@@ -121,7 +134,11 @@ fn spawn_key_reader() -> mpsc::UnboundedReceiver<KeyEvent> {
     rx
 }
 
-fn handle_command(app: &AppState, command: TuiCommand) -> CommandResult {
+fn handle_command(
+    app: &AppState,
+    command: TuiCommand,
+    save_hook: &(dyn Fn(&Config) -> std::result::Result<(), String> + Send + Sync),
+) -> CommandResult {
     match command {
         TuiCommand::Save => {
             let mut command_result = match app
@@ -129,15 +146,22 @@ fn handle_command(app: &AppState, command: TuiCommand) -> CommandResult {
                 .validate()
                 .and_then(|_| app.config.save_atomic(&app.path))
             {
-                Ok(()) => match send_command(ControlCommand::Reload) {
-                    Ok(ControlResponse::Ok) => result("saved; reload sent", false, true),
-                    Ok(ControlResponse::Err(code)) => {
-                        result(format!("saved; reload rejected: {code}"), true, true)
-                    }
-                    Ok(ControlResponse::Status(_)) => {
-                        result("saved; unexpected status response", true, true)
-                    }
-                    Err(_) => result("saved; no running goose to reload", false, true),
+                Ok(()) => match save_hook(&app.config) {
+                    Err(error) => result(
+                        format!("saved; login autostart reconcile failed: {error}"),
+                        true,
+                        true,
+                    ),
+                    Ok(()) => match send_command(ControlCommand::Reload) {
+                        Ok(ControlResponse::Ok) => result("saved; reload sent", false, true),
+                        Ok(ControlResponse::Err(code)) => {
+                            result(format!("saved; reload rejected: {code}"), true, true)
+                        }
+                        Ok(ControlResponse::Status(_)) => {
+                            result("saved; unexpected status response", true, true)
+                        }
+                        Err(_) => result("saved; no running goose to reload", false, true),
+                    },
                 },
                 Err(err) => result(format!("save failed: {err}"), true, false),
             };
@@ -187,11 +211,23 @@ fn handle_command(app: &AppState, command: TuiCommand) -> CommandResult {
             Ok(ControlResponse::Status(_)) => result("poke got unexpected status", true, false),
             Err(err) => result(format!("poke failed: {err}"), true, false),
         },
-        TuiCommand::Start => handle_start_with(app, launch_and_wait),
+        TuiCommand::Start => handle_start_with_hook(app, launch_and_wait, save_hook),
     }
 }
 
+#[cfg(test)]
 fn handle_start_with<F>(app: &AppState, launch: F) -> CommandResult
+where
+    F: FnOnce(&Path) -> Result<String, String>,
+{
+    handle_start_with_hook(app, launch, &|_| Ok(()))
+}
+
+fn handle_start_with_hook<F>(
+    app: &AppState,
+    launch: F,
+    save_hook: &(dyn Fn(&Config) -> std::result::Result<(), String> + Send + Sync),
+) -> CommandResult
 where
     F: FnOnce(&Path) -> Result<String, String>,
 {
@@ -203,6 +239,15 @@ where
             .and_then(|_| app.config.save_atomic(&app.path))
         {
             return result(format!("start blocked; save failed: {err}"), true, false);
+        }
+        if let Err(error) = save_hook(&app.config) {
+            let mut command_result = result(
+                format!("start blocked; saved, but login autostart reconcile failed: {error}"),
+                true,
+                true,
+            );
+            command_result.saved_config = Some(app.config.clone());
+            return command_result;
         }
     }
     let mut command_result = match launch(&app.path) {
@@ -369,9 +414,9 @@ fn macos_bundle_root_from_exe(exe: &Path) -> Option<PathBuf> {
 #[cfg(windows)]
 fn apply_detached_flags(command: &mut Command) {
     use std::os::windows::process::CommandExt;
-    const DETACHED_PROCESS: u32 = 0x0000_0008;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-    command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
 }
 
 #[cfg(not(windows))]
@@ -477,6 +522,34 @@ mod tests {
         assert!(launched.get());
         assert!(command_result.mark_saved);
         assert!(!command_result.is_error);
+    }
+
+    #[test]
+    fn dirty_start_is_blocked_truthfully_when_login_start_reconciliation_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        Config::default().save_atomic(&path).unwrap();
+        let mut app = AppState::new(Config::default(), path.clone());
+        app.config.lifecycle.autostart_on_login = true;
+
+        let command_result = handle_start_with_hook(
+            &app,
+            |_| -> Result<String, String> {
+                panic!("start must not run after a failed login-start reconciliation")
+            },
+            &|_| Err("foreign startup entry".into()),
+        );
+
+        assert!(command_result.is_error);
+        assert!(command_result.mark_saved);
+        assert!(command_result.status.contains("start blocked"));
+        assert!(command_result.status.contains("foreign startup entry"));
+        assert!(
+            Config::load_existing(&path)
+                .unwrap()
+                .lifecycle
+                .autostart_on_login
+        );
     }
 
     #[test]

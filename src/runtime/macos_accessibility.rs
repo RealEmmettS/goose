@@ -7,7 +7,8 @@ use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsE
 use std::path::{Path, PathBuf};
 
 const BUNDLE_ID: &str = "dev.emmetts.honk300";
-const RECEIPT_SCHEMA: &str = "honk300.install.v1";
+const RECEIPT_SCHEMA_V1: &str = "honk300.install.v1";
+const RECEIPT_SCHEMA_V2: &str = "honk300.install.v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PermissionTransition {
@@ -264,13 +265,43 @@ fn receipt_matches(
         Ok(value) => value,
         Err(_) => return Ok(false),
     };
-    Ok(
-        value.get("schema").and_then(Value::as_str) == Some(RECEIPT_SCHEMA)
-            && value.get("version").and_then(Value::as_str) == Some(bundle.version.as_str())
-            && value.get("tag").and_then(Value::as_str) == Some(bundle.tag.as_str())
-            && value.get("commit").and_then(Value::as_str) == Some(bundle.commit.as_str())
-            && value.get("install_root").and_then(Value::as_str) == Some(app),
-    )
+    let schema = value.get("schema").and_then(Value::as_str);
+    let common = value.get("version").and_then(Value::as_str) == Some(bundle.version.as_str())
+        && value.get("tag").and_then(Value::as_str) == Some(bundle.tag.as_str())
+        && value.get("commit").and_then(Value::as_str) == Some(bundle.commit.as_str())
+        && value.get("install_root").and_then(Value::as_str) == Some(app);
+    if !common {
+        return Ok(false);
+    }
+    if schema == Some(RECEIPT_SCHEMA_V1) {
+        return Ok(true);
+    }
+    let artifact = value.get("artifact").and_then(Value::as_object);
+    Ok(schema == Some(RECEIPT_SCHEMA_V2)
+        && value.get("origin").and_then(Value::as_str) == Some("mac-app")
+        && value.get("installer_family").and_then(Value::as_str) == Some("dmg")
+        && value.get("edition").and_then(Value::as_str) == Some("global")
+        && value.get("scope").and_then(Value::as_str) == Some("user")
+        && value.get("release_track").and_then(Value::as_str) == Some("stable")
+        && value.get("target").and_then(Value::as_str) == Some("universal2-apple-darwin")
+        && value.get("owned_root").and_then(Value::as_str) == Some(app)
+        && value.get("active_release").and_then(Value::as_str) == Some(app)
+        && artifact
+            .and_then(|artifact| artifact.get("name"))
+            .and_then(Value::as_str)
+            .is_some_and(|name| {
+                name == "honk300-universal2.app.zip" || name.ends_with("/Contents/MacOS/honk300")
+            })
+        && artifact
+            .and_then(|artifact| artifact.get("sha256"))
+            .and_then(Value::as_str)
+            .is_some_and(|hash| {
+                hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+            })
+        && artifact
+            .and_then(|artifact| artifact.get("size"))
+            .and_then(Value::as_u64)
+            .is_some_and(|size| size > 0))
 }
 
 fn require_exact_owned_state_path(
@@ -478,6 +509,37 @@ mod tests {
         assert!(onboarding.waiting_for(AccessibilityState::Denied));
         assert!(!onboarding.waiting_for(AccessibilityState::Trusted));
         assert!(!onboarding.should_prompt(AccessibilityState::Trusted));
+    }
+
+    #[test]
+    fn protected_v2_dmg_receipt_preserves_accessibility_eligibility() {
+        let fixture = ManagedFixture::new();
+        let app = fixture.home().join("Applications/Honk300.app");
+        fixture.rewrite_receipt(|value| {
+            value["schema"] = json!("honk300.install.v2");
+            value["channel"] = json!("mac-app");
+            value["origin"] = json!("mac-app");
+            value["installer_family"] = json!("dmg");
+            value["edition"] = json!("global");
+            value["scope"] = json!("user");
+            value["release_track"] = json!("stable");
+            value["target"] = json!("universal2-apple-darwin");
+            value["owned_root"] = json!(app.to_string_lossy());
+            value["active_release"] = json!(app.to_string_lossy());
+            value["artifact"] = json!({
+                "name": "honk300-universal2.app.zip",
+                "sha256": "0".repeat(64),
+                "size": 1
+            });
+        });
+
+        assert!(AccessibilityOnboarding::detect(
+            fixture.home(),
+            &fixture.executable,
+            &fixture.metadata
+        )
+        .expect("v2 managed receipt")
+        .managed());
     }
 
     #[test]

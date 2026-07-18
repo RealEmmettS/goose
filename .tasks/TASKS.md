@@ -9,6 +9,29 @@
 ## To-Do
 
 ## Active
+- [ ] **Publish v1.2.0 provenance-preserving self-updater** - qualify, publish, independently verify, merge to main, and close the immutable cross-platform updater release (owner codex) (needs #u31) #r120
+  - [x] Synchronize v1.2.0 version, readiness, board, public guidance, and both changelogs.
+  - [~] Pass the complete local, cross-target, packaging, audit, and exact-candidate gate.
+    > The noninteractive local/cross-target gate is complete; disposable native candidate jobs own the remaining Windows lifecycle/compositor, Mac, GNU Linux, and exact assembly proof.
+  - [x] Diagnose the reported Windows white-screen event and retire full-desktop calibration from local/product execution.
+    > The white/blank display was the developer compositor fixture, not product rendering. Product startup has no calibration; the former local obscuration opt-in now refuses, and strict paired-color surfaces run only on disposable CI.
+  - [x] Make Windows shortcuts, login startup, and background helpers windowless and non-activating while preserving intentional CLI terminals.
+    > Console-subsystem public aliases stay scriptable; independently hashed GUI-subsystem `honk300-app.exe` starts the exact sibling with `CREATE_NO_WINDOW`, no shell/PowerShell intermediary, and is wired through all MSI/EXE/manual shortcut and Run owners.
+  - [ ] Prove disposable-CI offscreen walk-in, graceful stop/quit/tray walk-off, and immediate every-alias `--force` shutdown without global input.
+  - [x] Prove owned note and image windows stay readable, aspect-correct, uncropped, and bounded to the active monitor without taking over the screen.
+    > Shared Windows/macOS sizing tests pass; live Windows proof measured a 614x346 note and a full-source 648x518 image on a 1920x1080 monitor, captured the image, and completed graceful cleanup.
+  - [x] Add a cross-platform login-autostart config option that reconciles through each install family's existing owned startup mechanism.
+    > Default-off TOML/TUI state now uses only receipt-owned HKLM/HKCU Run, LaunchAgent, or XDG autostart; fresh installer intent wins over stale config, foreign owners fail closed, and all four x64 Windows packages compile with exact selected state in the receipt.
+  - [ ] Merge the candidate-proven SHA to main and pass same-SHA ordinary CI.
+  - [ ] Publish atomically, pass post-release public-byte qualification, and verify stable/latest/site identity.
+  - [ ] Return to clean main and remove every non-main local and remote branch after preserving merged work.
+- [ ] **Provenance-preserving slot-based self-updater** - implement synchronous same-origin updates, atomic Windows release slots, DMG-managed Mac updates, and release qualification (owner codex) #u31
+  - [x] Record ADR 0031 and the versioned receipt/provenance contract.
+  - [x] Implement synchronous CLI/JSON results and fail-closed origin resolution.
+  - [x] Implement Windows immutable release slots, stable junctions, and safe legacy migration/takeover.
+  - [x] Preserve DMG, Debian, shell, and PowerShell update origins without cross-channel conversion.
+  - [x] Update installers, unversioned release artifacts, workflows, and public guidance.
+  - [ ] Pass focused fault tests and the complete local/release qualification gate.
 
 ## Done
 - [x] **Publish v1.1.0 cross-platform tray parity** - published and independently verified the immutable Windows/Linux tray-parity release across the complete Windows, macOS, Linux, Debian, stable/latest, and production-site matrix (done 2026-07-17) #r110

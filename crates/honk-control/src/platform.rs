@@ -61,14 +61,45 @@ impl ControlRequest {
 }
 
 /// Hand a decoded command to the sim and block until it answers (or the wait times out).
-fn dispatch(tx: &Sender<ControlRequest>, command: ControlCommand) -> ControlResponse {
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DispatchOutcome {
+    response: ControlResponse,
+    hard_stop: bool,
+}
+
+fn dispatch(tx: &Sender<ControlRequest>, command: ControlCommand) -> DispatchOutcome {
+    // A forced stop must not depend on the renderer, native menu, compositor, or AppKit event
+    // loop making progress. The authenticated transport thread acknowledges it directly and then
+    // terminates the process after writing the response. Ordinary stops remain engine-owned so
+    // they can perform the shared walk-off animation.
+    if command == ControlCommand::ForceStop {
+        return DispatchOutcome {
+            response: ControlResponse::Ok,
+            hard_stop: true,
+        };
+    }
+
     let (resp_tx, resp_rx) = mpsc::channel();
     if tx.send(ControlRequest::new(command, resp_tx)).is_err() {
-        return ControlResponse::Err("SERVER_CLOSED".into());
+        return DispatchOutcome {
+            response: ControlResponse::Err("SERVER_CLOSED".into()),
+            hard_stop: false,
+        };
     }
-    resp_rx
+    let response = resp_rx
         .recv_timeout(RESPONSE_TIMEOUT)
-        .unwrap_or_else(|_| ControlResponse::Err("TIMEOUT".into()))
+        .unwrap_or_else(|_| ControlResponse::Err("TIMEOUT".into()));
+    DispatchOutcome {
+        response,
+        hard_stop: false,
+    }
+}
+
+fn finish_hard_stop() -> ! {
+    // `process::exit` deliberately skips stack unwinding. Kernel-owned singleton, pipe/socket,
+    // window, and process resources are still released. That is the exact contract requested by
+    // `stop --force`; graceful cleanup belongs to the unforced path.
+    std::process::exit(0)
 }
 
 pub struct Singleton {
@@ -320,11 +351,39 @@ mod tests {
             .is_err()
         );
     }
+
+    #[test]
+    fn force_stop_bypasses_a_blocked_or_closed_sim_thread() {
+        let (tx, rx) = mpsc::channel();
+        drop(rx);
+
+        let outcome = dispatch(&tx, ControlCommand::ForceStop);
+
+        assert_eq!(outcome.response, ControlResponse::Ok);
+        assert!(outcome.hard_stop);
+    }
+
+    #[test]
+    fn graceful_stop_still_requires_the_sim_thread() {
+        let (tx, rx) = mpsc::channel();
+        drop(rx);
+
+        let outcome = dispatch(&tx, ControlCommand::Stop);
+
+        assert_eq!(
+            outcome.response,
+            ControlResponse::Err("SERVER_CLOSED".into())
+        );
+        assert!(!outcome.hard_stop);
+    }
 }
 
 #[cfg(windows)]
 mod imp {
-    use super::{dispatch, ControlCommand, ControlRequest, ControlResponse, SingletonStatus};
+    use super::{
+        dispatch, finish_hard_stop, ControlCommand, ControlRequest, ControlResponse,
+        DispatchOutcome, SingletonStatus,
+    };
     use std::collections::hash_map::DefaultHasher;
     use std::fs::OpenOptions;
     use std::hash::{Hash, Hasher};
@@ -482,15 +541,28 @@ mod imp {
 
             let mut file = unsafe { std::fs::File::from_raw_handle(pipe.0) };
             let mut buf = [0u8; 128];
-            let response = match read_bounded(&mut file, &mut buf, PIPE_READ_TIMEOUT) {
-                Ok(0) => ControlResponse::Err("EMPTY".into()),
+            let outcome = match read_bounded(&mut file, &mut buf, PIPE_READ_TIMEOUT) {
+                Ok(0) => DispatchOutcome {
+                    response: ControlResponse::Err("EMPTY".into()),
+                    hard_stop: false,
+                },
                 Ok(len) => match ControlCommand::decode(&buf[..len]) {
                     Ok(command) => dispatch(&tx, command),
-                    Err(err) => ControlResponse::Err(protocol_code(&err.to_string())),
+                    Err(err) => DispatchOutcome {
+                        response: ControlResponse::Err(protocol_code(&err.to_string())),
+                        hard_stop: false,
+                    },
                 },
-                Err(_) => ControlResponse::Err("READ_FAILED".into()),
+                Err(_) => DispatchOutcome {
+                    response: ControlResponse::Err("READ_FAILED".into()),
+                    hard_stop: false,
+                },
             };
-            let _ = file.write_all(response.encode().as_bytes());
+            let _ = file.write_all(outcome.response.encode().as_bytes());
+            if outcome.hard_stop {
+                drop(file);
+                finish_hard_stop();
+            }
             let _ = file.flush();
         }
     }
@@ -774,8 +846,8 @@ mod imp {
 #[cfg(unix)]
 mod imp {
     use super::{
-        dispatch, owner_only_mode, peer_identity_allowed, ControlCommand, ControlRequest,
-        ControlResponse, IpcNodeKind, SingletonStatus,
+        dispatch, finish_hard_stop, owner_only_mode, peer_identity_allowed, ControlCommand,
+        ControlRequest, ControlResponse, DispatchOutcome, IpcNodeKind, SingletonStatus,
     };
     use rustix::fs::{flock, FlockOperation};
     use rustix::io::Errno;
@@ -907,15 +979,28 @@ mod imp {
                         continue;
                     }
                     let mut buf = [0u8; 128];
-                    let response = match stream.read(&mut buf) {
-                        Ok(0) => ControlResponse::Err("EMPTY".into()),
+                    let outcome = match stream.read(&mut buf) {
+                        Ok(0) => DispatchOutcome {
+                            response: ControlResponse::Err("EMPTY".into()),
+                            hard_stop: false,
+                        },
                         Ok(len) => match ControlCommand::decode(&buf[..len]) {
                             Ok(command) => dispatch(&tx, command),
-                            Err(err) => ControlResponse::Err(err.to_string()),
+                            Err(err) => DispatchOutcome {
+                                response: ControlResponse::Err(err.to_string()),
+                                hard_stop: false,
+                            },
                         },
-                        Err(_) => ControlResponse::Err("READ_FAILED".into()),
+                        Err(_) => DispatchOutcome {
+                            response: ControlResponse::Err("READ_FAILED".into()),
+                            hard_stop: false,
+                        },
                     };
-                    let _ = stream.write_all(response.encode().as_bytes());
+                    let _ = stream.write_all(outcome.response.encode().as_bytes());
+                    if outcome.hard_stop {
+                        drop(stream);
+                        finish_hard_stop();
+                    }
                 }
                 Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
                     thread::sleep(Duration::from_millis(25));

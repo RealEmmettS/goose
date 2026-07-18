@@ -41,3 +41,6 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0028 — Shared Goose Control Surface And Tray Parity](./0028-shared-goose-control-surface-and-tray-parity.md)
 - [0029 — Windows Lifecycle And Terminal Hardening](./0029-windows-lifecycle-and-terminal-hardening.md)
 - [0030 — Windows And Linux Tray Control Parity](./0030-windows-linux-tray-control-parity.md)
+- [0031 — Provenance-Preserving Slot Self-Update](./0031-provenance-preserving-slot-self-update.md)
+- [0032 — Owned Props, Explicit Lifecycle, And Login Autostart](./0032-owned-props-lifecycle-and-login-autostart.md)
+- [0033 — Windowless Windows App Launch And Disposable-Desktop Qualification](./0033-windowless-windows-app-launch-and-disposable-desktop-qualification.md)

@@ -10,7 +10,7 @@ use std::path::PathBuf;
     name = "honk300",
     version,
     about = "A desktop goose for your screen",
-    after_help = "Goose-speak:\n  <name> plz                 Start the goose\n  <name> bad | no | no honk  Stop the goose\n  <name> exit | quit         Stop the goose\n  <name> do honk             Poke a honk\n\nInstalled names: honk300, honk, goose."
+    after_help = "Goose-speak:\n  <name> plz                         Start the goose\n  <name> bad | no | no honk          Walk offscreen, then stop\n  <name> exit | quit                 Walk offscreen, then stop\n  <name> stop | exit | quit --force  Stop immediately\n  <name> do honk                     Poke a honk\n\nInstalled names: honk300, honk, goose."
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -48,7 +48,11 @@ pub enum Command {
         options: StartOptions,
     },
     /// Stop the running goose through local IPC.
-    Stop,
+    Stop {
+        /// Stop immediately instead of walking offscreen first.
+        #[arg(long)]
+        force: bool,
+    },
     /// Ask the running goose to reload runtime options.
     Reload,
     /// Show the running goose's platform and capability status.
@@ -77,7 +81,11 @@ pub enum Command {
         purge: bool,
     },
     /// Download and run the matching release installer for this install source.
-    Update,
+    Update {
+        /// Emit exactly one machine-readable result object on stdout.
+        #[arg(long)]
+        json: bool,
+    },
     /// Create or refresh the user config file.
     Setup {
         /// Use a specific config.toml instead of the per-user default.
@@ -134,7 +142,7 @@ impl Cli {
     pub fn is_client_command(&self) -> bool {
         matches!(
             self.command,
-            Some(Command::Stop | Command::Reload | Command::Status | Command::Do { .. })
+            Some(Command::Stop { .. } | Command::Reload | Command::Status | Command::Do { .. })
         )
     }
 }
@@ -234,7 +242,10 @@ mod tests {
     #[test]
     fn parses_stop_reload_status_and_do() {
         let stop = Cli::try_parse_normalized(["honk300", "stop"]).unwrap();
-        assert_eq!(stop.command, Some(Command::Stop));
+        assert_eq!(stop.command, Some(Command::Stop { force: false }));
+
+        let forced_stop = Cli::try_parse_normalized(["honk300", "stop", "--force"]).unwrap();
+        assert_eq!(forced_stop.command, Some(Command::Stop { force: true }));
 
         let reload = Cli::try_parse_normalized(["honk300", "reload"]).unwrap();
         assert_eq!(reload.command, Some(Command::Reload));
@@ -268,15 +279,27 @@ mod tests {
     #[test]
     fn goose_speak_stop_shortcuts() {
         let bad = Cli::try_parse_normalized(["honk", "bad"]).unwrap();
-        assert_eq!(bad.command, Some(Command::Stop));
+        assert_eq!(bad.command, Some(Command::Stop { force: false }));
         let no = Cli::try_parse_normalized(["goose", "no"]).unwrap();
-        assert_eq!(no.command, Some(Command::Stop));
+        assert_eq!(no.command, Some(Command::Stop { force: false }));
         let no_honk = Cli::try_parse_normalized(["goose", "no", "honk"]).unwrap();
-        assert_eq!(no_honk.command, Some(Command::Stop));
+        assert_eq!(no_honk.command, Some(Command::Stop { force: false }));
         let exit = Cli::try_parse_normalized(["goose", "exit"]).unwrap();
-        assert_eq!(exit.command, Some(Command::Stop));
+        assert_eq!(exit.command, Some(Command::Stop { force: false }));
         let quit = Cli::try_parse_normalized(["honk", "quit"]).unwrap();
-        assert_eq!(quit.command, Some(Command::Stop));
+        assert_eq!(quit.command, Some(Command::Stop { force: false }));
+
+        for word in ["stop", "exit", "quit", "bad", "no"] {
+            let forced = Cli::try_parse_normalized(["goose", word, "--force"]).unwrap();
+            assert_eq!(
+                forced.command,
+                Some(Command::Stop { force: true }),
+                "goose {word} --force should stop immediately"
+            );
+        }
+
+        let forced_no_honk = Cli::try_parse_normalized(["goose", "no", "honk", "--force"]).unwrap();
+        assert_eq!(forced_no_honk.command, Some(Command::Stop { force: true }));
     }
 
     #[test]
@@ -288,11 +311,13 @@ mod tests {
             &["start"],
             &["plz"],
             &["stop"],
+            &["stop", "--force"],
             &["bad"],
             &["no"],
             &["no", "honk"],
             &["exit"],
             &["quit"],
+            &["quit", "--force"],
             &["reload"],
             &["status"],
             &["config"],
@@ -355,7 +380,7 @@ mod tests {
         for (word, expected) in [
             ("install", Command::Install { autostart: false }),
             ("uninstall", Command::Uninstall { purge: false }),
-            ("update", Command::Update),
+            ("update", Command::Update { json: false }),
             (
                 "setup",
                 Command::Setup {
@@ -388,6 +413,9 @@ mod tests {
 
         let uninstall = Cli::try_parse_normalized(["honk300", "uninstall", "--purge"]).unwrap();
         assert_eq!(uninstall.command, Some(Command::Uninstall { purge: true }));
+
+        let update = Cli::try_parse_normalized(["honk300", "update", "--json"]).unwrap();
+        assert_eq!(update.command, Some(Command::Update { json: true }));
     }
 
     #[test]

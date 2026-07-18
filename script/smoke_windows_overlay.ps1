@@ -12,6 +12,18 @@ param(
     [Parameter(ParameterSetName = 'Smoke')]
     [switch] $AllowUnobservableTrayRecoveryHost,
 
+    [Parameter(ParameterSetName = 'Smoke')]
+    [switch] $AllowInteractiveDesktopObscuration,
+
+    [Parameter(ParameterSetName = 'Smoke')]
+    [switch] $NoticeOnly,
+
+    [Parameter(ParameterSetName = 'Smoke')]
+    [switch] $PropsOnly,
+
+    [Parameter(ParameterSetName = 'Smoke')]
+    [switch] $LifecycleOnly,
+
     [Parameter(Mandatory = $true, ParameterSetName = 'Background')]
     [switch] $BackgroundHost,
 
@@ -123,6 +135,8 @@ public static class Honk300TraySmoke {
     public static extern uint RegisterWindowMessage(string name);
     [DllImport("user32.dll")]
     public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr CreateWindowEx(
         uint exStyle, string className, string windowName, uint style,
@@ -132,6 +146,12 @@ public static class Honk300TraySmoke {
     private static extern bool DestroyWindow(IntPtr window);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr LoadIcon(IntPtr instance, IntPtr iconName);
+
+    public static uint WindowProcessId(IntPtr window) {
+        uint processId;
+        GetWindowThreadProcessId(window, out processId);
+        return processId;
+    }
 
     public static bool ProbeNotificationArea() {
         const uint WS_EX_TOOLWINDOW = 0x00000080;
@@ -563,7 +583,80 @@ if ($BackgroundHost) {
     exit 0
 }
 
+function Open-WindowsTrayMenu {
+    $owner = [Honk300TraySmoke]::FindWindow('honk300_status_tray_owner', 'Honk300 controls')
+    if ($owner -eq [IntPtr]::Zero) {
+        throw 'Windows tray proof could not find the exact Honk300 controls owner'
+    }
+    $point = [System.Windows.Forms.Cursor]::Position
+    $packedPoint = (($point.Y -band 0xffff) -shl 16) -bor ($point.X -band 0xffff)
+    # Version-4 notification callbacks carry the icon id in the high word and NIN_KEYSELECT in
+    # the low word. This opens the real native menu without synthesizing input into another app.
+    $callback = 0x0400 + 0x0300
+    $ninKeySelect = (1 -shl 16) -bor (0x0400 + 1)
+    if (-not [Honk300TraySmoke]::PostMessage(
+        $owner, $callback, [IntPtr]::new($packedPoint), [IntPtr]::new($ninKeySelect)
+    )) {
+        throw 'could not open the exact Honk300 notification-area menu'
+    }
+    return $owner
+}
+
+function Invoke-WindowsTrayQuit {
+    param(
+        [Parameter(Mandatory = $true)] [System.Diagnostics.Process] $Process,
+        [Parameter(Mandatory = $true)] [string] $Token
+    )
+
+    $owner = Open-WindowsTrayMenu
+
+    # Classic Win32 popup menus are not consistently surfaced by UI Automation on every Windows
+    # host. Prove that the exact process-owned menu is live, then send a randomized registered
+    # message to its hidden owner. The runtime ends its own menu on the UI thread and enqueues the
+    # same finite Quit command used by the native menu selection. No global input or foreign focus
+    # is involved.
+    $menu = [IntPtr]::Zero
+    for ($attempt = 0; $attempt -lt 80; $attempt += 1) {
+        if ($Process.HasExited) {
+            throw 'runtime exited before the native Quit item could be invoked'
+        }
+        $candidate = [Honk300TraySmoke]::FindWindow('#32768', $null)
+        if (
+            $candidate -ne [IntPtr]::Zero -and
+            [Honk300TraySmoke]::WindowProcessId($candidate) -eq [uint32]$Process.Id
+        ) {
+            $menu = $candidate
+            break
+        }
+        Start-Sleep -Milliseconds 50
+    }
+    if ($menu -eq [IntPtr]::Zero) {
+        throw 'the visible Honk300 menu did not expose an exact process-owned popup HWND'
+    }
+    $message = [Honk300TraySmoke]::RegisterWindowMessage("Honk300SmokeTrayQuit-$Token")
+    if ($message -eq 0) {
+        throw 'could not register the randomized Honk300 tray Quit smoke message'
+    }
+    if (-not [Honk300TraySmoke]::PostMessage(
+        $owner, $message, [IntPtr]::Zero, [IntPtr]::Zero
+    )) {
+        throw 'could not invoke Quit Honk300 on the exact native menu owner'
+    }
+}
+
 if (-not $IsWindows) { throw 'smoke_windows_overlay.ps1 must run on Windows' }
+
+$isGitHubActions = $env:GITHUB_ACTIONS -eq 'true'
+if ($AllowInteractiveDesktopObscuration -and -not $isGitHubActions) {
+    throw @'
+Interactive full-desktop calibration has been retired. It was developer test infrastructure, not
+Honk300 product behavior. Use -LifecycleOnly for visible local qualification; strict paired-color
+compositor proof runs only on a disposable GitHub Actions desktop.
+'@
+}
+$runLifecycleOnly = $LifecycleOnly -or (
+    -not $isGitHubActions -and -not ($NoticeOnly -or $PropsOnly)
+)
 
 $resolvedBinary = (Resolve-Path -LiteralPath $Binary).Path
 if (-not (Test-Path -LiteralPath $resolvedBinary -PathType Leaf)) {
@@ -666,7 +759,10 @@ public static class Honk300OverlaySmokeNative {
     [DllImport("ntdll.dll")]
     private static extern int NtResumeProcess(IntPtr process);
 
-    public static Honk300OverlayRect FindLargestVisibleOverlay(int expectedProcessId) {
+    private static Honk300OverlayRect FindLargestVisibleWindow(
+        int expectedProcessId,
+        string expectedClass
+    ) {
         Honk300OverlayRect best = null;
         long bestArea = 0;
         EnumWindows(delegate(IntPtr hwnd, IntPtr ignored) {
@@ -676,7 +772,7 @@ public static class Honk300OverlaySmokeNative {
             if (processId != (uint)expectedProcessId) return true;
             StringBuilder name = new StringBuilder(256);
             GetClassName(hwnd, name, name.Capacity);
-            if (!String.Equals(name.ToString(), "honk300_overlay", StringComparison.Ordinal)) return true;
+            if (!String.Equals(name.ToString(), expectedClass, StringComparison.Ordinal)) return true;
             RECT rect;
             if (!GetWindowRect(hwnd, out rect)) return true;
             int width = rect.Right - rect.Left;
@@ -696,6 +792,18 @@ public static class Honk300OverlaySmokeNative {
             return true;
         }, IntPtr.Zero);
         return best;
+    }
+
+    public static Honk300OverlayRect FindLargestVisibleOverlay(int expectedProcessId) {
+        return FindLargestVisibleWindow(expectedProcessId, "honk300_overlay");
+    }
+
+    public static Honk300OverlayRect FindVisibleOwnedNote(int expectedProcessId) {
+        return FindLargestVisibleWindow(expectedProcessId, "honk300_collect_note");
+    }
+
+    public static Honk300OverlayRect FindVisibleOwnedImage(int expectedProcessId) {
+        return FindLargestVisibleWindow(expectedProcessId, "honk300_collect_image");
     }
 
     private static IntPtr OpenSuspendHandle(int processId) {
@@ -799,6 +907,171 @@ function Wait-ForRuntime {
         Start-Sleep -Milliseconds 200
     }
     throw "runtime did not report a supported Windows overlay: $last"
+}
+
+function Invoke-ExactClient {
+    param(
+        [Parameter(Mandatory = $true)] [string] $Client,
+        [Parameter(Mandatory = $true)] [string[]] $Arguments,
+        [string] $EvidenceName
+    )
+    $output = (& $Client @Arguments 2>&1 | Out-String)
+    $exitCode = $LASTEXITCODE
+    if ($EvidenceName) {
+        Set-Content -LiteralPath (Join-Path $evidence $EvidenceName) -Value $output -Encoding utf8NoBOM
+    }
+    if ($exitCode -ne 0) {
+        throw "exact alias command '$Client $($Arguments -join ' ')' failed ($exitCode): $output"
+    }
+    return $output
+}
+
+function Wait-ForVisibleGoose {
+    param([Parameter(Mandatory = $true)] [System.Diagnostics.Process] $Process)
+
+    for ($attempt = 0; $attempt -lt 150; $attempt += 1) {
+        if ($Process.HasExited) {
+            throw "runtime exited before the goose walked into frame (exit $($Process.ExitCode))"
+        }
+        $rect = [Honk300OverlaySmokeNative]::FindLargestVisibleOverlay($Process.Id)
+        if ($null -ne $rect) { return $rect }
+        Start-Sleep -Milliseconds 100
+    }
+    throw 'goose did not walk into frame from its offscreen startup position'
+}
+
+function Wait-ForCalibrationNotice {
+    param(
+        [Parameter(Mandatory = $true)] [System.Diagnostics.Process] $Process,
+        [Parameter(Mandatory = $true)] [string] $ExpectedText,
+        [Parameter(Mandatory = $true)] [string] $EvidencePath
+    )
+
+    $expectedHash = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData(
+            [Text.Encoding]::UTF8.GetBytes($ExpectedText)
+        )
+    ).ToLowerInvariant()
+    $last = '<no owned-note movement evidence>'
+    for ($attempt = 0; $attempt -lt 400; $attempt += 1) {
+        if ($Process.HasExited) {
+            throw "runtime exited before presenting its calibration notice (exit $($Process.ExitCode))"
+        }
+        if (Test-Path -LiteralPath $EvidencePath -PathType Leaf) {
+            $last = Get-Content -LiteralPath $EvidencePath -Raw
+            $fields = @{}
+            foreach ($line in ($last -split '\r?\n')) {
+                if ($line -match '^(?<Key>[a-z0-9_]+)=(?<Value>.*)$') {
+                    $fields[$Matches.Key] = $Matches.Value
+                }
+            }
+            if (
+                $fields.schema -eq 'honk300.windows.calibration-note.v1' -and
+                $fields.pid -eq [string]$Process.Id -and
+                $fields.text_sha256 -eq $expectedHash -and
+                $fields.result -eq 'created-prefilled-and-moved' -and
+                [double]$fields.distance -ge 20.0
+            ) {
+                $note = [Honk300OverlaySmokeNative]::FindVisibleOwnedNote($Process.Id)
+                if ($null -eq $note) {
+                    Start-Sleep -Milliseconds 100
+                    continue
+                }
+                $screen = [System.Windows.Forms.Screen]::FromHandle([IntPtr]::new($note.Hwnd)).Bounds
+                $maxWidth = [Math]::Floor($screen.Width * 0.48)
+                $maxHeight = [Math]::Floor($screen.Height * 0.48)
+                if ($note.Width -gt $maxWidth -or $note.Height -gt $maxHeight) {
+                    throw "owned note dominates its monitor: $($note.Width)x$($note.Height) on $($screen.Width)x$($screen.Height)"
+                }
+                $fields['note_width'] = [string]$note.Width
+                $fields['note_height'] = [string]$note.Height
+                $fields['monitor_width'] = [string]$screen.Width
+                $fields['monitor_height'] = [string]$screen.Height
+                return $fields
+            }
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    throw "goose-driven calibration notice did not expose the expected text: $last"
+}
+
+function Wait-ForOwnedImage {
+    param(
+        [Parameter(Mandatory = $true)] [System.Diagnostics.Process] $Process,
+        [Parameter(Mandatory = $true)] [string] $EvidencePath
+    )
+
+    $last = '<no owned-image evidence>'
+    for ($attempt = 0; $attempt -lt 400; $attempt += 1) {
+        if ($Process.HasExited) {
+            throw "runtime exited before presenting its owned image (exit $($Process.ExitCode))"
+        }
+        if (Test-Path -LiteralPath $EvidencePath -PathType Leaf) {
+            $last = Get-Content -LiteralPath $EvidencePath -Raw
+            $fields = @{}
+            foreach ($line in ($last -split '\r?\n')) {
+                if ($line -match '^(?<Key>[a-z0-9_]+)=(?<Value>.*)$') {
+                    $fields[$Matches.Key] = $Matches.Value
+                }
+            }
+            $image = [Honk300OverlaySmokeNative]::FindVisibleOwnedImage($Process.Id)
+            if (
+                $fields.schema -eq 'honk300.windows.collect-image.v1' -and
+                $fields.pid -eq [string]$Process.Id -and
+                $fields.result -eq 'created-aspect-fitted' -and
+                $null -ne $image
+            ) {
+                $sourceWidth = [int]$fields.source_width
+                $sourceHeight = [int]$fields.source_height
+                $fittedWidth = [int]$fields.fitted_width
+                $fittedHeight = [int]$fields.fitted_height
+                if ($sourceWidth -lt 1 -or $sourceHeight -lt 1) {
+                    throw "owned image evidence has invalid source dimensions: $last"
+                }
+                if ($image.Width -ne $fittedWidth -or $image.Height -ne $fittedHeight) {
+                    throw "owned image HWND size $($image.Width)x$($image.Height) does not match fitted evidence ${fittedWidth}x${fittedHeight}"
+                }
+                if ($image.Width -gt $sourceWidth -or $image.Height -gt $sourceHeight) {
+                    throw "owned image was enlarged from ${sourceWidth}x${sourceHeight} to $($image.Width)x$($image.Height)"
+                }
+                $sourceRatio = [double]$sourceWidth / $sourceHeight
+                $windowRatio = [double]$image.Width / $image.Height
+                if ([Math]::Abs($sourceRatio - $windowRatio) -gt 0.015) {
+                    throw "owned image aspect ratio changed from $sourceRatio to $windowRatio"
+                }
+                $screen = [System.Windows.Forms.Screen]::FromHandle([IntPtr]::new($image.Hwnd)).Bounds
+                $maxWidth = [Math]::Min(900, [Math]::Floor($screen.Width * 0.48))
+                $maxHeight = [Math]::Min(700, [Math]::Floor($screen.Height * 0.48))
+                if ($image.Width -gt $maxWidth -or $image.Height -gt $maxHeight) {
+                    throw "owned image dominates its monitor: $($image.Width)x$($image.Height) on $($screen.Width)x$($screen.Height)"
+                }
+                $fields['window_x'] = [string]$image.X
+                $fields['window_y'] = [string]$image.Y
+                $fields['window_width'] = [string]$image.Width
+                $fields['window_height'] = [string]$image.Height
+                $fields['window_hwnd'] = [string]$image.Hwnd
+                $fields['monitor_width'] = [string]$screen.Width
+                $fields['monitor_height'] = [string]$screen.Height
+                return $fields
+            }
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    throw "goose-driven owned image did not satisfy the bounded aspect-fit contract: $last"
+}
+
+function Initialize-SmokeConfig {
+    # The config path must not be pre-created: setup owns its atomic first write.
+    if (Test-Path -LiteralPath $config) { throw "temporary config unexpectedly exists: $config" }
+    Invoke-ExactBinary -Arguments @('setup', '--config', $config) -EvidenceName 'setup.txt' | Out-Null
+    $smokeConfig = Get-Content -LiteralPath $config -Raw
+    foreach ($setting in @('quiet_hours_enabled', 'pause_on_fullscreen', 'collect_memes')) {
+        if ($smokeConfig -notmatch "(?m)^$setting = true\s*$") {
+            throw "generated config does not contain expected $setting setting"
+        }
+        $smokeConfig = $smokeConfig -replace "(?m)^$setting = true\s*$", "$setting = false"
+    }
+    Set-Content -LiteralPath $config -Value $smokeConfig -Encoding utf8NoBOM
 }
 
 function Wait-ForBackgroundReady {
@@ -916,11 +1189,36 @@ function Measure-ControlledBackgroundCapture {
 }
 
 function Start-ExactRuntime {
-    param([string] $Label)
+    param(
+        [string] $Label,
+        [string] $SmokeNoteText,
+        [switch] $TrackImage,
+        [string] $SmokeTrayQuitToken
+    )
     $stdout = Join-Path $evidence "$Label-runtime.stdout.log"
     $stderr = Join-Path $evidence "$Label-runtime.stderr.log"
+    $smokeNoteEvidence = Join-Path $evidence "$Label-note-evidence.txt"
+    $smokeImageEvidence = Join-Path $evidence "$Label-image-evidence.txt"
+    Remove-Item -LiteralPath $smokeNoteEvidence -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $smokeImageEvidence -Force -ErrorAction SilentlyContinue
     $previousSmokePresent = [Environment]::GetEnvironmentVariable(
         'HONK300_WINDOWS_SMOKE_PRESENT',
+        'Process'
+    )
+    $previousSmokeNoteText = [Environment]::GetEnvironmentVariable(
+        'HONK300_SMOKE_NOTE_TEXT',
+        'Process'
+    )
+    $previousSmokeNoteEvidence = [Environment]::GetEnvironmentVariable(
+        'HONK300_SMOKE_NOTE_EVIDENCE',
+        'Process'
+    )
+    $previousSmokeImageEvidence = [Environment]::GetEnvironmentVariable(
+        'HONK300_SMOKE_IMAGE_EVIDENCE',
+        'Process'
+    )
+    $previousSmokeTrayQuitToken = [Environment]::GetEnvironmentVariable(
+        'HONK300_WINDOWS_SMOKE_TRAY_QUIT_TOKEN',
         'Process'
     )
     try {
@@ -939,8 +1237,29 @@ function Start-ExactRuntime {
                 'Process'
             )
         }
+        [Environment]::SetEnvironmentVariable(
+            'HONK300_SMOKE_NOTE_TEXT',
+            $(if ($SmokeNoteText) { $SmokeNoteText } else { $null }),
+            'Process'
+        )
+        [Environment]::SetEnvironmentVariable(
+            'HONK300_SMOKE_NOTE_EVIDENCE',
+            $(if ($SmokeNoteText) { $smokeNoteEvidence } else { $null }),
+            'Process'
+        )
+        [Environment]::SetEnvironmentVariable(
+            'HONK300_SMOKE_IMAGE_EVIDENCE',
+            $(if ($TrackImage) { $smokeImageEvidence } else { $null }),
+            'Process'
+        )
+        [Environment]::SetEnvironmentVariable(
+            'HONK300_WINDOWS_SMOKE_TRAY_QUIT_TOKEN',
+            $(if ($SmokeTrayQuitToken) { $SmokeTrayQuitToken } else { $null }),
+            'Process'
+        )
         $process = Start-Process -FilePath $resolvedBinary `
             -ArgumentList @('start', '--config', "`"$config`"", '--no-sound', '--no-mouse-steal', '--no-window-ride') `
+            -WindowStyle Hidden `
             -RedirectStandardOutput $stdout `
             -RedirectStandardError $stderr `
             -PassThru
@@ -949,6 +1268,26 @@ function Start-ExactRuntime {
         [Environment]::SetEnvironmentVariable(
             'HONK300_WINDOWS_SMOKE_PRESENT',
             $previousSmokePresent,
+            'Process'
+        )
+        [Environment]::SetEnvironmentVariable(
+            'HONK300_SMOKE_NOTE_TEXT',
+            $previousSmokeNoteText,
+            'Process'
+        )
+        [Environment]::SetEnvironmentVariable(
+            'HONK300_SMOKE_NOTE_EVIDENCE',
+            $previousSmokeNoteEvidence,
+            'Process'
+        )
+        [Environment]::SetEnvironmentVariable(
+            'HONK300_SMOKE_IMAGE_EVIDENCE',
+            $previousSmokeImageEvidence,
+            'Process'
+        )
+        [Environment]::SetEnvironmentVariable(
+            'HONK300_WINDOWS_SMOKE_TRAY_QUIT_TOKEN',
+            $previousSmokeTrayQuitToken,
             'Process'
         )
     }
@@ -973,12 +1312,126 @@ Set-Content -LiteralPath (Join-Path $evidence 'exact-binary.sha256.txt') `
     -Value "$initialHash  $resolvedBinary" -Encoding ascii
 
 try {
+    Initialize-SmokeConfig
+
+    if ($NoticeOnly -or $PropsOnly) {
+        $ownedNoteText = "I brought you a note.`r`nIt should be readable without taking over your screen."
+        $runtime = Start-ExactRuntime -Label 'owned-note' -SmokeNoteText $ownedNoteText
+        Wait-ForRuntime -Process $runtime -EvidenceName 'owned-note-status.txt'
+        $noticeGooseRect = Wait-ForVisibleGoose -Process $runtime
+        # Let FirstUX complete on-screen before requesting the prop. This makes the cue readable
+        # and prevents it from competing with the final edge-entry beat.
+        Start-Sleep -Seconds 2
+        Invoke-ExactBinary -Arguments @('do', 'note') -EvidenceName 'owned-note-command.txt' | Out-Null
+        $noticeRuntimeEvidence = Join-Path $evidence 'owned-note-note-evidence.txt'
+        $noticeFields = Wait-ForCalibrationNotice `
+            -Process $runtime -ExpectedText $ownedNoteText -EvidencePath $noticeRuntimeEvidence
+        Set-Content -LiteralPath (Join-Path $evidence 'owned-note.txt') `
+            -Encoding utf8NoBOM -Value @"
+runtime_pid=$($runtime.Id)
+notice_from=$($noticeFields.from)
+notice_to=$($noticeFields.to)
+notice_drag_distance=$($noticeFields.distance)
+note_size=$($noticeFields.note_width)x$($noticeFields.note_height)
+monitor_size=$($noticeFields.monitor_width)x$($noticeFields.monitor_height)
+goose_rect=$($noticeGooseRect.X),$($noticeGooseRect.Y),$($noticeGooseRect.Width),$($noticeGooseRect.Height)
+message=$($ownedNoteText -replace "`r?`n", ' | ')
+result=visible-bounded-owned-note
+"@
+        Start-Sleep -Seconds 3
+        Invoke-ExactBinary -Arguments @('stop') -EvidenceName 'owned-note-stop.txt' | Out-Null
+        if (-not $runtime.WaitForExit(15000)) {
+            throw 'owned-note goose did not complete its graceful walk-off'
+        }
+        $noticeRuntimeLog = Get-Content -LiteralPath `
+            (Join-Path $evidence 'owned-note-runtime.stdout.log') -Raw
+        if ($noticeRuntimeLog -notmatch '(?m)^honk300: goose walked home; stopping\.\s*$') {
+            throw 'owned-note runtime did not prove graceful walk-off'
+        }
+        $runtime = $null
+        if ($NoticeOnly) {
+            Write-Output "Windows bounded owned-note proof passed for $resolvedBinary"
+            return
+        }
+        if ($PropsOnly) {
+            $propConfig = Get-Content -LiteralPath $config -Raw
+            if ($propConfig -notmatch '(?m)^collect_memes = false\s*$') {
+                throw 'temporary config does not contain the disabled collect_memes setting'
+            }
+            $propConfig = $propConfig -replace '(?m)^collect_memes = false\s*$', 'collect_memes = true'
+            Set-Content -LiteralPath $config -Value $propConfig -Encoding utf8NoBOM
+
+            $runtime = Start-ExactRuntime -Label 'collect-image' -TrackImage
+            Wait-ForRuntime -Process $runtime -EvidenceName 'collect-image-status.txt'
+            Wait-ForVisibleGoose -Process $runtime | Out-Null
+            Start-Sleep -Seconds 2
+            Invoke-ExactBinary -Arguments @('do', 'meme') -EvidenceName 'collect-image-command.txt' | Out-Null
+            $imageFields = Wait-ForOwnedImage `
+                -Process $runtime `
+                -EvidencePath (Join-Path $evidence 'collect-image-image-evidence.txt')
+            $imageRect = [Honk300OverlayRect]::new()
+            $imageRect.X = [int]$imageFields.window_x
+            $imageRect.Y = [int]$imageFields.window_y
+            $imageRect.Width = [int]$imageFields.window_width
+            $imageRect.Height = [int]$imageFields.window_height
+            $imageRect.Hwnd = [long]$imageFields.window_hwnd
+            Save-ScreenRect -Rect $imageRect -Path (Join-Path $evidence 'collect-image-visible.png')
+            Set-Content -LiteralPath (Join-Path $evidence 'collect-image.txt') `
+                -Encoding utf8NoBOM -Value @"
+runtime_pid=$($runtime.Id)
+source_size=$($imageFields.source_width)x$($imageFields.source_height)
+fitted_size=$($imageFields.fitted_width)x$($imageFields.fitted_height)
+window_size=$($imageFields.window_width)x$($imageFields.window_height)
+monitor_size=$($imageFields.monitor_width)x$($imageFields.monitor_height)
+result=visible-bounded-aspect-preserved-and-uncropped
+"@
+            Start-Sleep -Seconds 5
+            Invoke-ExactBinary -Arguments @('quit') -EvidenceName 'collect-image-stop.txt' | Out-Null
+            if (-not $runtime.WaitForExit(15000)) {
+                throw 'owned-image goose did not complete its graceful walk-off'
+            }
+            $imageRuntimeLog = Get-Content -LiteralPath `
+                (Join-Path $evidence 'collect-image-runtime.stdout.log') -Raw
+            if ($imageRuntimeLog -notmatch '(?m)^honk300: goose walked home; stopping\.\s*$') {
+                throw 'owned-image runtime did not prove graceful walk-off'
+            }
+            $runtime = $null
+            Write-Output "Windows bounded note/image prop proof passed for $resolvedBinary"
+            return
+        }
+    }
+
+    if ($runLifecycleOnly) {
+        $captureMode = 'visible-lifecycle-no-obscuration'
+        $runtime = Start-ExactRuntime -Label 'first'
+        $firstPid = $runtime.Id
+        Wait-ForRuntime -Process $runtime -EvidenceName 'status-start.txt'
+        Test-WindowsTrayRecovery `
+            -EvidencePath (Join-Path $evidence 'tray-recovery.txt') `
+            -RuntimeStderrPath (Join-Path $evidence 'first-runtime.stderr.log')
+        $duplicate = Invoke-ExactBinary -Arguments @('start', '--config', $config, '--no-sound') `
+            -EvidenceName 'single-instance.txt'
+        if ($duplicate -notmatch 'already running') {
+            throw "second start did not prove single-instance enforcement: $duplicate"
+        }
+        Wait-ForVisibleGoose -Process $runtime | Out-Null
+        $visualPassed = $true
+        Set-Content -LiteralPath (Join-Path $evidence 'local-visual-contract.txt') `
+            -Encoding utf8NoBOM -Value @"
+mode=visible-lifecycle-no-obscuration
+runtime_pid=$firstPid
+result=offscreen-walk-in-visible-without-full-desktop-test-surfaces
+strict_transparency_proof=disposable-ci-only
+"@
+    }
+    else {
     $hostExecutable = (Get-Process -Id $PID).Path
     $background = Start-Process -FilePath $hostExecutable `
         -ArgumentList @(
             '-NoLogo', '-NoProfile', '-NonInteractive', '-Sta', '-ExecutionPolicy', 'Bypass',
             '-File', "`"$PSCommandPath`"", '-BackgroundHost', '-BackgroundState', "`"$backgroundState`""
         ) `
+        -WindowStyle Hidden `
         -RedirectStandardOutput (Join-Path $work 'background.stdout.log') `
         -RedirectStandardError (Join-Path $work 'background.stderr.log') `
         -PassThru
@@ -1072,18 +1525,6 @@ light_hex=$lightHex
 light_coverage=$($lightProof.Coverage.ToString('F6', [System.Globalization.CultureInfo]::InvariantCulture))
 light_sha256=$lightProofHash
 "@
-
-    # The config path must not be pre-created: setup owns its atomic first write.
-    if (Test-Path -LiteralPath $config) { throw "temporary config unexpectedly exists: $config" }
-    Invoke-ExactBinary -Arguments @('setup', '--config', $config) -EvidenceName 'setup.txt' | Out-Null
-    $smokeConfig = Get-Content -LiteralPath $config -Raw
-    foreach ($setting in @('quiet_hours_enabled', 'pause_on_fullscreen')) {
-        if ($smokeConfig -notmatch "(?m)^$setting = true\s*$") {
-            throw "generated config does not contain expected $setting setting"
-        }
-        $smokeConfig = $smokeConfig -replace "(?m)^$setting = true\s*$", "$setting = false"
-    }
-    Set-Content -LiteralPath $config -Value $smokeConfig -Encoding utf8NoBOM
 
     $runtime = Start-ExactRuntime -Label 'first'
     $firstPid = $runtime.Id
@@ -1250,6 +1691,16 @@ light_sha256=$lightProofHash
         throw "no exact $captureMode pose proved a complete side or top-down body, shade, outline, wing, warm articulation, and per-pixel alpha"
     }
 
+    # Restore the real desktop before lifecycle qualification. Calibration backgrounds exist only
+    # long enough to capture paired transparency evidence; walk-in/walk-off and force behavior are
+    # intentionally visible on the operator's ordinary monitor topology.
+    Set-Content -LiteralPath $stopPath -Value 'stop' -Encoding ascii -NoNewline
+    if (-not $background.WaitForExit(5000)) {
+        throw 'controlled calibration background did not restore the ordinary desktop'
+    }
+    $background = $null
+    }
+
     $document = Get-Content -LiteralPath $config -Raw
     if ($document -notmatch '(?m)^calm_goose = false\s*$') {
         throw 'generated config does not contain the reload-safe calm_goose setting'
@@ -1262,21 +1713,117 @@ light_sha256=$lightProofHash
     Invoke-ExactBinary -Arguments @('stop') -EvidenceName 'stop-first.txt' | Out-Null
     $runtime.WaitForExit(15000)
     if (-not $runtime.HasExited) { throw 'first runtime did not exit after stop' }
+    $firstRuntimeLog = Get-Content -LiteralPath (Join-Path $evidence 'first-runtime.stdout.log') -Raw
+    if ($firstRuntimeLog -notmatch '(?m)^honk300: goose walked home; stopping\.\s*$') {
+        throw 'ordinary stop did not complete the graceful offscreen walk'
+    }
     $runtime = $null
     $stopped = Invoke-ExactBinary -Arguments @('status') -EvidenceName 'status-stopped.txt'
     if ($stopped -notmatch '(?m)^honk300: not running\s*$') {
         throw "status did not report stopped: $stopped"
     }
 
-    # No delay or cleanup shim: reacquiring immediately is the regression proof for
-    # mutex/IPC teardown. It must be a new process running the same exact file.
-    $runtime = Start-ExactRuntime -Label 'restart'
-    if ($runtime.Id -eq $firstPid) { throw 'immediate restart unexpectedly reused the first PID' }
-    Wait-ForRuntime -Process $runtime -EvidenceName 'status-restart.txt'
-    Invoke-ExactBinary -Arguments @('stop') -EvidenceName 'stop-restart.txt' | Out-Null
-    $runtime.WaitForExit(15000)
-    if (-not $runtime.HasExited) { throw 'restarted runtime did not exit after stop' }
+    $aliasDirectory = Join-Path $work 'aliases'
+    New-Item -ItemType Directory -Force -Path $aliasDirectory | Out-Null
+    $clients = @{}
+    foreach ($name in @('honk300', 'honk', 'goose')) {
+        $client = Join-Path $aliasDirectory "$name.exe"
+        Copy-Item -LiteralPath $resolvedBinary -Destination $client
+        $clients[$name] = $client
+    }
+
+    $gracefulResults = [System.Collections.Generic.List[string]]::new()
+    $gracefulResults.Add('honk300 stop=graceful')
+    foreach ($name in @('honk300', 'honk', 'goose')) {
+        foreach ($verb in @('stop', 'quit', 'exit')) {
+            if ($name -eq 'honk300' -and $verb -eq 'stop') { continue }
+            $label = "graceful-$name-$verb"
+            $runtime = Start-ExactRuntime -Label $label
+            if ($runtime.Id -eq $firstPid) { throw "$label unexpectedly reused the first PID" }
+            Wait-ForRuntime -Process $runtime -EvidenceName "$label-status.txt"
+            Wait-ForVisibleGoose -Process $runtime | Out-Null
+            Invoke-ExactClient -Client $clients[$name] -Arguments @($verb) `
+                -EvidenceName "$label-command.txt" | Out-Null
+            if (-not $runtime.WaitForExit(15000)) { throw "$name $verb did not finish its walk-off" }
+            $log = Get-Content -LiteralPath (Join-Path $evidence "$label-runtime.stdout.log") -Raw
+            if ($log -notmatch '(?m)^honk300: goose walked home; stopping\.\s*$') {
+                throw "$name $verb did not take the graceful runtime path"
+            }
+            if ($log -match '(?m)^honk300: forced stop command received; stopping immediately\.\s*$') {
+                throw "$name $verb unexpectedly took the forced runtime path"
+            }
+            $gracefulResults.Add("$name $verb=graceful")
+            $runtime = $null
+        }
+    }
+
+    $trayQuitToken = [Guid]::NewGuid().ToString('N')
+    $runtime = Start-ExactRuntime -Label 'graceful-tray-quit' `
+        -SmokeTrayQuitToken $trayQuitToken
+    Wait-ForRuntime -Process $runtime -EvidenceName 'graceful-tray-quit-status.txt'
+    Wait-ForVisibleGoose -Process $runtime | Out-Null
+    Invoke-WindowsTrayQuit -Process $runtime -Token $trayQuitToken
+    if (-not $runtime.WaitForExit(15000)) { throw 'native tray Quit did not finish its walk-off' }
+    $trayLog = Get-Content -LiteralPath `
+        (Join-Path $evidence 'graceful-tray-quit-runtime.stdout.log') -Raw
+    if ($trayLog -notmatch '(?m)^honk300: goose walked home; stopping\.\s*$') {
+        throw 'native tray Quit did not take the graceful runtime path'
+    }
+    $gracefulResults.Add('native tray Quit=graceful')
     $runtime = $null
+    Set-Content -LiteralPath (Join-Path $evidence 'graceful-matrix.txt') `
+        -Encoding utf8NoBOM -Value ($gracefulResults -join "`n")
+
+    $forceResults = [System.Collections.Generic.List[string]]::new()
+    $runtime = Start-ExactRuntime -Label 'force-modal-tray-goose-quit'
+    Wait-ForRuntime -Process $runtime -EvidenceName 'force-modal-tray-goose-quit-status.txt'
+    Wait-ForVisibleGoose -Process $runtime | Out-Null
+    Open-WindowsTrayMenu | Out-Null
+    Start-Sleep -Milliseconds 250
+    $modalStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $modalForceOutput = Invoke-ExactClient -Client $clients['goose'] `
+        -Arguments @('quit', '--force') -EvidenceName 'force-modal-tray-goose-quit-command.txt'
+    if ($modalForceOutput -notmatch '(?m)^honk300: command accepted\.\s*$') {
+        throw 'goose quit --force did not receive an accepted result while the native tray menu was modal'
+    }
+    if (-not $runtime.WaitForExit(5000)) {
+        throw 'goose quit --force did not bypass the modal native tray menu'
+    }
+    $modalStopwatch.Stop()
+    $modalLog = Get-Content -LiteralPath `
+        (Join-Path $evidence 'force-modal-tray-goose-quit-runtime.stdout.log') -Raw
+    if ($modalLog -match '(?m)^honk300: goose walked home; stopping\.\s*$') {
+        throw 'goose quit --force unexpectedly walked off while the native tray menu was modal'
+    }
+    $forceResults.Add(
+        "goose quit --force with modal native tray menu=immediate elapsed_ms=$($modalStopwatch.ElapsedMilliseconds)"
+    )
+    $runtime = $null
+
+    foreach ($name in @('honk300', 'honk', 'goose')) {
+        foreach ($verb in @('stop', 'quit', 'exit')) {
+            $label = "force-$name-$verb"
+            $runtime = Start-ExactRuntime -Label $label
+            Wait-ForRuntime -Process $runtime -EvidenceName "$label-status.txt"
+            Wait-ForVisibleGoose -Process $runtime | Out-Null
+            $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+            $forceOutput = Invoke-ExactClient -Client $clients[$name] `
+                -Arguments @($verb, '--force') -EvidenceName "$label-command.txt"
+            if ($forceOutput -notmatch '(?m)^honk300: command accepted\.\s*$') {
+                throw "$name $verb --force did not receive a truthful accepted result"
+            }
+            if (-not $runtime.WaitForExit(5000)) { throw "$name $verb --force did not exit immediately" }
+            $stopwatch.Stop()
+            $log = Get-Content -LiteralPath (Join-Path $evidence "$label-runtime.stdout.log") -Raw
+            if ($log -match '(?m)^honk300: goose walked home; stopping\.\s*$') {
+                throw "$name $verb --force unexpectedly ran the graceful walk-off path"
+            }
+            $forceResults.Add("$name $verb --force=immediate elapsed_ms=$($stopwatch.ElapsedMilliseconds)")
+            $runtime = $null
+        }
+    }
+    Set-Content -LiteralPath (Join-Path $evidence 'force-matrix.txt') `
+        -Encoding utf8NoBOM -Value ($forceResults -join "`n")
 
     $finalHash = (Get-FileHash -LiteralPath $resolvedBinary -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($finalHash -ne $initialHash) {
@@ -1287,7 +1834,7 @@ exact_binary=$resolvedBinary
 sha256=$initialHash
 first_pid=$firstPid
 visual_capture=$captureMode
-lifecycle=start,status,single-instance,reload,stop,immediate-restart,status,stop
+lifecycle=offscreen-walk-in,status,single-instance,reload,all-alias-all-synonym-graceful,graceful-native-tray-quit,all-alias-all-synonym-force
 "@
     Write-Output "Windows layered-overlay $captureMode and lifecycle smoke passed for $resolvedBinary ($initialHash)"
 }
@@ -1296,7 +1843,7 @@ finally {
         try { [Honk300OverlaySmokeNative]::Resume($runtime.Id) } catch { Write-Warning $_ }
     }
     if ($null -ne $runtime -and -not $runtime.HasExited) {
-        try { & $resolvedBinary stop *> $null } catch { Write-Warning $_ }
+        try { & $resolvedBinary stop --force *> $null } catch { Write-Warning $_ }
         if (-not $runtime.WaitForExit(5000)) { $runtime.Kill($true) }
     }
     Set-Content -LiteralPath $stopPath -Value 'stop' -Encoding ascii -NoNewline -ErrorAction SilentlyContinue

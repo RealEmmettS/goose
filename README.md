@@ -15,6 +15,12 @@ installer smokes passed. The Mac app and DMG are Developer ID-signed, notarized,
 independently Gatekeeper-verified. While the goose runs, macOS, Windows, and compatible Linux
 desktops expose the same accessible Configure and animated-Quit control surface.
 
+**Next release candidate:** v1.2.0 adds provenance-preserving synchronous self-update, immutable
+Windows/Linux release slots, exact installer-family continuity, transactional fresh-install
+takeover, one-object JSON results, owned monitor-bounded props, explicit graceful/forced lifecycle,
+provenance-owned login start, and windowless Windows app/login launch under ADRs 0031–0033 and
+task `#r120`.
+
 ## Install
 
 ### Windows
@@ -29,6 +35,19 @@ The MSI owns repair, upgrade, rollback, and uninstall. Corporate per-user packag
 installers, portable archives, checksums, and the PowerShell bootstrap remain under each
 [GitHub release](https://github.com/RealEmmettS/goose/releases/latest) for administrators and
 compatibility.
+
+Slot-aware releases keep each verified Windows payload in an immutable version/target directory
+and move the stable `honk300`, `honk`, and `goose` command paths through a neutral `current`
+selector. `honk300 update` reads the protected installation receipt and delegates to that exact
+origin—Global/Corporate MSI, Global/Corporate EXE, or PowerShell—while the invoking old executable
+remains untouched and alive. Unknown or conflicting ownership stops with an assisted reinstall
+link instead of guessing Global MSI. A newly run installer, including an intentional downgrade,
+is the user's latest intent and becomes authoritative only after staged verification.
+If that change crosses from a machine-wide install to a per-user Corporate install, Windows may
+require one administrator grant to retire the old machine owner. Cancelling that grant preserves
+the new staged slot but reports `cleanup_pending`; Honk300 does not pretend the older machine PATH
+has stopped winning. Running the new slot's `honk300 update` retries only the validated Honk300
+registration and clears the pending state after the public aliases are verified.
 
 Windows users on v1.0.2 or earlier must rerun the current installer once. Those older immutable
 executables cannot self-repair their update-discovery bug; v1.0.3 and later perform subsequent
@@ -47,6 +66,11 @@ The signed and notarized universal DMG is the recommended install for both Apple
 Intel Macs:
 
 - [Download the latest Honk300 DMG](https://github.com/RealEmmettS/goose/releases/latest/download/honk300-universal2.dmg)
+
+The DMG remains the fresh graphical install. A receipted app at
+`~/Applications/Honk300.app` updates synchronously with the exact-tag signed app ZIP while
+preserving the same bundle and Accessibility identity. Mounted-DMG, foreign, read-only, and
+unreceipted launches use the latest DMG as an assisted reinstall and do not claim update success.
 
 Open the disk image and run **Install Honk300**. The universal Intel/Apple Silicon helper verifies
 the adjacent app's Developer ID team and bundle identity, installs it without `sudo` into
@@ -105,6 +129,10 @@ downloads that exact-tag payload, verifies its embedded SHA-256, stages on the d
 filesystem, and rolls back the payload and owned integrations if installation fails. It does not
 use `sudo`.
 
+Shell-managed Linux installs use immutable release directories and an atomic `current` symlink.
+Debian installs remain dpkg-owned and update only with the matching architecture package; the two
+origins never convert into one another during `update`.
+
 - Linux: managed payload under `${XDG_DATA_HOME:-~/.local/share}/honk300/install`; receipt,
   desktop entry, and user media stay in the corresponding XDG user directories; aliases under
   `~/.local/bin`.
@@ -130,6 +158,7 @@ honk300 config                Open the terminal settings editor
 honk300 reload                Apply reloadable saved settings
 honk300 do honk               Request an action
 honk300 stop                  Stop the running goose
+honk300 stop --force          Stop immediately without the walk-off
 ```
 
 Friendly aliases include `goose plz`, `honk bad`, `goose no honk`, `goose quit`, and
@@ -143,6 +172,12 @@ departure edge instead. If you personally close a note or meme it opened, there 
 chance it gets visibly annoyed and then tries its existing bounded mouse-steal prank. That second
 step still obeys your settings, quiet/fullscreen manners, live permission, and platform support;
 program cleanup never triggers it, and Linux currently has no collect windows to close.
+
+Collected notes and pictures are fitted to the monitor receiving the goose. Notes remain readable
+without exceeding 48% of either monitor dimension. Pictures preserve their complete source and
+aspect ratio, downscale only when needed, and are never cropped or enlarged beyond their natural
+size. Windows notes use a Honk300-owned native editable window rather than Notepad, so the prank
+cannot restore, focus, type into, or expose a user's editor tabs.
 
 First run materializes schema-current configuration. Existing malformed files and files from a
 newer schema are never replaced automatically. To intentionally reset one, use
@@ -163,6 +198,16 @@ claims. Terminal windows are always protected from focus, typing, dragging, ridi
 collection. Codex and Visual Studio Code surfaces receive the same conservative protection across
 platforms, including the ChatGPT-titled Codex desktop surface on Windows.
 
+The General settings page also exposes default-off **Start on login**, stored as
+`[lifecycle].autostart_on_login`. It reconciles only the startup integration owned by the active
+installer: the matching Windows machine/user Run value, the managed Mac LaunchAgent, or the
+current Linux user's XDG autostart entry. A fresh installer's selection is latest intent; later
+config saves update that same integration. Unknown ownership and foreign startup entries are
+refused instead of duplicated. On Windows, shortcuts and login startup target the internal
+GUI-subsystem `honk300-app.exe`, which starts the exact sibling runtime with no console window;
+the public `honk300`/`honk`/`goose` commands remain ordinary console programs only for a terminal
+the user intentionally opened.
+
 User notes and PNG memes can be added without modifying the program:
 
 - Windows: `%LOCALAPPDATA%\honk300\media\Notes` and `...\Memes`
@@ -171,18 +216,24 @@ User notes and PNG memes can be added without modifying the program:
 
 ## Remove or update
 
-On Windows, use Add/Remove Programs or rerun the Global MSI. On macOS and Linux, all three command
-names share the same update and removal paths:
+On every platform, all three command names share the provenance-preserving update command.
+Windows still uses Add/Remove Programs for graphical removal; update delegates to the exact
+installer family named by the active receipt:
 
 ```text
 honk300 update
+honk300 update --json
 honk300 uninstall
 honk300 uninstall --purge
 ```
 
 A normal uninstall preserves user media. `--purge` backs up user media before removing user
 state. Debian package installs update and uninstall through `dpkg` and may request administrator
-approval; per-user macOS/Linux installs do not use `sudo`. Autostart is opt-in and off by default.
+approval; per-user macOS/Linux installs do not use `sudo`. Login autostart is opt-in and off by
+default; use **Start on login** in `honk300 config` or set `autostart_on_login = true` under
+`[lifecycle]`.
+Human update progress is stderr-only. `--json` writes exactly one final stdout object, and exit
+zero means the selected release, receipt, selector, and aliases were activated and verified.
 
 ## Platform support
 
@@ -218,7 +269,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.1.0
+dist plan --tag=v1.2.0
 cargo audit --version 0.22.2
 ```
 
@@ -236,9 +287,17 @@ records the immutable-tag fix-forward to the public v1.0.1 identity. ADR 0028 de
 goose control-surface icon and the Configure/TUI plus graceful-Quit parity contract. ADR 0029
 records the Alienware-derived Windows update/lifecycle, Corporate retry, and integrated-terminal
 hardening contract; ADR 0030 implements that contract with native Windows and Linux surfaces and
-explicit unavailable-host boundaries.
-[`docs/readiness/v1.1.0-readiness.md`](docs/readiness/v1.1.0-readiness.md) records the completed
-stable release evidence; earlier readiness reports remain immutable-release history.
+explicit unavailable-host boundaries. ADR 0031 supersedes ADR 0029's flat Windows update
+transaction with authoritative provenance receipts, immutable slots, synchronous verification,
+and matching Mac/Linux update ownership. ADR 0032 replaces external Windows Notepad props with
+owned bounded windows and defines monitor-relative image fitting, graceful versus forced stop,
+and the one provenance-owned login-start setting. ADR 0033 makes Windows app/login/background
+launch windowless while preserving normal intentional CLI behavior, and moves every full-desktop
+compositor surface to disposable CI; product startup performs no calibration.
+[`docs/readiness/v1.2.0-readiness.md`](docs/readiness/v1.2.0-readiness.md) tracks the in-flight
+exact candidate, same-SHA main, publication, and public-byte qualification. The completed
+[`v1.1.0 readiness report`](docs/readiness/v1.1.0-readiness.md) and earlier reports remain
+immutable-release history.
 
 ## License and assets
 

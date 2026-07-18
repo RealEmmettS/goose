@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -71,6 +72,35 @@ def build_package_tree(
         (aliases / name).symlink_to("../lib/honk300/honk300")
 
     target = ARCHITECTURES[architecture]
+    payload_hash = hashlib.sha256(installed.read_bytes()).hexdigest()
+    receipt = {
+        "schema": "honk300.install.v2",
+        "version": version,
+        "tag": tag,
+        "commit": commit.lower(),
+        "channel": "deb",
+        "origin": "deb",
+        "installer_family": "deb",
+        "edition": "global",
+        "scope": "machine",
+        "release_track": "stable",
+        "layout": "debian-package",
+        "target": target,
+        "artifact": {
+            "name": "usr/lib/honk300/honk300",
+            "sha256": payload_hash,
+            "size": installed.stat().st_size,
+        },
+        "install_root": "/usr/lib/honk300",
+        "owned_root": "/usr/lib/honk300",
+        "active_release": "/usr/lib/honk300",
+        "aliases": ["/usr/bin/honk300", "/usr/bin/honk", "/usr/bin/goose"],
+        "autostart": {"enabled": False, "owner": "deb"},
+    }
+    _write(
+        installed.parent / "install-receipt.json",
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+    )
     metadata = {
         "schema": "honk300.package.v1",
         "version": version,

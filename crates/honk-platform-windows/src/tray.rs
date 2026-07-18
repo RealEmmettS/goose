@@ -17,7 +17,7 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyIcon,
-    DestroyMenu, DestroyWindow, GetCursorPos, PostMessageW, RegisterClassExW,
+    DestroyMenu, DestroyWindow, EndMenu, GetCursorPos, PostMessageW, RegisterClassExW,
     RegisterWindowMessageW, SetForegroundWindow, TrackPopupMenu, ICONINFO, MF_SEPARATOR, MF_STRING,
     TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_CONTEXTMENU, WM_DESTROY, WM_NULL, WM_USER, WNDCLASSEXW,
     WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
@@ -33,6 +33,7 @@ const TRAY_ICON_GUID: windows::core::GUID =
 const STATUS_ICON_PNG: &[u8] = include_bytes!("../../../Assets/UI/honk300-status-goose@2x.png");
 
 static TASKBAR_CREATED_MESSAGE: AtomicU32 = AtomicU32::new(0);
+static SMOKE_TRAY_QUIT_MESSAGE: AtomicU32 = AtomicU32::new(0);
 static TASKBAR_READD_REQUESTED: AtomicBool = AtomicBool::new(false);
 static COMMANDS: OnceLock<Mutex<VecDeque<ControlSurfaceCommand>>> = OnceLock::new();
 
@@ -69,6 +70,7 @@ impl StatusTray {
                 return Err(Error::from_win32());
             }
             TASKBAR_CREATED_MESSAGE.store(taskbar_created, Ordering::Release);
+            SMOKE_TRAY_QUIT_MESSAGE.store(register_smoke_tray_quit_message()?, Ordering::Release);
 
             let module = GetModuleHandleW(None)?;
             let instance = HINSTANCE(module.0);
@@ -166,6 +168,7 @@ impl StatusTray {
 impl Drop for StatusTray {
     fn drop(&mut self) {
         unsafe {
+            SMOKE_TRAY_QUIT_MESSAGE.store(0, Ordering::Release);
             if self.added {
                 let _ = Shell_NotifyIconW(NIM_DELETE, &self.notify_data());
             }
@@ -192,6 +195,16 @@ unsafe extern "system" fn tray_wndproc(
 ) -> LRESULT {
     if message == TASKBAR_CREATED_MESSAGE.load(Ordering::Acquire) {
         TASKBAR_READD_REQUESTED.store(true, Ordering::Release);
+        return LRESULT(0);
+    }
+    let smoke_tray_quit = SMOKE_TRAY_QUIT_MESSAGE.load(Ordering::Acquire);
+    if smoke_tray_quit != 0 && message == smoke_tray_quit {
+        // The disposable Windows qualification runner opens the real native menu first. Ending
+        // that process-owned menu on its UI thread and enqueueing the same finite command avoids
+        // global keyboard/mouse input and proves the exact graceful-Quit route without touching
+        // whichever foreign application happens to be focused.
+        let _ = EndMenu();
+        enqueue_menu_selection(QUIT_COMMAND_ID);
         return LRESULT(0);
     }
     if message == TRAY_CALLBACK_MESSAGE {
@@ -238,14 +251,7 @@ unsafe fn show_menu(hwnd: HWND, mut point: POINT) {
             hwnd,
             None,
         );
-        let command = match selected.0 as usize {
-            CONFIGURE_COMMAND_ID => Some(ControlSurfaceCommand::Configure),
-            QUIT_COMMAND_ID => Some(ControlSurfaceCommand::Quit),
-            _ => None,
-        };
-        if let Some(command) = command {
-            with_commands(|commands| commands.push_back(command));
-        }
+        enqueue_menu_selection(selected.0 as usize);
         let mut data = NOTIFYICONDATAW {
             cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
             hWnd: hwnd,
@@ -262,6 +268,42 @@ unsafe fn show_menu(hwnd: HWND, mut point: POINT) {
     let _ = DestroyMenu(menu);
     if let Err(error) = result {
         eprintln!("honk300: Windows tray menu could not open ({error})");
+    }
+}
+
+fn command_for_menu_selection(selection: usize) -> Option<ControlSurfaceCommand> {
+    match selection {
+        CONFIGURE_COMMAND_ID => Some(ControlSurfaceCommand::Configure),
+        QUIT_COMMAND_ID => Some(ControlSurfaceCommand::Quit),
+        _ => None,
+    }
+}
+
+fn enqueue_menu_selection(selection: usize) {
+    if let Some(command) = command_for_menu_selection(selection) {
+        with_commands(|commands| commands.push_back(command));
+    }
+}
+
+fn register_smoke_tray_quit_message() -> windows::core::Result<u32> {
+    let Some(token) = std::env::var_os("HONK300_WINDOWS_SMOKE_TRAY_QUIT_TOKEN") else {
+        return Ok(0);
+    };
+    let token = token
+        .to_str()
+        .filter(|token| {
+            (32..=64).contains(&token.len())
+                && token
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        })
+        .ok_or_else(|| failure("invalid Windows tray smoke token"))?;
+    let message_name = wide(&format!("Honk300SmokeTrayQuit-{token}"));
+    let message = unsafe { RegisterWindowMessageW(PCWSTR(message_name.as_ptr())) };
+    if message == 0 {
+        Err(Error::from_win32())
+    } else {
+        Ok(message)
     }
 }
 
@@ -369,7 +411,11 @@ fn failure(message: impl AsRef<str>) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{compose_tray_bgra, point_from_callback, write_utf16, STATUS_ICON_PNG};
+    use super::{
+        command_for_menu_selection, compose_tray_bgra, point_from_callback, write_utf16,
+        CONFIGURE_COMMAND_ID, QUIT_COMMAND_ID, STATUS_ICON_PNG,
+    };
+    use honk_control::ControlSurfaceCommand;
     use tiny_skia::Pixmap;
     use windows::Win32::Foundation::WPARAM;
 
@@ -405,5 +451,19 @@ mod tests {
             String::from_utf16(&target[..length]).unwrap(),
             "Honk300 controls"
         );
+    }
+
+    #[test]
+    fn native_menu_and_ci_hook_share_the_finite_command_mapping() {
+        assert_eq!(
+            command_for_menu_selection(CONFIGURE_COMMAND_ID),
+            Some(ControlSurfaceCommand::Configure)
+        );
+        assert_eq!(
+            command_for_menu_selection(QUIT_COMMAND_ID),
+            Some(ControlSurfaceCommand::Quit)
+        );
+        assert_eq!(command_for_menu_selection(0), None);
+        assert_eq!(command_for_menu_selection(usize::MAX), None);
     }
 }

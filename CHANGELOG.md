@@ -11,7 +11,7 @@ All notable changes to this project are documented here. Format based on
 > verification waivers. The goose now renders, walks, leaves mud, plays sounds, reacts to the
 > cursor, can
 > perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
-> Notepad/meme windows on Windows. It now enters/leaves through real exposed edges, occasionally
+> owned note/image windows on Windows. It now enters/leaves through real exposed edges, occasionally
 > wraps only while fully hidden, and can react when a user closes one of its collected windows.
 > It can be controlled through a single-instance local IPC
 > channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
@@ -25,6 +25,74 @@ All notable changes to this project are documented here. Format based on
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
 ## [Unreleased]
+
+## [1.2.0] - 2026-07-18
+
+### Added
+- **Provenance-preserving slot updater (ADR 0031)** - adds authoritative
+  `honk300.install.v2` receipts and immutable version/target release slots. Windows installers
+  activate through stable `current`/`bin` junctions; shell-managed Linux activates through an
+  atomic `current` symlink. Receipts record installer family, edition, scope, stable track,
+  target, owned root, active release, and exact artifact identity while retaining v1 migration
+  reads.
+- **Live-image and rollback qualification** - adds a Windows smoke that keeps the old executable
+  mapped while switching installer origins, injects a failure after junction retargeting, proves
+  the previous selector and receipt return intact, then verifies all three aliases and hashes.
+- **Configurable login start (ADR 0032)** - adds default-off
+  `[lifecycle].autostart_on_login` configuration and a General-TUI **Start on login** control.
+  Saves reconcile through the active receipt's existing HKLM/HKCU Run value, macOS LaunchAgent,
+  or per-user XDG autostart entry; foreign integrations and unknown provenance fail closed.
+- **Explicit force-stop grammar** - all three command names accept `stop`, `quit`, and `exit
+  --force` through a distinct `FORCE_STOP` IPC command for immediate termination. The same
+  commands without `--force`, plus tray/menu Quit, retain the engine-owned offscreen walk-off.
+
+### Changed
+- **Synchronous same-origin updates** - `honk300 update [--json]` now waits for the matching MSI,
+  EXE, PowerShell, DMG-origin app ZIP, Debian package, or shell bootstrap and verifies activation
+  before exit zero. Progress is stderr-only and JSON mode emits exactly one final stdout object.
+  Unknown or conflicting provenance stops with an assisted-reinstall command instead of guessing
+  Global MSI.
+- **Latest install is latest intent** - slot-aware MSI and EXE installers permit intentional
+  downgrade, stage payloads before activation, preserve mapped old releases, and prevent an
+  inactive owner's uninstall from deactivating a newer cross-channel selection. The graphical
+  Mac install remains the signed DMG, Debian remains dpkg-owned, and package/bootstrap origins do
+  not convert during update.
+- **Conflicting Windows owner cleanup** - after activation, validated MSI/Inno conflicts are
+  recorded in a protected cleanup journal. `honk300 update` retries only those exact registered
+  uninstallers and verifies their removal; denied opposite-scope elevation remains nonzero
+  `cleanup_pending` with the new slot preserved instead of falsely claiming public PATH takeover.
+- **Monitor-relative collected props (ADR 0032)** - Windows and macOS use one engine-owned fit
+  contract: notes target 32% of the receiving monitor with a hard 48% ceiling; images preserve
+  aspect ratio, include the complete source without cropping, never upscale, and stay within 48%
+  of either monitor dimension and 900x700 logical pixels.
+- **Installer/config autostart precedence** - Windows slot receipts now record the actual MSI
+  feature or Inno task selection. Package updates preserve it; a newer fresh-installer receipt is
+  mirrored into config as latest intent, while a newer explicit config edit updates the one owned
+  platform integration and receipt.
+
+### Fixed
+- **Windows self-update lock ordering** - removes the detached wait-for-parent and Restart Manager
+  unlock dependency. Installer-owned activation now verifies staged payloads, retargets neutral
+  selectors in place, commits the protected receipt, and lets the initiating CLI verify the final
+  version, target, aliases, and artifact identity while still running from its old release.
+- **Transactional receipt rollback** - preserves the prior protected receipt when activation
+  fails before its backup is created, restores source markers with the selector, and retains an
+  already-existing same-version Linux slot during injected post-activation rollback.
+- **No local full-screen calibration (ADR 0033)** - product startup performs no screen
+  calibration, and local Windows qualification now refuses to create the old full-desktop
+  dark/near-white surfaces even with the former opt-in flag. Strict paired-color compositor proof
+  runs only on disposable GitHub Actions desktops.
+- **Owned Windows note presentation (ADR 0032)** - replaces external Notepad launch and synthetic
+  input with a process-owned native editable note window. Windows session restoration can no
+  longer expose a user's existing tabs, and Honk300 never opens or executes a script as note
+  content.
+- **Windowless Windows app startup (ADR 0033)** - keeps `honk300.exe` as the console-subsystem
+  public CLI while shipping an independently hashed GUI-subsystem `honk300-app.exe` for Start
+  Menu/desktop shortcuts and login startup. It launches the exact sibling runtime with
+  `CREATE_NO_WINDOW`, null standard handles, and no PowerShell, shell association, visible helper,
+  or focus-stealing console. Config restarts and background lifecycle helpers use the same
+  no-console process boundary; only intentional CLI/TUI use and explicit **Configure Honk300…**
+  may show a terminal.
 
 ## [1.1.0] - 2026-07-17
 

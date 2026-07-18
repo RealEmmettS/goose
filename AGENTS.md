@@ -9,8 +9,8 @@ Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of 
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
 **Current stage: v1.1.0 is the public stable/latest release at exact source commit
-`e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`; Windows/Linux tray parity is complete under ADR
-0030 and `#r110`.** M0-M19 are implemented
+`e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`; v1.2.0 is the in-flight provenance-preserving
+self-updater and owned-lifecycle candidate under ADRs 0031–0033 and `#r120`.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -222,6 +222,11 @@ are done.
   edge, walk in, and keep ticking/presenting on stop until the full pose has walked out. Shared
   monitor seams are continuous; only genuinely exposed edges may use the occasional 20% hidden
   wrap, and deliberate puddle/prank errands never wrap.
+- Ordinary `stop`/`quit`/`exit` and native Quit always use that graceful walk-off. The explicit
+  `--force` variants on all three command names terminate immediately through separate IPC.
+- Windows collected notes are Honk300-owned native edit windows, never Notepad or global input.
+  Windows/macOS notes and images share the ADR 0032 monitor-relative fit: hard 48% per-dimension
+  ceiling, aspect-preserving complete-image downscale, no crop, and no upscaling.
 - A user—not program cleanup—closing a spawned note or meme gets an independent 30% annoyed
   reaction roll. The reaction may chain only the existing bounded cursor nab and only after live
   capability, permission/pointer, configuration, and manners checks. Linux collect windows remain
@@ -231,6 +236,24 @@ are done.
   size/hash verification through execution; generated bootstrap delegation must reacquire without
   an ambient bypass, machine-wide paths are checked across sessions, reboot-deferred MSI results
   fail closed, and every pre-READY helper error kills and waits for the child.
+- Update provenance is authoritative and never guessed from a Windows install path. A protected
+  v2 receipt preserves installer family, edition, scope, stable track, target, owned root, active
+  release, and exact artifact identity. Windows and shell-managed Linux activate immutable slots
+  through neutral selectors while the initiating process stays mapped to its old release; DMG,
+  Debian, and package/bootstrap origins remain distinct. A fresh verified installer may
+  intentionally downgrade and becomes the user's latest intent. Conflicting Windows registrations
+  are retired only after commit through a protected journal; an opposite-scope cleanup that lacks
+  an administrator grant stays nonzero `cleanup_pending` and must not claim public alias takeover.
+- `[lifecycle].autostart_on_login` is default-off and reconciles only through the receipt-owned
+  Windows Run value, managed Mac LaunchAgent, or per-user Linux XDG entry. Fresh installer intent
+  outranks stale config; later explicit config edits update the same owned mechanism. Foreign or
+  ambiguous startup ownership fails closed and must never create a duplicate persistence path.
+- Windows keeps the three public aliases as console-subsystem commands for intentional CLI use.
+  Start Menu/desktop shortcuts and login startup target the independently hashed GUI-subsystem
+  `honk300-app.exe`, which starts only its exact sibling with `CREATE_NO_WINDOW`, null handles,
+  and no shell intermediary. Background restarts/helpers must never create or focus a terminal.
+  Product startup performs no screen calibration; full-desktop compositor surfaces are
+  disposable-CI-only.
 - Starting, stopping, and configuration remain **CLI/TUI over local IPC** on every platform.
   The macOS menu-bar item, Windows notification-area item, and compatible Linux StatusNotifier
   item expose the same shared icon, accessible naming, existing-TUI Configure action, and engine-
@@ -292,6 +315,18 @@ are done.
   in `docs/adr/0029-windows-lifecycle-and-terminal-hardening.md`.
 - The native Windows/Linux tray owners, shared command router, recovery, package ownership, and
   explicit unavailable-host boundary live in `docs/adr/0030-windows-linux-tray-control-parity.md`.
+- Provenance-preserving v2 receipts, synchronous updates, immutable Windows/Linux release slots,
+  latest-intent activation, and DMG-origin app-ZIP updates live in
+  `docs/adr/0031-provenance-preserving-slot-self-update.md`; it supersedes only ADR 0029's Windows
+  update transaction and receipt-refresh portions.
+- Owned monitor-bounded props, graceful versus forced lifecycle, and provenance-owned login start
+  live in
+  `docs/adr/0032-owned-props-lifecycle-and-login-autostart.md`; it supersedes ADR 0003/0015 only
+  where they required an external Windows Notepad process and synthetic input.
+- Windowless Windows app/login/background launch and disposable-desktop-only full compositor
+  qualification live in
+  `docs/adr/0033-windowless-windows-app-launch-and-disposable-desktop-qualification.md`; it
+  supersedes ADR 0032's Windows startup command and interactive-local calibration notice.
 
 ## Task management system
 
@@ -350,9 +385,9 @@ family's local gate:
 - `cargo clippy --all-targets --workspace -- -D warnings`
 - `cargo test --workspace`  ·  single test: `cargo test -p honk-engine <name>`
 - `cargo build --release`
-- Windows host only: `pwsh -File script/smoke_windows_overlay.ps1 -Binary target/release/honk300.exe -EvidenceDirectory target/windows-overlay-evidence`
+- Windows local lifecycle only, and only when the operator welcomes visible testing: `pwsh -File script/smoke_windows_overlay.ps1 -Binary target/release/honk300.exe -EvidenceDirectory target/windows-overlay-evidence -LifecycleOnly`. Full paired-color compositor proof is disposable-CI-only; `-AllowInteractiveDesktopObscuration` is intentionally rejected locally.
 - Linux host only: `HONK300_BIN="$PWD/target/release/honk300" bash script/smoke_m17_m18_linux.sh`
-- `dist plan --tag=v1.1.0`
+- `dist plan --tag=v1.2.0`
 - `cargo audit --version 0.22.2`
 
 Release packaging uses **cargo-dist** for portable archives plus project-owned atomic release,

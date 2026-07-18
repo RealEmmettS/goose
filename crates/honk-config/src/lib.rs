@@ -38,6 +38,7 @@ pub struct Config {
     pub audio: AudioConfig,
     pub safety: SafetyConfig,
     pub platform: PlatformConfig,
+    pub lifecycle: LifecycleConfig,
 }
 
 impl Default for Config {
@@ -58,8 +59,17 @@ impl Default for Config {
             audio: AudioConfig::default(),
             safety: SafetyConfig::default(),
             platform: PlatformConfig::default(),
+            lifecycle: LifecycleConfig::default(),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct LifecycleConfig {
+    /// Reconcile the install family's one owned login-start mechanism. This setting never creates
+    /// an additional scheduler/startup-folder owner alongside the existing platform mechanism.
+    pub autostart_on_login: bool,
 }
 
 impl ColorConfig {
@@ -978,6 +988,13 @@ impl Config {
 
         let platform = table_mut(doc, "platform");
         set_bool(platform, "wayland", self.platform.wayland);
+
+        let lifecycle = table_mut(doc, "lifecycle");
+        set_bool(
+            lifecycle,
+            "autostart_on_login",
+            self.lifecycle.autostart_on_login,
+        );
     }
 }
 
@@ -1229,6 +1246,7 @@ fn unknown_key_warning(text: &str) -> Option<String> {
         "audio",
         "safety",
         "platform",
+        "lifecycle",
     ];
     for (key, item) in doc.as_table().iter() {
         if !root_allowed.contains(&key) {
@@ -1312,6 +1330,7 @@ fn known_section_keys(section: &str) -> &'static [&'static str] {
         "audio" => &["enabled", "honk", "bite", "mud", "pat"],
         "safety" => &["pause_on_fullscreen", "no_mouse_steal", "no_window_ride"],
         "platform" => &["wayland"],
+        "lifecycle" => &["autostart_on_login"],
         _ => &[],
     }
 }
@@ -1384,6 +1403,27 @@ mod tests {
         assert!(!c.audio.enabled);
         assert!(c.audio.honk);
         assert_eq!(c.mouse.grab_distance, 60.0);
+        assert!(!c.lifecycle.autostart_on_login);
+    }
+
+    #[test]
+    fn login_autostart_preference_round_trips_in_the_lifecycle_section() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let mut config = Config::default();
+        config.lifecycle.autostart_on_login = true;
+
+        config.save_atomic(&path).unwrap();
+
+        let saved = fs::read_to_string(&path).unwrap();
+        assert!(saved.contains("[lifecycle]"));
+        assert!(saved.contains("autostart_on_login = true"));
+        assert!(
+            Config::load_existing(&path)
+                .unwrap()
+                .lifecycle
+                .autostart_on_login
+        );
     }
 
     #[test]

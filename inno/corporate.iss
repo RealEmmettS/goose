@@ -10,6 +10,15 @@
 #ifndef InnoArchitecturesAllowed
   #define InnoArchitecturesAllowed "x64"
 #endif
+#ifndef ReleaseTag
+  #define ReleaseTag "v" + MyAppVersion
+#endif
+#ifndef ReleaseCommit
+  #define ReleaseCommit "0000000000000000000000000000000000000000"
+#endif
+#ifndef PayloadSha256
+  #define PayloadSha256 "0000000000000000000000000000000000000000000000000000000000000000"
+#endif
 
 #define MyAppName "honk300"
 #define MyAppFullName "honk300 (Corporate Edition)"
@@ -41,7 +50,7 @@ WizardStyle=modern
 ChangesEnvironment=yes
 UninstallDisplayName={#MyAppFullName}
 SetupLogging=yes
-CloseApplications=yes
+CloseApplications=no
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
@@ -51,21 +60,16 @@ Name: "autostart"; Description: "Start honk300 when this user logs in"; GroupDes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "honk300.exe"; Flags: ignoreversion
-Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "honk.exe"; Flags: ignoreversion
-Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\bin"; DestName: "goose.exe"; Flags: ignoreversion
-Source: "install-source-exe-corporate.txt"; DestDir: "{app}"; DestName: "install-source.txt"; Flags: ignoreversion
+Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\channels\exe-corporate\releases\{#MyAppVersion}-{#TargetTriple}\bin"; DestName: "honk300.exe"; Flags: ignoreversion uninsneveruninstall
+Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\channels\exe-corporate\releases\{#MyAppVersion}-{#TargetTriple}\bin"; DestName: "honk.exe"; Flags: ignoreversion uninsneveruninstall
+Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\channels\exe-corporate\releases\{#MyAppVersion}-{#TargetTriple}\bin"; DestName: "goose.exe"; Flags: ignoreversion uninsneveruninstall
+Source: "{#SourceBinDir}\honk300-app.exe"; DestDir: "{app}\channels\exe-corporate\releases\{#MyAppVersion}-{#TargetTriple}\bin"; DestName: "honk300-app.exe"; Flags: ignoreversion uninsneveruninstall
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY_ASSETS.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Honk300"; Filename: "{app}\bin\honk300.exe"; Parameters: "start"; WorkingDir: "{app}\bin"
-Name: "{userdesktop}\Honk300"; Filename: "{app}\bin\honk300.exe"; Parameters: "start"; WorkingDir: "{app}\bin"; Tasks: desktopicon
-
-[Registry]
-Root: HKCU; Subkey: "Software\Honk300"; ValueType: string; ValueName: "InstallSource"; ValueData: "exe-corporate"; Flags: uninsdeletevalue
-Root: HKCU; Subkey: "Software\Honk300"; Flags: uninsdeletekeyifempty
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Honk300"; ValueData: """{app}\bin\honk300.exe"" start"; Tasks: autostart; Flags: uninsdeletevalue
+Name: "{group}\Honk300"; Filename: "{app}\bin\honk300-app.exe"; WorkingDir: "{app}\bin"; Flags: uninsneveruninstall
+Name: "{userdesktop}\Honk300"; Filename: "{app}\bin\honk300-app.exe"; WorkingDir: "{app}\bin"; Tasks: desktopicon; Flags: uninsneveruninstall
 
 [Code]
 const
@@ -88,32 +92,48 @@ begin
   RegWriteExpandStringValue(HKEY_CURRENT_USER, EnvironmentKey, 'Path', Paths);
 end;
 
-procedure EnvRemovePath(Path: string);
-var
-  Paths: string;
-  P: Integer;
-begin
-  if not RegQueryStringValue(HKEY_CURRENT_USER, EnvironmentKey, 'Path', Paths) then exit;
-
-  P := Pos(';' + Uppercase(Path) + ';', ';' + Uppercase(Paths) + ';');
-  if P = 0 then exit;
-
-  if P = 1 then
-    Delete(Paths, 1, Length(Path) + 1)
-  else
-    Delete(Paths, P - 1, Length(Path) + 1);
-
-  RegWriteExpandStringValue(HKEY_CURRENT_USER, EnvironmentKey, 'Path', Paths);
-end;
-
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Helper, Params, AutostartValue: string;
+  ResultCode: Integer;
 begin
-  if CurStep = ssPostInstall then
+  if CurStep = ssPostInstall then begin
+    if WizardIsTaskSelected('autostart') then
+      AutostartValue := 'true'
+    else
+      AutostartValue := 'false';
+    Helper := ExpandConstant('{app}\channels\exe-corporate\releases\{#MyAppVersion}-{#TargetTriple}\bin\honk300.exe');
+    Params := '__windows-slot-activate --root "' + ExpandConstant('{app}') +
+      '" --origin "exe-corporate" --version "{#MyAppVersion}" --tag "{#ReleaseTag}"' +
+      ' --commit "{#ReleaseCommit}" --target "{#TargetTriple}"' +
+      ' --artifact-name "honk300-{#TargetTriple}-corporate-setup.exe" --artifact-path "' +
+      ExpandConstant('{srcexe}') + '" --payload-sha256 "{#PayloadSha256}"' +
+      ' --autostart "' + AutostartValue + '"';
+    if not Exec(Helper, Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
+      RaiseException('Honk300 slot activation failed with exit code ' + IntToStr(ResultCode));
     EnvAddPath(ExpandConstant('{app}') + '\bin');
+    RegWriteStringValue(HKEY_CURRENT_USER, 'Software\Honk300', 'InstallSource', 'exe-corporate');
+    if WizardIsTaskSelected('autostart') then
+      RegWriteStringValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run',
+        'Honk300', '"' + ExpandConstant('{app}\bin\honk300-app.exe') + '"')
+    else
+      RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Honk300');
+    if not Exec(Helper, '__windows-slot-commit --root "' + ExpandConstant('{app}') + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
+      RaiseException('Honk300 slot commit failed with exit code ' + IntToStr(ResultCode));
+    if FileExists(ExpandConstant('{app}\.owner-cleanup-pending.json')) and (not WizardSilent) then
+      MsgBox('The new Honk300 copy is installed, but an older installer owner still needs cleanup. Run "honk300 update" to finish the verified cleanup.', mbInformation, MB_OK);
+  end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Helper: string;
+  ResultCode: Integer;
 begin
-  if CurUninstallStep = usPostUninstall then
-    EnvRemovePath(ExpandConstant('{app}') + '\bin');
+  if CurUninstallStep = usUninstall then begin
+    Helper := ExpandConstant('{app}\bin\honk300.exe');
+    if FileExists(Helper) then
+      if not Exec(Helper, '__windows-slot-uninstall --root "' + ExpandConstant('{app}') + '" --origin "exe-corporate"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
+        RaiseException('Honk300 slot uninstall failed with exit code ' + IntToStr(ResultCode));
+  end;
 end;

@@ -14,13 +14,16 @@ use honk_engine::render::{
 };
 use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
-    CollectWindowCommand, CollectWindowPayload, CursorCommand, DesktopLayout, LocalTime, Pointer,
-    PresenceSnapshot, Rect, Sound, Vec2, World,
+    collect_window::fitted_collect_image_size, CollectWindowCommand, CollectWindowId,
+    CollectWindowPayload, CursorCommand, DesktopLayout, LocalTime, Pointer, PresenceSnapshot, Rect,
+    Sound, Vec2, World,
 };
 use honk_platform_windows::{
     init_dpi_awareness, local_time, pointer_state, presence_state, warp_cursor,
     CollectWindowController, ForeignWindowWatcher, Overlay, StatusTray,
 };
+use sha2::{Digest, Sha256};
+use std::path::{Path, PathBuf};
 
 pub fn run(
     options: RuntimeOptions,
@@ -28,6 +31,9 @@ pub fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut config = options.config.clone();
     let assets = assets::AssetCatalog::load();
+    let smoke_note = smoke_note_text();
+    let smoke_note_evidence = std::env::var_os("HONK300_SMOKE_NOTE_EVIDENCE").map(PathBuf::from);
+    let smoke_image_evidence = std::env::var_os("HONK300_SMOKE_IMAGE_EVIDENCE").map(PathBuf::from);
     println!("honk300: loaded {}", assets.summary());
 
     // Opt into Per-Monitor-V2 DPI awareness before creating any window or enumerating monitors, so
@@ -126,6 +132,10 @@ pub fn run(
     let mut warned_presence = false;
     let mut last_presence_poll = f64::NEG_INFINITY;
     let mut next_audio_probe = 0.0;
+    let mut smoke_note_id: Option<CollectWindowId> = None;
+    let mut smoke_note_origin: Option<Vec2> = None;
+    let mut smoke_note_recorded = false;
+    let mut smoke_image_recorded = false;
 
     println!("honk300: a goose is loose on your desktop. Use `honk300 stop` to send it home.");
 
@@ -204,6 +214,11 @@ pub fn run(
                     println!("honk300: stop command received.");
                     request.respond(ControlResponse::Ok);
                     RuntimeCore::begin_graceful_stop(&mut world);
+                }
+                ControlCommand::ForceStop => {
+                    println!("honk300: forced stop command received; stopping immediately.");
+                    request.respond(ControlResponse::Ok);
+                    return Ok(());
                 }
                 ControlCommand::Reload => {
                     let response = match Config::load_existing(&options.config_path) {
@@ -352,31 +367,81 @@ pub fn run(
 
         core.tick(&mut world, frame);
 
+        let collect_display = world
+            .layout()
+            .region_at(world.goose.position)
+            .and_then(|index| world.layout().regions().get(index).copied())
+            .unwrap_or(primary_bounds);
+        collect_controller.update_display_bounds(collect_display);
+
         for command in world.take_collect_window_commands() {
             let result = match command {
                 CollectWindowCommand::Spawn { request, payload } => match payload {
                     CollectWindowPayload::Note { .. } => {
-                        collect_controller.spawn_note(request).map(|_| ())
+                        collect_controller.spawn_note(request).and_then(|id| {
+                            if let Some(text) = smoke_note.as_deref() {
+                                collect_controller.type_text(id, text)?;
+                                smoke_note_id = Some(id);
+                                println!(
+                                    "honk300: owned Windows calibration note created and prefilled."
+                                );
+                                Ok(())
+                            } else {
+                                Ok(())
+                            }
+                        })
                     }
                     CollectWindowPayload::Meme { index } => {
                         if let Some(meme) = assets.meme(index) {
-                            collect_controller
+                            let result = collect_controller
                                 .spawn_image(request, &meme.title, &meme.pixmap)
-                                .map(|_| ())
+                                .map(|_| ());
+                            if result.is_ok() && !smoke_image_recorded {
+                                if let Some(path) = smoke_image_evidence.as_deref() {
+                                    write_smoke_image_evidence(
+                                        path,
+                                        index,
+                                        meme.pixmap.width(),
+                                        meme.pixmap.height(),
+                                        collect_display,
+                                    )?;
+                                    smoke_image_recorded = true;
+                                }
+                            }
+                            result
                         } else {
                             Ok(())
                         }
                     }
                 },
                 CollectWindowCommand::Move { id, top_left } => {
-                    collect_controller.move_window(id, top_left)
+                    let result = collect_controller.move_window(id, top_left);
+                    if result.is_ok() && smoke_note_id == Some(id) && !smoke_note_recorded {
+                        if let Some(origin) = smoke_note_origin {
+                            if Vec2::distance(origin, top_left) >= 20.0 {
+                                if let Some(path) = smoke_note_evidence.as_deref() {
+                                    let text = smoke_note
+                                        .as_deref()
+                                        .expect("smoke note id requires smoke note text");
+                                    write_smoke_note_evidence(path, origin, top_left, text)?;
+                                }
+                                smoke_note_recorded = true;
+                            }
+                        } else {
+                            smoke_note_origin = Some(top_left);
+                        }
+                    }
+                    result
                 }
                 CollectWindowCommand::SetPassthrough { id, passthrough } => {
                     collect_controller.set_passthrough(id, passthrough)
                 }
                 CollectWindowCommand::Focus { id } => collect_controller.focus(id),
                 CollectWindowCommand::TypeNote { id, note_index } => {
-                    if let Some(text) = assets.note_text(note_index) {
+                    if let Some(text) = smoke_note
+                        .as_deref()
+                        .or_else(|| assets.note_text(note_index))
+                    {
                         collect_controller.type_text(id, text)
                     } else {
                         Ok(())
@@ -558,6 +623,68 @@ fn smoke_collect_kind() -> Option<honk_engine::CollectWindowKind> {
         "meme" => Some(honk_engine::CollectWindowKind::Meme),
         _ => None,
     }
+}
+
+/// Exact text used only by the interactive Windows calibration preflight. The ordinary runtime
+/// never sets this variable; keeping the override next to the existing smoke hooks lets the
+/// qualification prove the real goose-driven owned-note path without changing user media.
+fn smoke_note_text() -> Option<String> {
+    std::env::var("HONK300_SMOKE_NOTE_TEXT")
+        .ok()
+        .filter(|text| !text.trim().is_empty())
+}
+
+fn write_smoke_note_evidence(
+    path: &Path,
+    origin: Vec2,
+    moved: Vec2,
+    text: &str,
+) -> std::io::Result<()> {
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    let text_sha256 = format!("{:x}", Sha256::digest(text.as_bytes()));
+    std::fs::write(
+        &temporary,
+        format!(
+            "schema=honk300.windows.calibration-note.v1\npid={}\ntext_sha256={}\nfrom={:.1},{:.1}\nto={:.1},{:.1}\ndistance={:.1}\nresult=created-prefilled-and-moved\n",
+            std::process::id(),
+            text_sha256,
+            origin.x,
+            origin.y,
+            moved.x,
+            moved.y,
+            Vec2::distance(origin, moved),
+        ),
+    )?;
+    std::fs::rename(temporary, path)
+}
+
+fn write_smoke_image_evidence(
+    path: &Path,
+    index: u32,
+    source_width: u32,
+    source_height: u32,
+    display: Rect,
+) -> std::io::Result<()> {
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    let (fitted_width, fitted_height) =
+        fitted_collect_image_size(source_width, source_height, display);
+    std::fs::write(
+        &temporary,
+        format!(
+            "schema=honk300.windows.collect-image.v1\npid={}\nindex={}\nsource_width={}\nsource_height={}\nfitted_width={}\nfitted_height={}\ndisplay={:.0},{:.0},{:.0},{:.0}\nresult=created-aspect-fitted\n",
+            std::process::id(),
+            index,
+            source_width,
+            source_height,
+            fitted_width,
+            fitted_height,
+            display.min.x,
+            display.min.y,
+            display.width(),
+            display.height(),
+        ),
+    )?;
+    std::fs::rename(temporary, path)
 }
 
 fn runtime_local_time() -> LocalTime {

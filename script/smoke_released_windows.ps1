@@ -24,6 +24,7 @@ $Version = $Tag.Substring(1)
 $Root = Join-Path $env:RUNNER_TEMP "honk300-live-msi-$([Guid]::NewGuid().ToString('N'))"
 $MsiExec = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) 'msiexec.exe'
 $Binary = Join-Path $env:ProgramFiles 'honk300\bin\honk300.exe'
+$AppLauncher = Join-Path $env:ProgramFiles 'honk300\bin\honk300-app.exe'
 $ArchitectureScript = Join-Path $PSScriptRoot 'verify_binary_architecture.py'
 $script:MsiInvocation = 0
 $ExpectedHost = if ($TargetTriple -eq 'aarch64-pc-windows-msvc') { 'ARM64' } else { 'AMD64' }
@@ -79,8 +80,8 @@ function Reported-Version {
 }
 
 function Assert-PeMachine {
-    param([string] $Path)
-    & python $ArchitectureScript --format pe --machine $ExpectedMachine $Path
+    param([string] $Path, [int] $Subsystem)
+    & python $ArchitectureScript --format pe --machine $ExpectedMachine --subsystem $Subsystem $Path
     if ($LASTEXITCODE -ne 0) { throw "PE identity check failed for $Path" }
 }
 
@@ -121,7 +122,7 @@ try {
     $SourceHash = $null
     if ($SourceBinaryPath) {
         $SourceBinaryPath = (Resolve-Path -LiteralPath $SourceBinaryPath).Path
-        Assert-PeMachine -Path $SourceBinaryPath
+        Assert-PeMachine -Path $SourceBinaryPath -Subsystem 3
         $SourceHash = (Get-FileHash -LiteralPath $SourceBinaryPath -Algorithm SHA256).Hash.ToLowerInvariant()
     }
 
@@ -132,11 +133,22 @@ try {
         throw "administrative extraction expected one honk300.exe, got $($ExtractedBinaries.Count)"
     }
     $ExtractedBinary = $ExtractedBinaries[0].FullName
-    Assert-PeMachine -Path $ExtractedBinary
+    Assert-PeMachine -Path $ExtractedBinary -Subsystem 3
     $ExtractedHash = (Get-FileHash -LiteralPath $ExtractedBinary -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($SourceHash -and $ExtractedHash -ne $SourceHash) {
         throw 'MSI-extracted binary does not match the exact qualified build'
     }
+    $ExtractedLaunchers = @(
+        Get-ChildItem -LiteralPath $AdministrativeStage -Recurse -Filter honk300-app.exe -File
+    )
+    if ($ExtractedLaunchers.Count -ne 1) {
+        throw "administrative extraction expected one honk300-app.exe, got $($ExtractedLaunchers.Count)"
+    }
+    $ExtractedLauncher = $ExtractedLaunchers[0].FullName
+    Assert-PeMachine -Path $ExtractedLauncher -Subsystem 2
+    $ExtractedLauncherHash = (
+        Get-FileHash -LiteralPath $ExtractedLauncher -Algorithm SHA256
+    ).Hash.ToLowerInvariant()
 
     foreach ($package in @($CurrentMsi, $PreviousMsi)) {
         $cleanup = Start-Msi -Mode '/x' -Path $package
@@ -160,14 +172,27 @@ try {
 
     Require-MsiSuccess -Mode '/i' -Path $CurrentMsi
     if ((Reported-Version) -ne $Version) { throw "upgrade did not install $Version" }
-    Assert-PeMachine -Path $Binary
+    Assert-PeMachine -Path $Binary -Subsystem 3
+    Assert-PeMachine -Path $AppLauncher -Subsystem 2
     $InstalledHash = (Get-FileHash -LiteralPath $Binary -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($InstalledHash -ne $ExtractedHash) {
         throw 'installed binary does not match the administratively extracted MSI payload'
     }
+    $InstalledLauncherHash = (
+        Get-FileHash -LiteralPath $AppLauncher -Algorithm SHA256
+    ).Hash.ToLowerInvariant()
+    if ($InstalledLauncherHash -ne $ExtractedLauncherHash) {
+        throw 'installed app launcher does not match the administratively extracted MSI payload'
+    }
     Require-MsiSuccess -Mode '/fa' -Path $CurrentMsi
     $RepairedHash = (Get-FileHash -LiteralPath $Binary -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($RepairedHash -ne $ExtractedHash) { throw 'MSI repair changed the installed executable' }
+    $RepairedLauncherHash = (
+        Get-FileHash -LiteralPath $AppLauncher -Algorithm SHA256
+    ).Hash.ToLowerInvariant()
+    if ($RepairedLauncherHash -ne $ExtractedLauncherHash) {
+        throw 'MSI repair changed the windowless app launcher'
+    }
 
     @(
         "target=$TargetTriple",
@@ -177,6 +202,9 @@ try {
         "extracted_sha256=$ExtractedHash",
         "installed_sha256=$InstalledHash",
         "repaired_sha256=$RepairedHash"
+        "extracted_launcher_sha256=$ExtractedLauncherHash"
+        "installed_launcher_sha256=$InstalledLauncherHash"
+        "repaired_launcher_sha256=$RepairedLauncherHash"
     ) | Set-Content -LiteralPath (Join-Path $OverlayEvidenceDirectory 'msi-identity.txt') -Encoding utf8
 
     & (Join-Path $PSScriptRoot 'smoke_windows_overlay.ps1') `
@@ -185,13 +213,28 @@ try {
         -AllowUnavailableTrayHost:($TargetTriple -eq 'aarch64-pc-windows-msvc') `
         -AllowUnobservableTrayRecoveryHost:$AllowUnobservableTrayRecoveryHost
 
-    $downgrade = Start-Msi -Mode '/i' -Path $PreviousMsi
-    if ($downgrade.ExitCode -in @(0, 3010)) { throw 'Downgrade unexpectedly succeeded' }
-    if ((Reported-Version) -ne $Version) { throw 'rejected downgrade changed the installed version' }
+    $receiptPath = Join-Path $env:ProgramFiles 'honk300\install-receipt.json'
+    $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+    if ($receipt.schema -ne 'honk300.install.v2' -or $receipt.origin -ne 'msi-global') {
+        throw 'published MSI did not commit the protected Global MSI receipt'
+    }
+    if ($receipt.app_launcher.path -ne $AppLauncher -or $receipt.app_launcher.sha256 -ne $InstalledLauncherHash) {
+        throw 'published MSI receipt did not bind the exact windowless app launcher'
+    }
+    if (-not (Test-Path (Join-Path $env:ProgramFiles 'honk300\current') -PathType Container)) {
+        throw 'published MSI did not activate the stable current junction'
+    }
+    foreach ($alias in @('honk300.exe', 'honk.exe', 'goose.exe')) {
+        $aliasPath = Join-Path $env:ProgramFiles "honk300\bin\$alias"
+        if ((& $aliasPath --version | Select-Object -Last 1).Trim() -notmatch "$Version$") {
+            throw "published MSI did not activate $alias"
+        }
+    }
 
     Require-MsiSuccess -Mode '/x' -Path $CurrentMsi
     if (Test-Path -LiteralPath $Binary -PathType Leaf) { throw 'MSI uninstall left honk300.exe behind' }
-    Write-Output "native Windows $TargetTriple $Tag rollback, upgrade, repair, downgrade, compositor, and uninstall smoke passed"
+    if (Test-Path -LiteralPath $AppLauncher -PathType Leaf) { throw 'MSI uninstall left honk300-app.exe behind' }
+    Write-Output "native Windows $TargetTriple $Tag rollback, slot upgrade, repair, compositor, and uninstall smoke passed"
 }
 finally {
     foreach ($package in @($CurrentMsi, $PreviousMsi)) {

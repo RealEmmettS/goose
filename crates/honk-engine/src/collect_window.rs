@@ -5,6 +5,75 @@
 //! platform runtime.
 
 use crate::math::{Rect, Vec2};
+use tiny_skia::{FilterQuality, Pixmap, PixmapPaint, Transform};
+
+/// A collect prop may be noticeable without becoming a temporary full-screen surface.
+pub const COLLECT_PROP_MAX_SCREEN_FRACTION: f32 = 0.48;
+const COLLECT_IMAGE_MAX_WIDTH: u32 = 900;
+const COLLECT_IMAGE_MAX_HEIGHT: u32 = 700;
+
+fn monitor_limited_extent(screen: f32, fraction: f32, minimum: f32, maximum: f32) -> f32 {
+    let safety_limit = (screen.max(1.0) * COLLECT_PROP_MAX_SCREEN_FRACTION)
+        .floor()
+        .max(1.0);
+    (screen * fraction)
+        .round()
+        .clamp(minimum, maximum)
+        .min(safety_limit)
+}
+
+/// A readable note target with a hard ceiling tied to the monitor that receives it.
+pub fn collect_note_size(display_bounds: Rect) -> Vec2 {
+    Vec2::new(
+        monitor_limited_extent(display_bounds.width(), 0.32, 420.0, 720.0),
+        monitor_limited_extent(display_bounds.height(), 0.32, 240.0, 420.0),
+    )
+}
+
+/// Aspect-preserving, downscale-only image dimensions for the receiving monitor.
+pub fn fitted_collect_image_size(width: u32, height: u32, display_bounds: Rect) -> (u32, u32) {
+    let max_width = (display_bounds.width().max(1.0) * COLLECT_PROP_MAX_SCREEN_FRACTION)
+        .floor()
+        .max(1.0) as u32;
+    let max_height = (display_bounds.height().max(1.0) * COLLECT_PROP_MAX_SCREEN_FRACTION)
+        .floor()
+        .max(1.0) as u32;
+    let max_width = max_width.min(COLLECT_IMAGE_MAX_WIDTH);
+    let max_height = max_height.min(COLLECT_IMAGE_MAX_HEIGHT);
+    let scale = 1.0_f64
+        .min(max_width as f64 / width.max(1) as f64)
+        .min(max_height as f64 / height.max(1) as f64);
+    (
+        ((width as f64 * scale).round() as u32).max(1),
+        ((height as f64 * scale).round() as u32).max(1),
+    )
+}
+
+/// Return the original pixels when they already fit; otherwise resample the entire image using
+/// one uniform scale factor. The output therefore cannot crop, stretch, or enlarge the source.
+pub fn fit_collect_image(pixmap: &Pixmap, display_bounds: Rect) -> Option<Pixmap> {
+    let (width, height) =
+        fitted_collect_image_size(pixmap.width(), pixmap.height(), display_bounds);
+    if width == pixmap.width() && height == pixmap.height() {
+        return Some(pixmap.clone());
+    }
+    let mut fitted = Pixmap::new(width, height)?;
+    fitted.draw_pixmap(
+        0,
+        0,
+        pixmap.as_ref(),
+        &PixmapPaint {
+            quality: FilterQuality::Bicubic,
+            ..PixmapPaint::default()
+        },
+        Transform::from_scale(
+            width as f32 / pixmap.width() as f32,
+            height as f32 / pixmap.height() as f32,
+        ),
+        None,
+    );
+    Some(fitted)
+}
 
 /// Opaque backend token for a window controlled by the collect-window runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -237,6 +306,39 @@ mod tests {
         assert_eq!(
             CollectWindowPayload::Meme { index: 4 }.kind(),
             CollectWindowKind::Meme
+        );
+    }
+
+    #[test]
+    fn collect_images_fit_without_cropping_stretching_or_upscaling() {
+        let display = Rect::new(Vec2::ZERO, Vec2::new(1620.0, 1080.0));
+        assert_eq!(fitted_collect_image_size(2400, 1600, display), (777, 518));
+        assert_eq!(fitted_collect_image_size(1000, 3000, display), (173, 518));
+        assert_eq!(fitted_collect_image_size(320, 180, display), (320, 180));
+
+        let panorama = fitted_collect_image_size(8000, 500, display);
+        assert_eq!(panorama, (777, 49));
+        let tiny_display = Rect::new(Vec2::ZERO, Vec2::new(640.0, 480.0));
+        let portrait = fitted_collect_image_size(500, 4000, tiny_display);
+        assert!(portrait.0 <= 307 && portrait.1 <= 230);
+        assert!((portrait.0 as f64 / portrait.1 as f64 - 0.125).abs() < 0.01);
+    }
+
+    #[test]
+    fn collect_notes_are_readable_but_bounded_on_every_display() {
+        for display in [
+            Rect::new(Vec2::ZERO, Vec2::new(640.0, 480.0)),
+            Rect::new(Vec2::ZERO, Vec2::new(1920.0, 1080.0)),
+            Rect::new(Vec2::ZERO, Vec2::new(3840.0, 2160.0)),
+        ] {
+            let size = collect_note_size(display);
+            assert!(size.x <= display.width() * COLLECT_PROP_MAX_SCREEN_FRACTION);
+            assert!(size.y <= display.height() * COLLECT_PROP_MAX_SCREEN_FRACTION);
+            assert!(size.x > 0.0 && size.y > 0.0);
+        }
+        assert_eq!(
+            collect_note_size(Rect::new(Vec2::ZERO, Vec2::new(1920.0, 1080.0))),
+            Vec2::new(614.0, 346.0)
         );
     }
 }

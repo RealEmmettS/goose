@@ -24,13 +24,23 @@ use honk_config::{reset_to_defaults, Config, ConfigError, ConfigLoadState};
 use honk_control::CommandServer;
 use honk_control::{
     send_command, wait_for_shutdown, ControlCommand, ControlResponse, LifecycleLease,
-    RuntimeStatus, Singleton,
+    RuntimeStatus, Singleton, SingletonStatus,
 };
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use runtime::RuntimeOptions;
 use std::io::{self, Write};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(windows)]
+    if install::run_windows_config_autostart_protocol()? {
+        return Ok(());
+    }
+
+    #[cfg(windows)]
+    if install::run_windows_slot_protocol()? {
+        return Ok(());
+    }
+
     #[cfg(windows)]
     if std::env::var_os("HONK300_INTERNAL_WINDOWS_UNINSTALL").as_deref()
         == Some(std::ffi::OsStr::new("1"))
@@ -70,20 +80,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::Config { config }) => run_config(config),
         Some(Command::Install { autostart }) => install::install(autostart),
         Some(Command::Uninstall { purge }) => install::uninstall(purge),
-        Some(Command::Update) => update::run(),
+        Some(Command::Update { json }) => update::run(json),
         Some(Command::Setup { config, reset }) => run_setup(config, reset),
         Some(Command::Start { options }) => run_start(options),
         None => run_start(StartOptions::default()),
-        Some(Command::Stop | Command::Reload | Command::Status | Command::Do { .. }) => {
+        Some(Command::Stop { .. } | Command::Reload | Command::Status | Command::Do { .. }) => {
             unreachable!()
         }
     }
 }
 
 fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
-    let wait_for_stop = matches!(&cli.command, Some(Command::Stop));
+    let wait_for_stop = matches!(&cli.command, Some(Command::Stop { .. }));
+    let is_force_stop = matches!(&cli.command, Some(Command::Stop { force: true }));
+    let is_status = matches!(&cli.command, Some(Command::Status));
+    let force_runtime_was_running = if is_force_stop {
+        let (probe, status) = Singleton::acquire()?;
+        drop(probe);
+        status == SingletonStatus::AlreadyRunning
+    } else {
+        false
+    };
     let command = match cli.command {
-        Some(Command::Stop) => ControlCommand::Stop,
+        Some(Command::Stop { force: false }) => ControlCommand::Stop,
+        Some(Command::Stop { force: true }) => ControlCommand::ForceStop,
         Some(Command::Reload) => ControlCommand::Reload,
         Some(Command::Status) => ControlCommand::Status,
         Some(Command::Do { action }) => ControlCommand::Do(action.into_engine()),
@@ -92,20 +112,27 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             | Command::Config { .. }
             | Command::Install { .. }
             | Command::Uninstall { .. }
-            | Command::Update
+            | Command::Update { .. }
             | Command::Setup { .. },
         )
         | None => unreachable!("non-client commands are handled separately"),
     };
     let response = match send_command(command) {
         Ok(response) => response,
+        // A hard stop intentionally tears down the IPC endpoint without unwinding the runtime.
+        // If the response bytes lose that race, the singleton is the authoritative completion
+        // signal. Only accept that fallback when a runtime demonstrably existed before dispatch.
+        Err(_err) if is_force_stop && force_runtime_was_running => {
+            wait_for_shutdown()?;
+            ControlResponse::Ok
+        }
         Err(err)
             if matches!(
                 err.kind(),
                 std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused
             ) =>
         {
-            if matches!(cli.command, Some(Command::Status)) {
+            if is_status {
                 print_status(RuntimeStatus::not_running())?;
                 return Ok(());
             }
@@ -171,7 +198,12 @@ fn ignore_broken_pipe(result: io::Result<()>) -> io::Result<()> {
 
 fn run_config(config: Option<std::path::PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
     let path = honk_config::resolve_path(config)?;
-    honk_config_tui::run(path)?;
+    let mut loaded = Config::load_or_default(Some(path.clone()))?;
+    install::prepare_config_autostart(&path, &mut loaded.config)?;
+    honk_config_tui::run_with_save_hook(path, |config| {
+        install::reconcile_config_autostart(config.lifecycle.autostart_on_login)
+            .map_err(|error| error.to_string())
+    })?;
     Ok(())
 }
 
@@ -230,10 +262,11 @@ fn run_start(options: StartOptions) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let loaded = Config::load_or_default(options.config.clone())?;
+    let mut loaded = Config::load_or_default(options.config.clone())?;
     if let Some(warning) = &loaded.warning {
         eprintln!("honk300 config: {warning}");
     }
+    install::prepare_config_autostart(&loaded.path, &mut loaded.config)?;
 
     let server = CommandServer::start()?;
     runtime::windows::run(
@@ -259,10 +292,11 @@ fn run_start(options: StartOptions) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let loaded = Config::load_or_default(options.config.clone())?;
+    let mut loaded = Config::load_or_default(options.config.clone())?;
     if let Some(warning) = &loaded.warning {
         eprintln!("honk300 config: {warning}");
     }
+    install::prepare_config_autostart(&loaded.path, &mut loaded.config)?;
 
     let server = CommandServer::start()?;
     runtime::macos::run(
@@ -287,10 +321,11 @@ fn run_start(options: StartOptions) -> Result<(), Box<dyn std::error::Error>> {
         println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
         return Ok(());
     }
-    let loaded = Config::load_or_default(options.config.clone())?;
+    let mut loaded = Config::load_or_default(options.config.clone())?;
     if let Some(warning) = &loaded.warning {
         eprintln!("honk300 config: {warning}");
     }
+    install::prepare_config_autostart(&loaded.path, &mut loaded.config)?;
 
     let server = CommandServer::start()?;
     runtime::linux::run(

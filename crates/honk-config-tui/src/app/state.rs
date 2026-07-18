@@ -97,6 +97,7 @@ pub enum ToggleField {
     NoMouseSteal,
     NoWindowRide,
     Wayland,
+    AutostartOnLogin,
     OnHourHonk,
     MultiMonitorChase,
     CanAttackMouse,
@@ -341,6 +342,9 @@ impl AppState {
                 self.config.safety.no_window_ride = !self.config.safety.no_window_ride
             }
             ToggleField::Wayland => self.config.platform.wayland = !self.config.platform.wayland,
+            ToggleField::AutostartOnLogin => {
+                self.config.lifecycle.autostart_on_login = !self.config.lifecycle.autostart_on_login
+            }
             ToggleField::OnHourHonk => {
                 self.config.behaviors.on_hour_double_honk =
                     !self.config.behaviors.on_hour_double_honk
@@ -601,6 +605,11 @@ impl AppState {
                     "Wayland backend",
                     restart_required(self.config.platform.wayland),
                     RowKind::Toggle(ToggleField::Wayland),
+                ),
+                row(
+                    "Start on login",
+                    on_off(self.config.lifecycle.autostart_on_login),
+                    RowKind::Toggle(ToggleField::AutostartOnLogin),
                 ),
             ],
             Category::Behaviors => vec![
@@ -1157,6 +1166,24 @@ mod tests {
         assert!(app.config.audio.enabled);
         app.apply(Action::Toggle);
         assert!(!app.config.audio.enabled);
+        assert!(app.dirty());
+    }
+
+    #[test]
+    fn general_login_start_row_controls_the_persisted_lifecycle_preference() {
+        let mut app = app();
+        let rows = app.rows();
+        let index = rows
+            .iter()
+            .position(|row| row.label == "Start on login")
+            .expect("General must expose login start");
+        assert_eq!(rows[index].value, "off");
+
+        app.selected_row = index;
+        app.apply(Action::Toggle);
+
+        assert!(app.config.lifecycle.autostart_on_login);
+        assert_eq!(app.rows()[index].value, "on");
         assert!(app.dirty());
     }
 

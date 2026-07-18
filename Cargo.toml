@@ -2,8 +2,9 @@
 #
 # A deliberate divergence from the single-crate *300 sibling repos (TR300/ND300/WB300):
 # the workspace forces the platform-agnostic engine (`honk-engine`) to never `use` an OS
-# crate. The shipped artifact still remains ONE binary (installed under three names),
-# which keeps cargo-dist / the installers happy in a later packaging round.
+# crate. The shipped product runtime remains one public binary installed under three names;
+# Windows packages additionally carry one internal GUI-subsystem launcher for windowless app and
+# login startup.
 #
 # M19 owns the release metadata and installer/update lifecycle. Round R3 (ADR 0017) adds the two
 # Apple targets so cargo-dist emits darwin tar.xz archives and the shell installer covers macOS;
@@ -37,12 +38,13 @@ repository = "https://github.com/RealEmmettS/goose"
 # `png-format` pulls the `png` encoder used by the offscreen golden-frame test harness.
 tiny-skia = { version = "0.11", features = ["png-format"] }
 
-# The root package is also the shipped `honk300` binary (the plan puts `src/main.rs` at the
-# workspace root). M1/M2 wire the engine to the Windows overlay; M10 adds CLI/IPC control,
-# and M12 owns the full config TUI.
+# The root package ships the `honk300` CLI/runtime plus a Windows-only GUI-subsystem launcher.
+# The latter is deliberately selected only for Windows archives and installers so Explorer,
+# shortcuts, and login startup never allocate or focus a console. M1/M2 wire the engine to the
+# Windows overlay; M10 adds CLI/IPC control, and M12 owns the full config TUI.
 [package]
 name = "honk300"
-version = "1.1.0"
+version = "1.2.0"
 description = "Cross-platform Desktop Goose — a procedural goose that roams your screen"
 edition.workspace = true
 rust-version.workspace = true
@@ -60,9 +62,11 @@ include = [
     "/crates/**",
     "/src/**",
     "/script/**",
+    "!/script/**/__pycache__/**",
     "/wix/**",
     "/wix-corporate/**",
     "/inno/**",
+    "!/inno/Output/**",
 ]
 
 [package.metadata.wix]
@@ -74,6 +78,10 @@ eula = false
 [[bin]]
 name = "honk300"
 path = "src/main.rs"
+
+[[bin]]
+name = "honk300-app"
+path = "src/bin/honk300-app.rs"
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
@@ -143,3 +151,13 @@ pr-run-mode = "plan"
 install-updater = false
 install-path = "CARGO_HOME"
 publish-prereleases = false
+
+[workspace.metadata.dist.binaries]
+x86_64-pc-windows-msvc = ["honk300", "honk300-app"]
+aarch64-pc-windows-msvc = ["honk300", "honk300-app"]
+x86_64-apple-darwin = ["honk300"]
+aarch64-apple-darwin = ["honk300"]
+x86_64-unknown-linux-gnu = ["honk300"]
+aarch64-unknown-linux-gnu = ["honk300"]
+x86_64-unknown-linux-musl = ["honk300"]
+aarch64-unknown-linux-musl = ["honk300"]

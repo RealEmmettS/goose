@@ -10,6 +10,7 @@ RELEASE = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
 WINDOWS = (WORKFLOWS / "windows-installers.yml").read_text(encoding="utf-8")
 MACOS = (WORKFLOWS / "macos-packaging.yml").read_text(encoding="utf-8")
 CI = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
+POST_RELEASE = (WORKFLOWS / "post-release-smoke.yml").read_text(encoding="utf-8")
 CARGO = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
 
 
@@ -184,11 +185,16 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "release-portable-${{ matrix.triple }}",
             "honk300-${{ matrix.triple }}.zip",
             "cargo-dist ZIP must contain root honk300.exe",
+            "cargo-dist ZIP must contain root honk300-app.exe",
+            "--subsystem 3",
+            "--subsystem 2",
             "verify_binary_architecture.py --format pe",
             "zip_sha256_before",
             "zip_sha256_after",
             "binary_sha256_before",
             "binary_sha256_after",
+            "launcher_sha256_before",
+            "launcher_sha256_after",
             "smoke_windows_overlay.ps1",
             "qualification-windows-portable-${{ matrix.triple }}",
         ):
@@ -204,10 +210,38 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "qualification-input-windows-aarch64-pc-windows-msvc",
             "runs-on: windows-11-arm",
             "-TargetTriple aarch64-pc-windows-msvc",
+            "-AppLauncher target/qualification-input-aarch64-pc-windows-msvc/honk300-app.exe",
             "-CurrentMsiPath target/qualification-input-aarch64-pc-windows-msvc/",
             "-SourceBinaryPath target/qualification-input-aarch64-pc-windows-msvc/honk300.exe",
         ):
             self.assertIn(required, WINDOWS)
+
+    def test_windows_takeover_matrix_runs_for_candidate_main_and_public_bytes(self) -> None:
+        for required in (
+            "smoke_windows_installer_takeover.ps1",
+            "real x64 four-family takeover ordering",
+            "real native ARM64 four-family takeover ordering",
+            "qualification-windows-installer-takeover-${{ matrix.triple }}",
+            "qualification-windows-installer-takeover-aarch64-pc-windows-msvc",
+        ):
+            self.assertIn(required, WINDOWS)
+        for required in (
+            "same-sha-windows-installers:",
+            "uses: ./.github/workflows/windows-installers.yml",
+            "same_sha_main: true",
+            "commit: ${{ needs.same-sha-plan.outputs.commit }}",
+        ):
+            self.assertIn(required, CI)
+        for required in (
+            "Download exact public four-family installers and qualify takeover",
+            "honk300-$triple-corporate.msi",
+            "honk300-$triple-setup.exe",
+            "honk300-$triple-corporate-setup.exe",
+            "latest alias does not identify exact $tag bytes",
+            "smoke_windows_installer_takeover.ps1",
+            "post-release-windows-takeover-$triple",
+        ):
+            self.assertIn(required, POST_RELEASE)
 
 
 if __name__ == "__main__":

@@ -77,6 +77,16 @@ install_and_verify() {
   sudo apt-get install --yes "$PACKAGE"
   [ -x /usr/lib/honk300/honk300 ]
   [ "$(cat /usr/lib/honk300/install-source.txt)" = deb ]
+  python3 - <<'PY'
+import json
+from pathlib import Path
+receipt = json.loads(Path('/usr/lib/honk300/install-receipt.json').read_text())
+assert receipt['schema'] == 'honk300.install.v2'
+assert receipt['origin'] == 'deb'
+assert receipt['installer_family'] == 'deb'
+assert receipt['release_track'] == 'stable'
+assert receipt['active_release'] == '/usr/lib/honk300'
+PY
   [ -f "$PACKAGED_TRAY_ICON" ] && [ ! -L "$PACKAGED_TRAY_ICON" ]
   ldd /usr/lib/honk300/honk300 > "$EVIDENCE_DIR/installed-ldd.txt"
   if grep -F 'not found' "$EVIDENCE_DIR/installed-ldd.txt"; then
@@ -88,7 +98,7 @@ install_and_verify() {
     [ "$(readlink "/usr/bin/$name")" = '../lib/honk300/honk300' ]
     reported="$("/usr/bin/$name" --version | awk '{ print $NF }' | sed 's/[+-].*$//')"
     [ "$reported" = "$VERSION" ]
-    "/usr/bin/$name" update | grep -F "already on the latest version ($VERSION)"
+    "/usr/bin/$name" update 2>&1 | grep -F "already on the latest version ($VERSION)"
   done
   dpkg-query --search /usr/lib/honk300/honk300 | grep -F 'honk300: /usr/lib/honk300/honk300'
 }

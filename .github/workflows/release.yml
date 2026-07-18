@@ -377,6 +377,15 @@ jobs:
             test "$(readlink "$extracted/usr/bin/honk")" = '../lib/honk300/honk300'
             test "$(readlink "$extracted/usr/bin/goose")" = '../lib/honk300/honk300'
             test "$(cat "$extracted/usr/lib/honk300/install-source.txt")" = deb
+            python3 - <<PY
+          import json
+          from pathlib import Path
+          receipt = json.loads(Path('$extracted/usr/lib/honk300/install-receipt.json').read_text())
+          assert receipt['schema'] == 'honk300.install.v2'
+          assert receipt['origin'] == 'deb'
+          assert receipt['target'] == '$triple'
+          assert receipt['active_release'] == '/usr/lib/honk300'
+          PY
             test "$(dpkg-deb --field "$output" Package)" = honk300
             test "$(dpkg-deb --field "$output" Version)" = "$version"
             test "$(dpkg-deb --field "$output" Architecture)" = "$architecture"
@@ -509,22 +518,30 @@ jobs:
           New-Item -ItemType Directory -Force -Path $extract, $evidence | Out-Null
           Expand-Archive -LiteralPath $zip -DestinationPath $extract
           $binary = Join-Path $extract 'honk300.exe'
+          $launcher = Join-Path $extract 'honk300-app.exe'
           if (-not (Test-Path -LiteralPath $binary -PathType Leaf)) {
             throw "cargo-dist ZIP must contain root honk300.exe"
+          }
+          if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) {
+            throw "cargo-dist ZIP must contain root honk300-app.exe"
           }
           $unexpected = Get-ChildItem -LiteralPath $extract -Recurse -Filter honk300.exe |
             Where-Object { $_.FullName -ne (Resolve-Path -LiteralPath $binary).Path }
           if ($unexpected) { throw 'cargo-dist ZIP contains duplicate honk300.exe payloads' }
-          python script/verify_binary_architecture.py --format pe --machine '${{ matrix.machine }}' $binary |
+          python script/verify_binary_architecture.py --format pe --machine '${{ matrix.machine }}' --subsystem 3 $binary |
             Tee-Object -FilePath (Join-Path $evidence 'architecture.txt')
+          python script/verify_binary_architecture.py --format pe --machine '${{ matrix.machine }}' --subsystem 2 $launcher |
+            Tee-Object -FilePath (Join-Path $evidence 'launcher-architecture.txt')
           if ($LASTEXITCODE -ne 0) { throw 'cargo-dist PE identity check failed' }
           $zipBefore = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           $binaryBefore = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
+          $launcherBefore = (Get-FileHash -LiteralPath $launcher -Algorithm SHA256).Hash.ToLowerInvariant()
           @(
             "triple=${{ matrix.triple }}",
             "pe_machine=${{ matrix.machine }}",
             "zip_sha256_before=$zipBefore",
             "binary_sha256_before=$binaryBefore"
+            "launcher_sha256_before=$launcherBefore"
           ) | Set-Content -LiteralPath (Join-Path $evidence 'identity.txt') -Encoding utf8
           $allowUnavailableTrayHost = '${{ matrix.host_arch }}' -eq 'ARM64'
           $allowUnobservableTrayRecoveryHost = '${{ matrix.host_arch }}' -eq 'AMD64'
@@ -535,11 +552,14 @@ jobs:
             -AllowUnobservableTrayRecoveryHost:$allowUnobservableTrayRecoveryHost
           $zipAfter = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           $binaryAfter = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
+          $launcherAfter = (Get-FileHash -LiteralPath $launcher -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($zipAfter -ne $zipBefore) { throw 'cargo-dist ZIP changed during qualification' }
           if ($binaryAfter -ne $binaryBefore) { throw 'extracted binary changed during qualification' }
+          if ($launcherAfter -ne $launcherBefore) { throw 'extracted app launcher changed during qualification' }
           @(
             "zip_sha256_after=$zipAfter",
             "binary_sha256_after=$binaryAfter"
+            "launcher_sha256_after=$launcherAfter"
           ) | Add-Content -LiteralPath (Join-Path $evidence 'identity.txt') -Encoding utf8
 
       - name: Upload exact Windows portable qualification evidence
@@ -704,7 +724,7 @@ jobs:
             HONK300_TEST_LOCAL_DIR="$PWD/release-assets" \
               sh release-assets/honk300-installer.sh
           done
-          binary="$smoke/data/honk300/install/bin/honk300"
+          binary="$smoke/data/honk300/install/current/bin/honk300"
           test -x "$binary"
           test "$("$binary" --version | awk '{print $NF}' | sed 's/[+-].*$//')" = "${TAG#v}"
           test "$(readlink "$smoke/home/.local/bin/honk300")" = "$binary"

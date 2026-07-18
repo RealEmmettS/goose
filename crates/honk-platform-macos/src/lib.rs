@@ -125,8 +125,8 @@ mod platform {
     };
     use honk_control::ControlSurfaceCommand;
     use honk_engine::collect_window::{
-        CollectWindowCloseOrigin, CollectWindowId, CollectWindowKind, CollectWindowRequestId,
-        CollectWindowSnapshot,
+        collect_note_size, fit_collect_image, CollectWindowCloseOrigin, CollectWindowId,
+        CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot,
     };
     use honk_engine::{
         ForeignWindowId, ForeignWindowSnapshot, LocalTime, PresenceSnapshot, Rect, Vec2,
@@ -1364,6 +1364,7 @@ mod platform {
         windows: HashMap<CollectWindowId, ControlledWindow>,
         active_request: Option<(CollectWindowRequestId, CollectWindowKind)>,
         spawn_top_left: Vec2,
+        display_bounds: Rect,
         coordinate_space: Rect,
     }
 
@@ -1375,17 +1376,20 @@ mod platform {
                 windows: HashMap::new(),
                 active_request: None,
                 spawn_top_left: Vec2::new(primary_bounds.min.x + 40.0, primary_bounds.min.y + 80.0),
+                display_bounds: primary_bounds,
                 coordinate_space: appkit_coordinate_space(primary_bounds, virtual_desktop_bounds),
             }
         }
 
         pub fn update_display_bounds(
             &mut self,
+            display_bounds: Rect,
             primary_bounds: Rect,
             virtual_desktop_bounds: Rect,
         ) {
+            self.display_bounds = display_bounds;
             self.spawn_top_left =
-                Vec2::new(primary_bounds.min.x + 40.0, primary_bounds.min.y + 80.0);
+                Vec2::new(display_bounds.min.x + 40.0, display_bounds.min.y + 80.0);
             self.coordinate_space = appkit_coordinate_space(primary_bounds, virtual_desktop_bounds);
         }
 
@@ -1436,7 +1440,7 @@ mod platform {
                 .mtm
                 .ok_or_else(|| io::Error::other("macOS collect windows require the main thread"))?;
             let id = self.alloc_id();
-            let size = Vec2::new(340.0, 180.0);
+            let size = collect_note_size(self.display_bounds);
             let window = create_prop_window(
                 mtm,
                 "Honk300 Note",
@@ -1486,6 +1490,8 @@ mod platform {
                 .mtm
                 .ok_or_else(|| io::Error::other("macOS collect windows require the main thread"))?;
             let id = self.alloc_id();
+            let pixmap = fit_collect_image(pixmap, self.display_bounds)
+                .ok_or_else(|| io::Error::other("could not allocate a bounded collect image"))?;
             let size = Vec2::new(pixmap.width() as f32, pixmap.height() as f32);
             let window = create_prop_window(
                 mtm,

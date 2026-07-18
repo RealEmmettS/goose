@@ -145,6 +145,11 @@ pub fn run(
                     request.respond(ControlResponse::Ok);
                     RuntimeCore::begin_graceful_stop(&mut world);
                 }
+                ControlCommand::ForceStop => {
+                    println!("honk300: forced stop command received; stopping immediately.");
+                    request.respond(ControlResponse::Ok);
+                    return Ok(());
+                }
                 ControlCommand::Reload => {
                     let response = match Config::load_existing(&options.config_path) {
                         Ok(next_config)

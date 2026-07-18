@@ -86,12 +86,65 @@ jobs:
             -TargetTriple '${{ matrix.triple }}' `
             -AllowUnobservableTrayRecoveryHost:('${{ matrix.triple }}' -eq 'x86_64-pc-windows-msvc') `
             -OverlayEvidenceDirectory 'target/post-release-windows-overlay-${{ matrix.triple }}'
+      - name: Download exact public four-family installers and qualify takeover
+        env:
+          HONK300_SMOKE_TAG: ${{ inputs.tag }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:HONK300_SMOKE_TAG
+          $version = $tag.TrimStart('v')
+          $triple = '${{ matrix.triple }}'
+          $stage = Join-Path $env:RUNNER_TEMP "honk300-public-takeover-$triple"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          function Get-VerifiedAsset([string] $name) {
+            $asset = Join-Path $stage $name
+            $sidecar = "$asset.sha256"
+            $base = "https://github.com/RealEmmettS/goose/releases/download/$tag"
+            Invoke-WebRequest -UseBasicParsing "$base/$name" -OutFile $asset -MaximumRetryCount 4 -RetryIntervalSec 2
+            Invoke-WebRequest -UseBasicParsing "$base/$name.sha256" -OutFile $sidecar -MaximumRetryCount 4 -RetryIntervalSec 2
+            $expected = ((Get-Content -LiteralPath $sidecar -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
+            $actual = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($expected -notmatch '^[0-9a-f]{64}$' -or $actual -ne $expected) {
+              throw "public checksum mismatch for $name"
+            }
+            $latest = Join-Path $stage "latest-$name"
+            $latestSidecar = "$latest.sha256"
+            $latestBase = 'https://github.com/RealEmmettS/goose/releases/latest/download'
+            Invoke-WebRequest -UseBasicParsing "$latestBase/$name" -OutFile $latest -MaximumRetryCount 4 -RetryIntervalSec 2
+            Invoke-WebRequest -UseBasicParsing "$latestBase/$name.sha256" -OutFile $latestSidecar -MaximumRetryCount 4 -RetryIntervalSec 2
+            $latestExpected = ((Get-Content -LiteralPath $latestSidecar -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
+            $latestActual = (Get-FileHash -LiteralPath $latest -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($latestExpected -ne $actual -or $latestActual -ne $actual) {
+              throw "latest alias does not identify exact $tag bytes for $name"
+            }
+            return $asset
+          }
+          $globalMsi = Get-VerifiedAsset "honk300-$triple.msi"
+          $corporateMsi = Get-VerifiedAsset "honk300-$triple-corporate.msi"
+          $globalExe = Get-VerifiedAsset "honk300-$triple-setup.exe"
+          $corporateExe = Get-VerifiedAsset "honk300-$triple-corporate-setup.exe"
+          ./script/smoke_windows_installer_takeover.ps1 `
+            -GlobalMsi $globalMsi `
+            -CorporateMsi $corporateMsi `
+            -GlobalExe $globalExe `
+            -CorporateExe $corporateExe `
+            -ExpectedVersion $version `
+            -EvidenceDirectory "target/post-release-windows-takeover-$triple" `
+            -AllowMachineMutation
       - name: Upload published Windows overlay qualification evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
         with:
           name: honk300-windows-overlay-published-${{ matrix.triple }}-${{ inputs.tag }}
           path: target/post-release-windows-overlay-${{ matrix.triple }}
+          if-no-files-found: error
+      - name: Upload published Windows installer takeover evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: honk300-windows-takeover-published-${{ matrix.triple }}-${{ inputs.tag }}
+          path: target/post-release-windows-takeover-${{ matrix.triple }}
           if-no-files-found: error
 
   debian-package:

@@ -74,6 +74,35 @@ function Open-VerifiedPinnedFile([string] $Path, [int64] $ExpectedSize, [string]
     }
 }
 
+function Read-PeSubsystem([string] $Path) {
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -lt 0x40) { throw "PE is truncated: $Path" }
+    $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
+    $optional = $peOffset + 24
+    if ($optional + 70 -ge $bytes.Length) { throw "PE optional header is truncated: $Path" }
+    return [BitConverter]::ToUInt16($bytes, $optional + 68)
+}
+
+function Get-HiddenProgramVersion([string] $Path) {
+    $start = [Diagnostics.ProcessStartInfo]::new()
+    $start.FileName = $Path
+    $start.Arguments = '--version'
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = $true
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $start
+    if (-not $process.Start()) { throw "could not start hidden version verification: $Path" }
+    $stdout = $process.StandardOutput.ReadToEnd()
+    $stderr = $process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+    if ($process.ExitCode -ne 0) {
+        throw "hidden version verification failed for ${Path}: $stderr"
+    }
+    return ($stdout.Trim().Split()[-1] -replace '[+-].*$', '')
+}
+
 function Start-LifecycleLease([IO.Stream] $ArchiveStream, [string] $WorkRoot) {
     Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -125,76 +154,6 @@ function Start-LifecycleLease([IO.Stream] $ArchiveStream, [string] $WorkRoot) {
     return $process
 }
 
-function Assert-NoRestartManagerLocks([string[]] $Paths) {
-    if (-not ('Honk300RestartManagerProbe' -as [type])) {
-        Add-Type -TypeDefinition @'
-using System;
-using System.ComponentModel;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Text;
-
-public static class Honk300RestartManagerProbe
-{
-    private const int ErrorMoreData = 234;
-
-    [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)]
-    private static extern int RmStartSession(out uint handle, int flags, StringBuilder sessionKey);
-
-    [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)]
-    private static extern int RmRegisterResources(
-        uint handle,
-        uint fileCount,
-        string[] fileNames,
-        uint applicationCount,
-        IntPtr applications,
-        uint serviceCount,
-        string[] serviceNames);
-
-    [DllImport("rstrtmgr.dll")]
-    private static extern int RmGetList(
-        uint handle,
-        out uint processInfoNeeded,
-        ref uint processInfoCount,
-        IntPtr processInfo,
-        ref uint rebootReasons);
-
-    [DllImport("rstrtmgr.dll")]
-    private static extern int RmEndSession(uint handle);
-
-    public static void AssertUnlocked(string path)
-    {
-        if (!File.Exists(path)) return;
-        uint handle;
-        var key = new StringBuilder(64);
-        int result = RmStartSession(out handle, 0, key);
-        if (result != 0) throw new Win32Exception(result, "Restart Manager session failed");
-        try
-        {
-            result = RmRegisterResources(handle, 1, new[] { path }, 0, IntPtr.Zero, 0, null);
-            if (result != 0) throw new Win32Exception(result, "Restart Manager registration failed");
-            uint needed = 0;
-            uint count = 0;
-            uint reasons = 0;
-            result = RmGetList(handle, out needed, ref count, IntPtr.Zero, ref reasons);
-            if (result != 0 && result != ErrorMoreData)
-                throw new Win32Exception(result, "Restart Manager lock query failed");
-            if (needed != 0)
-                throw new InvalidOperationException("another Windows session is using " + path);
-        }
-        finally
-        {
-            RmEndSession(handle);
-        }
-    }
-}
-'@
-    }
-    foreach ($candidate in $Paths) {
-        [Honk300RestartManagerProbe]::AssertUnlocked($candidate)
-    }
-}
-
 try {
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -213,13 +172,7 @@ try {
     if ($msiexecItem.PSIsContainer -or (($msiexecItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
         throw "Windows Installer is not a regular system executable: $msiexec"
     }
-    $installedBin = Join-Path $env:ProgramFiles 'honk300\bin'
-    Assert-NoRestartManagerLocks @(
-        (Join-Path $installedBin 'honk300.exe'),
-        (Join-Path $installedBin 'honk.exe'),
-        (Join-Path $installedBin 'goose.exe')
-    )
-    $arguments = @('/i', ('"' + $path + '"'), '/passive', '/norestart')
+    $arguments = @('/i', ('"' + $path + '"'), 'HONK300ORIGIN=powershell', '/passive', '/norestart')
     $process = Start-Process -FilePath $msiexec -ArgumentList $arguments -Verb RunAs -Wait -PassThru
     if ($process.ExitCode -ne 0) {
         throw "msiexec.exe exited with code $($process.ExitCode); pending or reboot-deferred replacement is not accepted"
@@ -229,30 +182,33 @@ try {
     if (-not (Test-Path -LiteralPath $installed -PathType Leaf)) {
         throw "Global MSI completed but the installed executable is missing: $installed"
     }
-    $reported = (& $installed --version | Select-Object -Last 1).Trim().Split()[-1] -replace '[+-].*$', ''
+    $reported = Get-HiddenProgramVersion $installed
     if ($reported -ne $Version) {
         throw "Global MSI completed but installed version is $reported, expected $Version"
     }
+    if ((Read-PeSubsystem $installed) -ne 3) {
+        throw 'Global MSI installed a public CLI that is not a console-subsystem PE'
+    }
+    $installedLauncher = Join-Path $env:ProgramFiles 'honk300\bin\honk300-app.exe'
+    if (-not (Test-Path -LiteralPath $installedLauncher -PathType Leaf) -or
+        (Read-PeSubsystem $installedLauncher) -ne 2) {
+        throw 'Global MSI did not install the windowless GUI-subsystem app launcher'
+    }
+    $installedLauncherHash = (
+        Get-FileHash -LiteralPath $installedLauncher -Algorithm SHA256
+    ).Hash.ToLowerInvariant()
 
     $installRoot = Join-Path $env:ProgramFiles 'honk300'
-    $runKey = Get-ItemProperty -LiteralPath 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue
-    $autostartEnabled = $null -ne $runKey -and $runKey.PSObject.Properties.Name -contains 'Honk300'
-    $receipt = [ordered]@{
-        schema = 'honk300.install.v1'
-        version = $Version
-        tag = $Tag
-        commit = $Commit
-        channel = 'powershell-global-msi'
-        layout = 'windows-global-msi'
-        target = $triple
-        artifact = [ordered]@{ name = $artifact; sha256 = $expectedHash.ToLowerInvariant() }
-        install_root = $installRoot
-        aliases = @(
-            (Join-Path $installRoot 'bin\honk300.exe'),
-            (Join-Path $installRoot 'bin\honk.exe'),
-            (Join-Path $installRoot 'bin\goose.exe')
-        )
-        autostart = [ordered]@{ enabled = $autostartEnabled; owner = 'msi' }
+    $protectedReceipt = Join-Path $installRoot 'install-receipt.json'
+    $receipt = Get-Content -LiteralPath $protectedReceipt -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    if ($receipt.schema -ne 'honk300.install.v2' -or $receipt.origin -ne 'powershell' -or
+        $receipt.installer_family -ne 'powershell' -or $receipt.release_track -ne 'stable' -or
+        $receipt.version -ne $Version -or $receipt.target -ne $triple -or
+        $receipt.artifact.name -ne $artifact -or $receipt.artifact.sha256 -ne $expectedHash.ToLowerInvariant() -or
+        [int64]$receipt.artifact.size -ne $expectedSize -or
+        $receipt.app_launcher.path -ne $installedLauncher -or
+        $receipt.app_launcher.sha256 -ne $installedLauncherHash) {
+        throw 'Global MSI completed without the exact PowerShell-origin protected receipt'
     }
     $receiptDir = Join-Path $env:LOCALAPPDATA 'honk300'
     $receiptPath = Join-Path $receiptDir 'install-receipt.json'
@@ -281,7 +237,7 @@ try {
         } catch {
             throw "refusing to replace a foreign install receipt: $receiptPath"
         }
-        if ($existingReceipt.schema -ne 'honk300.install.v1') {
+        if ($existingReceipt.schema -notin @('honk300.install.v1', 'honk300.install.v2')) {
             throw "refusing to replace a foreign install receipt: $receiptPath"
         }
     }

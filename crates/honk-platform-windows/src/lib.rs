@@ -19,44 +19,34 @@ mod tray;
 pub use tray::StatusTray;
 
 use honk_engine::collect_window::{
-    CollectWindowCloseOrigin, CollectWindowId, CollectWindowKind, CollectWindowRequestId,
-    CollectWindowSnapshot,
+    collect_note_size, fit_collect_image, CollectWindowCloseOrigin, CollectWindowId,
+    CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot,
 };
 use honk_engine::math::Rect;
 use honk_engine::{ForeignWindowId, ForeignWindowSnapshot, PresenceSnapshot};
 use honk_engine::{LocalTime, Vec2};
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::ffi::{c_void, OsString};
+use std::ffi::c_void;
 use std::fs;
 use std::io::Write;
-use std::os::windows::ffi::OsStringExt;
-use std::path::{Path, PathBuf};
-use std::process::{Child, Command};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
 use tiny_skia::Pixmap;
-use windows::core::{w, Error, Result, BSTR, PCWSTR};
+use windows::core::{w, Error, Result, PCWSTR};
 use windows::Win32::Foundation::{
     BOOL, COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM,
 };
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, EnumDisplayMonitors, GetDC,
     GetMonitorInfoW, ReleaseDC, SelectObject, AC_SRC_ALPHA, AC_SRC_OVER, BITMAPINFO,
-    BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ, HMONITOR,
-    MONITORINFO,
-};
-use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER,
-    COINIT_APARTMENTTHREADED,
+    BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, COLOR_WINDOW, DIB_RGB_COLORS, HBITMAP, HBRUSH, HDC,
+    HGDIOBJ, HMONITOR, MONITORINFO,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::SystemInformation::{GetLocalTime, GetSystemDirectoryW};
-use windows::Win32::UI::Accessibility::{
-    CUIAutomation, IUIAutomation, IUIAutomationElement, IUIAutomationValuePattern, SetWinEventHook,
-    TreeScope_Descendants, UIA_ValuePatternId, UnhookWinEvent, HWINEVENTHOOK,
-};
+use windows::Win32::System::SystemInformation::GetLocalTime;
+use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
 use windows::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
@@ -67,18 +57,19 @@ use windows::Win32::UI::Shell::{
     QUNS_RUNNING_D3D_FULL_SCREEN,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EnumWindows, GetAncestor,
-    GetClassNameW, GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowLongPtrW,
-    GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
-    PeekMessageW, PostMessageW, RegisterClassExW, SetCursorPos, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowPos, ShowWindow, TranslateMessage, UpdateLayeredWindow,
-    EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART, GA_ROOT, GWL_EXSTYLE,
-    MONITORINFOF_PRIMARY, MSG, OBJID_WINDOW, PM_REMOVE, SM_CXSCREEN, SM_CXVIRTUALSCREEN,
-    SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_SHOWNOACTIVATE, ULW_ALPHA,
-    WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE,
-    WM_DPICHANGED, WM_QUIT, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetAncestor, GetClassNameW,
+    GetClientRect, GetCursorPos, GetDlgItem, GetSystemMetrics, GetWindowLongPtrW, GetWindowRect,
+    GetWindowTextW, IsIconic, IsWindow, IsWindowVisible, MoveWindow, PeekMessageW,
+    RegisterClassExW, SetCursorPos, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
+    SetWindowTextW, ShowWindow, TranslateMessage, UpdateLayeredWindow, ES_AUTOVSCROLL,
+    ES_MULTILINE, ES_WANTRETURN, EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART, GA_ROOT,
+    GWL_EXSTYLE, HMENU, MONITORINFOF_PRIMARY, MSG, OBJID_WINDOW, PM_REMOVE, SM_CXSCREEN,
+    SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_HIDE,
+    SW_SHOWNOACTIVATE, ULW_ALPHA, WINDOW_STYLE, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
+    WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_QUIT, WM_SIZE, WNDCLASSEXW,
+    WS_BORDER, WS_CHILD, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_EX_TRANSPARENT, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_VISIBLE, WS_VSCROLL,
 };
 
 /// Set on `WM_DPICHANGED`/`WM_DISPLAYCHANGE` from the overlay wndproc; drained by the runtime
@@ -174,18 +165,18 @@ struct RawMoveEvent {
 }
 
 static MOVE_EVENTS: OnceLock<Mutex<VecDeque<RawMoveEvent>>> = OnceLock::new();
-static IMAGE_USER_CLOSES: OnceLock<Mutex<VecDeque<isize>>> = OnceLock::new();
+static COLLECT_USER_CLOSES: OnceLock<Mutex<VecDeque<isize>>> = OnceLock::new();
 
 fn move_events() -> &'static Mutex<VecDeque<RawMoveEvent>> {
     MOVE_EVENTS.get_or_init(|| Mutex::new(VecDeque::new()))
 }
 
-fn image_user_closes() -> &'static Mutex<VecDeque<isize>> {
-    IMAGE_USER_CLOSES.get_or_init(|| Mutex::new(VecDeque::new()))
+fn collect_user_closes() -> &'static Mutex<VecDeque<isize>> {
+    COLLECT_USER_CLOSES.get_or_init(|| Mutex::new(VecDeque::new()))
 }
 
-fn record_image_user_close(hwnd: HWND) {
-    if let Ok(mut closes) = image_user_closes().lock() {
+fn record_collect_user_close(hwnd: HWND) {
+    if let Ok(mut closes) = collect_user_closes().lock() {
         let key = hwnd_key(hwnd);
         if !closes.contains(&key) {
             closes.push_back(key);
@@ -193,8 +184,8 @@ fn record_image_user_close(hwnd: HWND) {
     }
 }
 
-fn take_image_user_close(hwnd: HWND) -> bool {
-    let Ok(mut closes) = image_user_closes().lock() else {
+fn take_collect_user_close(hwnd: HWND) -> bool {
+    let Ok(mut closes) = collect_user_closes().lock() else {
         return false;
     };
     let key = hwnd_key(hwnd);
@@ -409,254 +400,120 @@ fn rect_from_win32(rect: RECT) -> Rect {
 }
 
 enum ControlledWindow {
-    Notepad(NotepadWindow),
+    Note(NoteWindow),
     Image(ImageWindow),
 }
 
 impl ControlledWindow {
-    /// The window handle once it exists. A freshly-spawned Notepad reports `None` until its
-    /// top-level window appears (the `Pending` phase), so no snapshot is produced for it yet.
     fn hwnd(&self) -> Option<HWND> {
         match self {
-            Self::Notepad(window) => window.hwnd(),
+            Self::Note(window) => Some(window.hwnd),
             Self::Image(window) => Some(window.hwnd),
         }
     }
 
     fn request(&self) -> CollectWindowRequestId {
         match self {
-            Self::Notepad(window) => window.request,
+            Self::Note(window) => window.request,
             Self::Image(window) => window.request,
         }
     }
 
     fn kind(&self) -> CollectWindowKind {
         match self {
-            Self::Notepad(_) => CollectWindowKind::Note,
+            Self::Note(_) => CollectWindowKind::Note,
             Self::Image(_) => CollectWindowKind::Meme,
         }
     }
 }
 
-/// How long to keep looking for a freshly-spawned Notepad's top-level window before giving up
-/// and reclaiming the process. Kept at/under the engine's `COLLECT_SPAWN_TIMEOUT` (3s).
-const NOTEPAD_WINDOW_DEADLINE: Duration = Duration::from_secs(3);
-/// Minimum spacing between `EnumWindows` scans while waiting for the Notepad window, so the
-/// per-tick poll doesn't hammer the desktop window list at the sim loop's cadence.
-const NOTEPAD_POLL_INTERVAL: Duration = Duration::from_millis(40);
-/// Let `SetForegroundWindow` settle before the first typing attempt (spread across ticks, never
-/// slept on the sim thread).
-const NOTEPAD_TYPE_SETTLE: Duration = Duration::from_millis(30);
-/// Give up trying to type into the Notepad after this, so a stolen foreground never wedges it.
-const NOTEPAD_TYPE_DEADLINE: Duration = Duration::from_millis(1500);
-/// Grace period on drop for a clean `WM_CLOSE` before falling back to `TerminateProcess`.
-const NOTEPAD_CLOSE_GRACE: Duration = Duration::from_millis(150);
+const NOTE_EDIT_ID: i32 = 1;
 
-/// Non-blocking, per-tick state of a Notepad window the goose spawned. The goose intentionally
-/// types into this instance; only this tracked process is ever moved, typed into, or killed —
-/// never a pre-existing user Notepad.
-#[derive(Debug, Clone, Copy)]
-enum NotepadState {
-    /// The process is launched but its top-level window hasn't appeared yet.
-    Pending {
-        give_up_at: Instant,
-        next_poll_at: Instant,
-    },
-    /// The window exists and has been moved to the spawn anchor.
-    Ready { hwnd: HWND },
-    /// The HWND disappeared; wait briefly for a normal child-process exit before classifying it.
-    Closing { give_up_at: Instant },
-}
-
-/// Deferred typing request: text queued by `TypeNote`, sent once the window is confirmed
-/// foreground. Split across ticks instead of a blocking sleep.
-struct PendingType {
-    text: String,
-    settle_at: Instant,
-    give_up_at: Instant,
-}
-
-/// Result of one poll pass over a Notepad window.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NotepadPoll {
-    Alive,
-    Dead(CollectWindowCloseOrigin),
-}
-
-fn normal_exit_origin(success: bool) -> CollectWindowCloseOrigin {
-    if success {
-        CollectWindowCloseOrigin::User
-    } else {
-        CollectWindowCloseOrigin::Program
-    }
-}
-
-struct NotepadWindow {
+/// A Honk300-owned native text window. Windows 11 Notepad restores a user's prior tab session
+/// when launched without a file, so delegating notes to `notepad.exe` can surface and manipulate
+/// unrelated documents. Keeping the editable control in-process guarantees exact ownership.
+struct NoteWindow {
     request: CollectWindowRequestId,
-    child: Child,
-    pid: u32,
-    spawn_top_left: Vec2,
-    state: NotepadState,
-    pending_type: Option<PendingType>,
+    hwnd: HWND,
+    edit: HWND,
 }
 
-impl NotepadWindow {
-    fn spawn(request: CollectWindowRequestId, spawn_top_left: Vec2) -> Result<Self> {
-        let notepad = system_notepad_path()?;
-        let child = Command::new(&notepad).spawn().map_err(|err| {
-            error_from_message(format!("failed to spawn {}: {err}", notepad.display()))
-        })?;
-        let pid = child.id();
-        let now = Instant::now();
-        Ok(Self {
-            request,
-            child,
-            pid,
-            spawn_top_left,
-            state: NotepadState::Pending {
-                give_up_at: now + NOTEPAD_WINDOW_DEADLINE,
-                next_poll_at: now,
-            },
-            pending_type: None,
-        })
-    }
+impl NoteWindow {
+    fn new(request: CollectWindowRequestId, top_left: Vec2, display_bounds: Rect) -> Result<Self> {
+        unsafe {
+            let hmodule = GetModuleHandleW(None)?;
+            let hinstance = HINSTANCE(hmodule.0);
+            let class_name = w!("honk300_collect_note");
+            let wc = WNDCLASSEXW {
+                cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+                lpfnWndProc: Some(note_wndproc),
+                hInstance: hinstance,
+                hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as usize as *mut c_void),
+                lpszClassName: class_name,
+                ..Default::default()
+            };
+            RegisterClassExW(&wc);
 
-    fn hwnd(&self) -> Option<HWND> {
-        match self.state {
-            NotepadState::Ready { hwnd } => Some(hwnd),
-            NotepadState::Pending { .. } | NotepadState::Closing { .. } => None,
-        }
-    }
-
-    /// Advance the spawn/typing state machine one tick. Returns `Dead` when the entry should be
-    /// dropped (window never appeared, or the window was closed) — the tracked process is
-    /// reclaimed before that so the map removal + `Drop` don't have to block.
-    fn poll(&mut self, now: Instant) -> NotepadPoll {
-        match self.state {
-            NotepadState::Pending {
-                give_up_at,
-                next_poll_at,
-            } => {
-                if now >= next_poll_at {
-                    if let Some(hwnd) = find_process_window(self.pid) {
-                        let _ = move_hwnd(hwnd, self.spawn_top_left);
-                        self.state = NotepadState::Ready { hwnd };
-                        return NotepadPoll::Alive;
-                    }
-                    self.state = NotepadState::Pending {
-                        give_up_at,
-                        next_poll_at: now + NOTEPAD_POLL_INTERVAL,
-                    };
-                }
-                if now >= give_up_at {
-                    self.force_kill();
-                    NotepadPoll::Dead(CollectWindowCloseOrigin::Program)
-                } else {
-                    NotepadPoll::Alive
-                }
-            }
-            NotepadState::Ready { hwnd } => {
-                if unsafe { !IsWindow(hwnd).as_bool() } {
-                    // A vanished HWND alone is not user-close evidence: a crash or system
-                    // teardown looks the same. Wait non-blockingly for a successful process exit.
-                    self.state = NotepadState::Closing {
-                        give_up_at: now + NOTEPAD_CLOSE_GRACE,
-                    };
-                    return NotepadPoll::Alive;
-                }
-                self.service_pending_type(hwnd, now);
-                NotepadPoll::Alive
-            }
-            NotepadState::Closing { give_up_at } => match self.child.try_wait() {
-                Ok(Some(status)) => NotepadPoll::Dead(normal_exit_origin(status.success())),
-                Ok(None) if now < give_up_at => NotepadPoll::Alive,
-                Ok(None) | Err(_) => {
-                    self.force_kill();
-                    NotepadPoll::Dead(CollectWindowCloseOrigin::Program)
-                }
-            },
+            let size = collect_note_size(display_bounds);
+            let (width, height) = (size.x as i32, size.y as i32);
+            let hwnd = CreateWindowExW(
+                WS_EX_TOOLWINDOW,
+                class_name,
+                w!("A note from Honk300"),
+                WS_OVERLAPPEDWINDOW,
+                top_left.x.round() as i32,
+                top_left.y.round() as i32,
+                width,
+                height,
+                None,
+                None,
+                hinstance,
+                None,
+            )?;
+            let edit_style = WS_CHILD
+                | WS_VISIBLE
+                | WS_BORDER
+                | WS_VSCROLL
+                | WINDOW_STYLE((ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN) as u32);
+            let edit = CreateWindowExW(
+                Default::default(),
+                w!("EDIT"),
+                w!(""),
+                edit_style,
+                0,
+                0,
+                width,
+                height,
+                hwnd,
+                HMENU(NOTE_EDIT_ID as usize as *mut c_void),
+                hinstance,
+                None,
+            )?;
+            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+            resize_note_edit(hwnd);
+            Ok(Self {
+                request,
+                hwnd,
+                edit,
+            })
         }
     }
 
     fn move_to(&self, top_left: Vec2) -> Result<()> {
-        match self.state {
-            NotepadState::Ready { hwnd } => move_hwnd(hwnd, top_left),
-            NotepadState::Pending { .. } | NotepadState::Closing { .. } => Ok(()),
-        }
+        move_hwnd(self.hwnd, top_left)
     }
 
-    /// Queue `text` to be typed once the window is foreground. Best-effort: it never blocks and
-    /// never reports failure (a missed note isn't a capability loss), so a transient foreground
-    /// steal can't latch collect-window off.
-    fn begin_typing(&mut self, text: &str) {
-        let NotepadState::Ready { hwnd } = self.state else {
-            return;
-        };
-        unsafe {
-            let _ = SetForegroundWindow(hwnd);
-        }
-        let now = Instant::now();
-        self.pending_type = Some(PendingType {
-            text: text.to_string(),
-            settle_at: now + NOTEPAD_TYPE_SETTLE,
-            give_up_at: now + NOTEPAD_TYPE_DEADLINE,
-        });
-    }
-
-    fn service_pending_type(&mut self, hwnd: HWND, now: Instant) {
-        let (settle_at, give_up_at) = match &self.pending_type {
-            Some(pending) => (pending.settle_at, pending.give_up_at),
-            None => return,
-        };
-        if now < settle_at {
-            return;
-        }
-        if now >= give_up_at {
-            self.pending_type = None;
-            return;
-        }
-        unsafe {
-            if GetForegroundWindow() == hwnd {
-                if let Some(pending) = self.pending_type.take() {
-                    // UI Automation writes through the edit control rooted at this exact HWND.
-                    // If Notepad does not expose a writable value pattern, fail closed: never
-                    // fall back to process-global synthetic keyboard input.
-                    let _ = set_text_via_uia(hwnd, &pending.text);
-                }
-            } else {
-                // Not foreground yet: re-assert and retry on a later tick.
-                let _ = SetForegroundWindow(hwnd);
-            }
-        }
-    }
-
-    /// Terminate and reap the tracked process. Only ever the Notepad we spawned (tracked pid).
-    fn force_kill(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+    fn set_text(&self, text: &str) -> Result<()> {
+        let text_w: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        unsafe { SetWindowTextW(self.edit, PCWSTR(text_w.as_ptr())) }
     }
 }
 
-impl Drop for NotepadWindow {
+impl Drop for NoteWindow {
     fn drop(&mut self) {
-        // Ask the window we spawned to close, give it a brief grace, then force-terminate the
-        // tracked process so `honk300 stop` never leaves a notepad.exe zombie. Notepad with typed
-        // text prompts to save, so this usually falls through to the kill. Only ever our process.
-        if let NotepadState::Ready { hwnd } = self.state {
-            unsafe {
-                let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
-            }
-            let deadline = Instant::now() + NOTEPAD_CLOSE_GRACE;
-            while Instant::now() < deadline {
-                match self.child.try_wait() {
-                    Ok(Some(_)) => return,
-                    Ok(None) => std::thread::sleep(Duration::from_millis(10)),
-                    Err(_) => break,
-                }
-            }
+        unsafe {
+            let _ = DestroyWindow(self.hwnd);
         }
-        let _ = self.child.kill();
-        let _ = self.child.wait();
     }
 }
 
@@ -673,8 +530,11 @@ impl ImageWindow {
         title: &str,
         pixmap: &Pixmap,
         top_left: Vec2,
+        display_bounds: Rect,
     ) -> Result<Self> {
         unsafe {
+            let pixmap = fit_collect_image(pixmap, display_bounds)
+                .ok_or_else(|| error_from_message("could not allocate a bounded collect image"))?;
             let hmodule = GetModuleHandleW(None)?;
             let hinstance = HINSTANCE(hmodule.0);
             let class_name = w!("honk300_collect_image");
@@ -707,7 +567,7 @@ impl ImageWindow {
             let mut window = Self {
                 request,
                 hwnd,
-                pixmap: pixmap.clone(),
+                pixmap,
                 dib: None,
             };
             window.present_at(top_left)?;
@@ -757,6 +617,7 @@ pub struct CollectWindowController {
     last_rects: HashMap<CollectWindowId, Rect>,
     active_request: Option<(CollectWindowRequestId, CollectWindowKind)>,
     spawn_top_left: Vec2,
+    display_bounds: Rect,
 }
 
 impl CollectWindowController {
@@ -767,7 +628,13 @@ impl CollectWindowController {
             last_rects: HashMap::new(),
             active_request: None,
             spawn_top_left: Vec2::new(bounds.min.x + 40.0, bounds.min.y + 80.0),
+            display_bounds: bounds,
         }
+    }
+
+    pub fn update_display_bounds(&mut self, bounds: Rect) {
+        self.display_bounds = bounds;
+        self.spawn_top_left = Vec2::new(bounds.min.x + 40.0, bounds.min.y + 80.0);
     }
 
     pub fn spawn_note(&mut self, request: CollectWindowRequestId) -> Result<CollectWindowId> {
@@ -775,11 +642,9 @@ impl CollectWindowController {
             self.active_request = Some((request, CollectWindowKind::Note));
             return Ok(id);
         }
-        // Launch immediately and hand back an id; the window is discovered and positioned by the
-        // per-tick `snapshot` poll, so the sim/render thread never blocks waiting on Notepad.
-        let window = NotepadWindow::spawn(request, self.spawn_top_left)?;
         let id = self.alloc_id();
-        self.windows.insert(id, ControlledWindow::Notepad(window));
+        let window = NoteWindow::new(request, self.spawn_top_left, self.display_bounds)?;
+        self.windows.insert(id, ControlledWindow::Note(window));
         self.active_request = Some((request, CollectWindowKind::Note));
         Ok(id)
     }
@@ -795,7 +660,13 @@ impl CollectWindowController {
             return Ok(id);
         }
         let id = self.alloc_id();
-        let window = ImageWindow::new(request, title, pixmap, self.spawn_top_left)?;
+        let window = ImageWindow::new(
+            request,
+            title,
+            pixmap,
+            self.spawn_top_left,
+            self.display_bounds,
+        )?;
         self.windows.insert(id, ControlledWindow::Image(window));
         self.active_request = Some((request, CollectWindowKind::Meme));
         Ok(id)
@@ -803,7 +674,7 @@ impl CollectWindowController {
 
     pub fn move_window(&mut self, id: CollectWindowId, top_left: Vec2) -> Result<()> {
         match self.windows.get_mut(&id) {
-            Some(ControlledWindow::Notepad(window)) => window.move_to(top_left),
+            Some(ControlledWindow::Note(window)) => window.move_to(top_left),
             Some(ControlledWindow::Image(window)) => window.present_at(top_left),
             None => Ok(()),
         }
@@ -828,17 +699,14 @@ impl CollectWindowController {
     }
 
     pub fn type_text(&mut self, id: CollectWindowId, text: &str) -> Result<()> {
-        // Queue the text; the target-specific UI Automation write is deferred to the per-tick
-        // poll, so nothing sleeps on the sim thread. Best-effort by design.
-        if let Some(ControlledWindow::Notepad(window)) = self.windows.get_mut(&id) {
-            window.begin_typing(text);
+        if let Some(ControlledWindow::Note(window)) = self.windows.get_mut(&id) {
+            window.set_text(text)?;
         }
         Ok(())
     }
 
     pub fn close(&mut self, id: CollectWindowId) {
-        // Dropping the entry runs `NotepadWindow`/`ImageWindow` `Drop`, which closes/kills the
-        // window we own. Only ever the meme (Image) window in normal flow — notes linger.
+        // Dropping the entry destroys only the Honk300-owned native note/image window.
         if let Some(window) = self.windows.remove(&id) {
             if self.active_request == Some((window.request(), window.kind())) {
                 self.active_request = None;
@@ -848,21 +716,22 @@ impl CollectWindowController {
     }
 
     pub fn snapshot(&mut self) -> Option<CollectWindowSnapshot> {
-        // Drive the per-window state machines (spawn discovery + deferred typing) and cull any
-        // window that has died, then report the active typed request's geometry. A Notepad still
-        // in its `Pending` phase reports no HWND yet, so it simply produces no matching snapshot
-        // until ready; the engine's `WaitForSpawn` tolerates that until its own deadline.
-        let now = Instant::now();
+        // Cull any native collect window that has died, then report the active request's geometry.
         let mut dead = Vec::new();
         for (id, window) in self.windows.iter_mut() {
             let close_origin = match window {
-                ControlledWindow::Notepad(np) => match np.poll(now) {
-                    NotepadPoll::Alive => None,
-                    NotepadPoll::Dead(origin) => Some(origin),
+                ControlledWindow::Note(note) => unsafe {
+                    (!IsWindow(note.hwnd).as_bool()).then(|| {
+                        if take_collect_user_close(note.hwnd) {
+                            CollectWindowCloseOrigin::User
+                        } else {
+                            CollectWindowCloseOrigin::Program
+                        }
+                    })
                 },
-                ControlledWindow::Image(img) => unsafe {
-                    (!IsWindow(img.hwnd).as_bool()).then(|| {
-                        if take_image_user_close(img.hwnd) {
+                ControlledWindow::Image(image) => unsafe {
+                    (!IsWindow(image.hwnd).as_bool()).then(|| {
+                        if take_collect_user_close(image.hwnd) {
                             CollectWindowCloseOrigin::User
                         } else {
                             CollectWindowCloseOrigin::Program
@@ -938,9 +807,7 @@ impl CollectWindowController {
 
 impl Drop for CollectWindowController {
     fn drop(&mut self) {
-        // Clear passthrough on any still-live windows; the per-window `Drop` (run when `windows`
-        // is dropped right after this) then destroys images and closes/kills spawned Notepads, so
-        // `honk300 stop` leaves no collect windows or notepad.exe zombies behind.
+        // Clear passthrough before the per-window drops destroy every Honk300-owned note/image.
         for window in self.windows.values() {
             if let Some(hwnd) = window.hwnd() {
                 let _ = set_passthrough(hwnd, false);
@@ -983,84 +850,6 @@ fn set_passthrough(hwnd: HWND, passthrough: bool) -> Result<()> {
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
         )
     }
-}
-
-struct FindWindowData {
-    pid: u32,
-    hwnd: HWND,
-}
-
-unsafe extern "system" fn enum_window_for_pid(hwnd: HWND, lparam: LPARAM) -> BOOL {
-    let data = &mut *(lparam.0 as *mut FindWindowData);
-    let mut pid = 0u32;
-    GetWindowThreadProcessId(hwnd, Some(&mut pid));
-    if pid == data.pid && is_foreign_top_level_window(hwnd, &[]) {
-        data.hwnd = hwnd;
-        return BOOL(0);
-    }
-    BOOL(1)
-}
-
-/// Single, non-blocking scan for a top-level window owned by `pid`. Returns `None` if the window
-/// hasn't appeared yet; the caller polls this across ticks instead of sleeping.
-fn find_process_window(pid: u32) -> Option<HWND> {
-    let mut data = FindWindowData {
-        pid,
-        hwnd: HWND(std::ptr::null_mut()),
-    };
-    unsafe {
-        let _ = EnumWindows(
-            Some(enum_window_for_pid),
-            LPARAM(&mut data as *mut FindWindowData as isize),
-        );
-    }
-    (!data.hwnd.0.is_null()).then_some(data.hwnd)
-}
-
-fn set_text_via_uia(hwnd: HWND, text: &str) -> Result<()> {
-    unsafe {
-        let initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-        if initialized.is_err() {
-            return Err(Error::from(initialized));
-        }
-
-        let result = (|| {
-            let automation: IUIAutomation =
-                CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER)?;
-            let root = automation.ElementFromHandle(hwnd)?;
-            if try_set_uia_value(&root, text)? {
-                return Ok(());
-            }
-
-            let condition = automation.CreateTrueCondition()?;
-            let descendants = root.FindAll(TreeScope_Descendants, &condition)?;
-            let count = descendants.Length()?.clamp(0, 256);
-            for index in 0..count {
-                let element = descendants.GetElement(index)?;
-                if try_set_uia_value(&element, text)? {
-                    return Ok(());
-                }
-            }
-            Err(error_from_message(
-                "spawned Notepad exposes no writable UI Automation value target",
-            ))
-        })();
-
-        CoUninitialize();
-        result
-    }
-}
-
-unsafe fn try_set_uia_value(element: &IUIAutomationElement, text: &str) -> Result<bool> {
-    let Ok(pattern) = element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId)
-    else {
-        return Ok(false);
-    };
-    if pattern.CurrentIsReadOnly()?.as_bool() {
-        return Ok(false);
-    }
-    pattern.SetValue(&BSTR::from(text))?;
-    Ok(true)
 }
 
 fn present_layered(
@@ -1136,40 +925,6 @@ fn error_from_message(message: impl Into<String>) -> Error {
         windows::core::HRESULT(0x8000_4005u32 as i32),
         message.into(),
     )
-}
-
-fn system_notepad_path() -> Result<PathBuf> {
-    // SAFETY: GetSystemDirectoryW writes at most the supplied slice length and does not retain
-    // the buffer. The first call obtains the required length; the second owns the UTF-16 buffer
-    // for the duration of the call.
-    let required = unsafe { GetSystemDirectoryW(None) };
-    if required == 0 {
-        return Err(Error::from_win32());
-    }
-    let mut buffer = vec![0_u16; required as usize + 1];
-    let written = unsafe { GetSystemDirectoryW(Some(&mut buffer)) };
-    if written == 0 {
-        return Err(Error::from_win32());
-    }
-    if written as usize >= buffer.len() {
-        return Err(error_from_message(
-            "Windows system directory changed while it was queried",
-        ));
-    }
-    let path = PathBuf::from(OsString::from_wide(&buffer[..written as usize])).join("notepad.exe");
-    let metadata = fs::symlink_metadata(&path).map_err(|err| {
-        error_from_message(format!(
-            "could not validate system Notepad at {}: {err}",
-            path.display()
-        ))
-    })?;
-    if !metadata.is_file() || metadata.file_type().is_symlink() {
-        return Err(error_from_message(format!(
-            "system Notepad is not a regular executable: {}",
-            path.display()
-        )));
-    }
-    Ok(path)
 }
 
 /// A reusable top-down 32-bpp DIB section we blit the goose into each frame.
@@ -1687,7 +1442,43 @@ extern "system" fn image_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
             WM_CLOSE => {
                 // Unlike controller cleanup (which calls DestroyWindow directly), WM_CLOSE is
                 // positive evidence that the native/user close path was invoked.
-                record_image_user_close(hwnd);
+                record_collect_user_close(hwnd);
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_DESTROY => LRESULT(0),
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        }
+    }
+}
+
+fn resize_note_edit(hwnd: HWND) {
+    unsafe {
+        let Ok(edit) = GetDlgItem(hwnd, NOTE_EDIT_ID) else {
+            return;
+        };
+        let mut client = RECT::default();
+        if GetClientRect(hwnd, &mut client).is_ok() {
+            let _ = MoveWindow(
+                edit,
+                0,
+                0,
+                (client.right - client.left).max(1),
+                (client.bottom - client.top).max(1),
+                true,
+            );
+        }
+    }
+}
+
+extern "system" fn note_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_SIZE => {
+                resize_note_edit(hwnd);
+                LRESULT(0)
+            }
+            WM_CLOSE => {
+                record_collect_user_close(hwnd);
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_DESTROY => LRESULT(0),
@@ -1699,6 +1490,9 @@ extern "system" fn image_wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: L
 #[cfg(test)]
 mod tests {
     use super::*;
+    use honk_engine::collect_window::{
+        fitted_collect_image_size, COLLECT_PROP_MAX_SCREEN_FRACTION,
+    };
 
     #[test]
     fn layered_window_preserves_asymmetric_channels_and_alpha_when_swizzling_to_bgra() {
@@ -1711,17 +1505,52 @@ mod tests {
     }
 
     #[test]
-    fn only_normal_process_exit_and_native_close_signal_count_as_user_close() {
-        assert_eq!(normal_exit_origin(true), CollectWindowCloseOrigin::User);
-        assert_eq!(normal_exit_origin(false), CollectWindowCloseOrigin::Program);
+    fn collect_images_fit_the_monitor_without_cropping_or_upscaling() {
+        let display = Rect::new(Vec2::ZERO, Vec2::new(1920.0, 1080.0));
 
+        let landscape = fitted_collect_image_size(2400, 1600, display);
+        assert_eq!(landscape, (777, 518));
+        assert!(landscape.0 <= 900 && landscape.1 <= 518);
+        assert!((landscape.0 as f32 / landscape.1 as f32 - 1.5).abs() < 0.01);
+
+        let portrait = fitted_collect_image_size(1000, 3000, display);
+        assert_eq!(portrait, (173, 518));
+        assert!((portrait.0 as f32 / portrait.1 as f32 - 1.0 / 3.0).abs() < 0.01);
+
+        assert_eq!(
+            fitted_collect_image_size(320, 180, display),
+            (320, 180),
+            "small images retain their natural readable size"
+        );
+    }
+
+    #[test]
+    fn note_window_is_readable_but_never_dominates_the_monitor() {
+        for display in [
+            Rect::new(Vec2::ZERO, Vec2::new(3840.0, 2160.0)),
+            Rect::new(Vec2::ZERO, Vec2::new(1920.0, 1080.0)),
+            Rect::new(Vec2::ZERO, Vec2::new(800.0, 600.0)),
+        ] {
+            let size = collect_note_size(display);
+            assert!(size.x >= 1.0 && size.y >= 1.0);
+            assert!(size.x <= display.width() * COLLECT_PROP_MAX_SCREEN_FRACTION);
+            assert!(size.y <= display.height() * COLLECT_PROP_MAX_SCREEN_FRACTION);
+        }
+        assert_eq!(
+            collect_note_size(Rect::new(Vec2::ZERO, Vec2::new(1920.0, 1080.0))),
+            Vec2::new(614.0, 346.0)
+        );
+    }
+
+    #[test]
+    fn only_native_collect_close_signal_counts_as_user_close() {
         let hwnd = HWND(std::ptr::dangling_mut::<c_void>());
-        assert!(!take_image_user_close(hwnd));
-        record_image_user_close(hwnd);
-        record_image_user_close(hwnd);
-        assert!(take_image_user_close(hwnd));
+        assert!(!take_collect_user_close(hwnd));
+        record_collect_user_close(hwnd);
+        record_collect_user_close(hwnd);
+        assert!(take_collect_user_close(hwnd));
         assert!(
-            !take_image_user_close(hwnd),
+            !take_collect_user_close(hwnd),
             "native close evidence is one-shot"
         );
     }
@@ -1770,19 +1599,8 @@ mod tests {
 
     #[test]
     fn note_typing_is_target_scoped_not_global_input() {
-        fn requires_targeted_setter(_setter: fn(HWND, &str) -> Result<()>) {}
-        requires_targeted_setter(set_text_via_uia);
-    }
-
-    #[test]
-    fn note_process_uses_the_validated_windows_system_binary() {
-        let path = system_notepad_path().expect("Windows system Notepad should exist");
-        assert!(path.is_absolute());
-        assert_eq!(
-            path.file_name().and_then(|name| name.to_str()),
-            Some("notepad.exe")
-        );
-        assert_ne!(path, PathBuf::from("notepad.exe"));
+        fn requires_targeted_setter(_setter: fn(&NoteWindow, &str) -> Result<()>) {}
+        requires_targeted_setter(NoteWindow::set_text);
     }
 
     #[test]

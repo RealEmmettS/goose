@@ -10,6 +10,7 @@ const MAX_FRAME_BYTES: usize = 128;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ControlCommand {
     Stop,
+    ForceStop,
     Reload,
     Status,
     Do(PokeAction),
@@ -96,6 +97,7 @@ impl ControlCommand {
     pub fn encode(self) -> String {
         match self {
             Self::Stop => format!("{VERSION} STOP\n"),
+            Self::ForceStop => format!("{VERSION} FORCE_STOP\n"),
             Self::Reload => format!("{VERSION} RELOAD\n"),
             Self::Status => format!("{VERSION} STATUS\n"),
             Self::Do(action) => format!("{VERSION} DO {}\n", encode_action(action)),
@@ -121,6 +123,10 @@ impl ControlCommand {
             "STOP" => {
                 ensure_end(parts)?;
                 Ok(Self::Stop)
+            }
+            "FORCE_STOP" => {
+                ensure_end(parts)?;
+                Ok(Self::ForceStop)
             }
             "RELOAD" => {
                 ensure_end(parts)?;
@@ -446,6 +452,7 @@ mod tests {
     fn round_trips_commands() {
         for command in [
             ControlCommand::Stop,
+            ControlCommand::ForceStop,
             ControlCommand::Reload,
             ControlCommand::Status,
             ControlCommand::Do(PokeAction::Honk),
@@ -479,6 +486,10 @@ mod tests {
         );
         assert_eq!(
             ControlCommand::decode(b"HONK300/1 STOP NOW\n"),
+            Err(ProtocolError::ExtraTokens)
+        );
+        assert_eq!(
+            ControlCommand::decode(b"HONK300/1 FORCE_STOP NOW\n"),
             Err(ProtocolError::ExtraTokens)
         );
         assert_eq!(

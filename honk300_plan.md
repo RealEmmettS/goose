@@ -51,6 +51,8 @@ and brings you memes. The original is closed-source C#/.NET (Windows `GooseDeskt
 Xamarin/Mono `.app`). **Intended outcome:** a self-contained Rust binary `honk300` (with `honk`
 and `goose` aliases) that recreates the original across the three OSes — plus a set of modern,
 opt-in behaviors and a terminal config UI — packaged with the full `*300` installer family.
+Honk300's current safe equivalent uses its own native note window and never launches or types
+into Notepad or another user editor.
 
 **Scope note (personal use):** installation is on a personal device, which relaxes
 code-signing/notarization and copyright-redistribution constraints (documented below), but we
@@ -63,10 +65,13 @@ still build the full installer matrix because matching the `*300` family is an e
 | **Goose visual** | **Procedural** clean-room render from the public modding-API constants — no sprite extraction. |
 | **Sounds** | Bundle original honk/bite/mud (+ Mac pat) audio **1:1**, embedded (personal use). Kept out of any source/package artifact. |
 | **Memes** | Copy screened originals 1:1 for personal-use builds, add **one complete custom in-house counterpart per original** in the clumsy MS Paint house style, and keep user-supplied `Meme8.png`. Absent/unsupported slots skip at runtime. |
-| **Notes** | Copy screened original notepad messages 1:1 for personal-use builds and add **one custom goose-voiced counterpart per original**. |
+| **Notes** | Copy screened original notepad messages 1:1 for personal-use builds and add **one custom goose-voiced counterpart per original**. Present them only in Honk300-owned native windows; never launch or type into the user's editor. |
 | **Config** | **TOML** (`config.toml`), original keys preserved at verified values, versioned + tolerant loader. No `EnableMods` key. |
 | **Modding** | **No external mods** (no DLL/`.so`/`.dylib`, no WASM, no third-party data mods). Autumn becomes a **built-in** season/task. Extensibility = **documented internal seams**. |
-| **Control** | **No global quit key.** Starting, stopping, and configuration use the CLI/TUI over a **single-instance + IPC command channel** (`stop` / `do` / `reload`). ADRs 0024/0028/0030 add macOS, Windows, and compatible Linux control items which open that same TUI or request the same graceful stop; they are not a second settings model. |
+| **Control** | **No global quit key.** Starting, stopping, and configuration use the CLI/TUI over a **single-instance + IPC command channel** (`stop` / `do` / `reload`). ADRs 0024/0028/0030 add macOS, Windows, and compatible Linux control items which open that same TUI or request the same graceful stop; they are not a second settings model. Ordinary stop/quit/exit walks offscreen; the explicit `--force` variants terminate immediately. |
+| **Collected prop bounds** | Windows/macOS notes and images use one shared active-monitor fit: readable notes, hard 48% per-axis ceiling, complete aspect-preserving images, downscale only, never crop or stretch. Linux remains explicitly unsupported. |
+| **Login start** | Default-off `[lifecycle].autostart_on_login` reconciles only through the active install receipt's existing Windows Run, Mac LaunchAgent, or Linux XDG owner. Fresh installer intent outranks stale config; foreign ownership fails closed. |
+| **Windows launch surfaces** | Public aliases remain console-subsystem commands for a user-chosen terminal. Shortcuts/login startup use the exact-slot GUI-subsystem `honk300-app.exe`, which directly starts its sibling with no console or shell intermediary. Product startup performs no calibration; full-desktop compositor fixtures are disposable-CI-only. |
 | **Protected windows** | The goose may visually overlay terminal windows, but must never move, focus, type into, ride, drag, collect, or otherwise manipulate terminal windows — even in spicy/default-off modes. ADR 0029 conservatively includes Codex and Visual Studio Code surfaces across platforms. |
 | **Default behavior** | Full original **prank, always-on**. `--no-mouse-steal` is opt-in; `pause_on_fullscreen` default on; a **Calm goose** TUI toggle is the opposite pole. |
 | **Config UI** | A **ratatui** Claude-Code/QubeTX-family-style TUI at `<name> config`, toggling every behavior incl. Autumn; **hot-apply where cheap**, restart-note otherwise. |
@@ -246,7 +251,7 @@ TUI **Poke** panel.
 | Warp the user's cursor | ✅ `SetCursorPos`/enigo | ✅ `CGWarpMouseCursorPosition` (A11y) | ✅ `XWarpPointer`/enigo | ❌ blocked by protocol |
 | Move **other** apps' windows | ✅ `SetWindowPos` | ✅ AXUIElement (A11y) | ✅ EWMH `_NET_MOVERESIZE_WINDOW` (X11 windows) | ❌ impossible by design |
 | Detect window move-start/end (perch & ride) | ✅ `SetWinEventHook(MOVESIZESTART/END)` | ✅ AX observers | ✅ ConfigureNotify / `_NET_WM_STATE` | ❌ self-skips |
-| Synthesize keystrokes (Notepad) | ✅ SendInput/enigo | ✅ CGEvent (A11y/Input Mon.) | ✅ XTEST/enigo | ❌ blocked |
+| Present owned editable collect note | ✅ native edit HWND | ✅ owned AppKit window | ❌ unsupported | ❌ unsupported |
 | CLI/TUI control (`start`/`stop`/`config`) | ✅ named pipe | ✅ unix socket | ✅ unix socket | ✅ unix socket |
 | Graphical Configure/Quit shortcut | ✅ notification-area item → existing TUI/graceful stop | ✅ menu-bar item → existing TUI/graceful stop | ✅ when a StatusNotifier host exists | ✅ independent of reduced compositor mode when a StatusNotifier host exists |
 | DND/fullscreen detect (quiet hours) | ✅ `SHQueryUserNotificationState` | ✅ NSWorkspace / Focus | ✅ EWMH fullscreen / idle | ⚠️ best-effort |
@@ -708,13 +713,30 @@ The 4-installer matrix built for **both** x64 and ARM64 (WiX + Inno both support
 `InstallSource=msi-global`), `wix-corporate/corporate.wxs` (perUser, `%LocalAppData%\Programs\
 honk300\bin`, `msi-corporate`), `inno/global.iss` (`exe-global`), `inno/corporate.iss`
 (`exe-corporate`). **For a GUI pet:** a Start-Menu (and optional desktop) shortcut, and an
-**optional** `HKCU\…\Run` autostart entry (checkbox, default off). Install **all three name
+**optional** matching-scope `HKLM` (Global) or `HKCU` (Corporate) `Run` autostart entry (checkbox,
+default off). Install **all three name
 aliases** (`honk300`/`honk`/`goose`). Port `windows-installers.yml` (fires via `workflow_run`
 after cargo-dist's `Release`, torn-release guard via `dist-manifest.json` + the Windows zip, WiX
 `candle`/`light` with `-sice:ICE38 -sice:ICE64 -sice:ICE91`, Inno EXEs, `.sha256` sidecars,
 `gh release upload --clobber`), **matrixed over arch** → up to 8 Windows installer artifacts. CI
 builds ARM64 via the MSVC ARM64 toolchain (native ARM runner or cross), honestly noting any
 emulation-only test gaps.
+
+ADR 0031 changes the payload transaction without changing those public roots or aliases. Every
+installer stages identical binaries under
+`channels/<installer-owner>/releases/<version>-<target>/bin`; a neutral `current` junction selects
+one immutable release and the existing `bin` path follows lexical `current\bin`. MSI/Inno retain
+registration, elevation, shortcuts, and uninstall ownership. Their embedded verified helper owns
+selector/receipt commit and rollback, permits intentional downgrade, and never replaces or
+terminates the updater's mapped old release. A first slot-aware install may retire the legacy flat
+`bin` directory once under installer authority.
+
+After activation, a protected journal records only strictly validated conflicting Honk300
+MSI/Inno registrations. The updater retries those exact native uninstallers and clears the journal
+only after registration and public-alias verification. Opposite-scope takeover is bounded by
+Windows authority: a per-user Corporate install cannot retire or outrank a machine-wide PATH
+without an administrator grant. If that grant is denied, the new slot remains staged/selected but
+the operation is nonzero `cleanup_pending`; it never claims the public command has switched.
 
 ### 13.3 macOS: universal2 Developer ID app + graphical per-user DMG
 A real `.app` bundle with a **stable bundle-id** (`dev.emmetts.honk300`) is **mandatory** for
@@ -749,7 +771,8 @@ than inheriting a dynamic physical-display profile. WindowServer remains respons
 per-display-profile composition.
 
 ADR 0022 restricts automatic Accessibility onboarding to that exact installed app plus a matching
-bundle release identity and `honk300.install.v1` receipt. Before the native prompt or Settings
+bundle release identity and an owned `honk300.install.v1` migration receipt or authoritative
+`honk300.install.v2` receipt. Before the native prompt or Settings
 pane opens, the runtime atomically records an owner-only per-update marker under Honk300's state
 tree. A missing or unsafe marker path, identity mismatch, development binary, source-tree bundle,
 or direct mounted-DMG launch fails closed to the existing non-prompting degraded startup.
@@ -763,7 +786,8 @@ the safe wait without reopening UI for the already-marked update. Windows and Li
 activate this engine mode.
 
 ### 13.4 Linux: `.desktop` + tarball/Debian, X11-first, per-arch
-Shell installer drops the binary (all three aliases), extracts assets, installs
+The shell installer stages immutable `releases/<version>-<target>` directories, atomically moves
+`current`, and exposes all three aliases through that selector. It also installs
 `~/.local/share/applications/honk300.desktop` + optional `~/.config/autostart/honk300.desktop`,
 for **each arch** (x64 + ARM, gnu + musl). Each release also assembles native
 `honk300-amd64.deb` and `honk300-arm64.deb` packages from the exact qualified GNU binaries. The
@@ -773,17 +797,24 @@ uses `sudo` or `pkexec` only for the machine-wide package, while the shell path 
 and no-sudo. Default runs X11/XWayland; `--wayland` opts into the degraded layer-shell mode.
 
 ### 13.5 In-binary `install / uninstall / update / setup`
-Reuse the family's atomic-write + marker-block + symlink-resolution machinery
-(`qube-machine-report/src/install/mod.rs`) and SHA-256 self-update (`…/src/update.rs`), **but**
+Use the family's atomic-write + marker-block + symlink-resolution machinery as historical input,
+with ADR 0031's stronger receipt and slot transaction, **but**
 "install" = **login-autostart + shortcut/.desktop/LaunchAgent + asset extraction + `InstallSource`
 marker** — **not** a `.bashrc`/PowerShell-profile alias-autorun (a shell-autorun for a windowed
-app would wrongly spawn a goose on every shell start). Self-update: read
-`HKCU\Software\Honk300\InstallSource` (or path classification) **and the running arch**, download
-the **arch-matched** installer, SHA-256-verify (refuse on mismatch), run silently
+app would wrongly spawn a goose on every shell start). Self-update resolves an owned
+`honk300.install.v2` receipt first, then validated registration/owned-marker evidence, and never
+guesses MSI from a Program Files path. It preserves installer family, edition, scope, stable
+track, and running architecture; downloads the **arch-matched** installer; SHA-256-verifies it;
+and runs it synchronously
 (`msiexec /i /passive /norestart` or Inno `/SILENT /SUPPRESSMSGBOXES /NORESTART`), handle msiexec
-`3010` honestly, post-install `--version` verify. Debian provenance selects only the matching
+`3010` as failure, then verifies the protected receipt, active selector, target, artifact identity,
+all aliases, and installed version before exit zero. `update --json` emits progress only on stderr
+and exactly one final stdout object. Debian provenance selects only the matching
 GNU `.deb`, verifies the manifest's target/kind/size/hash plus exact owned path and `dpkg-query`
 identity, then performs the package-manager upgrade. **Never** a `cargo install` strategy.
+An already-current Windows slot with a conflicting-owner journal retries cleanup before reporting
+`up_to_date`; cancellation or a surviving registration stays nonzero with an exact assisted
+command.
 
 ### 13.6 Uninstall (`<name> uninstall`)
 Channel-aware; `--yes` / `--purge` / `--json`. `--purge` removes state/config/registry/PATH and
@@ -819,7 +850,7 @@ being implemented three more times.
 | M6 | Hit-testing: **pat = hover-streak + hearts**; **click → hyper** | hover pets, click hypes, empty passes through |
 | M7 | Cursor mischief (warp + nab sub-states) | goose drags the real cursor |
 | M8 | Foreign-window dragging + **perch & ride** (move-start → ride / smooth-abandon) | goose rides a dragged window; abandons cleanly |
-| M9 | Collect-window dispatcher: Notepad (faithful keystroke synth) + meme | goose types a note; drags meme windows |
+| M9 | Collect-window dispatcher: original Notepad compatibility target + meme; ADR 0032 later replaces the Windows Notepad process with a product-owned native note | goose presents its own note; drags meme windows |
 | M10 | **Single-instance + IPC command channel** (stop/do/reload); **no tray, no global quit key** at that milestone | second launch refused; `honk300 stop` quits; CLI pokes reach the running goose; ADR 0024 later adds only the macOS TUI/graceful-Quit shortcut |
 | M11 | **CLI grammar** (3 names + goose-speak phrase-map) + `do <action>` pokes + `help` | `goose plz` starts, `honk bad` stops, `goose do honk` honks |
 | M12 | **Config TUI** (ratatui reducer; groups + Poke panel; TOML I/O; hot-apply via IPC) | current settings hot-apply where supported; future settings are marked planned/restart-required; save persists |
@@ -834,6 +865,9 @@ being implemented three more times.
 | R7 / v1.0.2 (ADR 0028) | forward Mac production patch: shared Quiver goose control-surface source, macOS 11-safe template raster, explicit accessible image-only menu, sealed resource gates, and documented future Windows/Linux tray parity | physical-Mac icon/Configure/TUI/animated-Quit and performance evidence plus full exact-SHA cross-platform candidate, signing/notarization, atomic release, published v1.0.1→v1.0.2 CLI update, and latest-DMG website verification; Windows/Linux tray implementations remain deferred |
 | R8 / v1.0.3 (ADR 0029) | Alienware-derived patch: native Windows update invocation and receipt refresh, coexisting Global/Corporate lifecycle ownership, deferred-parent timing, Corporate failure/retry semantics, and conservative integrated-terminal protection | physical Windows compositor/Corporate lifecycle and forced-failure evidence, real Windows PowerShell update/receipt tests, complete exact-SHA cross-platform release gate, and public Global update verification; no tray implementation |
 | R9 / v1.1.0 (ADR 0030) | shared finite control-surface routing plus native fixed-GUID Windows notification-area and pure-Rust Linux StatusNotifier owners, recovery, exact-executable terminal launch, embedded/package-owned icon integration, and explicit unavailable-host degradation | physical Windows accessible menu/TUI/graceful-Quit/recovery proof, hosted x64/ARM64 Linux watcher/host/recovery/unavailable proof, GNU/musl/package contracts, and complete exact-SHA cross-platform release gate |
+| R10 / v1.2.0 (ADR 0031) | provenance-preserving v2 receipts, synchronous self-update, immutable Windows/Linux release slots, neutral selectors, DMG-origin app-ZIP updates, and latest-intent downgrade/takeover semantics | live-old-process Windows slot proof, rollback injection, four-family/two-architecture installer matrix, managed Mac and Debian/shell origin proof, one-object JSON, exact-tag/latest identity, and complete candidate/main/post-release gates |
+| R10.1 / v1.2.0 (ADR 0032) | owned Windows note windows, shared monitor-relative uncropped prop fitting, offscreen walk-in/graceful exit plus explicit force, and receipt-owned login-start config | native prop bounds/image evidence, zero-Notepad contract, Windows lifecycle matrix, one startup owner per provenance, installer-intent precedence, and cross-platform config/package gates |
+| R10.2 / v1.2.0 (ADR 0033) | separate console CLI and GUI-subsystem Windows app launcher, independently hashed slot ownership, no-console login/background start, and disposable-CI-only full-desktop compositor surfaces | PE-subsystem/header checks, all-four-installer shortcut/Run/receipt/repair/uninstall proof, no-shell launch contract, randomized process-owned tray-Quit routing, and native x64/ARM64 disposable runner gates |
 
 Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
 and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus
@@ -871,7 +905,7 @@ and optional Accessibility-granted macOS job record their run evidence in
 | O_tele | Privacy / phone-home perception | **No telemetry, no network** except `<name> update` (only `update.rs` has an HTTP client). |
 | O_ipc | IPC channel abused | Local-only pipe/socket, no network, authenticated to the same user; commands are a closed enum (Stop/Do/Reload). |
 | O_supply | Dependency supply chain | Pin `Cargo.lock`; `cargo audit`; prefer pure-Rust crates (tiny-skia, rodio, symphonia, ureq, sha2, ratatui). |
-| O_lock | Running process or artifact replacement races install/update/uninstall | Retain the real singleton through every mutation; Unix staged FIFO lease + explicit signal rollback; Windows same-stream pinned payloads, cross-session exact-path Restart Manager checks, guarded deferred uninstall, and rejection of reboot-deferred MSI results. |
+| O_lock | Running process or artifact replacement races install/update/uninstall | Retain the real singleton through every mutation; Unix staged FIFO lease + explicit signal rollback; Windows immutable version/target slots plus in-place neutral-junction retargeting keep the old mapped image untouched, exact payload/receipt/alias verification gates commit, and reboot-deferred MSI remains failure. |
 | O_cargo | Accidental crates.io contamination | No `cargo install` update strategy; test that no strategy invokes `cargo install`; post-install `--version` always. |
 | O_arch | ARM build/test gaps | Build all arches in CI; note any emulation-only test coverage honestly; arch-matched self-update. |
 | O_race | TUI/engine config races | Reducer-only TUI state + versioned config + the `Reload` hot-apply protocol (engine re-reads atomically). |
@@ -925,9 +959,10 @@ durable macOS Accessibility for an un-bundled binary.
 - **Protected-window tests:** platform backends must classify terminal windows and prove foreign-
   window ride, collect-window, and spicy behavior paths do not target them.
 - **Per-platform manual matrix** (`TESTING.md`): overlay transparency + click-through + clickable
-  goose; wander; footmarks; honk/mute; cursor-grab; window-drag + perch-ride; notepad-type;
-  meme-drop; pat-hover hearts; moods; seasonal; multi-monitor + mixed-DPI; **start/stop grammar**
-  (`start`/`stop`/`honk bad`/`goose no honk`); **`goose config` hot-apply**; autostart on/off;
+  goose; wander; footmarks; honk/mute; cursor-grab; window-drag + perch-ride; owned-note text;
+  bounded uncropped image drop; pat-hover hearts; moods; seasonal; multi-monitor + mixed-DPI;
+  offscreen walk-in, graceful ordinary stop/quit/exit, every-name `--force` path, zero product
+  calibration; **`goose config` hot-apply**; provenance-owned login autostart on/off;
   terminal windows are visually overlaid but not manipulated.
 - **Degradation tests:** macOS without Accessibility, including exact managed eligibility,
   one-prompt-per-update state, safe-edge permission wait, same-process grant/revocation, and
@@ -939,7 +974,8 @@ durable macOS Accessibility for an un-bundled binary.
   --purge` leaves nothing behind.
 - **Local gate (family standard):** `cargo fmt --all -- --check`,
   `cargo clippy --all-targets --workspace -- -D warnings`, `cargo test --workspace`,
-  `cargo build --release`, run the binary.
+  `cargo build --release`; visible desktop execution requires an operator-welcomed session, and
+  full paired-color compositor execution is disposable-CI-only.
 
 ---
 
@@ -981,5 +1017,5 @@ intentionally limited.
   is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, completed stable
   v1.0.2 task `#v102`, completed hardware-verification task `#v1a`, completed v1.0.3 release task
   `#r103`, completed tray tasks `#trayc`/`#wtray`/`#ltray`, completed v1.1.0 release task `#r110`,
-  and the readiness evidence.
+  active v1.2.0 updater/release tasks `#u31`/`#r120`, and the readiness evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

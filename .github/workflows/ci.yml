@@ -11,6 +11,37 @@ permissions:
   contents: read
 
 jobs:
+  same-sha-plan:
+    name: Resolve same-SHA installer identity
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.identity.outputs.tag }}
+      commit: ${{ steps.identity.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(next(package["version"] for package in json.load(sys.stdin)["packages"] if package["name"] == "honk300"))')"
+          printf 'tag=v%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'commit=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  same-sha-windows-installers:
+    name: Same-SHA Windows installer matrix
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: same-sha-plan
+    uses: ./.github/workflows/windows-installers.yml
+    with:
+      tag: ${{ needs.same-sha-plan.outputs.tag }}
+      commit: ${{ needs.same-sha-plan.outputs.commit }}
+      candidate: true
+      same_sha_main: true
+
   security-and-release-contracts:
     name: Dependency audit and release contracts
     runs-on: ubuntu-latest
@@ -57,7 +88,8 @@ jobs:
       - name: Prove x64 PE identity
         shell: pwsh
         run: |
-          python script/verify_binary_architecture.py --format pe --machine 0x8664 target/release/honk300.exe
+          python script/verify_binary_architecture.py --format pe --machine 0x8664 --subsystem 3 target/release/honk300.exe
+          python script/verify_binary_architecture.py --format pe --machine 0x8664 --subsystem 2 target/release/honk300-app.exe
           if ($LASTEXITCODE -ne 0) { throw 'x64 PE identity check failed' }
       - name: Windows layered-overlay compositor and lifecycle smoke
         shell: pwsh
@@ -100,14 +132,20 @@ jobs:
       - name: Native ARM64 tests and release build
         run: |
           cargo test --workspace --locked --target aarch64-pc-windows-msvc
-          cargo build --release --locked --target aarch64-pc-windows-msvc --bin honk300
+          cargo build --release --locked --target aarch64-pc-windows-msvc --bin honk300 --bin honk300-app
       - name: ARM64 layered-overlay compositor and lifecycle smoke
         shell: pwsh
         run: |
           python script/verify_binary_architecture.py `
             --format pe `
             --machine 0xAA64 `
+            --subsystem 3 `
             target/aarch64-pc-windows-msvc/release/honk300.exe
+          python script/verify_binary_architecture.py `
+            --format pe `
+            --machine 0xAA64 `
+            --subsystem 2 `
+            target/aarch64-pc-windows-msvc/release/honk300-app.exe
           ./script/smoke_windows_overlay.ps1 `
             -Binary target/aarch64-pc-windows-msvc/release/honk300.exe `
             -EvidenceDirectory target/windows-overlay-evidence-arm64 `

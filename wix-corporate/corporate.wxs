@@ -1,5 +1,10 @@
 <?xml version='1.0' encoding='windows-1252'?>
 
+<?ifndef Tag ?><?define Tag = "v$(var.Version)" ?><?endif ?>
+<?ifndef Commit ?><?define Commit = "0000000000000000000000000000000000000000" ?><?endif ?>
+<?ifndef TargetTriple ?><?define TargetTriple = "x86_64-pc-windows-msvc" ?><?endif ?>
+<?ifndef PayloadSha256 ?><?define PayloadSha256 = "0000000000000000000000000000000000000000000000000000000000000000" ?><?endif ?>
+
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
     <Product
         Id='*'
@@ -21,15 +26,15 @@
             InstallScope='perUser'
             SummaryCodepage='1252'/>
 
-        <!-- Keep the previous per-user product outside the new install transaction. A failed
-             pre-finalize upgrade then leaves the old component clients untouched, so a clean
-             retry cannot inherit rollback-restored orphan clients. The shared component GUIDs
-             and feature paths remain stable as required for this late schedule. -->
+        <!-- Remove the related product inside the rollbackable transaction, after the new slot
+             is staged but before its selector is activated. A later failure restores the old
+             product and the slot rollback action restores its selectors and receipt. -->
         <MajorUpgrade
-            Schedule='afterInstallFinalize'
-            DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
+            Schedule='afterInstallExecute'
+            AllowDowngrades='yes'/>
 
         <Media Id='1' Cabinet='media1.cab' EmbedCab='yes'/>
+        <Property Id='HONK300AUTOSTART' Value='false' Secure='yes'/>
 
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='LocalAppDataFolder'>
@@ -40,7 +45,7 @@
                             <File Id='ThirdPartyAssetsFile' Name='THIRD_PARTY_ASSETS.md' DiskId='1' Source='$(var.SourceRoot)\THIRD_PARTY_ASSETS.md'/>
                         </Component>
                         <Directory Id='Bin' Name='bin'>
-                            <Component Id='Path' Guid='103257E6-F862-4C5B-A921-104C5ACFA761' KeyPath='yes'>
+                            <Component Id='Path' Guid='103257E6-F862-4C5B-A921-104C5ACFA761' KeyPath='yes' Permanent='yes'>
                                 <Environment
                                     Id='PATH'
                                     Name='PATH'
@@ -50,18 +55,28 @@
                                     Action='set'
                                     System='no'/>
                             </Component>
-                            <Component Id='Honk300Exe' Guid='*'>
-                                <File Id='Honk300ExeFile' Name='honk300.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300.exe' KeyPath='yes'/>
-                            </Component>
-                            <Component Id='HonkAliasExe' Guid='*'>
-                                <File Id='HonkAliasExeFile' Name='honk.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300.exe' KeyPath='yes'/>
-                            </Component>
-                            <Component Id='GooseAliasExe' Guid='*'>
-                                <File Id='GooseAliasExeFile' Name='goose.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300.exe' KeyPath='yes'/>
-                            </Component>
-                            <Component Id='InstallSourceMarkerFile' Guid='*'>
-                                <File Id='InstallSourceFile' Name='install-source.txt' DiskId='1' Source='wix-corporate\install-source-msi-corporate.txt' KeyPath='yes'/>
-                            </Component>
+                        </Directory>
+                        <Directory Id='Channels' Name='channels'>
+                            <Directory Id='MsiCorporateChannel' Name='msi-corporate'>
+                                <Directory Id='MsiCorporateReleases' Name='releases'>
+                                    <Directory Id='ReleaseSlot' Name='$(var.Version)-$(var.TargetTriple)'>
+                                        <Directory Id='ReleaseBin' Name='bin'>
+                                            <Component Id='Honk300Exe' Guid='*' Permanent='yes'>
+                                                <File Id='Honk300ExeFile' Name='honk300.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300.exe' KeyPath='yes'/>
+                                            </Component>
+                                            <Component Id='HonkAliasExe' Guid='*' Permanent='yes'>
+                                                <File Id='HonkAliasExeFile' Name='honk.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300.exe' KeyPath='yes'/>
+                                            </Component>
+                                        <Component Id='GooseAliasExe' Guid='*' Permanent='yes'>
+                                            <File Id='GooseAliasExeFile' Name='goose.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300.exe' KeyPath='yes'/>
+                                        </Component>
+                                        <Component Id='Honk300AppExe' Guid='*' Permanent='yes'>
+                                            <File Id='Honk300AppExeFile' Name='honk300-app.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300-app.exe' KeyPath='yes'/>
+                                        </Component>
+                                        </Directory>
+                                    </Directory>
+                                </Directory>
+                            </Directory>
                         </Directory>
                     </Directory>
                 </Directory>
@@ -72,7 +87,7 @@
         </Directory>
 
         <DirectoryRef Id='APPLICATIONFOLDER'>
-            <Component Id='InstallSourceMarker' Guid='*'>
+            <Component Id='InstallSourceMarker' Guid='*' Permanent='yes'>
                 <RegistryValue
                     Root='HKCU'
                     Key='Software\Honk300'
@@ -84,12 +99,11 @@
         </DirectoryRef>
 
         <DirectoryRef Id='ApplicationProgramsFolder'>
-            <Component Id='StartMenuShortcut' Guid='*'>
+            <Component Id='StartMenuShortcut' Guid='*' Permanent='yes'>
                 <Shortcut
                     Id='StartMenuShortcut'
                     Name='Honk300'
-                    Target='[Bin]honk300.exe'
-                    Arguments='start'
+                    Target='[Bin]honk300-app.exe'
                     WorkingDirectory='Bin'/>
                 <RemoveFolder Id='RemoveApplicationProgramsFolder' On='uninstall'/>
                 <RegistryValue Root='HKCU' Key='Software\Honk300' Name='StartMenuShortcut' Type='integer' Value='1' KeyPath='yes'/>
@@ -103,7 +117,7 @@
                     Key='Software\Microsoft\Windows\CurrentVersion\Run'
                     Name='Honk300'
                     Type='string'
-                    Value='"[Bin]honk300.exe" start'
+                    Value='"[Bin]honk300-app.exe"'
                     KeyPath='yes'/>
             </Component>
         </DirectoryRef>
@@ -120,7 +134,7 @@
             <ComponentRef Id='Honk300Exe'/>
             <ComponentRef Id='HonkAliasExe'/>
             <ComponentRef Id='GooseAliasExe'/>
-            <ComponentRef Id='InstallSourceMarkerFile'/>
+            <ComponentRef Id='Honk300AppExe'/>
             <ComponentRef Id='LegalNotices'/>
             <ComponentRef Id='InstallSourceMarker'/>
             <ComponentRef Id='StartMenuShortcut'/>
@@ -133,7 +147,32 @@
         </Feature>
 
         <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
+        <SetProperty Id='HONK300AUTOSTART' Value='true' After='CostFinalize'>&amp;Autostart=3</SetProperty>
         <Property Id='ARPHELPLINK' Value='https://github.com/RealEmmettS/goose'/>
+
+        <Binary Id='Honk300SlotHelper' SourceFile='$(var.CargoTargetBinDir)\honk300.exe'/>
+        <CustomAction Id='SetRollbackSlotData' Property='RollbackWindowsSlot' Value='__windows-slot-rollback --root &quot;[APPLICATIONFOLDER]&quot;'/>
+        <CustomAction Id='RollbackWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='[CustomActionData]' Execute='rollback' Impersonate='yes' Return='ignore'/>
+        <CustomAction
+            Id='SetActivateSlotData'
+            Property='ActivateWindowsSlot'
+            HideTarget='yes'
+            Value='__wsa -r &quot;[APPLICATIONFOLDER]&quot; -o &quot;msi-corporate&quot; -c &quot;$(var.Commit)&quot; -a &quot;[OriginalDatabase]&quot; -u &quot;[HONK300AUTOSTART]&quot;'/>
+        <CustomAction Id='ActivateWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='[CustomActionData]' Execute='deferred' Impersonate='yes' Return='check' HideTarget='yes'/>
+        <CustomAction Id='SetCommitSlotData' Property='CommitWindowsSlot' Value='__windows-slot-commit --root &quot;[APPLICATIONFOLDER]&quot;'/>
+        <CustomAction Id='CommitWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='[CustomActionData]' Execute='commit' Impersonate='yes' Return='check'/>
+        <CustomAction Id='SetUninstallSlotData' Property='UninstallWindowsSlot' Value='__windows-slot-uninstall --root &quot;[APPLICATIONFOLDER]&quot; --origin &quot;msi-corporate&quot;'/>
+        <CustomAction Id='UninstallWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='[CustomActionData]' Execute='deferred' Impersonate='yes' Return='check'/>
+        <InstallExecuteSequence>
+            <Custom Action='SetRollbackSlotData' After='RemoveExistingProducts'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+            <Custom Action='RollbackWindowsSlot' After='SetRollbackSlotData'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+            <Custom Action='SetActivateSlotData' After='RollbackWindowsSlot'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+            <Custom Action='ActivateWindowsSlot' After='SetActivateSlotData'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+            <Custom Action='SetCommitSlotData' After='ActivateWindowsSlot'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+            <Custom Action='CommitWindowsSlot' After='SetCommitSlotData'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+            <Custom Action='SetUninstallSlotData' Before='UninstallWindowsSlot'>REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE</Custom>
+            <Custom Action='UninstallWindowsSlot' Before='RemoveFiles'>REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE</Custom>
+        </InstallExecuteSequence>
 
         <WixVariable Id='WixUILicenseRtf' Value='$(var.SourceRoot)\wix\honk300-license.rtf'/>
 

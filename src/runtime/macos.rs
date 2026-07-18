@@ -148,7 +148,11 @@ pub fn run(
             if world.permission_waiting() {
                 world.update_permission_wait_anchor(safe_anchor(primary));
             }
-            collect_controller.update_display_bounds(primary, overlay.virtual_desktop_bounds());
+            collect_controller.update_display_bounds(
+                primary,
+                primary,
+                overlay.virtual_desktop_bounds(),
+            );
         }
 
         let frame = core.begin_frame();
@@ -159,6 +163,11 @@ pub fn run(
                     println!("honk300: stop command received.");
                     request.respond(ControlResponse::Ok);
                     RuntimeCore::begin_graceful_stop(&mut world);
+                }
+                ControlCommand::ForceStop => {
+                    println!("honk300: forced stop command received; stopping immediately.");
+                    request.respond(ControlResponse::Ok);
+                    return Ok(());
                 }
                 ControlCommand::Reload => {
                     let response = match Config::load_existing(&options.config_path) {
@@ -356,6 +365,17 @@ pub fn run(
         world.set_collect_window_snapshot(collect_controller.snapshot());
 
         core.tick(&mut world, frame);
+
+        let collect_display = world
+            .layout()
+            .region_at(world.goose.position)
+            .and_then(|index| world.layout().regions().get(index).copied())
+            .unwrap_or(primary_bounds);
+        collect_controller.update_display_bounds(
+            collect_display,
+            primary_bounds,
+            overlay.virtual_desktop_bounds(),
+        );
 
         for command in world.take_collect_window_commands() {
             let result = match command {

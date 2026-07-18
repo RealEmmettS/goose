@@ -32,7 +32,7 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn("smoke_released_unix.sh", WORKFLOW)
         self.assertIn("smoke_released_windows.ps1", WORKFLOW)
         self.assertIn("permissions:\n  contents: read", WORKFLOW)
-        self.assertEqual(WORKFLOW.count("HONK300_SMOKE_TAG: ${{ inputs.tag }}"), 3)
+        self.assertEqual(WORKFLOW.count("HONK300_SMOKE_TAG: ${{ inputs.tag }}"), 4)
         self.assertNotIn("'${{ inputs.tag }}'", WORKFLOW)
 
     def test_unix_smoke_proves_idempotence_and_complete_fault_rollback(self) -> None:
@@ -62,7 +62,9 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn("Sequence 4010", WINDOWS_SMOKE)
         self.assertIn("v0.2.1", WINDOWS_SMOKE)
         self.assertIn("failed upgrade did not restore", WINDOWS_SMOKE)
-        self.assertIn("Downgrade unexpectedly succeeded", WINDOWS_SMOKE)
+        self.assertNotIn("Downgrade unexpectedly succeeded", WINDOWS_SMOKE)
+        self.assertIn("honk300.install.v2", WINDOWS_SMOKE)
+        self.assertIn("stable current junction", WINDOWS_SMOKE)
         self.assertIn("administrative extraction", WINDOWS_SMOKE)
         self.assertIn("aarch64-pc-windows-msvc", WINDOWS_SMOKE)
         self.assertIn("0xAA64", WINDOWS_SMOKE)

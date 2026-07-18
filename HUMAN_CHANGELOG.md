@@ -34,6 +34,21 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Latest — July 2026
 
 ### Added
+- **Updates now remember exactly how the Goose was installed.** A protected installation record
+  keeps the all-users, workplace, Mac, Linux-package, and terminal-install choices separate, while
+  saved release copies let the command switch safely without overwriting the copy that is still
+  running. This makes future updates predictable and preserves the user's chosen installation.
+- **Windows update tests now keep the old Goose running during the switch.** The test also forces
+  a failure halfway through, confirms the previous copy returns completely, and then checks every
+  command name after a successful retry. This catches the lock and partial-update failures people
+  actually experience.
+- **Starting the Goose when you sign in is now a real setting.** The terminal settings screen has
+  one default-off switch that uses the installation's existing Windows, Mac, or Linux login
+  mechanism. It refuses unfamiliar startup entries instead of creating duplicates, which keeps
+  the choice predictable and easy to undo.
+- **There is now an explicit emergency stop.** Adding `--force` to stop, quit, or exit under any
+  Goose command name closes it immediately. Leaving that flag off still lets it walk fully out of
+  frame, so everyday exits remain friendly while automation and recovery have a clear escape.
 - **Windows and compatible Linux desktops now have a Goose control icon.** While the Goose is
   running, the small icon can open the existing settings screen or ask it to walk away and quit.
   It uses the same accessible name and familiar two choices as the Mac, which makes control easier
@@ -48,6 +63,26 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   This update does not pretend those other trays already exist.
 
 ### Improved
+- **The update command now waits until the result is real.** It uses the same kind of installer as
+  last time, checks the final copy before saying it worked, and can return one clean result for
+  scripts. If ownership is unclear, it gives a safe reinstall instruction instead of making a
+  potentially wrong system-wide choice.
+- **The most recent successful install represents the user's current choice.** Running another
+  official installer can deliberately move to an older release or another edition after its files
+  are checked. Mac, supported Linux packages, and terminal installs keep their own familiar
+  update experiences instead of silently changing installation methods.
+- **Windows no longer hides a half-finished switch between all-users and workplace installs.** The
+  new checked copy stays available, but removing an older all-users owner can still need an
+  administrator's approval. If that approval is cancelled, the update reports that cleanup is
+  pending and gives a safe retry instead of pretending the command now opens the new copy.
+- **Notes and pictures stay noticeable without taking over the monitor.** Notes use a readable
+  fraction of the screen. Pictures keep their full shape and content, shrink only when needed,
+  and are never cropped, stretched, or blown up from a naturally small image. This keeps the
+  prank mildly disruptive instead of blocking the desktop.
+- **Login-start choices survive installs and updates honestly.** A fresh installer choice becomes
+  the current preference, while a later settings change updates that same owned startup entry.
+  Updates keep the chosen installer and startup behavior, which prevents stale defaults from
+  quietly reversing what the user asked for.
 - **Every desktop control follows one behavior.** Configure opens the exact running copy's one
   terminal settings screen, and Quit lets the Goose finish walking completely offscreen before it
   closes. This keeps platform menus from drifting into separate settings or abrupt shutdowns.
@@ -71,6 +106,22 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   controllable. This keeps a cosmetic problem from blocking startup.
 
 ### Fixed
+- **Windows updates no longer need the command that started them to disappear.** The installer
+  moves a stable pointer to the checked new copy while the old command finishes normally, then
+  confirms all three Goose command names work. This avoids the locked-running-file problem rather
+  than trying to force the file closed.
+- **Goose notes no longer involve Notepad at all.** The Goose owns its little editable note
+  window, so Windows cannot restore an unrelated user tab and the program cannot accidentally
+  surface or run a script. Closing the Goose's own note still behaves like closing the prank.
+- **Windows app and login startup no longer flash or focus a terminal.** Shortcuts and automatic
+  login startup use a tiny native background launcher instead of opening the command program or
+  PowerShell visibly. Commands typed in a terminal still behave normally in that same terminal,
+  and choosing Configure still intentionally opens settings; everything else stays out of the
+  user's way.
+- **A failed update no longer loses the previous installation record.** The rollback keeps the
+  earlier record and command selection even when failure happens at an awkward instant, and a
+  repeated Linux installation keeps its already-checked saved copy. This makes retries safe and
+  truthful.
 - **The Windows tray now opens a usable settings screen.** It starts a normal terminal with clean
   input and output instead of inheriting background redirection, which prevents an empty-looking
   settings window.
@@ -96,6 +147,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   gives up safely when a broken peer sends nothing, which keeps startup responsive and reliable.
 
 ### Behind the scenes
+- **Screen-covering graphics calibration no longer runs on a person's Windows desktop.** The app
+  never needs it, and local checks now refuse to create the old dark and near-white full-screen
+  surfaces. Strict transparency proof runs only on disposable release machines, so development
+  cannot blank the user's display or interrupt what they are doing.
 - **Release checks now reproduce Windows shell restart ordering.** The test first proves the old
   icon stays gone before asking the Goose to restore it, then allows a bounded settling period and
   saves clearer timing details. One older hosted Windows shell may call the recovery unobservable

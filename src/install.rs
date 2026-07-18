@@ -1,6 +1,11 @@
 use std::fs;
 use std::io;
+#[cfg(target_os = "macos")]
+use std::io::Read;
 use std::path::{Path, PathBuf};
+
+#[cfg(target_os = "macos")]
+use sha2::{Digest, Sha256};
 
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 use honk_control::LifecycleLease;
@@ -8,9 +13,12 @@ use honk_control::LifecycleLease;
 const APP_NAME: &str = "honk300";
 #[cfg(windows)]
 const DISPLAY_NAME: &str = "Honk300";
+#[cfg(windows)]
+const WINDOWS_APP_LAUNCHER_NAME: &str = "honk300-app.exe";
 const MARKER_FILE: &str = "install-source.txt";
 const COMMAND_NAMES: &[&str] = &["honk300", "honk", "goose"];
 const OWNERSHIP_MARKER: &str = "honk300.install.v1";
+const INSTALL_RECEIPT_V2: &str = "honk300.install.v2";
 #[cfg(any(test, target_os = "linux", target_os = "macos"))]
 const PATH_MARKER_START: &str = "# >>> honk300 managed PATH >>>";
 #[cfg(any(test, target_os = "linux", target_os = "macos"))]
@@ -78,12 +86,357 @@ impl InstallSource {
     }
 }
 
-pub fn detect_install_source() -> InstallSource {
+#[derive(Debug, Clone)]
+struct ManagedAutostartIdentity {
+    source: InstallSource,
+    program: PathBuf,
+    receipt_path: Option<PathBuf>,
+}
+
+/// Apply the config's login-start preference through the one mechanism already owned by the
+/// active installation family. An uninstalled/source-tree copy may save the default `false`
+/// preference without mutating the machine, but enabling requires authoritative install identity.
+pub fn reconcile_config_autostart(enabled: bool) -> Result<(), DynError> {
+    let Some(identity) = managed_autostart_identity()? else {
+        return if enabled {
+            Err("login autostart requires a managed Honk300 install; run `honk300 install` or the platform installer first".into())
+        } else {
+            Ok(())
+        };
+    };
+
     #[cfg(windows)]
     {
+        if windows_autostart_is_machine_owned(identity.source) {
+            if windows_autostart_identity_matches(&identity, enabled)? {
+                return Ok(());
+            }
+            return elevate_windows_autostart_reconcile(enabled);
+        }
+        reconcile_windows_autostart(&identity, enabled)?;
+    }
+    #[cfg(target_os = "linux")]
+    reconcile_linux_autostart(&identity, enabled)?;
+    #[cfg(target_os = "macos")]
+    reconcile_macos_autostart(&identity, enabled)?;
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+    return Err("login autostart is unsupported on this platform".into());
+
+    Ok(())
+}
+
+/// Resolve installer intent and config intent before the runtime or TUI consumes the preference.
+/// A newer receipt wins and is mirrored into config; otherwise an explicitly configured value is
+/// applied to the one startup mechanism owned by the active installation.
+pub fn prepare_config_autostart(
+    config_path: &Path,
+    config: &mut honk_config::Config,
+) -> Result<(), DynError> {
+    let contents = match fs::read_to_string(config_path) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => String::new(),
+        Err(error) => return Err(error.into()),
+    };
+    let explicitly_configured = contents.lines().any(|line| {
+        line.split_once('#')
+            .map_or(line, |(value, _)| value)
+            .trim_start()
+            .starts_with("autostart_on_login")
+    });
+
+    let Some(identity) = managed_autostart_identity()? else {
+        return if explicitly_configured {
+            reconcile_config_autostart(config.lifecycle.autostart_on_login)
+        } else {
+            Ok(())
+        };
+    };
+    if let Some(receipt_path) = identity.receipt_path.as_deref() {
+        let config_modified = fs::metadata(config_path)
+            .and_then(|metadata| metadata.modified())
+            .ok();
+        let receipt_modified = fs::metadata(receipt_path)?.modified()?;
+        if config_modified.is_none_or(|modified| receipt_modified > modified) {
+            let actual = owned_autostart_state(&identity)?;
+            if config.lifecycle.autostart_on_login != actual {
+                config.lifecycle.autostart_on_login = actual;
+                config.save_atomic(config_path)?;
+            }
+            return Ok(());
+        }
+    }
+    if explicitly_configured {
+        reconcile_config_autostart(config.lifecycle.autostart_on_login)?;
+    }
+    Ok(())
+}
+
+fn owned_autostart_state(identity: &ManagedAutostartIdentity) -> Result<bool, DynError> {
+    #[cfg(windows)]
+    return windows_owned_autostart_state(identity);
+    #[cfg(target_os = "linux")]
+    {
+        let _ = identity;
+        owned_text_autostart_state(&linux_autostart_path()?, OWNERSHIP_MARKER)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = identity;
+        owned_text_autostart_state(&macos_launch_agent_path()?, OWNERSHIP_MARKER)
+    }
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+    {
+        let _ = identity;
+        Err("login autostart is unsupported on this platform".into())
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn owned_text_autostart_state(path: &Path, marker: &str) -> Result<bool, DynError> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(format!(
+            "login-start integration is not a regular owned file: {}",
+            path.display()
+        )
+        .into());
+    }
+    let contents = fs::read_to_string(path)?;
+    if !contents.contains(marker) {
+        return Err(format!(
+            "refusing foreign login-start integration: {}",
+            path.display()
+        )
+        .into());
+    }
+    Ok(true)
+}
+
+fn managed_autostart_identity() -> Result<Option<ManagedAutostartIdentity>, DynError> {
+    let current_exe = std::env::current_exe()?;
+    let source = detect_install_source();
+    if source == InstallSource::Unknown {
+        return Ok(None);
+    }
+
+    for receipt_path in current_owned_receipt_candidates(&current_exe)
+        .into_iter()
+        .chain(external_receipt_candidates())
+    {
+        let metadata = match fs::symlink_metadata(&receipt_path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.into()),
+        };
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return Err(format!(
+                "install receipt is not a regular owned file: {}",
+                receipt_path.display()
+            )
+            .into());
+        }
+        let receipt: serde_json::Value = serde_json::from_slice(&fs::read(&receipt_path)?)?;
+        if validated_receipt_source(&receipt, &current_exe) != Some(source) {
+            continue;
+        }
+        let root = PathBuf::from(
+            receipt
+                .get("install_root")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("managed install receipt has no install_root")?,
+        );
+        let program = managed_autostart_program(source, &root, &receipt)?;
+        if !program.exists() {
+            return Err(format!(
+                "managed login-autostart program is missing: {}",
+                program.display()
+            )
+            .into());
+        }
+        return Ok(Some(ManagedAutostartIdentity {
+            source,
+            program,
+            receipt_path: Some(receipt_path),
+        }));
+    }
+
+    if source == InstallSource::ManualLocal {
+        let program = manual_autostart_program(current_exe);
+        if !program.exists() {
+            return Err(format!(
+                "manual login-autostart program is missing: {}",
+                program.display()
+            )
+            .into());
+        }
+        return Ok(Some(ManagedAutostartIdentity {
+            source,
+            program,
+            receipt_path: None,
+        }));
+    }
+    Err("the detected install has no authoritative receipt for login autostart".into())
+}
+
+fn manual_autostart_program(current_exe: PathBuf) -> PathBuf {
+    #[cfg(windows)]
+    {
+        current_exe.with_file_name(WINDOWS_APP_LAUNCHER_NAME)
+    }
+    #[cfg(not(windows))]
+    {
+        current_exe
+    }
+}
+
+fn managed_autostart_program(
+    source: InstallSource,
+    root: &Path,
+    receipt: &serde_json::Value,
+) -> Result<PathBuf, DynError> {
+    #[cfg(windows)]
+    {
+        let _ = (source, receipt);
+        Ok(root.join("bin").join(WINDOWS_APP_LAUNCHER_NAME))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (source, receipt);
+        Ok(root.join("Contents").join("MacOS").join("honk300"))
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = (source, root);
+        receipt
+            .get("aliases")
+            .and_then(serde_json::Value::as_array)
+            .and_then(|aliases| aliases.first())
+            .and_then(serde_json::Value::as_str)
+            .map(PathBuf::from)
+            .ok_or_else(|| "managed Linux receipt has no stable honk300 alias".into())
+    }
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+    {
+        let _ = (source, root, receipt);
+        Err("login autostart is unsupported on this platform".into())
+    }
+}
+
+#[cfg(windows)]
+fn receipt_autostart_enabled(path: Option<&Path>) -> Result<Option<bool>, DynError> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let value: serde_json::Value = serde_json::from_slice(&fs::read(path)?)?;
+    Ok(value
+        .get("autostart")
+        .and_then(|autostart| autostart.get("enabled"))
+        .and_then(serde_json::Value::as_bool))
+}
+
+fn update_receipt_autostart(
+    identity: &ManagedAutostartIdentity,
+    enabled: bool,
+) -> Result<(), DynError> {
+    let Some(path) = identity.receipt_path.as_deref() else {
+        return Ok(());
+    };
+    // A Debian receipt is machine-owned while this preference is intentionally per-user XDG
+    // state. Do not claim one user's choice as package-global receipt state.
+    if identity.source == InstallSource::Deb {
+        return Ok(());
+    }
+    let metadata = fs::symlink_metadata(path)?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err("install receipt is not a regular owned file".into());
+    }
+    let mut receipt: serde_json::Value = serde_json::from_slice(&fs::read(path)?)?;
+    let owner = receipt
+        .get("autostart")
+        .and_then(|autostart| autostart.get("owner"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("honk300-install")
+        .to_owned();
+    receipt["autostart"] = serde_json::json!({ "enabled": enabled, "owner": owner });
+    let parent = path
+        .parent()
+        .ok_or("install receipt has no parent directory")?;
+    let temporary = parent.join(format!(
+        ".install-receipt.autostart.{}.tmp",
+        std::process::id()
+    ));
+    if temporary.exists() {
+        return Err(format!(
+            "stale autostart receipt transaction exists: {}",
+            temporary.display()
+        )
+        .into());
+    }
+    fs::write(&temporary, serde_json::to_vec_pretty(&receipt)?)?;
+    fs::set_permissions(&temporary, metadata.permissions())?;
+    if let Err(error) = fs::rename(&temporary, path) {
+        let _ = fs::remove_file(&temporary);
+        return Err(error.into());
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn reconcile_linux_autostart(
+    identity: &ManagedAutostartIdentity,
+    enabled: bool,
+) -> Result<(), DynError> {
+    let path = linux_autostart_path()?;
+    preflight_owned_text_file(&path, OWNERSHIP_MARKER)?;
+    if enabled {
+        write_owned_text_file(
+            &path,
+            &linux_desktop_entry(&identity.program),
+            OWNERSHIP_MARKER,
+        )?;
+    } else {
+        remove_owned_text_file(&path, OWNERSHIP_MARKER)?;
+    }
+    update_receipt_autostart(identity, enabled)
+}
+
+#[cfg(target_os = "macos")]
+fn reconcile_macos_autostart(
+    identity: &ManagedAutostartIdentity,
+    enabled: bool,
+) -> Result<(), DynError> {
+    let path = macos_launch_agent_path()?;
+    preflight_owned_text_file(&path, OWNERSHIP_MARKER)?;
+    if enabled {
+        write_owned_text_file(
+            &path,
+            &macos_launch_agent_plist(&identity.program),
+            OWNERSHIP_MARKER,
+        )?;
+    } else {
+        remove_owned_text_file(&path, OWNERSHIP_MARKER)?;
+    }
+    update_receipt_autostart(identity, enabled)
+}
+
+pub fn detect_install_source() -> InstallSource {
+    let receipt_evidence = read_install_receipt_source();
+    if receipt_evidence != InstallSourceEvidence::Missing {
+        return receipt_evidence.source_or_unknown();
+    }
+
+    #[cfg(windows)]
+    {
+        let registration = read_windows_registration_install_source();
+        if registration != InstallSourceEvidence::Missing {
+            return registration.source_or_unknown();
+        }
         windows_install_source_precedence(
             read_file_install_source_marker(),
-            read_windows_install_source_marker(),
             classify_current_exe_install_source(),
         )
     }
@@ -94,40 +447,293 @@ pub fn detect_install_source() -> InstallSource {
             return source;
         }
 
-        // A macOS bundle install is authoritative from the running executable's own location: the
-        // `~/.local/bin` aliases resolve (via `current_exe`) into `…/honk300.app/Contents/MacOS`, so
-        // `update` can pick the DMG replacement path. Anything else on macOS (shell/cargo-home/bare)
-        // falls through to the shell-installer path like Linux.
-        if cfg!(target_os = "macos") && current_exe_is_app_bundle() {
-            return InstallSource::MacApp;
-        }
-
         classify_current_exe_install_source()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InstallSourceEvidence {
+    Missing,
+    Valid(InstallSource),
+    InvalidOrConflicting,
+}
+
+impl InstallSourceEvidence {
+    fn source_or_unknown(self) -> InstallSource {
+        match self {
+            Self::Valid(source) => source,
+            Self::Missing | Self::InvalidOrConflicting => InstallSource::Unknown,
+        }
+    }
+}
+
+fn read_install_receipt_source() -> InstallSourceEvidence {
+    let Ok(executable) = std::env::current_exe() else {
+        return InstallSourceEvidence::Missing;
+    };
+    let owned = install_receipt_source_from_candidates(
+        &current_owned_receipt_candidates(&executable),
+        &executable,
+    );
+    if owned != InstallSourceEvidence::Missing {
+        return owned;
+    }
+    install_receipt_source_from_candidates(&external_receipt_candidates(), &executable)
+}
+
+#[cfg(windows)]
+pub(crate) fn detected_windows_install_root(
+    expected_source: InstallSource,
+) -> Result<Option<PathBuf>, DynError> {
+    let executable = std::env::current_exe()?;
+    for candidates in [
+        current_owned_receipt_candidates(&executable),
+        external_receipt_candidates(),
+    ] {
+        let mut found = false;
+        let mut source = None;
+        let mut root: Option<PathBuf> = None;
+        for candidate in candidates {
+            let metadata = match fs::symlink_metadata(&candidate) {
+                Ok(metadata) => metadata,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+                Err(error) => return Err(error.into()),
+            };
+            found = true;
+            if !metadata.is_file() || metadata.file_type().is_symlink() {
+                return Err(format!(
+                    "install receipt is not a regular owned file: {}",
+                    candidate.display()
+                )
+                .into());
+            }
+            let value: serde_json::Value = serde_json::from_slice(&fs::read(&candidate)?)?;
+            let candidate_source =
+                validated_receipt_source(&value, &executable).ok_or_else(|| {
+                    format!(
+                        "install receipt identity is invalid: {}",
+                        candidate.display()
+                    )
+                })?;
+            let candidate_root = value
+                .get("install_root")
+                .and_then(serde_json::Value::as_str)
+                .map(PathBuf::from)
+                .ok_or_else(|| format!("install receipt has no root: {}", candidate.display()))?;
+            if source.is_some_and(|existing| existing != candidate_source)
+                || root
+                    .as_ref()
+                    .is_some_and(|existing| !paths_match(existing, &candidate_root))
+            {
+                return Err("conflicting protected Windows install receipts".into());
+            }
+            source = Some(candidate_source);
+            root = Some(candidate_root);
+        }
+        if found {
+            if source != Some(expected_source) {
+                return Err(
+                    "protected Windows receipt origin conflicts with update strategy".into(),
+                );
+            }
+            return Ok(root);
+        }
+    }
+    Ok(None)
+}
+
+fn install_receipt_source_from_candidates(
+    candidates: &[PathBuf],
+    executable: &Path,
+) -> InstallSourceEvidence {
+    let mut source = None;
+    let mut found = false;
+    for candidate in candidates {
+        let metadata = match fs::symlink_metadata(candidate) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(_) => return InstallSourceEvidence::InvalidOrConflicting,
+        };
+        found = true;
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return InstallSourceEvidence::InvalidOrConflicting;
+        }
+        let Ok(bytes) = fs::read(candidate) else {
+            return InstallSourceEvidence::InvalidOrConflicting;
+        };
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+            return InstallSourceEvidence::InvalidOrConflicting;
+        };
+        let Some(candidate_source) = validated_receipt_source(&value, executable) else {
+            return InstallSourceEvidence::InvalidOrConflicting;
+        };
+        if source.is_some_and(|existing| existing != candidate_source) {
+            return InstallSourceEvidence::InvalidOrConflicting;
+        }
+        source = Some(candidate_source);
+    }
+    match (found, source) {
+        (false, _) => InstallSourceEvidence::Missing,
+        (true, Some(source)) => InstallSourceEvidence::Valid(source),
+        (true, None) => InstallSourceEvidence::InvalidOrConflicting,
+    }
+}
+
+fn current_owned_receipt_candidates(executable: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    for ancestor in executable.ancestors().skip(1).take(8).filter(|path| {
+        path.file_name().is_some_and(|name| {
+            let name = name.to_string_lossy();
+            name.eq_ignore_ascii_case("honk300")
+                || name.eq_ignore_ascii_case("Honk300.app")
+                || name.eq_ignore_ascii_case("install")
+        })
+    }) {
+        let candidate = ancestor.join("install-receipt.json");
+        if !candidates.contains(&candidate) {
+            candidates.push(candidate);
+        }
+    }
+    candidates
+}
+
+fn external_receipt_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    #[cfg(windows)]
+    if let Ok(path) = windows_receipt_path() {
+        candidates.push(path);
+    }
+    #[cfg(target_os = "linux")]
+    if let Ok(path) = linux_receipt_path() {
+        if !candidates.contains(&path) {
+            candidates.push(path);
+        }
+    }
+    #[cfg(target_os = "macos")]
+    if let Ok(path) = macos_receipt_path() {
+        if !candidates.contains(&path) {
+            candidates.push(path);
+        }
+    }
+    candidates
+}
+
+fn validated_receipt_source(value: &serde_json::Value, executable: &Path) -> Option<InstallSource> {
+    let schema = value.get("schema")?.as_str()?;
+    let install_root = value.get("install_root")?.as_str().map(Path::new)?;
+    if !path_is_within(executable, install_root) {
+        return None;
+    }
+    if schema == OWNERSHIP_MARKER {
+        let channel = value.get("channel")?.as_str()?;
+        return legacy_receipt_source(channel);
+    }
+    if schema != INSTALL_RECEIPT_V2 {
+        return None;
+    }
+    let source = InstallSource::from_marker(value.get("origin")?.as_str()?);
+    let family = value.get("installer_family")?.as_str()?;
+    let edition = value.get("edition")?.as_str()?;
+    let scope = value.get("scope")?.as_str()?;
+    let track = value.get("release_track")?.as_str()?;
+    let target = value.get("target")?.as_str()?;
+    let active_release = value.get("active_release")?.as_str()?;
+    let artifact = value.get("artifact")?.as_object()?;
+    let artifact_name = artifact.get("name")?.as_str()?;
+    let artifact_hash = artifact.get("sha256")?.as_str()?;
+    let artifact_size = artifact.get("size")?.as_u64()?;
+    if track != "stable"
+        || target.is_empty()
+        || active_release.is_empty()
+        || artifact_name.is_empty()
+        || artifact_size == 0
+        || artifact_hash.len() != 64
+        || !artifact_hash.chars().all(|c| c.is_ascii_hexdigit())
+    {
+        return None;
+    }
+    let identity_matches = match source {
+        InstallSource::MsiGlobal => ("msi", "global", "machine"),
+        InstallSource::MsiCorporate => ("msi", "corporate", "user"),
+        InstallSource::ExeGlobal => ("exe", "global", "machine"),
+        InstallSource::ExeCorporate => ("exe", "corporate", "user"),
+        InstallSource::PowerShell => ("powershell", "global", "machine"),
+        InstallSource::Shell => ("shell", "global", "user"),
+        InstallSource::Deb => ("deb", "global", "machine"),
+        InstallSource::MacApp => ("dmg", "global", "user"),
+        InstallSource::ManualLocal | InstallSource::Unknown => return None,
+    };
+    (family, edition, scope == identity_matches.2)
+        .eq(&(identity_matches.0, identity_matches.1, true))
+        .then_some(source)
+}
+
+fn legacy_receipt_source(channel: &str) -> Option<InstallSource> {
+    match channel {
+        "msi-global" => Some(InstallSource::MsiGlobal),
+        "msi-corporate" => Some(InstallSource::MsiCorporate),
+        "exe-global" => Some(InstallSource::ExeGlobal),
+        "exe-corporate" => Some(InstallSource::ExeCorporate),
+        "powershell" | "powershell-global-msi" => Some(InstallSource::PowerShell),
+        "shell" => Some(InstallSource::Shell),
+        "deb" => Some(InstallSource::Deb),
+        "dmg" | "mac-app" => Some(InstallSource::MacApp),
+        _ => None,
     }
 }
 
 #[cfg(any(test, windows))]
 fn windows_install_source_precedence(
     file_marker: Option<InstallSource>,
-    registry_marker: Option<InstallSource>,
     classified_path: InstallSource,
 ) -> InstallSource {
-    file_marker.or(registry_marker).unwrap_or(classified_path)
+    file_marker.unwrap_or(classified_path)
 }
 
-/// True when the running executable lives inside a `*.app` bundle. Kept non-`cfg` (and exercised
-/// on every host) so it never reads as dead code on non-macOS builds; the `cfg!` guard above keeps
-/// the `MacApp` verdict macOS-only in practice.
-#[cfg(not(windows))]
-fn current_exe_is_app_bundle() -> bool {
-    std::env::current_exe()
-        .ok()
-        .as_deref()
-        .map(path_is_in_app_bundle)
-        .unwrap_or(false)
+#[cfg(windows)]
+fn read_windows_registration_install_source() -> InstallSourceEvidence {
+    let Ok(current_exe) = std::env::current_exe() else {
+        return InstallSourceEvidence::InvalidOrConflicting;
+    };
+    let mut matches = Vec::new();
+    for source in [
+        InstallSource::MsiGlobal,
+        InstallSource::MsiCorporate,
+        InstallSource::ExeGlobal,
+        InstallSource::ExeCorporate,
+    ] {
+        match find_windows_managed_uninstall(source, &current_exe) {
+            Ok(Some(_)) => matches.push(source),
+            Ok(None) => {}
+            Err(_) => return InstallSourceEvidence::InvalidOrConflicting,
+        }
+    }
+    windows_registration_evidence(&matches, read_windows_install_source_marker())
 }
 
-#[cfg(any(test, not(windows)))]
+#[cfg(any(test, windows))]
+fn windows_registration_evidence(
+    matches: &[InstallSource],
+    registered_origin: Option<InstallSource>,
+) -> InstallSourceEvidence {
+    let [source] = matches else {
+        return if matches.is_empty() {
+            InstallSourceEvidence::Missing
+        } else {
+            InstallSourceEvidence::InvalidOrConflicting
+        };
+    };
+    match registered_origin {
+        None => InstallSourceEvidence::Valid(*source),
+        Some(origin) if origin == *source => InstallSourceEvidence::Valid(origin),
+        Some(InstallSource::PowerShell) if *source == InstallSource::MsiGlobal => {
+            InstallSourceEvidence::Valid(InstallSource::PowerShell)
+        }
+        Some(_) => InstallSourceEvidence::InvalidOrConflicting,
+    }
+}
+
+#[cfg(test)]
 fn path_is_in_app_bundle(path: &Path) -> bool {
     path.ancestors()
         .any(|ancestor| ancestor.extension().and_then(|ext| ext.to_str()) == Some("app"))
@@ -145,13 +751,14 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
     ensure_external_media_root(&media)?;
     migrate_legacy_user_media(&bin_dir.join("Assets"), &media, LegacyMigrationMode::Move)?;
     copy_current_exe_to_aliases(&bin_dir)?;
+    copy_windows_app_launcher(&bin_dir)?;
     write_install_marker(&root, InstallSource::ManualLocal)?;
     write_windows_install_source_marker(InstallSource::ManualLocal)?;
     add_windows_user_path(&bin_dir)?;
-    create_windows_start_menu_shortcut(&bin_dir.join("honk300.exe"))?;
+    create_windows_start_menu_shortcut(&bin_dir.join(WINDOWS_APP_LAUNCHER_NAME))?;
 
     if autostart {
-        set_windows_autostart(Some(&bin_dir.join("honk300.exe")))?;
+        set_windows_autostart(Some(&bin_dir.join(WINDOWS_APP_LAUNCHER_NAME)))?;
     } else {
         set_windows_autostart(None)?;
     }
@@ -515,6 +1122,38 @@ fn copy_current_exe_to_aliases(bin_dir: &Path) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(windows)]
+fn copy_windows_app_launcher(bin_dir: &Path) -> io::Result<()> {
+    let current = std::env::current_exe()?;
+    let source = current
+        .parent()
+        .ok_or_else(|| io::Error::other("current executable has no parent directory"))?
+        .join(WINDOWS_APP_LAUNCHER_NAME);
+    let metadata = fs::symlink_metadata(&source).map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!(
+                "windowless Windows app launcher is missing at {}; reinstall from the current Windows package: {error}",
+                source.display()
+            ),
+        )
+    })?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "windowless Windows app launcher is not a regular file: {}",
+                source.display()
+            ),
+        ));
+    }
+    let destination = bin_dir.join(WINDOWS_APP_LAUNCHER_NAME);
+    if !same_file_best_effort(&source, &destination) {
+        fs::copy(source, destination)?;
+    }
+    Ok(())
+}
+
 #[cfg(any(windows, target_os = "linux"))]
 fn copy_current_exe(dest: &Path) -> io::Result<()> {
     let source = std::env::current_exe()?;
@@ -603,11 +1242,9 @@ fn classify_current_exe_install_source() -> InstallSource {
 
 fn classify_install_path(path: &str) -> InstallSource {
     let lower = path.to_ascii_lowercase().replace('/', "\\");
-    if lower.contains("\\program files\\honk300\\") {
-        InstallSource::MsiGlobal
-    } else if lower.contains("\\appdata\\local\\programs\\honk300\\") {
-        InstallSource::MsiCorporate
-    } else if lower.contains("\\.local\\share\\honk300\\install\\") {
+    // Program Files and LocalAppData alone cannot distinguish MSI from EXE ownership. They are
+    // deliberately ambiguous unless a receipt, registration, or adjacent owned marker says more.
+    if lower.contains("\\.local\\share\\honk300\\install\\") {
         InstallSource::Shell
     } else {
         InstallSource::Unknown
@@ -631,7 +1268,6 @@ fn paths_match(left: &Path, right: &Path) -> bool {
     normalize(left) == normalize(right)
 }
 
-#[cfg(any(test, windows))]
 fn path_is_within(path: &Path, root: &Path) -> bool {
     let normalize = |value: &Path| {
         let value = value.to_string_lossy().replace('\\', "/");
@@ -1119,8 +1755,10 @@ fn receipt_is_owned(receipt: &Path, install_root: &Path) -> io::Result<bool> {
         .get("install_root")
         .and_then(serde_json::Value::as_str)
         .map(Path::new);
-    Ok(schema == Some(OWNERSHIP_MARKER)
-        && root.is_some_and(|recorded| paths_match(recorded, install_root)))
+    Ok(
+        matches!(schema, Some(OWNERSHIP_MARKER) | Some(INSTALL_RECEIPT_V2))
+            && root.is_some_and(|recorded| paths_match(recorded, install_root)),
+    )
 }
 
 fn remove_owned_receipt(receipt: &Path, install_root: &Path) -> io::Result<bool> {
@@ -1231,6 +1869,21 @@ fn write_text_file(path: &Path, text: &str) -> io::Result<()> {
     fs::write(path, text)
 }
 
+#[cfg(target_os = "macos")]
+fn sha256_file(path: &Path) -> io::Result<String> {
+    let mut file = fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
 #[cfg(windows)]
 fn remove_file_if_exists(path: &Path) -> io::Result<()> {
     match fs::remove_file(path) {
@@ -1246,6 +1899,1353 @@ fn remove_dir_if_exists(path: &Path) -> io::Result<()> {
         Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(err) => Err(err),
     }
+}
+
+#[cfg(windows)]
+pub fn run_windows_slot_protocol() -> Result<bool, DynError> {
+    let args = std::env::args_os().skip(1).collect::<Vec<_>>();
+    let Some(action) = args.first().and_then(|arg| arg.to_str()) else {
+        return Ok(false);
+    };
+    match action {
+        "__wsa" => {
+            let values = parse_internal_short_args(&args[1..])?;
+            let origin = InstallSource::from_marker(required_internal_short_arg(&values, "o")?);
+            let target = current_windows_target_triple();
+            let version = env!("CARGO_PKG_VERSION").to_owned();
+            let artifact_name = canonical_windows_artifact_name(origin, target)?;
+            let payload_sha256 =
+                crate::update::compute_sha256_for_install(&std::env::current_exe()?)?;
+            let launcher_sha256 = current_windows_app_launcher_hash()?;
+            windows_slot_activate(WindowsSlotActivation {
+                root: required_internal_short_path(&values, "r")?,
+                origin,
+                tag: format!("v{version}"),
+                version,
+                commit: required_internal_short_arg(&values, "c")?.to_owned(),
+                target: target.to_owned(),
+                artifact_name,
+                artifact_path: required_internal_short_path(&values, "a")?,
+                payload_sha256,
+                launcher_sha256,
+                autostart: required_internal_bool_short(&values, "u")?,
+            })?;
+            Ok(true)
+        }
+        "__windows-slot-activate" => {
+            let values = parse_internal_named_args(&args[1..])?;
+            windows_slot_activate(WindowsSlotActivation {
+                root: required_internal_path(&values, "root")?,
+                origin: InstallSource::from_marker(required_internal_arg(&values, "origin")?),
+                version: required_internal_arg(&values, "version")?.to_owned(),
+                tag: required_internal_arg(&values, "tag")?.to_owned(),
+                commit: required_internal_arg(&values, "commit")?.to_owned(),
+                target: required_internal_arg(&values, "target")?.to_owned(),
+                artifact_name: required_internal_arg(&values, "artifact-name")?.to_owned(),
+                artifact_path: required_internal_path(&values, "artifact-path")?,
+                payload_sha256: required_internal_arg(&values, "payload-sha256")?.to_owned(),
+                launcher_sha256: current_windows_app_launcher_hash()?,
+                autostart: required_internal_bool(&values, "autostart")?,
+            })?;
+            Ok(true)
+        }
+        "__windows-slot-rollback" => {
+            let values = parse_internal_named_args(&args[1..])?;
+            windows_slot_rollback(&required_internal_path(&values, "root")?)?;
+            Ok(true)
+        }
+        "__windows-slot-commit" => {
+            let values = parse_internal_named_args(&args[1..])?;
+            windows_slot_commit(&required_internal_path(&values, "root")?)?;
+            Ok(true)
+        }
+        "__windows-slot-uninstall" => {
+            let values = parse_internal_named_args(&args[1..])?;
+            let root = required_internal_path(&values, "root")?;
+            let origin = InstallSource::from_marker(required_internal_arg(&values, "origin")?);
+            windows_slot_uninstall(&root, origin)?;
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
+
+#[cfg(windows)]
+fn parse_internal_short_args(
+    args: &[std::ffi::OsString],
+) -> Result<std::collections::HashMap<String, std::ffi::OsString>, DynError> {
+    let mut values = std::collections::HashMap::new();
+    let mut index = 0;
+    while index < args.len() {
+        let key = args[index]
+            .to_str()
+            .filter(|key| key.starts_with('-') && key.len() == 2)
+            .ok_or("invalid compact Windows slot argument")?[1..]
+            .to_owned();
+        let value = args
+            .get(index + 1)
+            .ok_or_else(|| format!("missing value for -{key}"))?
+            .clone();
+        if values.insert(key.clone(), value).is_some() {
+            return Err(format!("duplicate compact argument -{key}").into());
+        }
+        index += 2;
+    }
+    Ok(values)
+}
+
+#[cfg(windows)]
+fn required_internal_short_arg<'a>(
+    values: &'a std::collections::HashMap<String, std::ffi::OsString>,
+    key: &str,
+) -> Result<&'a str, DynError> {
+    values
+        .get(key)
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| format!("missing or non-Unicode compact argument -{key}").into())
+}
+
+#[cfg(windows)]
+fn required_internal_short_path(
+    values: &std::collections::HashMap<String, std::ffi::OsString>,
+    key: &str,
+) -> Result<PathBuf, DynError> {
+    values
+        .get(key)
+        .map(PathBuf::from)
+        .ok_or_else(|| format!("missing compact path -{key}").into())
+}
+
+#[cfg(windows)]
+fn required_internal_bool_short(
+    values: &std::collections::HashMap<String, std::ffi::OsString>,
+    key: &str,
+) -> Result<bool, DynError> {
+    parse_internal_bool(required_internal_short_arg(values, key)?)
+}
+
+#[cfg(all(windows, target_arch = "x86_64"))]
+fn current_windows_target_triple() -> &'static str {
+    "x86_64-pc-windows-msvc"
+}
+
+#[cfg(all(windows, target_arch = "aarch64"))]
+fn current_windows_target_triple() -> &'static str {
+    "aarch64-pc-windows-msvc"
+}
+
+#[cfg(windows)]
+fn canonical_windows_artifact_name(
+    origin: InstallSource,
+    target: &str,
+) -> Result<String, DynError> {
+    let name = match origin {
+        InstallSource::MsiGlobal | InstallSource::PowerShell => format!("honk300-{target}.msi"),
+        InstallSource::MsiCorporate => format!("honk300-{target}-corporate.msi"),
+        InstallSource::ExeGlobal => format!("honk300-{target}-setup.exe"),
+        InstallSource::ExeCorporate => format!("honk300-{target}-corporate-setup.exe"),
+        _ => return Err("unsupported compact Windows slot origin".into()),
+    };
+    Ok(name)
+}
+
+#[cfg(windows)]
+fn parse_internal_named_args(
+    args: &[std::ffi::OsString],
+) -> Result<std::collections::HashMap<String, std::ffi::OsString>, DynError> {
+    let mut values = std::collections::HashMap::new();
+    let mut index = 0;
+    while index < args.len() {
+        let key = args[index]
+            .to_str()
+            .filter(|key| key.starts_with("--") && key.len() > 2)
+            .ok_or("invalid internal Windows slot argument")?[2..]
+            .to_owned();
+        let value = args
+            .get(index + 1)
+            .ok_or_else(|| format!("missing value for --{key}"))?
+            .clone();
+        if values.insert(key.clone(), value).is_some() {
+            return Err(format!("duplicate internal argument --{key}").into());
+        }
+        index += 2;
+    }
+    Ok(values)
+}
+
+#[cfg(windows)]
+fn required_internal_arg<'a>(
+    values: &'a std::collections::HashMap<String, std::ffi::OsString>,
+    key: &str,
+) -> Result<&'a str, DynError> {
+    values
+        .get(key)
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| format!("missing or non-Unicode internal argument --{key}").into())
+}
+
+#[cfg(windows)]
+fn required_internal_path(
+    values: &std::collections::HashMap<String, std::ffi::OsString>,
+    key: &str,
+) -> Result<PathBuf, DynError> {
+    values
+        .get(key)
+        .map(PathBuf::from)
+        .ok_or_else(|| format!("missing internal path --{key}").into())
+}
+
+#[cfg(windows)]
+fn required_internal_bool(
+    values: &std::collections::HashMap<String, std::ffi::OsString>,
+    key: &str,
+) -> Result<bool, DynError> {
+    parse_internal_bool(required_internal_arg(values, key)?)
+}
+
+#[cfg(windows)]
+fn parse_internal_bool(value: &str) -> Result<bool, DynError> {
+    match value {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err("invalid internal boolean argument".into()),
+    }
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone)]
+struct WindowsSlotActivation {
+    root: PathBuf,
+    origin: InstallSource,
+    version: String,
+    tag: String,
+    commit: String,
+    target: String,
+    artifact_name: String,
+    artifact_path: PathBuf,
+    payload_sha256: String,
+    launcher_sha256: String,
+    autostart: bool,
+}
+
+#[cfg(windows)]
+fn current_windows_app_launcher_hash() -> Result<String, DynError> {
+    let current = std::env::current_exe()?;
+    let launcher = current
+        .parent()
+        .ok_or("Windows slot helper has no parent directory")?
+        .join(WINDOWS_APP_LAUNCHER_NAME);
+    Ok(crate::update::compute_sha256_for_install(&launcher)?)
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone)]
+struct WindowsSlotState {
+    root: PathBuf,
+    new_release: PathBuf,
+    previous_current: Option<PathBuf>,
+    previous_bin: Option<PathBuf>,
+    legacy_bin: Option<PathBuf>,
+    receipt_backup: Option<PathBuf>,
+    previous_marker: Option<String>,
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone)]
+struct WindowsRegisteredOwner {
+    source: InstallSource,
+    install_root: PathBuf,
+    uninstall: WindowsManagedUninstall,
+    registration: String,
+}
+
+#[cfg(windows)]
+const WINDOWS_OWNER_CLEANUP_JOURNAL: &str = ".owner-cleanup-pending.json";
+
+#[cfg(any(test, windows))]
+fn windows_origins_share_registration(left: InstallSource, right: InstallSource) -> bool {
+    left == right
+        || matches!(
+            (left, right),
+            (InstallSource::PowerShell, InstallSource::MsiGlobal)
+                | (InstallSource::MsiGlobal, InstallSource::PowerShell)
+        )
+}
+
+#[cfg(any(test, windows))]
+fn windows_owner_conflicts(
+    active_origin: InstallSource,
+    active_root: &Path,
+    owner_origin: InstallSource,
+    owner_root: &Path,
+) -> bool {
+    !paths_match(active_root, owner_root)
+        || !windows_origins_share_registration(active_origin, owner_origin)
+}
+
+#[cfg(windows)]
+fn windows_slot_family(origin: InstallSource) -> Option<&'static str> {
+    match origin {
+        InstallSource::MsiGlobal | InstallSource::PowerShell => Some("msi-global"),
+        InstallSource::MsiCorporate => Some("msi-corporate"),
+        InstallSource::ExeGlobal => Some("exe-global"),
+        InstallSource::ExeCorporate => Some("exe-corporate"),
+        _ => None,
+    }
+}
+
+#[cfg(windows)]
+fn windows_slot_activate(request: WindowsSlotActivation) -> Result<(), DynError> {
+    validate_windows_slot_activation(&request)?;
+    let root = &request.root;
+    finish_windows_committed_slot_cleanup(root)?;
+    let state_path = root.join(".slot-transaction.json");
+    if state_path.exists() {
+        windows_slot_rollback(root)?;
+    }
+    let slot_family = windows_slot_family(request.origin)
+        .ok_or("internal Windows slot activation received a non-Windows origin")?;
+    let release = root
+        .join("channels")
+        .join(slot_family)
+        .join("releases")
+        .join(format!("{}-{}", request.version, request.target));
+    let release_bin = release.join("bin");
+    validate_real_directory(&release_bin)?;
+    for name in ["honk300.exe", "honk.exe", "goose.exe"] {
+        let executable = release_bin.join(name);
+        validate_regular_file_hash(&executable, &request.payload_sha256)?;
+        verify_installed_version(&executable, &request.version)?;
+    }
+    validate_regular_file_hash(
+        &release_bin.join(WINDOWS_APP_LAUNCHER_NAME),
+        &request.launcher_sha256,
+    )?;
+    let current = root.join("current");
+    let bin = root.join("bin");
+    let previous_current = read_owned_junction_target(&current)?;
+    let mut previous_bin = read_owned_junction_target(&bin)?;
+    let mut legacy_bin = None;
+    if bin.exists() && previous_bin.is_none() {
+        let metadata = fs::symlink_metadata(&bin)?;
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            return Err(format!(
+                "legacy command path is not a real directory: {}",
+                bin.display()
+            )
+            .into());
+        }
+        let retired = root
+            .join("channels")
+            .join("legacy-flat")
+            .join("releases")
+            .join(format!("retired-{}", std::process::id()));
+        if retired.exists() {
+            return Err(format!(
+                "legacy retirement path already exists: {}",
+                retired.display()
+            )
+            .into());
+        }
+        fs::create_dir_all(retired.parent().expect("retired release has a parent"))?;
+        legacy_bin = Some(retired);
+        previous_bin = None;
+    }
+    let receipt = root.join("install-receipt.json");
+    preflight_windows_slot_receipt(&receipt, root)?;
+    let receipt_backup = receipt.exists().then(|| {
+        root.join(format!(
+            ".install-receipt.rollback.{}.json",
+            std::process::id()
+        ))
+    });
+    let state = WindowsSlotState {
+        root: root.clone(),
+        new_release: release.clone(),
+        previous_current,
+        previous_bin,
+        legacy_bin: legacy_bin.clone(),
+        receipt_backup: receipt_backup.clone(),
+        previous_marker: fs::read_to_string(root.join(MARKER_FILE)).ok(),
+    };
+    write_windows_slot_state(&state_path, &state)?;
+
+    let activation = (|| -> Result<(), DynError> {
+        if let Some(retired) = &legacy_bin {
+            fs::rename(&bin, retired)?;
+        }
+        windows_slot_fault("after_legacy_retirement")?;
+        retarget_windows_junction(&current, &release)?;
+        windows_slot_fault("after_current_junction")?;
+        retarget_windows_junction(&bin, &current.join("bin"))?;
+        windows_slot_fault("after_bin_junction")?;
+        if let Some(backup) = &receipt_backup {
+            fs::rename(&receipt, backup)?;
+        }
+        windows_slot_fault("before_receipt_commit")?;
+        write_windows_slot_receipt(&receipt, &request, &release)?;
+        windows_slot_fault("after_receipt_commit")?;
+        write_text_file(&root.join(MARKER_FILE), request.origin.marker_value())?;
+        windows_slot_fault("before_alias_verification")?;
+        verify_windows_slot_activation(root, &request, &release)?;
+        Ok(())
+    })();
+    if let Err(error) = activation {
+        let rollback = windows_slot_rollback(root);
+        if let Err(rollback_error) = rollback {
+            return Err(format!(
+                "Windows slot activation failed: {error}; rollback also failed: {rollback_error}"
+            )
+            .into());
+        }
+        return Err(error);
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn windows_slot_fault(point: &str) -> Result<(), DynError> {
+    if std::env::var("HONK300_TEST_WINDOWS_SLOT_FAIL_AT").as_deref() == Ok(point) {
+        Err(format!("injected Windows slot failure at {point}").into())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+fn validate_windows_slot_activation(request: &WindowsSlotActivation) -> Result<(), DynError> {
+    if !request.root.is_absolute()
+        || request.root.file_name().and_then(|name| name.to_str()) != Some(APP_NAME)
+    {
+        return Err("Windows slot root must be an absolute honk300 directory".into());
+    }
+    if request.tag != format!("v{}", request.version)
+        || request.commit.len() != 40
+        || !request.commit.chars().all(|c| c.is_ascii_hexdigit())
+        || !matches!(
+            request.target.as_str(),
+            "x86_64-pc-windows-msvc" | "aarch64-pc-windows-msvc"
+        )
+        || request.artifact_name.is_empty()
+        || request.payload_sha256.len() != 64
+        || !request
+            .payload_sha256
+            .chars()
+            .all(|c| c.is_ascii_hexdigit())
+        || request.launcher_sha256.len() != 64
+        || !request
+            .launcher_sha256
+            .chars()
+            .all(|c| c.is_ascii_hexdigit())
+    {
+        return Err("Windows slot release identity is invalid".into());
+    }
+    let artifact = fs::symlink_metadata(&request.artifact_path)?;
+    if !artifact.is_file() || artifact.file_type().is_symlink() {
+        return Err("Windows installer artifact is not a regular pinned file".into());
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn validate_regular_file_hash(path: &Path, expected: &str) -> Result<(), DynError> {
+    let metadata = fs::symlink_metadata(path)?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(format!("slot payload is not a regular file: {}", path.display()).into());
+    }
+    let actual = crate::update::compute_sha256_for_install(path)?;
+    if !actual.eq_ignore_ascii_case(expected) {
+        return Err(format!("slot payload hash mismatch: {}", path.display()).into());
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn verify_installed_version(executable: &Path, expected: &str) -> Result<(), DynError> {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let output = std::process::Command::new(executable)
+        .arg("--version")
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()?;
+    let reported = String::from_utf8_lossy(&output.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap_or("")
+        .split(['+', '-'])
+        .next()
+        .unwrap_or("")
+        .to_owned();
+    if !output.status.success() || reported != expected {
+        return Err(format!(
+            "{} reports {reported}, expected {expected}",
+            executable.display()
+        )
+        .into());
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn preflight_windows_slot_receipt(path: &Path, root: &Path) -> Result<(), DynError> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    if !metadata.is_file() || metadata.file_type().is_symlink() || !receipt_is_owned(path, root)? {
+        return Err(format!(
+            "refusing to replace foreign Windows slot receipt: {}",
+            path.display()
+        )
+        .into());
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn write_windows_slot_receipt(
+    path: &Path,
+    request: &WindowsSlotActivation,
+    active_release: &Path,
+) -> Result<(), DynError> {
+    let (family, edition, scope) = match request.origin {
+        InstallSource::MsiGlobal => ("msi", "global", "machine"),
+        InstallSource::MsiCorporate => ("msi", "corporate", "user"),
+        InstallSource::ExeGlobal => ("exe", "global", "machine"),
+        InstallSource::ExeCorporate => ("exe", "corporate", "user"),
+        InstallSource::PowerShell => ("powershell", "global", "machine"),
+        _ => return Err("unsupported Windows receipt origin".into()),
+    };
+    let artifact_size = fs::metadata(&request.artifact_path)?.len();
+    let artifact_hash = crate::update::compute_sha256_for_install(&request.artifact_path)?;
+    let bin = request.root.join("bin");
+    let receipt = serde_json::json!({
+        "schema": INSTALL_RECEIPT_V2,
+        "version": request.version,
+        "tag": request.tag,
+        "commit": request.commit,
+        "channel": request.origin.marker_value(),
+        "origin": request.origin.marker_value(),
+        "installer_family": family,
+        "edition": edition,
+        "scope": scope,
+        "release_track": "stable",
+        "layout": "windows-slots-v1",
+        "target": request.target,
+        "artifact": {
+            "name": request.artifact_name,
+            "sha256": artifact_hash,
+            "size": artifact_size
+        },
+        "install_root": request.root.to_string_lossy(),
+        "owned_root": request.root.to_string_lossy(),
+        "active_release": active_release.to_string_lossy(),
+        "aliases": [
+            bin.join("honk300.exe").to_string_lossy(),
+            bin.join("honk.exe").to_string_lossy(),
+            bin.join("goose.exe").to_string_lossy()
+        ],
+        "app_launcher": {
+            "path": bin.join(WINDOWS_APP_LAUNCHER_NAME).to_string_lossy(),
+            "sha256": request.launcher_sha256
+        },
+        "autostart": { "enabled": request.autostart, "owner": family },
+        "cleanup": { "state": "inactive_releases_retained" }
+    });
+    let temp = request
+        .root
+        .join(format!(".install-receipt.{}.tmp", std::process::id()));
+    if temp.exists() {
+        return Err(format!("stale receipt transaction exists: {}", temp.display()).into());
+    }
+    fs::write(&temp, serde_json::to_vec_pretty(&receipt)?)?;
+    fs::rename(&temp, path)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn verify_windows_slot_activation(
+    root: &Path,
+    request: &WindowsSlotActivation,
+    release: &Path,
+) -> Result<(), DynError> {
+    if !read_owned_junction_target(&root.join("current"))?
+        .is_some_and(|target| paths_match(&target, release))
+    {
+        return Err("stable current junction does not select the staged release".into());
+    }
+    let bin_target = root.join("current").join("bin");
+    if !read_owned_junction_target(&root.join("bin"))?
+        .is_some_and(|target| paths_match(&target, &bin_target))
+    {
+        return Err("stable bin junction does not follow current/bin".into());
+    }
+    for name in ["honk300.exe", "honk.exe", "goose.exe"] {
+        let alias = root.join("bin").join(name);
+        validate_regular_file_hash(&alias, &request.payload_sha256)?;
+        verify_installed_version(&alias, &request.version)?;
+    }
+    validate_regular_file_hash(
+        &root.join("bin").join(WINDOWS_APP_LAUNCHER_NAME),
+        &request.launcher_sha256,
+    )?;
+    let value: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("install-receipt.json"))?)?;
+    if validated_receipt_source(&value, &root.join("bin").join("honk300.exe"))
+        != Some(request.origin)
+    {
+        return Err("activated receipt does not preserve the requested provenance".into());
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn windows_slot_rollback(root: &Path) -> Result<(), DynError> {
+    let state_path = root.join(".slot-transaction.json");
+    if !state_path.exists() {
+        return Ok(());
+    }
+    let state = read_windows_slot_state(&state_path)?;
+    if !paths_match(&state.root, root) {
+        return Err("Windows slot rollback state names a different root".into());
+    }
+    restore_windows_junction(&root.join("current"), state.previous_current.as_deref())?;
+    if let Some(legacy) = &state.legacy_bin {
+        remove_windows_junction(&root.join("bin"))?;
+        if legacy.exists() {
+            fs::rename(legacy, root.join("bin"))?;
+        }
+    } else {
+        restore_windows_junction(&root.join("bin"), state.previous_bin.as_deref())?;
+    }
+    let receipt = root.join("install-receipt.json");
+    match &state.receipt_backup {
+        Some(backup) if backup.exists() => {
+            if receipt.exists() {
+                fs::remove_file(&receipt)?;
+            }
+            fs::rename(backup, &receipt)?;
+        }
+        Some(_) => {
+            // Activation failed before moving the pre-existing receipt; leave it untouched.
+        }
+        None if receipt.exists() => fs::remove_file(&receipt)?,
+        None => {}
+    }
+    let marker = root.join(MARKER_FILE);
+    if let Some(previous) = state.previous_marker {
+        write_text_file(&marker, &previous)?;
+    } else if marker.exists() {
+        fs::remove_file(marker)?;
+    }
+    fs::remove_file(state_path)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn windows_slot_commit(root: &Path) -> Result<(), DynError> {
+    let state_path = root.join(".slot-transaction.json");
+    let committed_path = root.join(".slot-committed.json");
+    if state_path.exists() {
+        if committed_path.exists() {
+            return Err("Windows slot committed-cleanup journal already exists".into());
+        }
+        fs::rename(&state_path, &committed_path)?;
+    } else if !committed_path.exists() {
+        return Ok(());
+    }
+    finish_windows_committed_slot_cleanup(root)?;
+    // Conflicting-owner retirement is deliberately post-commit. The native installer must keep
+    // its own registration and staged slot intact; the initiating `honk300 update` observes the
+    // journal during final verification and returns nonzero cleanup_pending. A direct graphical
+    // install retains the same state for the next explicit update/cleanup retry.
+    refresh_windows_owner_cleanup_journal(root)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn finish_windows_committed_slot_cleanup(root: &Path) -> Result<(), DynError> {
+    let committed_path = root.join(".slot-committed.json");
+    if !committed_path.exists() {
+        return Ok(());
+    }
+    let state = read_windows_slot_state(&committed_path)?;
+    if !paths_match(&state.root, root) {
+        return Err("Windows committed slot journal names a different root".into());
+    }
+    windows_slot_fault("commit_cleanup")?;
+    if let Some(backup) = state.receipt_backup {
+        if backup.exists() {
+            fs::remove_file(backup)?;
+        }
+    }
+    fs::remove_file(committed_path)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn windows_registered_owners() -> Result<Vec<WindowsRegisteredOwner>, DynError> {
+    use winreg::enums::{
+        HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_32KEY, KEY_WOW64_64KEY,
+    };
+    use winreg::RegKey;
+
+    let mut owners = Vec::new();
+    for (hive_name, hive) in [("HKCU", HKEY_CURRENT_USER), ("HKLM", HKEY_LOCAL_MACHINE)] {
+        let root = RegKey::predef(hive);
+        for (view_name, view) in [("64", KEY_WOW64_64KEY), ("32", KEY_WOW64_32KEY)] {
+            let uninstall = match root.open_subkey_with_flags(
+                "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+                KEY_READ | view,
+            ) {
+                Ok(key) => key,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+                Err(error) => return Err(error.into()),
+            };
+            for key_name in uninstall.enum_keys().flatten() {
+                let Ok(key) = uninstall.open_subkey_with_flags(&key_name, KEY_READ) else {
+                    continue;
+                };
+                let identity = WindowsUninstallIdentity {
+                    key_name: key_name.clone(),
+                    display_name: key.get_value("DisplayName").unwrap_or_default(),
+                    publisher: key.get_value("Publisher").unwrap_or_default(),
+                    install_location: key
+                        .get_value::<String, _>("InstallLocation")
+                        .map(PathBuf::from)
+                        .unwrap_or_default(),
+                    uninstall_command: key.get_value("UninstallString").unwrap_or_default(),
+                    windows_installer: key
+                        .get_value::<u32, _>("WindowsInstaller")
+                        .unwrap_or_default()
+                        != 0,
+                };
+                if !identity.install_location.is_absolute()
+                    || identity
+                        .install_location
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        != Some(APP_NAME)
+                {
+                    continue;
+                }
+                let candidate = identity.install_location.join("bin").join("honk300.exe");
+                let source = if identity.windows_installer {
+                    if identity.display_name.eq_ignore_ascii_case(DISPLAY_NAME) {
+                        InstallSource::MsiGlobal
+                    } else if identity
+                        .display_name
+                        .eq_ignore_ascii_case("honk300 (Corporate Edition)")
+                    {
+                        InstallSource::MsiCorporate
+                    } else {
+                        continue;
+                    }
+                } else if identity
+                    .key_name
+                    .eq_ignore_ascii_case("{5A94FBD0-DA02-4F63-9363-7D9CE0E280F5}_is1")
+                {
+                    InstallSource::ExeGlobal
+                } else if identity
+                    .key_name
+                    .eq_ignore_ascii_case("{A072F01B-0AE8-4ED9-B67F-845ADF7831F9}_is1")
+                {
+                    InstallSource::ExeCorporate
+                } else {
+                    continue;
+                };
+                if matches!(source, InstallSource::MsiGlobal | InstallSource::ExeGlobal)
+                    != (hive == HKEY_LOCAL_MACHINE)
+                {
+                    // Never elevate an uninstall command discovered in a user-writable fake
+                    // Global registration. Corporate is per-user; Global is machine-wide.
+                    continue;
+                }
+                let Some(uninstall) =
+                    validate_windows_uninstall_identity(source, &candidate, &identity)
+                else {
+                    continue;
+                };
+                owners.push(WindowsRegisteredOwner {
+                    source,
+                    install_root: identity.install_location,
+                    uninstall,
+                    registration: format!("{hive_name}:{view_name}:{key_name}"),
+                });
+            }
+        }
+    }
+    owners.sort_by(|left, right| left.registration.cmp(&right.registration));
+    owners.dedup_by(|left, right| left.registration == right.registration);
+    Ok(owners)
+}
+
+#[cfg(windows)]
+fn active_windows_slot_identity(
+    root: &Path,
+) -> Result<(InstallSource, serde_json::Value), DynError> {
+    let receipt_path = root.join("install-receipt.json");
+    let metadata = fs::symlink_metadata(&receipt_path)?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err("active Windows slot receipt is not a protected regular file".into());
+    }
+    let receipt: serde_json::Value = serde_json::from_slice(&fs::read(&receipt_path)?)?;
+    let executable = root.join("bin").join("honk300.exe");
+    let source = validated_receipt_source(&receipt, &executable)
+        .ok_or("active Windows slot receipt is not authoritative")?;
+    Ok((source, receipt))
+}
+
+#[cfg(windows)]
+fn pending_windows_registered_owners(
+    active_origin: InstallSource,
+    active_root: &Path,
+) -> Result<Vec<WindowsRegisteredOwner>, DynError> {
+    let owners = windows_registered_owners()?;
+    if !owners.iter().any(|owner| {
+        !windows_owner_conflicts(
+            active_origin,
+            active_root,
+            owner.source,
+            &owner.install_root,
+        )
+    }) {
+        // Conflict cleanup is a package-owner operation. An internal slot harness, portable copy,
+        // or forged receipt without its matching native registration must never gain the ability
+        // to retire an unrelated installed product.
+        return Ok(Vec::new());
+    }
+    Ok(owners
+        .into_iter()
+        .filter(|owner| {
+            windows_owner_conflicts(
+                active_origin,
+                active_root,
+                owner.source,
+                &owner.install_root,
+            )
+        })
+        .collect())
+}
+
+#[cfg(windows)]
+fn windows_owner_assisted_command(owner: &WindowsRegisteredOwner) -> String {
+    match &owner.uninstall {
+        WindowsManagedUninstall::Msi { product_code, .. } => {
+            format!("msiexec.exe /x {product_code} /passive /norestart")
+        }
+        WindowsManagedUninstall::Exe { uninstaller, .. } => format!(
+            "\"{}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART",
+            uninstaller.display()
+        ),
+    }
+}
+
+#[cfg(windows)]
+fn set_windows_receipt_cleanup_state(
+    root: &Path,
+    mut receipt: serde_json::Value,
+    state: &str,
+) -> Result<(), DynError> {
+    receipt["cleanup"] = serde_json::json!({ "state": state });
+    let path = root.join("install-receipt.json");
+    let temp = root.join(format!(
+        ".install-receipt.cleanup.{}.tmp",
+        std::process::id()
+    ));
+    if temp.exists() {
+        return Err(format!(
+            "stale receipt cleanup transaction exists: {}",
+            temp.display()
+        )
+        .into());
+    }
+    fs::write(&temp, serde_json::to_vec_pretty(&receipt)?)?;
+    fs::rename(temp, path)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn refresh_windows_owner_cleanup_journal(root: &Path) -> Result<usize, DynError> {
+    let (active_origin, receipt) = active_windows_slot_identity(root)?;
+    let conflicts = pending_windows_registered_owners(active_origin, root)?;
+    let journal = root.join(WINDOWS_OWNER_CLEANUP_JOURNAL);
+    if conflicts.is_empty() {
+        remove_file_if_exists(&journal)?;
+        set_windows_receipt_cleanup_state(root, receipt, "inactive_releases_retained")?;
+        return Ok(0);
+    }
+    if let Ok(metadata) = fs::symlink_metadata(&journal) {
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return Err("Windows owner cleanup journal is not a protected regular file".into());
+        }
+    }
+    let value = serde_json::json!({
+        "schema": "honk300.windows-owner-cleanup.v1",
+        "state": "cleanup_pending",
+        "active_origin": active_origin.marker_value(),
+        "active_root": root.to_string_lossy(),
+        "conflicts": conflicts.iter().map(|owner| serde_json::json!({
+            "origin": owner.source.marker_value(),
+            "install_root": owner.install_root.to_string_lossy(),
+            "registration": owner.registration,
+            "assisted_command": windows_owner_assisted_command(owner),
+        })).collect::<Vec<_>>(),
+    });
+    let temp = root.join(format!(
+        ".{WINDOWS_OWNER_CLEANUP_JOURNAL}.{}.tmp",
+        std::process::id()
+    ));
+    if temp.exists() {
+        return Err(format!("stale owner cleanup transaction exists: {}", temp.display()).into());
+    }
+    fs::write(&temp, serde_json::to_vec_pretty(&value)?)?;
+    fs::rename(temp, journal)?;
+    set_windows_receipt_cleanup_state(root, receipt, "cleanup_pending")?;
+    Ok(conflicts.len())
+}
+
+#[cfg(windows)]
+fn windows_owner_uninstall_invocation(
+    owner: &WindowsRegisteredOwner,
+    system_msiexec: &Path,
+) -> WindowsPostExitInvocation {
+    let (file, arguments, elevated) = match &owner.uninstall {
+        WindowsManagedUninstall::Msi {
+            product_code,
+            elevated,
+        } => (
+            system_msiexec.to_string_lossy().into_owned(),
+            format!(
+                "@('/x','{}','/passive','/norestart')",
+                powershell_literal(product_code)
+            ),
+            *elevated,
+        ),
+        WindowsManagedUninstall::Exe {
+            uninstaller,
+            elevated,
+        } => (
+            uninstaller.to_string_lossy().into_owned(),
+            "@('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART')".to_owned(),
+            *elevated,
+        ),
+    };
+    let elevation = if elevated { " -Verb RunAs" } else { "" };
+    let script = format!(
+        "$ErrorActionPreference='Stop'; $process=Start-Process -FilePath '{}' -ArgumentList {arguments} -WindowStyle Hidden -Wait -PassThru{elevation}; if ($process.ExitCode -notin @(0,1605)) {{ exit $process.ExitCode }}",
+        powershell_literal(&file)
+    );
+    WindowsPostExitInvocation {
+        args: vec![
+            "-NoProfile".to_owned(),
+            "-WindowStyle".to_owned(),
+            "Hidden".to_owned(),
+            "-ExecutionPolicy".to_owned(),
+            "Bypass".to_owned(),
+            "-Command".to_owned(),
+            script.clone(),
+        ],
+        script,
+    }
+}
+
+#[cfg(windows)]
+pub(crate) fn windows_owner_cleanup_is_pending(root: &Path) -> bool {
+    root.join(WINDOWS_OWNER_CLEANUP_JOURNAL).exists()
+}
+
+#[cfg(windows)]
+pub(crate) fn discover_windows_owner_cleanup(root: &Path) -> Result<bool, DynError> {
+    Ok(refresh_windows_owner_cleanup_journal(root)? != 0)
+}
+
+#[cfg(windows)]
+pub(crate) fn retry_windows_owner_cleanup(
+    root: &Path,
+    expected_origin: InstallSource,
+) -> Result<bool, DynError> {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let journal = root.join(WINDOWS_OWNER_CLEANUP_JOURNAL);
+    if !journal.exists() {
+        return Ok(false);
+    }
+    let (active_origin, _) = active_windows_slot_identity(root)?;
+    if !windows_origins_share_registration(active_origin, expected_origin) {
+        return Err("pending Windows owner cleanup belongs to a different active origin".into());
+    }
+    let powershell = system_windows_powershell_path()?;
+    let msiexec = system_windows_msiexec_path()?;
+    let owners = pending_windows_registered_owners(active_origin, root)?;
+    for owner in owners {
+        let invocation = windows_owner_uninstall_invocation(&owner, &msiexec);
+        let status = std::process::Command::new(&powershell)
+            .args(&invocation.args)
+            .creation_flags(CREATE_NO_WINDOW)
+            .status()?;
+        if !status.success() {
+            let remaining = refresh_windows_owner_cleanup_journal(root)?;
+            return Err(format!(
+                "the selected Windows slot remains active, but conflicting owner {} could not be retired (exit {}); cleanup_pending with {remaining} owner(s). Assisted command: {}",
+                owner.registration,
+                status.code().unwrap_or(-1),
+                windows_owner_assisted_command(&owner)
+            )
+            .into());
+        }
+    }
+    let remaining = refresh_windows_owner_cleanup_journal(root)?;
+    if remaining != 0 {
+        return Err(format!(
+            "the selected Windows slot remains active, but {remaining} conflicting owner(s) are still registered; cleanup_pending"
+        )
+        .into());
+    }
+    Ok(true)
+}
+
+#[cfg(windows)]
+fn windows_slot_uninstall(root: &Path, origin: InstallSource) -> Result<(), DynError> {
+    if windows_slot_family(origin).is_none() {
+        return Err("unsupported Windows slot uninstall origin".into());
+    }
+    finish_windows_committed_slot_cleanup(root)?;
+    let receipt = root.join("install-receipt.json");
+    if !receipt.exists() {
+        return Ok(());
+    }
+    let value: serde_json::Value = serde_json::from_slice(&fs::read(&receipt)?)?;
+    let executable = root.join("bin").join("honk300.exe");
+    if validated_receipt_source(&value, &executable) != Some(origin) {
+        // A newer cross-channel install owns the neutral selectors. This uninstaller may retire
+        // only its registration and inactive payloads; it must not deactivate the latest intent.
+        return Ok(());
+    }
+    remove_windows_slot_integrations(root, origin)?;
+    remove_windows_junction(&root.join("bin"))?;
+    remove_windows_junction(&root.join("current"))?;
+    remove_file_if_exists(&root.join(WINDOWS_OWNER_CLEANUP_JOURNAL))?;
+    fs::remove_file(receipt)?;
+    let marker = root.join(MARKER_FILE);
+    if fs::read_to_string(&marker).is_ok_and(|value| InstallSource::from_marker(&value) == origin) {
+        fs::remove_file(marker)?;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn remove_windows_slot_integrations(root: &Path, origin: InstallSource) -> Result<(), DynError> {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_QUERY_VALUE, KEY_SET_VALUE};
+    use winreg::RegKey;
+
+    let (hive, environment_key, start_menu_root, desktop_root) = match origin {
+        InstallSource::MsiGlobal | InstallSource::ExeGlobal | InstallSource::PowerShell => (
+            HKEY_LOCAL_MACHINE,
+            "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+            std::env::var_os("ProgramData").map(PathBuf::from),
+            std::env::var_os("PUBLIC").map(|path| PathBuf::from(path).join("Desktop")),
+        ),
+        InstallSource::MsiCorporate | InstallSource::ExeCorporate => (
+            HKEY_CURRENT_USER,
+            "Environment",
+            std::env::var_os("APPDATA")
+                .map(PathBuf::from)
+                .map(|path| path.join("Microsoft/Windows/Start Menu/Programs")),
+            std::env::var_os("USERPROFILE").map(|path| PathBuf::from(path).join("Desktop")),
+        ),
+        _ => return Err("unsupported Windows integration owner".into()),
+    };
+    let registry = RegKey::predef(hive);
+    if let Ok(environment) =
+        registry.open_subkey_with_flags(environment_key, KEY_QUERY_VALUE | KEY_SET_VALUE)
+    {
+        remove_windows_registry_path(&environment, &root.join("bin"))?;
+    }
+    if let Ok(honk300) =
+        registry.open_subkey_with_flags("Software\\Honk300", KEY_QUERY_VALUE | KEY_SET_VALUE)
+    {
+        let recorded: String = honk300.get_value("InstallSource").unwrap_or_default();
+        if InstallSource::from_marker(&recorded) == origin {
+            let _ = honk300.delete_value("InstallSource");
+        }
+    }
+    if let Ok(run) = registry.open_subkey_with_flags(
+        "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+        KEY_QUERY_VALUE | KEY_SET_VALUE,
+    ) {
+        let command: String = run.get_value("Honk300").unwrap_or_default();
+        if command_executable_path(&command)
+            .is_some_and(|executable| path_is_within(&executable, root))
+        {
+            let _ = run.delete_value("Honk300");
+        }
+    }
+
+    if let Some(programs) = start_menu_root {
+        let programs = if hive == HKEY_LOCAL_MACHINE {
+            programs.join("Microsoft/Windows/Start Menu/Programs")
+        } else {
+            programs
+        };
+        let group = programs.join("honk300");
+        remove_file_if_exists(&group.join("Honk300.lnk"))?;
+        let _ = fs::remove_dir(group);
+    }
+    if let Some(desktop) = desktop_root {
+        remove_file_if_exists(&desktop.join("Honk300.lnk"))?;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn remove_windows_registry_path(key: &winreg::RegKey, removed: &Path) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+
+    let current: String = match key.get_value("Path") {
+        Ok(value) => value,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    let Some(updated) = windows_path_without_entry(&current, removed) else {
+        return Ok(());
+    };
+    let mut raw = key.get_raw_value("Path")?;
+    let mut bytes = std::ffi::OsStr::new(&updated)
+        .encode_wide()
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<_>>();
+    bytes.extend_from_slice(&0_u16.to_le_bytes());
+    raw.bytes = bytes;
+    key.set_raw_value("Path", &raw)
+}
+
+#[cfg(any(test, windows))]
+fn windows_path_without_entry(current: &str, removed: &Path) -> Option<String> {
+    let parts = current.split(';').collect::<Vec<_>>();
+    let kept = parts
+        .iter()
+        .copied()
+        .filter(|part| !part.trim().eq_ignore_ascii_case(&removed.to_string_lossy()))
+        .collect::<Vec<_>>();
+    (kept.len() != parts.len()).then(|| kept.join(";"))
+}
+
+#[cfg(windows)]
+fn write_windows_slot_state(path: &Path, state: &WindowsSlotState) -> Result<(), DynError> {
+    let value = serde_json::json!({
+        "schema": "honk300.windows-slot-transaction.v1",
+        "root": state.root.to_string_lossy(),
+        "new_release": state.new_release.to_string_lossy(),
+        "previous_current": state.previous_current.as_ref().map(|path| path.to_string_lossy()),
+        "previous_bin": state.previous_bin.as_ref().map(|path| path.to_string_lossy()),
+        "legacy_bin": state.legacy_bin.as_ref().map(|path| path.to_string_lossy()),
+        "receipt_backup": state.receipt_backup.as_ref().map(|path| path.to_string_lossy()),
+        "previous_marker": state.previous_marker.as_deref(),
+    });
+    let temp = path.with_extension(format!("{}.tmp", std::process::id()));
+    fs::write(&temp, serde_json::to_vec_pretty(&value)?)?;
+    fs::rename(temp, path)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn read_windows_slot_state(path: &Path) -> Result<WindowsSlotState, DynError> {
+    let metadata = fs::symlink_metadata(path)?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err("Windows slot state is not a regular file".into());
+    }
+    let value: serde_json::Value = serde_json::from_slice(&fs::read(path)?)?;
+    if value.get("schema").and_then(serde_json::Value::as_str)
+        != Some("honk300.windows-slot-transaction.v1")
+    {
+        return Err("Windows slot state schema is invalid".into());
+    }
+    let path_value = |key: &str| {
+        value
+            .get(key)
+            .and_then(serde_json::Value::as_str)
+            .map(PathBuf::from)
+    };
+    Ok(WindowsSlotState {
+        root: path_value("root").ok_or("Windows slot state has no root")?,
+        new_release: path_value("new_release").ok_or("Windows slot state has no new release")?,
+        previous_current: path_value("previous_current"),
+        previous_bin: path_value("previous_bin"),
+        legacy_bin: path_value("legacy_bin"),
+        receipt_backup: path_value("receipt_backup"),
+        previous_marker: value
+            .get("previous_marker")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+    })
+}
+
+#[cfg(windows)]
+fn read_owned_junction_target(path: &Path) -> Result<Option<PathBuf>, DynError> {
+    match fs::symlink_metadata(path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+        Ok(metadata) if metadata.file_type().is_symlink() => Ok(Some(fs::read_link(path)?)),
+        Ok(_) => Ok(None),
+    }
+}
+
+#[cfg(windows)]
+fn restore_windows_junction(path: &Path, target: Option<&Path>) -> Result<(), DynError> {
+    match target {
+        Some(target) => retarget_windows_junction(path, target),
+        None => remove_windows_junction(path),
+    }
+}
+
+#[cfg(windows)]
+fn remove_windows_junction(path: &Path) -> Result<(), DynError> {
+    match fs::remove_dir(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+#[cfg(windows)]
+fn retarget_windows_junction(junction: &Path, target: &Path) -> Result<(), DynError> {
+    use std::os::windows::ffi::OsStrExt;
+
+    const GENERIC_WRITE: u32 = 0x4000_0000;
+    const FILE_SHARE_ALL: u32 = 0x0000_0007;
+    const OPEN_EXISTING: u32 = 3;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    const FSCTL_SET_REPARSE_POINT: u32 = 0x0009_00A4;
+    const IO_REPARSE_TAG_MOUNT_POINT: u32 = 0xA000_0003;
+    const INVALID_HANDLE_VALUE: isize = -1;
+
+    #[link(name = "Kernel32")]
+    unsafe extern "system" {
+        fn CreateFileW(
+            name: *const u16,
+            access: u32,
+            share: u32,
+            security: *const std::ffi::c_void,
+            creation: u32,
+            flags: u32,
+            template: isize,
+        ) -> isize;
+        fn DeviceIoControl(
+            handle: isize,
+            code: u32,
+            input: *const std::ffi::c_void,
+            input_size: u32,
+            output: *mut std::ffi::c_void,
+            output_size: u32,
+            returned: *mut u32,
+            overlapped: *mut std::ffi::c_void,
+        ) -> i32;
+        fn CloseHandle(handle: isize) -> i32;
+    }
+
+    let absolute_target = if target.is_absolute() {
+        target.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(target)
+    };
+    // Prove that the lexical target currently resolves before storing that lexical path. Keeping
+    // `root\current\bin` lexical is what makes the public bin junction follow later activations.
+    absolute_target.canonicalize()?;
+    let created = match fs::symlink_metadata(junction) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            fs::create_dir(junction)?;
+            true
+        }
+        Err(error) => return Err(error.into()),
+        Ok(metadata) if metadata.file_type().is_symlink() => false,
+        Ok(_) => {
+            return Err(format!("refusing to retarget non-junction {}", junction.display()).into())
+        }
+    };
+    let result = (|| -> Result<(), DynError> {
+        let mut junction_wide = junction.as_os_str().encode_wide().collect::<Vec<_>>();
+        junction_wide.push(0);
+        let canonical_text = absolute_target.to_string_lossy();
+        let print_text = canonical_text
+            .strip_prefix(r"\\?\UNC\")
+            .map(|path| format!(r"\\{path}"))
+            .or_else(|| canonical_text.strip_prefix(r"\\?\").map(str::to_owned))
+            .unwrap_or_else(|| canonical_text.into_owned());
+        let print = std::ffi::OsStr::new(&print_text)
+            .encode_wide()
+            .collect::<Vec<_>>();
+        let substitute = format!(r"\??\{print_text}")
+            .encode_utf16()
+            .collect::<Vec<_>>();
+        let substitute_bytes = substitute.len() * 2;
+        let print_bytes = print.len() * 2;
+        let path_bytes = substitute_bytes + 2 + print_bytes + 2;
+        let data_length = 8 + path_bytes;
+        let mut buffer = vec![0u8; 8 + data_length];
+        buffer[0..4].copy_from_slice(&IO_REPARSE_TAG_MOUNT_POINT.to_le_bytes());
+        buffer[4..6].copy_from_slice(&(data_length as u16).to_le_bytes());
+        buffer[8..10].copy_from_slice(&0u16.to_le_bytes());
+        buffer[10..12].copy_from_slice(&(substitute_bytes as u16).to_le_bytes());
+        buffer[12..14].copy_from_slice(&((substitute_bytes + 2) as u16).to_le_bytes());
+        buffer[14..16].copy_from_slice(&(print_bytes as u16).to_le_bytes());
+        let mut offset = 16;
+        for unit in substitute
+            .iter()
+            .chain(std::iter::once(&0))
+            .chain(print.iter())
+            .chain(std::iter::once(&0))
+        {
+            buffer[offset..offset + 2].copy_from_slice(&unit.to_le_bytes());
+            offset += 2;
+        }
+        // SAFETY: the UTF-16 path and reparse buffer remain live for each synchronous Win32 call;
+        // the handle is checked and closed exactly once.
+        let handle = unsafe {
+            CreateFileW(
+                junction_wide.as_ptr(),
+                GENERIC_WRITE,
+                FILE_SHARE_ALL,
+                std::ptr::null(),
+                OPEN_EXISTING,
+                FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
+                0,
+            )
+        };
+        if handle == INVALID_HANDLE_VALUE {
+            return Err(io::Error::last_os_error().into());
+        }
+        let mut returned = 0;
+        // SAFETY: `handle` is a valid reparse-point handle and `buffer` describes a mount-point
+        // reparse buffer of exactly the supplied length. No output buffer or OVERLAPPED is used.
+        let success = unsafe {
+            DeviceIoControl(
+                handle,
+                FSCTL_SET_REPARSE_POINT,
+                buffer.as_ptr().cast(),
+                buffer.len() as u32,
+                std::ptr::null_mut(),
+                0,
+                &mut returned,
+                std::ptr::null_mut(),
+            )
+        };
+        let call_error = (success == 0).then(io::Error::last_os_error);
+        // SAFETY: the handle was returned by CreateFileW and has not been closed yet.
+        unsafe { CloseHandle(handle) };
+        if let Some(error) = call_error {
+            return Err(error.into());
+        }
+        Ok(())
+    })();
+    if result.is_err() && created {
+        let _ = fs::remove_dir(junction);
+    }
+    result
 }
 
 #[cfg(windows)]
@@ -1488,7 +3488,7 @@ fn create_windows_start_menu_shortcut(exe: &Path) -> io::Result<()> {
     let shortcut = windows_start_menu_shortcut_path()?;
     let working_dir = exe.parent().unwrap_or_else(|| Path::new(""));
     let script = format!(
-        "$w = New-Object -ComObject WScript.Shell; $s = $w.CreateShortcut('{}'); $s.TargetPath = '{}'; $s.Arguments = 'start'; $s.WorkingDirectory = '{}'; $s.Save()",
+        "$w = New-Object -ComObject WScript.Shell; $s = $w.CreateShortcut('{}'); $s.TargetPath = '{}'; $s.Arguments = ''; $s.WorkingDirectory = '{}'; $s.WindowStyle = 7; $s.Save()",
         ps_quote(&shortcut.to_string_lossy()),
         ps_quote(&exe.to_string_lossy()),
         ps_quote(&working_dir.to_string_lossy())
@@ -1538,11 +3538,188 @@ fn set_windows_autostart(exe: Option<&Path>) -> io::Result<()> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let (run, _) = hkcu.create_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")?;
     if let Some(exe) = exe {
-        run.set_value("Honk300", &format!("\"{}\" start", exe.display()))
+        run.set_value("Honk300", &windows_autostart_command(exe))
     } else {
         let _ = run.delete_value("Honk300");
         Ok(())
     }
+}
+
+#[cfg(windows)]
+fn windows_autostart_is_machine_owned(source: InstallSource) -> bool {
+    matches!(
+        source,
+        InstallSource::MsiGlobal | InstallSource::ExeGlobal | InstallSource::PowerShell
+    )
+}
+
+#[cfg(windows)]
+fn windows_autostart_command(program: &Path) -> String {
+    format!("\"{}\"", program.display())
+}
+
+#[cfg(windows)]
+fn legacy_windows_autostart_command(program: &Path) -> Option<String> {
+    (program.file_name()?.to_str()? == WINDOWS_APP_LAUNCHER_NAME).then(|| {
+        format!(
+            "\"{}\" start",
+            program.with_file_name("honk300.exe").display()
+        )
+    })
+}
+
+#[cfg(windows)]
+fn windows_autostart_value(source: InstallSource) -> io::Result<Option<String>> {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ};
+    use winreg::RegKey;
+
+    let hive = if windows_autostart_is_machine_owned(source) {
+        HKEY_LOCAL_MACHINE
+    } else {
+        HKEY_CURRENT_USER
+    };
+    let root = RegKey::predef(hive);
+    let run = match root.open_subkey_with_flags(
+        "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+        KEY_READ,
+    ) {
+        Ok(run) => run,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    match run.get_value::<String, _>("Honk300") {
+        Ok(value) => Ok(Some(value)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(windows)]
+fn windows_owned_autostart_state(identity: &ManagedAutostartIdentity) -> Result<bool, DynError> {
+    let expected = windows_autostart_command(&identity.program);
+    let legacy = legacy_windows_autostart_command(&identity.program);
+    match windows_autostart_value(identity.source)? {
+        None => Ok(false),
+        Some(actual) if actual.eq_ignore_ascii_case(&expected) => Ok(true),
+        Some(actual)
+            if legacy
+                .as_deref()
+                .is_some_and(|legacy| actual.eq_ignore_ascii_case(legacy)) =>
+        {
+            Ok(true)
+        }
+        Some(actual) => Err(format!(
+            "refusing to replace foreign Honk300 login-start value `{actual}`; expected `{expected}`"
+        )
+        .into()),
+    }
+}
+
+#[cfg(windows)]
+fn windows_autostart_identity_matches(
+    identity: &ManagedAutostartIdentity,
+    enabled: bool,
+) -> Result<bool, DynError> {
+    let expected = windows_autostart_command(&identity.program);
+    let actual = windows_autostart_value(identity.source)?;
+    let mechanism_matches = if enabled {
+        actual
+            .as_deref()
+            .is_some_and(|actual| actual.eq_ignore_ascii_case(&expected))
+    } else {
+        actual.is_none()
+    };
+    Ok(mechanism_matches
+        && receipt_autostart_enabled(identity.receipt_path.as_deref())?
+            .is_none_or(|v| v == enabled))
+}
+
+#[cfg(windows)]
+fn reconcile_windows_autostart(
+    identity: &ManagedAutostartIdentity,
+    enabled: bool,
+) -> Result<(), DynError> {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    use winreg::RegKey;
+
+    let expected = windows_autostart_command(&identity.program);
+    let legacy = legacy_windows_autostart_command(&identity.program);
+    let existing = windows_autostart_value(identity.source)?;
+    if existing.as_deref().is_some_and(|actual| {
+        !actual.eq_ignore_ascii_case(&expected)
+            && !legacy
+                .as_deref()
+                .is_some_and(|legacy| actual.eq_ignore_ascii_case(legacy))
+    }) {
+        return Err(format!(
+            "refusing to replace foreign Honk300 login-start value `{}`",
+            existing.expect("checked as present")
+        )
+        .into());
+    }
+    let hive = if windows_autostart_is_machine_owned(identity.source) {
+        HKEY_LOCAL_MACHINE
+    } else {
+        HKEY_CURRENT_USER
+    };
+    let root = RegKey::predef(hive);
+    let (run, _) = root.create_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")?;
+    if enabled {
+        run.set_value("Honk300", &expected)?;
+    } else if existing.is_some() {
+        run.delete_value("Honk300")?;
+    }
+    update_receipt_autostart(identity, enabled)
+}
+
+#[cfg(windows)]
+fn elevate_windows_autostart_reconcile(enabled: bool) -> Result<(), DynError> {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let current = std::env::current_exe()?;
+    let script = format!(
+        "$p=Start-Process -FilePath '{}' -ArgumentList @('__windows-config-autostart','{}') -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode",
+        powershell_literal(&current.to_string_lossy()),
+        enabled
+    );
+    let status = std::process::Command::new(system_windows_powershell_path()?)
+        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "elevated Global login-autostart reconciliation exited with {}",
+            status.code().unwrap_or(-1)
+        )
+        .into())
+    }
+}
+
+#[cfg(windows)]
+pub fn run_windows_config_autostart_protocol() -> Result<bool, DynError> {
+    let mut args = std::env::args_os();
+    let _program = args.next();
+    if args.next().as_deref() != Some(std::ffi::OsStr::new("__windows-config-autostart")) {
+        return Ok(false);
+    }
+    let enabled = match args.next().as_deref().and_then(std::ffi::OsStr::to_str) {
+        Some("true") => true,
+        Some("false") => false,
+        _ => return Err("invalid internal Windows autostart preference".into()),
+    };
+    if args.next().is_some() {
+        return Err("unexpected internal Windows autostart argument".into());
+    }
+    let identity = managed_autostart_identity()?
+        .ok_or("elevated Windows autostart helper has no managed install identity")?;
+    if !windows_autostart_is_machine_owned(identity.source) {
+        return Err("elevated Windows autostart helper refused a non-machine install".into());
+    }
+    reconcile_windows_autostart(&identity, enabled)?;
+    Ok(true)
 }
 
 #[cfg(windows)]
@@ -2115,7 +4292,12 @@ fn uninstall_windows_managed_under_lease(
     let installed_bin = original_exe
         .parent()
         .ok_or("honk300 uninstall: installed executable has no parent directory")?;
-    for name in ["honk300.exe", "honk.exe", "goose.exe"] {
+    for name in [
+        "honk300.exe",
+        "honk.exe",
+        "goose.exe",
+        WINDOWS_APP_LAUNCHER_NAME,
+    ] {
         match fs::symlink_metadata(installed_bin.join(name)) {
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error.into()),
@@ -2411,6 +4593,8 @@ fn macos_install_receipt(
     metadata: &MacosBundleMetadata,
     install_root: &Path,
     autostart: bool,
+    payload_hash: &str,
+    payload_size: u64,
 ) -> serde_json::Value {
     let home = install_root
         .parent()
@@ -2424,15 +4608,26 @@ fn macos_install_receipt(
             .into_owned()
     };
     serde_json::json!({
-        "schema": OWNERSHIP_MARKER,
+        "schema": INSTALL_RECEIPT_V2,
         "version": metadata.version,
         "tag": metadata.tag,
         "commit": metadata.commit,
-        "channel": "dmg",
+        "channel": "mac-app",
+        "origin": "mac-app",
+        "installer_family": "dmg",
+        "edition": "global",
+        "scope": "user",
+        "release_track": "stable",
         "layout": "mac-app",
         "target": "universal2-apple-darwin",
-        "artifact": { "name": "honk300-universal2.dmg" },
+        "artifact": {
+            "name": "Honk300.app/Contents/MacOS/honk300",
+            "sha256": payload_hash,
+            "size": payload_size
+        },
         "install_root": install_root.to_string_lossy(),
+        "owned_root": install_root.to_string_lossy(),
+        "active_release": install_root.to_string_lossy(),
         "aliases": [alias("honk300"), alias("honk"), alias("goose")],
         "autostart": { "enabled": autostart, "owner": "honk300-install" }
     })
@@ -2837,7 +5032,7 @@ fn preflight_owned_macos_receipt(path: &Path, root: &Path) -> io::Result<()> {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn preflight_owned_text_file(path: &Path, marker: &str) -> io::Result<()> {
     match fs::symlink_metadata(path) {
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
@@ -2877,7 +5072,16 @@ fn write_macos_receipt(
             format!("stale receipt transaction exists: {}", temp.display()),
         ));
     }
-    let bytes = serde_json::to_vec_pretty(&macos_install_receipt(metadata, root, autostart))?;
+    let payload = root.join("Contents").join("MacOS").join("honk300");
+    let payload_size = fs::metadata(&payload)?.len();
+    let payload_hash = sha256_file(&payload)?;
+    let bytes = serde_json::to_vec_pretty(&macos_install_receipt(
+        metadata,
+        root,
+        autostart,
+        &payload_hash,
+        payload_size,
+    ))?;
     fs::write(&temp, bytes)?;
     fs::set_permissions(&temp, fs::Permissions::from_mode(0o600))?;
     if let Err(error) = fs::rename(&temp, path) {
@@ -2985,6 +5189,32 @@ mod tests {
         assert_eq!(InstallSource::from_marker("cargo"), InstallSource::Unknown);
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn windows_login_start_uses_only_the_gui_launcher_and_recognizes_the_owned_legacy_value() {
+        let launcher = Path::new(r"C:\Program Files\honk300\bin\honk300-app.exe");
+        assert_eq!(
+            windows_autostart_command(launcher),
+            r#""C:\Program Files\honk300\bin\honk300-app.exe""#
+        );
+        assert_eq!(
+            legacy_windows_autostart_command(launcher).as_deref(),
+            Some(r#""C:\Program Files\honk300\bin\honk300.exe" start"#)
+        );
+        assert_eq!(
+            legacy_windows_autostart_command(Path::new(
+                r"C:\Program Files\honk300\bin\foreign.exe"
+            )),
+            None
+        );
+        assert_eq!(
+            manual_autostart_program(PathBuf::from(
+                r"C:\Users\goose\AppData\Local\Programs\honk300\bin\honk300.exe"
+            )),
+            PathBuf::from(r"C:\Users\goose\AppData\Local\Programs\honk300\bin\honk300-app.exe")
+        );
+    }
+
     #[test]
     fn lifecycle_lease_is_held_for_the_entire_mutation() {
         struct Lease(Rc<Cell<bool>>);
@@ -3049,11 +5279,11 @@ mod tests {
     fn install_path_classification_never_selects_cargo_update_path() {
         assert_eq!(
             classify_install_path(r"C:\Program Files\honk300\bin\honk300.exe"),
-            InstallSource::MsiGlobal
+            InstallSource::Unknown
         );
         assert_eq!(
             classify_install_path(r"C:\Users\a\AppData\Local\Programs\honk300\bin\goose.exe"),
-            InstallSource::MsiCorporate
+            InstallSource::Unknown
         );
         assert_eq!(
             classify_install_path("/home/a/.local/share/honk300/install/bin/honk300"),
@@ -3063,6 +5293,91 @@ mod tests {
             classify_install_path(r"C:\Users\a\.cargo\bin\honk300.exe"),
             InstallSource::Unknown
         );
+    }
+
+    #[test]
+    fn receipt_v2_requires_a_complete_consistent_install_identity() {
+        let root = test_dir("receipt-v2-identity");
+        let executable = root.join("current/bin/honk300.exe");
+        fs::create_dir_all(executable.parent().unwrap()).unwrap();
+        fs::write(&executable, b"fixture").unwrap();
+        let receipt = serde_json::json!({
+            "schema": INSTALL_RECEIPT_V2,
+            "version": "1.2.3",
+            "tag": "v1.2.3",
+            "commit": "0".repeat(40),
+            "origin": "msi-global",
+            "installer_family": "msi",
+            "edition": "global",
+            "scope": "machine",
+            "release_track": "stable",
+            "layout": "windows-slots-v1",
+            "target": "x86_64-pc-windows-msvc",
+            "artifact": { "name": "honk300-x86_64-pc-windows-msvc.msi", "sha256": "a".repeat(64), "size": 123 },
+            "install_root": root.to_string_lossy(),
+            "active_release": root.join("releases/1.2.3-x86_64-pc-windows-msvc").to_string_lossy(),
+            "aliases": [],
+            "autostart": { "enabled": false, "owner": "msi" }
+        });
+        assert_eq!(
+            validated_receipt_source(&receipt, &executable),
+            Some(InstallSource::MsiGlobal)
+        );
+
+        let mut inconsistent = receipt.clone();
+        inconsistent["scope"] = "user".into();
+        assert_eq!(validated_receipt_source(&inconsistent, &executable), None);
+
+        let mut bad_hash = receipt;
+        bad_hash["artifact"]["sha256"] = "not-a-hash".into();
+        assert_eq!(validated_receipt_source(&bad_hash, &executable), None);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn receipt_evidence_accepts_v1_but_rejects_foreign_and_conflicting_receipts() {
+        let root = test_dir("receipt-evidence");
+        let executable = root.join("bin/honk300");
+        fs::create_dir_all(executable.parent().unwrap()).unwrap();
+        fs::write(&executable, b"fixture").unwrap();
+        let first = root.join("first.json");
+        let second = root.join("second.json");
+        fs::write(
+            &first,
+            serde_json::to_vec(&serde_json::json!({
+                "schema": OWNERSHIP_MARKER,
+                "channel": "shell",
+                "install_root": root.to_string_lossy(),
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            install_receipt_source_from_candidates(std::slice::from_ref(&first), &executable),
+            InstallSourceEvidence::Valid(InstallSource::Shell)
+        );
+
+        fs::write(
+            &second,
+            serde_json::to_vec(&serde_json::json!({
+                "schema": OWNERSHIP_MARKER,
+                "channel": "deb",
+                "install_root": root.to_string_lossy(),
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            install_receipt_source_from_candidates(&[first.clone(), second.clone()], &executable),
+            InstallSourceEvidence::InvalidOrConflicting
+        );
+
+        fs::write(&second, b"foreign").unwrap();
+        assert_eq!(
+            install_receipt_source_from_candidates(&[second], &executable),
+            InstallSourceEvidence::InvalidOrConflicting
+        );
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
@@ -3154,9 +5469,9 @@ mod tests {
             tag: "v1.0.1".into(),
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
         };
-        let receipt = macos_install_receipt(&metadata, root, false);
+        let receipt = macos_install_receipt(&metadata, root, false, &"a".repeat(64), 123);
 
-        assert_eq!(receipt["schema"], OWNERSHIP_MARKER);
+        assert_eq!(receipt["schema"], INSTALL_RECEIPT_V2);
         assert_eq!(receipt["install_root"], root.to_string_lossy().as_ref());
         assert_eq!(receipt["version"], "1.0.1");
         assert_eq!(receipt["tag"], "v1.0.1");
@@ -3164,7 +5479,11 @@ mod tests {
             receipt["commit"],
             "0123456789abcdef0123456789abcdef01234567"
         );
-        assert_eq!(receipt["channel"], "dmg");
+        assert_eq!(receipt["origin"], "mac-app");
+        assert_eq!(receipt["installer_family"], "dmg");
+        assert_eq!(receipt["release_track"], "stable");
+        assert_eq!(receipt["artifact"]["size"], 123);
+        assert_eq!(receipt["active_release"], root.to_string_lossy().as_ref());
         assert_eq!(receipt["layout"], "mac-app");
     }
 
@@ -3555,27 +5874,111 @@ mod tests {
     }
 
     #[test]
-    fn windows_adjacent_marker_wins_when_global_and_corporate_installs_coexist() {
+    fn windows_adjacent_marker_is_only_used_after_registration_evidence_is_missing() {
         assert_eq!(
             windows_install_source_precedence(
                 Some(InstallSource::MsiCorporate),
-                Some(InstallSource::MsiGlobal),
                 InstallSource::MsiCorporate,
             ),
             InstallSource::MsiCorporate
         );
         assert_eq!(
-            windows_install_source_precedence(
-                None,
-                Some(InstallSource::MsiGlobal),
-                InstallSource::Unknown,
-            ),
-            InstallSource::MsiGlobal
-        );
-        assert_eq!(
-            windows_install_source_precedence(None, None, InstallSource::MsiCorporate),
+            windows_install_source_precedence(None, InstallSource::MsiCorporate),
             InstallSource::MsiCorporate
         );
+    }
+
+    #[test]
+    fn windows_registration_identity_is_unique_and_preserves_powershell_origin() {
+        assert_eq!(
+            windows_registration_evidence(&[], None),
+            InstallSourceEvidence::Missing
+        );
+        assert_eq!(
+            windows_registration_evidence(&[InstallSource::MsiGlobal], None),
+            InstallSourceEvidence::Valid(InstallSource::MsiGlobal)
+        );
+        assert_eq!(
+            windows_registration_evidence(
+                &[InstallSource::MsiGlobal],
+                Some(InstallSource::PowerShell)
+            ),
+            InstallSourceEvidence::Valid(InstallSource::PowerShell)
+        );
+        assert_eq!(
+            windows_registration_evidence(
+                &[InstallSource::MsiGlobal, InstallSource::ExeGlobal],
+                Some(InstallSource::ExeGlobal)
+            ),
+            InstallSourceEvidence::InvalidOrConflicting
+        );
+        assert_eq!(
+            windows_registration_evidence(
+                &[InstallSource::MsiCorporate],
+                Some(InstallSource::MsiGlobal)
+            ),
+            InstallSourceEvidence::InvalidOrConflicting
+        );
+    }
+
+    #[test]
+    fn windows_active_owner_path_cleanup_removes_only_the_exact_stable_bin() {
+        let removed = Path::new(r"C:\Program Files\honk300\bin");
+        assert_eq!(
+            windows_path_without_entry(
+                r"C:\Windows;C:\Program Files\honk300\bin;C:\Tools",
+                removed
+            ),
+            Some(r"C:\Windows;C:\Tools".into())
+        );
+        assert_eq!(
+            windows_path_without_entry(
+                r"C:\Windows;c:\program files\HONK300\BIN;C:\Tools",
+                removed
+            ),
+            Some(r"C:\Windows;C:\Tools".into())
+        );
+        assert_eq!(
+            windows_path_without_entry(r"C:\Windows;C:\Tools", removed),
+            None
+        );
+    }
+
+    #[test]
+    fn windows_owner_cleanup_preserves_only_the_active_registration_identity() {
+        let global = Path::new(r"C:\Program Files\honk300");
+        let corporate = Path::new(r"C:\Users\user\AppData\Local\Programs\honk300");
+
+        assert!(!windows_owner_conflicts(
+            InstallSource::MsiGlobal,
+            global,
+            InstallSource::MsiGlobal,
+            global,
+        ));
+        assert!(!windows_owner_conflicts(
+            InstallSource::PowerShell,
+            global,
+            InstallSource::MsiGlobal,
+            global,
+        ));
+        assert!(windows_owner_conflicts(
+            InstallSource::ExeGlobal,
+            global,
+            InstallSource::MsiGlobal,
+            global,
+        ));
+        assert!(windows_owner_conflicts(
+            InstallSource::MsiCorporate,
+            corporate,
+            InstallSource::MsiGlobal,
+            global,
+        ));
+        assert!(windows_owner_conflicts(
+            InstallSource::MsiGlobal,
+            global,
+            InstallSource::MsiGlobal,
+            corporate,
+        ));
     }
 
     #[test]

@@ -404,6 +404,119 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
 
 
 class WindowsOverlaySmokeContractTests(unittest.TestCase):
+    def test_interactive_full_screen_calibration_is_retired_outside_disposable_ci(self):
+        smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
+        guard = "if ($AllowInteractiveDesktopObscuration -and -not $isGitHubActions)"
+        background_start = "$background = Start-Process"
+        for required in (
+            "[switch] $AllowInteractiveDesktopObscuration",
+            "[switch] $NoticeOnly",
+            "[switch] $PropsOnly",
+            "[switch] $LifecycleOnly",
+            "$env:GITHUB_ACTIONS -eq 'true'",
+            guard,
+            "Interactive full-desktop calibration has been retired.",
+            "strict paired-color",
+            "compositor proof runs only on a disposable GitHub Actions desktop",
+            "$runLifecycleOnly = $LifecycleOnly",
+            "visible-lifecycle-no-obscuration",
+        ):
+            self.assertIn(required, smoke)
+        self.assertLess(smoke.index(guard), smoke.index(background_start))
+
+    def test_interactive_prop_proof_starts_with_a_bounded_goose_delivered_note(self):
+        smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
+        preview_start = "$runtime = Start-ExactRuntime -Label 'owned-note'"
+        background_start = "$background = Start-Process"
+        for required in (
+            "function Wait-ForVisibleGoose",
+            "function Wait-ForCalibrationNotice",
+            "HONK300_SMOKE_NOTE_TEXT",
+            "HONK300_SMOKE_NOTE_EVIDENCE",
+            "honk300_collect_note",
+            "honk300.windows.calibration-note.v1",
+            "created-prefilled-and-moved",
+            "I brought you a note.",
+            "It should be readable without taking over your screen.",
+            "@('do', 'note')",
+            "result=visible-bounded-owned-note",
+            "if ($NoticeOnly)",
+            "collect_memes",
+            "owned-note-runtime.stdout.log",
+            "goose walked home; stopping",
+        ):
+            self.assertIn(required, smoke)
+        self.assertNotIn("Get-Process -Name notepad", smoke)
+        self.assertLess(smoke.index(preview_start), smoke.index(background_start))
+
+    def test_windows_notes_are_owned_in_process_and_never_launch_notepad(self):
+        backend = (
+            ROOT / "crates" / "honk-platform-windows" / "src" / "lib.rs"
+        ).read_text(encoding="utf-8")
+        for required in (
+            "struct NoteWindow",
+            'w!("honk300_collect_note")',
+            'w!("A note from Honk300")',
+            "SetWindowTextW(self.edit",
+            "ControlledWindow::Note",
+        ):
+            self.assertIn(required, backend)
+        self.assertNotIn('Command::new(&notepad)', backend)
+        self.assertNotIn('join("notepad.exe")', backend)
+
+    def test_windows_collect_props_are_monitor_bounded_without_image_cropping(self):
+        contract = (ROOT / "crates" / "honk-engine" / "src" / "collect_window.rs").read_text(
+            encoding="utf-8"
+        )
+        backend = (
+            ROOT / "crates" / "honk-platform-windows" / "src" / "lib.rs"
+        ).read_text(encoding="utf-8")
+        mac_backend = (
+            ROOT / "crates" / "honk-platform-macos" / "src" / "lib.rs"
+        ).read_text(encoding="utf-8")
+        smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
+        for required in (
+            "COLLECT_PROP_MAX_SCREEN_FRACTION: f32 = 0.48",
+            "fn collect_note_size",
+            "fn fitted_collect_image_size",
+            "fn fit_collect_image",
+            "FilterQuality::Bicubic",
+            "Transform::from_scale",
+        ):
+            self.assertIn(required, contract)
+        for platform in (backend, mac_backend):
+            self.assertIn("collect_note_size", platform)
+            self.assertIn("fit_collect_image", platform)
+            self.assertIn("update_display_bounds", platform)
+        for required in (
+            "FindVisibleOwnedImage",
+            "function Wait-ForOwnedImage",
+            "created-aspect-fitted",
+            "visible-bounded-aspect-preserved-and-uncropped",
+            "collect-image-visible.png",
+        ):
+            self.assertIn(required, smoke)
+
+    def test_lifecycle_smoke_distinguishes_graceful_and_forced_shutdown(self):
+        smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
+        for required in (
+            "ordinary stop did not complete the graceful offscreen walk",
+            "foreach ($name in @('honk300', 'honk', 'goose'))",
+            "foreach ($verb in @('stop', 'quit', 'exit'))",
+            "Invoke-WindowsTrayQuit -Process $runtime -Token $trayQuitToken",
+            "HONK300_WINDOWS_SMOKE_TRAY_QUIT_TOKEN",
+            "Honk300SmokeTrayQuit-$Token",
+            "native tray Quit did not take the graceful runtime path",
+            "-Arguments @($verb, '--force')",
+            "forced stop command received; stopping immediately",
+            "--force unexpectedly ran the graceful walk-off path",
+            "all-alias-all-synonym-force",
+            "offscreen-walk-in",
+        ):
+            self.assertIn(required, smoke)
+        self.assertNotIn("$vkEnd", smoke)
+        self.assertNotIn("$vkReturn", smoke)
+
     def test_taskbar_recovery_allows_bounded_shell_rect_settle_and_records_latency(self):
         smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
         self.assertIn("$deletionSettlePolls = 0", smoke)
@@ -466,10 +579,11 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
             "virtual_screen=",
         ):
             self.assertIn(required, smoke)
-        self.assertLess(
-            smoke.index("$darkProofCapture ="),
-            smoke.index("$runtime = Start-ExactRuntime -Label 'first'"),
+        strict_start = smoke.index(
+            "$runtime = Start-ExactRuntime -Label 'first'",
+            smoke.index("$hostExecutable ="),
         )
+        self.assertLess(smoke.index("$darkProofCapture ="), strict_start)
 
     def test_hosted_arm64_wallpaper_capture_uses_a_strict_presenter_surface_fallback(self):
         smoke = (ROOT / "script" / "smoke_windows_overlay.ps1").read_text(encoding="utf-8")
@@ -557,8 +671,9 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
             "Get-FileHash -LiteralPath $resolvedBinary",
             "@('reload')",
             "@('stop')",
-            "Start-ExactRuntime -Label 'restart'",
-            "@('quiet_hours_enabled', 'pause_on_fullscreen')",
+            '$label = "graceful-$name-$verb"',
+            '$label = "force-$name-$verb"',
+            "@('quiet_hours_enabled', 'pause_on_fullscreen', 'collect_memes')",
         ):
             self.assertIn(required, smoke)
         self.assertNotIn("[System.Drawing.CopyPixelOperation]::CaptureBlt", smoke)

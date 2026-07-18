@@ -14,6 +14,11 @@ STAGE_ROOT=""
 DEST=""
 PREVIOUS=""
 SWAPPED=0
+SLOT_ACTIVATED=0
+NEW_RELEASE=""
+NEW_RELEASE_CREATED=0
+LEGACY_RELEASE=""
+SELECTOR_TEMP=""
 COMMITTED=0
 CREATED_LINKS=""
 REPLACED_LINKS=""
@@ -163,6 +168,22 @@ release_lifecycle_lease() {
 }
 
 rollback() {
+  if [ "$SLOT_ACTIVATED" -eq 1 ] || [ "$NEW_RELEASE_CREATED" -eq 1 ] || [ -n "$LEGACY_RELEASE" ]; then
+    selector="$DEST/current"
+    if [ "$SLOT_ACTIVATED" -eq 1 ]; then
+      [ ! -L "$selector" ] || rm -f "$selector"
+      if [ -n "$PREVIOUS" ]; then
+        ln -s "$PREVIOUS" "$selector"
+      fi
+    fi
+    [ -z "$SELECTOR_TEMP" ] || [ ! -L "$SELECTOR_TEMP" ] || rm -f "$SELECTOR_TEMP"
+    if [ -n "$LEGACY_RELEASE" ] && [ -d "$LEGACY_RELEASE" ]; then
+      mv "$LEGACY_RELEASE" "$DEST/bin"
+    fi
+    if [ "$NEW_RELEASE_CREATED" -eq 1 ] && [ -n "$NEW_RELEASE" ]; then rm -rf "$NEW_RELEASE"; fi
+    SLOT_ACTIVATED=0
+    return 0
+  fi
   [ "$SWAPPED" -eq 1 ] || return 0
   [ -n "$DEST" ] || return 0
   rm -rf "$DEST"
@@ -241,7 +262,9 @@ safe_link() {
     case "$old_target" in
       "$HOME/Applications/Honk300.app/Contents/MacOS/honk300"|\
       "$HOME/.local/share/honk300/install/bin/honk300"|\
-      "${XDG_DATA_HOME:-$HOME/.local/share}/honk300/install/bin/honk300") : ;;
+      "${XDG_DATA_HOME:-$HOME/.local/share}/honk300/install/bin/honk300"|\
+      "$HOME/.local/share/honk300/install/current/bin/honk300"|\
+      "${XDG_DATA_HOME:-$HOME/.local/share}/honk300/install/current/bin/honk300") : ;;
       *) die "refusing to replace foreign command symlink: $link -> $old_target" ;;
     esac
     REPLACED_LINKS="${REPLACED_LINKS}${REPLACED_LINKS:+
@@ -311,10 +334,20 @@ write_receipt() {
   artifact="$5"
   hash="$6"
   autostart="$7"
+  origin="$8"
+  family="$9"
+  shift 9
+  edition="$1"
+  scope="$2"
+  active_release="$3"
+  artifact_size="$4"
   [ ! -L "$receipt" ] || die "refusing to replace symlinked install receipt: $receipt"
   if [ -e "$receipt" ]; then
     [ -f "$receipt" ] || die "install receipt is not a regular file: $receipt"
-    grep -F '"schema": "honk300.install.v1"' "$receipt" >/dev/null 2>&1 || die "refusing to replace foreign install receipt: $receipt"
+    if ! grep -F '"schema": "honk300.install.v1"' "$receipt" >/dev/null 2>&1 \
+       && ! grep -F '"schema": "honk300.install.v2"' "$receipt" >/dev/null 2>&1; then
+      die "refusing to replace foreign install receipt: $receipt"
+    fi
     RECEIPT_BACKUP="$TEMP_ROOT/receipt-backup.json"
     cp -p "$receipt" "$RECEIPT_BACKUP"
   else
@@ -323,15 +356,22 @@ write_receipt() {
   temp="$TEMP_ROOT/receipt.json"
   cat > "$temp" <<EOF
 {
-  "schema": "honk300.install.v1",
+  "schema": "honk300.install.v2",
   "version": "$(json_escape "$VERSION")",
   "tag": "$(json_escape "$TAG")",
   "commit": "$(json_escape "$COMMIT")",
-  "channel": "shell",
+  "channel": "$(json_escape "$origin")",
+  "origin": "$(json_escape "$origin")",
+  "installer_family": "$(json_escape "$family")",
+  "edition": "$(json_escape "$edition")",
+  "scope": "$(json_escape "$scope")",
+  "release_track": "stable",
   "layout": "$(json_escape "$layout")",
   "target": "$(json_escape "$target")",
-  "artifact": { "name": "$(json_escape "$artifact")", "sha256": "$(json_escape "$hash")" },
+  "artifact": { "name": "$(json_escape "$artifact")", "sha256": "$(json_escape "$hash")", "size": $artifact_size },
   "install_root": "$(json_escape "$install_root")",
+  "owned_root": "$(json_escape "$install_root")",
+  "active_release": "$(json_escape "$active_release")",
   "aliases": ["$(json_escape "$HOME/.local/bin/honk300")", "$(json_escape "$HOME/.local/bin/honk")", "$(json_escape "$HOME/.local/bin/goose")"],
   "autostart": { "enabled": $autostart, "owner": "honk300-installer" }
 }
@@ -352,6 +392,41 @@ swap_install() {
   SWAPPED=1
 }
 
+activate_linux_slot() {
+  candidate="$1"
+  releases="$DEST/releases"
+  selector="$DEST/current"
+  release_id="$VERSION-$TARGET"
+  NEW_RELEASE="$releases/$release_id"
+  mkdir -p "$releases"
+  [ ! -L "$releases" ] || die "refusing reparse-point releases directory"
+  if [ -e "$NEW_RELEASE" ]; then
+    [ -d "$NEW_RELEASE" ] && [ ! -L "$NEW_RELEASE" ] || die "existing release slot is unsafe: $NEW_RELEASE"
+    verify_binary "$NEW_RELEASE/bin/honk300"
+    [ "$(file_sha256 "$NEW_RELEASE/bin/honk300")" = "$(file_sha256 "$candidate/bin/honk300")" ] \
+      || die "existing immutable release slot does not match the staged payload"
+    rm -rf "$candidate"
+  else
+    mv "$candidate" "$NEW_RELEASE"
+    NEW_RELEASE_CREATED=1
+  fi
+  if [ -L "$selector" ]; then
+    PREVIOUS="$(readlink "$selector")"
+  elif [ -e "$selector" ]; then
+    die "stable current selector is not a symlink: $selector"
+  elif [ -d "$DEST/bin" ] && [ ! -L "$DEST/bin" ]; then
+    LEGACY_RELEASE="$releases/legacy-flat-$PID"
+    [ ! -e "$LEGACY_RELEASE" ] || die "legacy migration target already exists: $LEGACY_RELEASE"
+    mv "$DEST/bin" "$LEGACY_RELEASE"
+  fi
+  SELECTOR_TEMP="$DEST/.current.$PID"
+  [ ! -e "$SELECTOR_TEMP" ] && [ ! -L "$SELECTOR_TEMP" ] || die "stale selector transaction exists: $SELECTOR_TEMP"
+  ln -s "$NEW_RELEASE" "$SELECTOR_TEMP"
+  mv -f "$SELECTOR_TEMP" "$selector"
+  SELECTOR_TEMP=""
+  SLOT_ACTIVATED=1
+}
+
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 case "$ARCH" in x86_64|amd64) ARCH=x86_64 ;; arm64|aarch64) ARCH=aarch64 ;; *) die "unsupported architecture: $ARCH" ;; esac
@@ -363,6 +438,17 @@ if [ "$OS" = Darwin ]; then
   DEST="$HOME/Applications/Honk300.app"
   EXISTING_BINARY="$DEST/Contents/MacOS/honk300"
   RECEIPT="$HOME/Library/Application Support/honk300/install-receipt.json"
+  INSTALL_ORIGIN=shell
+  INSTALL_FAMILY=shell
+  INSTALL_EDITION=global
+  INSTALL_SCOPE=user
+  if [ -f "$RECEIPT" ] && [ ! -L "$RECEIPT" ]; then
+    if grep -F '"origin": "mac-app"' "$RECEIPT" >/dev/null 2>&1 \
+       || grep -F '"channel": "dmg"' "$RECEIPT" >/dev/null 2>&1; then
+      INSTALL_ORIGIN=mac-app
+      INSTALL_FAMILY=dmg
+    fi
+  fi
 elif [ "$OS" = Linux ]; then
   if [ "$ARCH" = x86_64 ]; then arch_name=x86_64; else arch_name=aarch64; fi
   libc="${HONK300_LIBC:-}"
@@ -383,8 +469,12 @@ elif [ "$OS" = Linux ]; then
   esac
   DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
   DEST="${XDG_DATA_HOME:-$HOME/.local/share}/honk300/install"
-  EXISTING_BINARY="$DEST/bin/honk300"
+  EXISTING_BINARY="$DEST/current/bin/honk300"
   RECEIPT="$DATA_HOME/honk300/install-receipt.json"
+  INSTALL_ORIGIN=shell
+  INSTALL_FAMILY=shell
+  INSTALL_EDITION=global
+  INSTALL_SCOPE=user
 else
   die "unsupported operating system: $OS"
 fi
@@ -393,6 +483,7 @@ fi
 [ ! -e "$DEST" ] || [ -d "$DEST" ] || die "install root is not a directory: $DEST"
 if [ "$OS" = Linux ] && [ -d "$DEST" ]; then
   if ! grep -F '"schema": "honk300.install.v1"' "$RECEIPT" >/dev/null 2>&1 \
+     && ! grep -F '"schema": "honk300.install.v2"' "$RECEIPT" >/dev/null 2>&1 \
      && [ ! -f "$DEST/install-source.txt" ]; then
     die "refusing to replace an unrecognized Linux install root: $DEST"
   fi
@@ -401,8 +492,10 @@ if [ "$OS" = Darwin ] && [ -d "$DEST" ]; then
   existing_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$DEST/Contents/Info.plist" 2>/dev/null || true)"
   [ "$existing_id" = "dev.emmetts.honk300" ] || die "refusing to replace foreign app bundle: $DEST"
   [ ! -L "$RECEIPT" ] && [ -f "$RECEIPT" ] || die "refusing to replace an unreceipted macOS app bundle: $DEST"
-  grep -F '"schema": "honk300.install.v1"' "$RECEIPT" >/dev/null 2>&1 \
-    || die "refusing to replace an unreceipted macOS app bundle: $DEST"
+  if ! grep -F '"schema": "honk300.install.v1"' "$RECEIPT" >/dev/null 2>&1 \
+     && ! grep -F '"schema": "honk300.install.v2"' "$RECEIPT" >/dev/null 2>&1; then
+    die "refusing to replace an unreceipted macOS app bundle: $DEST"
+  fi
   grep -F '"install_root": "'"$(json_escape "$DEST")"'"' "$RECEIPT" >/dev/null 2>&1 \
     || die "refusing to replace an unreceipted macOS app bundle: $DEST"
 fi
@@ -427,6 +520,7 @@ else
   download "$URL" "$PAYLOAD"
 fi
 verify_file "$PAYLOAD" "$EXPECTED_SHA"
+ARTIFACT_SIZE="$(wc -c < "$PAYLOAD" | tr -d ' ')"
 
 if [ "$OS" = Darwin ]; then
   validate_zip "$PAYLOAD"
@@ -452,6 +546,7 @@ if [ "$OS" = Darwin ]; then
   verify_binary "$INSTALLED_BINARY"
   codesign --verify --deep --strict "$DEST"
   layout=mac-app
+  ACTIVE_RELEASE="$DEST"
   autostart=false
   [ ! -f "$HOME/Library/LaunchAgents/dev.emmetts.honk300.plist" ] || autostart=true
 else
@@ -465,10 +560,11 @@ else
   chmod 755 "$STAGE_ROOT/install/bin/honk300"
   verify_binary "$STAGE_ROOT/install/bin/honk300"
   hold_lifecycle_lease "$STAGE_ROOT/install/bin/honk300"
-  swap_install "$STAGE_ROOT/install" "$DEST"
-  INSTALLED_BINARY="$DEST/bin/honk300"
+  activate_linux_slot "$STAGE_ROOT/install"
+  INSTALLED_BINARY="$DEST/current/bin/honk300"
   verify_binary "$INSTALLED_BINARY"
-  layout=linux-xdg
+  layout=linux-slots-v1
+  ACTIVE_RELEASE="$NEW_RELEASE"
   autostart=false
   [ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/honk300.desktop" ] || autostart=true
   applications="$DATA_HOME/applications"
@@ -499,15 +595,17 @@ fi
 mkdir -p "$HOME/.local/bin"
 for name in honk300 honk goose; do safe_link "$HOME/.local/bin/$name" "$INSTALLED_BINARY"; done
 ensure_path_marker
-write_receipt "$RECEIPT" "$layout" "$DEST" "$TARGET" "$ARTIFACT" "$EXPECTED_SHA" "$autostart"
+write_receipt "$RECEIPT" "$layout" "$DEST" "$TARGET" "$ARTIFACT" "$EXPECTED_SHA" "$autostart" \
+  "$INSTALL_ORIGIN" "$INSTALL_FAMILY" "$INSTALL_EDITION" "$INSTALL_SCOPE" "$ACTIVE_RELEASE" "$ARTIFACT_SIZE"
 
 if [ "${HONK300_TEST_FAIL_AFTER_SWAP:-0}" = 1 ]; then
   die "fault injection after activation"
 fi
 
 COMMITTED=1
-[ -z "$PREVIOUS" ] || rm -rf "$PREVIOUS"
+if [ "$OS" = Darwin ]; then [ -z "$PREVIOUS" ] || rm -rf "$PREVIOUS"; fi
 SWAPPED=0
+SLOT_ACTIVATED=0
 
 printf 'honk300 %s installed at %s\n' "$VERSION" "$DEST"
 printf 'Open a new terminal, then run: honk300 start\n'

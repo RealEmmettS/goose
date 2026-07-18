@@ -16,6 +16,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SHELL = (ROOT / "script" / "honk300-installer.sh.in").read_text(encoding="utf-8")
 POWERSHELL = (ROOT / "script" / "honk300-installer.ps1.in").read_text(encoding="utf-8")
+WIX_GLOBAL = (ROOT / "wix" / "main.wxs").read_text(encoding="utf-8")
+WIX_CORPORATE = (ROOT / "wix-corporate" / "corporate.wxs").read_text(encoding="utf-8")
+INNO_GLOBAL = (ROOT / "inno" / "global.iss").read_text(encoding="utf-8")
+INNO_CORPORATE = (ROOT / "inno" / "corporate.iss").read_text(encoding="utf-8")
+WINDOWS_WORKFLOW = (ROOT / ".github" / "workflows" / "windows-installers.yml").read_text(encoding="utf-8")
 
 
 class InstallerTemplateTests(unittest.TestCase):
@@ -80,7 +85,7 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertLess(hold.index("mkfifo"), hold.index("LEASE_FD_OPEN=1"))
 
         mac_swap = SHELL.index('swap_install "$CANDIDATE" "$DEST"')
-        linux_swap = SHELL.index('swap_install "$STAGE_ROOT/install" "$DEST"')
+        linux_swap = SHELL.index('activate_linux_slot "$STAGE_ROOT/install"')
         self.assertLess(
             SHELL.rindex('hold_lifecycle_lease "$STAGED_BINARY"', 0, mac_swap),
             mac_swap,
@@ -139,6 +144,48 @@ class InstallerTemplateTests(unittest.TestCase):
             self.assertEqual(destination.read_text(encoding="utf-8"), "old\n")
             self.assertFalse(previous.exists())
 
+    @unittest.skipIf(os.name == "nt", "POSIX symlink rollback is validated on Unix hosts")
+    def test_shell_failure_before_selector_commit_preserves_old_slot(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            destination = root / "install"
+            releases = destination / "releases"
+            old_release = releases / "1.0.0-x86_64-unknown-linux-gnu"
+            new_release = releases / "1.1.0-x86_64-unknown-linux-gnu"
+            old_release.mkdir(parents=True)
+            new_release.mkdir()
+            (destination / "current").symlink_to(old_release, target_is_directory=True)
+            prefix = SHELL[: SHELL.index("\nsafe_link() {")]
+            harness = root / "failure-before-selector.sh"
+            harness.write_text(
+                prefix
+                + "\n"
+                + 'DEST="$TEST_DEST"\n'
+                + 'PREVIOUS="$TEST_OLD"\n'
+                + 'NEW_RELEASE="$TEST_NEW"\n'
+                + "NEW_RELEASE_CREATED=1\n"
+                + 'die "fault injection before selector commit"\n',
+                encoding="utf-8",
+            )
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "TEST_DEST": str(destination),
+                    "TEST_OLD": str(old_release),
+                    "TEST_NEW": str(new_release),
+                }
+            )
+            result = subprocess.run(
+                [self._bash(), str(harness)],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=environment,
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertEqual((destination / "current").resolve(), old_release.resolve())
+            self.assertFalse(new_release.exists())
+
     def test_shell_bootstrap_is_user_scoped_transactional_and_rejects_bad_archives(self) -> None:
         self.assertIn("$HOME/Applications/Honk300.app", SHELL)
         self.assertIn("${XDG_DATA_HOME:-$HOME/.local/share}/honk300/install", SHELL)
@@ -155,7 +202,11 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertIn("PATH_PROFILE", SHELL)
         self.assertIn("X-Honk300-Managed=true", SHELL)
         self.assertIn("RECEIPT_BACKUP", SHELL)
-        self.assertIn('"schema": "honk300.install.v1"', SHELL)
+        self.assertIn('"schema": "honk300.install.v2"', SHELL)
+        self.assertIn('"origin": "$(json_escape "$origin")"', SHELL)
+        self.assertIn('"active_release": "$(json_escape "$active_release")"', SHELL)
+        self.assertIn('release_id="$VERSION-$TARGET"', SHELL)
+        self.assertIn('selector="$DEST/current"', SHELL)
         self.assertIn('"commit": "$(json_escape "$COMMIT")"', SHELL)
         self.assertIn('"owner": "honk300-installer"', SHELL)
         self.assertIn("refusing to replace an unreceipted macOS app bundle", SHELL)
@@ -190,27 +241,27 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertNotIn("Start-Process -FilePath 'msiexec.exe'", POWERSHELL)
         self.assertIn("-Verb RunAs", POWERSHELL)
         self.assertIn("ProgramFiles", POWERSHELL)
-        self.assertIn("honk300.install.v1", POWERSHELL)
+        self.assertIn("honk300.install.v2", POWERSHELL)
         self.assertIn("install-receipt.json", POWERSHELL)
         self.assertIn("$Commit", POWERSHELL)
         self.assertIn("refusing to replace a reparse-point install receipt", POWERSHELL)
         self.assertIn("refusing to replace a foreign install receipt", POWERSHELL)
         self.assertIn("HONK300_INTERNAL_HOLD_LIFECYCLE_LEASE", POWERSHELL)
         self.assertIn("HONK300_INTERNAL_LIFECYCLE_LEASE_READY", POWERSHELL)
+        self.assertIn("function Get-HiddenProgramVersion", POWERSHELL)
+        self.assertIn("$start.CreateNoWindow = $true", POWERSHELL)
+        self.assertIn("$reported = Get-HiddenProgramVersion $installed", POWERSHELL)
+        self.assertNotIn("& $installed --version", POWERSHELL)
         self.assertIn("RedirectStandardInput", POWERSHELL)
         self.assertIn("portable lifecycle archive must contain exactly one honk300.exe", POWERSHELL)
         self.assertIn("[IO.Compression.ZipArchive]::new", POWERSHELL)
-        self.assertIn("rstrtmgr.dll", POWERSHELL)
-        self.assertIn("Assert-NoRestartManagerLocks", POWERSHELL)
-        self.assertIn("another Windows session is using", POWERSHELL)
+        self.assertNotIn("rstrtmgr.dll", POWERSHELL)
+        self.assertNotIn("Assert-NoRestartManagerLocks", POWERSHELL)
+        self.assertIn("HONK300ORIGIN=powershell", POWERSHELL)
         self.assertNotIn("@(0, 3010)", POWERSHELL)
         self.assertIn("pending or reboot-deferred replacement is not accepted", POWERSHELL)
         self.assertLess(
             POWERSHELL.index("$leaseProcess = Start-LifecycleLease"),
-            POWERSHELL.index("Assert-NoRestartManagerLocks @("),
-        )
-        self.assertLess(
-            POWERSHELL.index("Assert-NoRestartManagerLocks @("),
             POWERSHELL.index("Start-Process -FilePath $msiexec"),
         )
         self.assertLess(
@@ -331,6 +382,53 @@ class InstallerTemplateTests(unittest.TestCase):
                 with self.assertWarns(UserWarning):
                     archive.writestr("Honk300.app/Contents/MacOS/honk300", b"b")
             self.assertNotEqual(self._validate_archive("zip", duplicate_zip, root).returncode, 0)
+
+    def test_all_windows_installers_use_slots_preserve_origin_and_allow_latest_intent(self) -> None:
+        for wix, origin in [(WIX_GLOBAL, "msi-global"), (WIX_CORPORATE, "msi-corporate")]:
+            self.assertIn("AllowDowngrades='yes'", wix)
+            self.assertIn("Name='channels'", wix)
+            self.assertIn("Name='releases'", wix)
+            self.assertIn("Name='$(var.Version)-$(var.TargetTriple)'", wix)
+            self.assertGreaterEqual(wix.count("Permanent='yes'"), 6)
+            self.assertIn("Name='honk300-app.exe'", wix)
+            self.assertIn("Target='[Bin]honk300-app.exe'", wix)
+            self.assertIn("Value='\"[Bin]honk300-app.exe\"'", wix)
+            self.assertNotIn("Target='[Bin]honk300.exe' Arguments='start'", wix)
+            self.assertIn("<Component Id='LoginAutostart' Guid='*'>", wix)
+            self.assertNotIn("<Component Id='LoginAutostart' Guid='*' Permanent='yes'>", wix)
+            self.assertIn("__wsa -r", wix)
+            self.assertIn("__windows-slot-rollback", wix)
+            self.assertIn("__windows-slot-commit", wix)
+            self.assertIn("__windows-slot-uninstall", wix)
+            self.assertIn(origin, wix)
+            self.assertNotIn("DowngradeErrorMessage", wix)
+
+        for inno, origin in [(INNO_GLOBAL, "exe-global"), (INNO_CORPORATE, "exe-corporate")]:
+            self.assertIn("CloseApplications=no", inno)
+            self.assertIn(f"channels\\{origin}\\releases", inno)
+            self.assertGreaterEqual(inno.count("uninsneveruninstall"), 5)
+            self.assertIn(r'Source: "{#SourceBinDir}\honk300-app.exe"', inno)
+            self.assertIn(r'Filename: "{app}\bin\honk300-app.exe"', inno)
+            self.assertNotIn(r'Filename: "{app}\bin\honk300.exe"; Parameters: "start"', inno)
+            self.assertNotIn("uninsdeletevalue", inno)
+            self.assertIn("__windows-slot-activate", inno)
+            self.assertIn("__windows-slot-commit", inno)
+            self.assertIn("__windows-slot-uninstall", inno)
+            self.assertIn("RegWriteStringValue", inno)
+
+        for token in [
+            "-dPayloadSha256=$payloadSha256",
+            "/DPayloadSha256=$payloadSha256",
+            "smoke_windows_slot_update.ps1",
+            "smoke_windows_installer_takeover.ps1",
+            "honk300.install.v2",
+            "stable current junction is missing",
+            "all four slot origins with a live native ARM64 process",
+        ]:
+            self.assertIn(token, WINDOWS_WORKFLOW)
+
+        self.assertIn("PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
+        self.assertIn("Installed AND PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
 
 
 if __name__ == "__main__":

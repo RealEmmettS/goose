@@ -1,7 +1,7 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
+use std::process::{Command, ExitStatus, Stdio};
 
 #[cfg(target_os = "linux")]
 pub(crate) const INSTALL_ROOT: &str = "/usr/lib/honk300";
@@ -73,16 +73,21 @@ fn paths_equivalent(left: &Path, right: &Path) -> bool {
     }
 }
 
-pub(crate) fn install_package(path: &Path) -> Result<(), DynError> {
-    run_dpkg(&["--install"], Some(path), "installer")
+pub(crate) fn install_package(path: &Path, suppress_stdout: bool) -> Result<(), DynError> {
+    run_dpkg(&["--install"], Some(path), "installer", suppress_stdout)
 }
 
 #[cfg(target_os = "linux")]
 pub(crate) fn remove_package() -> Result<(), DynError> {
-    run_dpkg(&["--remove", PACKAGE_NAME], None, "uninstaller")
+    run_dpkg(&["--remove", PACKAGE_NAME], None, "uninstaller", false)
 }
 
-fn run_dpkg(arguments: &[&str], path: Option<&Path>, label: &str) -> Result<(), DynError> {
+fn run_dpkg(
+    arguments: &[&str],
+    path: Option<&Path>,
+    label: &str,
+    suppress_stdout: bool,
+) -> Result<(), DynError> {
     let uid = Command::new("id").arg("-u").output()?;
     if !uid.status.success() {
         return Err(
@@ -96,7 +101,20 @@ fn run_dpkg(arguments: &[&str], path: Option<&Path>, label: &str) -> Result<(), 
         if let Some(path) = path {
             command.arg(path);
         }
-        command.status()
+        if suppress_stdout {
+            return command.stdout(Stdio::null()).status();
+        }
+        let mut child = command.stdout(Stdio::piped()).spawn()?;
+        let mut stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| io::Error::other("dpkg stdout pipe was not created"))?;
+        let forward = std::thread::spawn(move || io::copy(&mut stdout, &mut io::stderr()));
+        let status = child.wait()?;
+        forward
+            .join()
+            .map_err(|_| io::Error::other("dpkg stdout forwarding thread panicked"))??;
+        Ok(status)
     };
     let status = if is_root {
         invoke("dpkg", &[])

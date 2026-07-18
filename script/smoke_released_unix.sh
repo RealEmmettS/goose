@@ -50,7 +50,7 @@ case "$OS" in
     SHELL=/bin/sh
     PROFILE="$HOME/.profile"
     DEST="$XDG_DATA_HOME/honk300/install"
-    BINARY="$DEST/bin/honk300"
+    BINARY="$DEST/current/bin/honk300"
     RECEIPT="$XDG_DATA_HOME/honk300/install-receipt.json"
     AUTOSTART="$XDG_CONFIG_HOME/autostart/honk300.desktop"
     DESKTOP="$XDG_DATA_HOME/applications/honk300.desktop"
@@ -81,7 +81,9 @@ verify_install() {
   reported="$($BINARY --version | awk '{print $NF}' | sed 's/[+-].*$//')"
   [ "$reported" = "$VERSION" ] || { printf 'installed version mismatch: %s\n' "$reported" >&2; exit 1; }
   require_file "$RECEIPT"
-  grep -F '"schema": "honk300.install.v1"' "$RECEIPT" >/dev/null
+  grep -F '"schema": "honk300.install.v2"' "$RECEIPT" >/dev/null
+  grep -F '"release_track": "stable"' "$RECEIPT" >/dev/null
+  grep -F '"active_release": ' "$RECEIPT" >/dev/null
   grep -F "\"tag\": \"$TAG\"" "$RECEIPT" >/dev/null
   grep -F '"autostart": { "enabled": true, "owner": "honk300-installer" }' "$RECEIPT" >/dev/null
 

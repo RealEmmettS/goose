@@ -37,6 +37,12 @@ class DebianPackagingTests(unittest.TestCase):
             self.assertEqual(installed.read_bytes(), binary.read_bytes())
             self.assertTrue(installed.stat().st_mode & stat.S_IXUSR)
             self.assertEqual((installed.parent / "install-source.txt").read_text(), "deb\n")
+            receipt = json.loads((installed.parent / "install-receipt.json").read_text())
+            self.assertEqual(receipt["schema"], "honk300.install.v2")
+            self.assertEqual(receipt["origin"], "deb")
+            self.assertEqual(receipt["installer_family"], "deb")
+            self.assertEqual(receipt["target"], "x86_64-unknown-linux-gnu")
+            self.assertEqual(receipt["artifact"]["size"], len(b"qualified-elf"))
             for name in ("honk300", "honk", "goose"):
                 alias = staging / "usr" / "bin" / name
                 self.assertTrue(alias.is_symlink())
