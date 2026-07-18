@@ -163,7 +163,7 @@
         <CustomAction
             Id='SetRollbackSlotData'
             Property='RollbackWindowsSlot'
-            Value='__windows-slot-rollback --root &quot;[APPLICATIONFOLDER]&quot;'/>
+            Value='__windows-slot-rollback --root &quot;[APPLICATIONFOLDER]\&quot;'/>
         <CustomAction
             Id='RollbackWindowsSlot'
             BinaryKey='Honk300SlotHelper'
@@ -175,7 +175,7 @@
             Id='SetActivateSlotData'
             Property='ActivateWindowsSlot'
             HideTarget='yes'
-            Value='__wsa -r &quot;[APPLICATIONFOLDER]&quot; -o &quot;[HONK300ORIGIN]&quot; -c &quot;$(var.Commit)&quot; -a &quot;[OriginalDatabase]&quot; -l &quot;$(var.LauncherSha256)&quot; -u &quot;[HONK300AUTOSTART]&quot;'/>
+            Value='__wsa -r &quot;[APPLICATIONFOLDER]\&quot; -o &quot;[HONK300ORIGIN]&quot; -c &quot;$(var.Commit)&quot; -a &quot;[OriginalDatabase]&quot; -l &quot;$(var.LauncherSha256)&quot; -u &quot;[HONK300AUTOSTART]&quot;'/>
         <CustomAction
             Id='ActivateWindowsSlot'
             BinaryKey='Honk300SlotHelper'
@@ -187,7 +187,7 @@
         <CustomAction
             Id='SetCommitSlotData'
             Property='CommitWindowsSlot'
-            Value='__windows-slot-commit --root &quot;[APPLICATIONFOLDER]&quot;'/>
+            Value='__windows-slot-commit --root &quot;[APPLICATIONFOLDER]\&quot;'/>
         <CustomAction
             Id='CommitWindowsSlot'
             BinaryKey='Honk300SlotHelper'
@@ -195,7 +195,7 @@
             Execute='commit'
             Impersonate='no'
             Return='check'/>
-        <CustomAction Id='SetUninstallSlotData' Property='UninstallWindowsSlot' Value='__windows-slot-uninstall --root &quot;[APPLICATIONFOLDER]&quot; --origin &quot;[HONK300ORIGIN]&quot;'/>
+        <CustomAction Id='SetUninstallSlotData' Property='UninstallWindowsSlot' Value='__windows-slot-uninstall --root &quot;[APPLICATIONFOLDER]\&quot; --origin &quot;[HONK300ORIGIN]&quot;'/>
         <CustomAction Id='UninstallWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='[CustomActionData]' Execute='deferred' Impersonate='no' Return='check'/>
         <InstallExecuteSequence>
             <Custom Action='SetRollbackSlotData' After='RemoveExistingProducts'>NOT REMOVE~=&quot;ALL&quot;</Custom>

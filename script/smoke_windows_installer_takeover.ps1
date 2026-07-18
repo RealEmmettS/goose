@@ -38,8 +38,12 @@ function Write-TakeoverProgress([string] $Message) {
 function Capture-TakeoverTimeout([string] $Label) {
     $safeLabel = (($Label -replace '[^A-Za-z0-9.-]', '-').Trim('-').ToLowerInvariant())
     try {
-        Get-CimInstance Win32_Process | Where-Object {
+        $allProcesses = @(Get-CimInstance Win32_Process)
+        $msiProcessIds = @($allProcesses | Where-Object Name -eq 'msiexec.exe' | ForEach-Object ProcessId)
+        $allProcesses | Where-Object {
             $_.Name -in @('msiexec.exe', 'honk300.exe', 'honk300-app.exe') -or
+            $_.Name -like 'MSI*.tmp' -or
+            $_.ParentProcessId -in $msiProcessIds -or
             $_.CommandLine -like '*honk300*'
         } | Select-Object ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine |
             ConvertTo-Json -Depth 4 |

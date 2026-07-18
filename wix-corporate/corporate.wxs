@@ -153,17 +153,17 @@
         <Property Id='ARPHELPLINK' Value='https://github.com/RealEmmettS/goose'/>
 
         <Binary Id='Honk300SlotHelper' SourceFile='$(var.CargoTargetBinDir)\honk300.exe'/>
-        <CustomAction Id='SetRollbackSlotData' Property='RollbackWindowsSlot' Value='__windows-slot-rollback --root &quot;[APPLICATIONFOLDER]&quot;'/>
+        <CustomAction Id='SetRollbackSlotData' Property='RollbackWindowsSlot' Value='__windows-slot-rollback --root &quot;[APPLICATIONFOLDER]\&quot;'/>
         <CustomAction Id='RollbackWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='[CustomActionData]' Execute='rollback' Impersonate='yes' Return='ignore'/>
         <CustomAction
             Id='SetActivateSlotData'
             Property='ActivateWindowsSlot'
             HideTarget='yes'
-            Value='__wsa -r &quot;[APPLICATIONFOLDER]&quot; -o &quot;msi-corporate&quot; -c &quot;$(var.Commit)&quot; -a &quot;[OriginalDatabase]&quot; -l &quot;$(var.LauncherSha256)&quot; -u &quot;[HONK300AUTOSTART]&quot;'/>
+            Value='__wsa -r &quot;[APPLICATIONFOLDER]\&quot; -o &quot;msi-corporate&quot; -c &quot;$(var.Commit)&quot; -a &quot;[OriginalDatabase]&quot; -l &quot;$(var.LauncherSha256)&quot; -u &quot;[HONK300AUTOSTART]&quot;'/>
         <CustomAction Id='ActivateWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='[CustomActionData]' Execute='deferred' Impersonate='yes' Return='check' HideTarget='yes'/>
-        <CustomAction Id='SetCommitSlotData' Property='CommitWindowsSlot' Value='__windows-slot-commit --root &quot;[APPLICATIONFOLDER]&quot;'/>
+        <CustomAction Id='SetCommitSlotData' Property='CommitWindowsSlot' Value='__windows-slot-commit --root &quot;[APPLICATIONFOLDER]\&quot;'/>
         <CustomAction Id='CommitWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='[CustomActionData]' Execute='commit' Impersonate='yes' Return='check'/>
-        <CustomAction Id='SetUninstallSlotData' Property='UninstallWindowsSlot' Value='__windows-slot-uninstall --root &quot;[APPLICATIONFOLDER]&quot; --origin &quot;msi-corporate&quot;'/>
+        <CustomAction Id='SetUninstallSlotData' Property='UninstallWindowsSlot' Value='__windows-slot-uninstall --root &quot;[APPLICATIONFOLDER]\&quot; --origin &quot;msi-corporate&quot;'/>
         <CustomAction Id='UninstallWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='[CustomActionData]' Execute='deferred' Impersonate='yes' Return='check'/>
         <InstallExecuteSequence>
             <Custom Action='SetRollbackSlotData' After='RemoveExistingProducts'>NOT REMOVE~=&quot;ALL&quot;</Custom>
