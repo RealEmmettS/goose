@@ -71,6 +71,34 @@ function Capture-TakeoverTimeout([string] $Label) {
     } catch {
         Add-Content -LiteralPath $progressPath -Value "timeout filesystem capture failed: $($_.Exception.Message)" -Encoding utf8
     }
+    try {
+        $machinePath = [string](Get-ItemPropertyValue `
+            -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment' `
+            -Name Path)
+        $userPath = [string](Get-ItemPropertyValue `
+            -LiteralPath 'HKCU:\Environment' `
+            -Name Path `
+            -ErrorAction SilentlyContinue)
+        $globalBin = (Join-Path $globalRoot 'bin').TrimEnd('\')
+        $corporateBin = (Join-Path $corporateRoot 'bin').TrimEnd('\')
+        $contains = {
+            param([string] $Value, [string] $Expected)
+            return $Value.Split(';').Where({
+                $_.Trim().TrimEnd('\').Equals($Expected, [StringComparison]::OrdinalIgnoreCase)
+            }).Count -gt 0
+        }
+        [pscustomobject]@{
+            machine_has_global = (& $contains $machinePath $globalBin)
+            machine_has_corporate = (& $contains $machinePath $corporateBin)
+            user_has_global = (& $contains $userPath $globalBin)
+            user_has_corporate = (& $contains $userPath $corporateBin)
+            machine_path = $machinePath
+            user_path = $userPath
+        } | ConvertTo-Json -Depth 3 |
+            Set-Content -LiteralPath (Join-Path $evidence "$safeLabel.path.json") -Encoding utf8
+    } catch {
+        Add-Content -LiteralPath $progressPath -Value "timeout PATH capture failed: $($_.Exception.Message)" -Encoding utf8
+    }
 }
 
 function Wait-CheckedProcess(
@@ -216,14 +244,20 @@ function Assert-PublicPathOwner([string] $Root, [string] $Origin) {
         param([string] $Value, [string] $Expected)
         return $Value.Split(';').Where({ $_.Trim().TrimEnd('\').Equals($Expected, [StringComparison]::OrdinalIgnoreCase) }).Count -gt 0
     }
+    $machineHasActive = (& $contains $machine $activeBin)
+    $machineHasGlobal = (& $contains $machine $globalBin)
+    $userHasActive = (& $contains $user $activeBin)
+    $userHasCorporate = (& $contains $user $corporateBin)
     if ($Origin -in @('msi-global', 'exe-global')) {
-        if (-not (& $contains $machine $activeBin) -or (& $contains $user $corporateBin)) {
-            throw "$Origin does not exclusively own the persisted public PATH"
+        if (-not $machineHasActive -or $userHasCorporate) {
+            Capture-TakeoverTimeout "$Origin-path-ownership-failed"
+            throw "$Origin does not exclusively own the persisted public PATH (machine_has_active=$machineHasActive; user_has_corporate=$userHasCorporate)"
         }
     }
     else {
-        if (-not (& $contains $user $activeBin) -or (& $contains $machine $globalBin)) {
-            throw "$Origin does not exclusively own the persisted public PATH"
+        if (-not $userHasActive -or $machineHasGlobal) {
+            Capture-TakeoverTimeout "$Origin-path-ownership-failed"
+            throw "$Origin does not exclusively own the persisted public PATH (user_has_active=$userHasActive; machine_has_global=$machineHasGlobal)"
         }
     }
 }
