@@ -175,7 +175,13 @@ function Get-HonkRegistrations {
             }
         }
     }
-    return @($items | Sort-Object hive, view, key -Unique)
+    # HKCU's uninstall inventory is shared between 32/64-bit registry views. Collapse only exact
+    # logical duplicates; any differing publisher/root/command evidence remains independently
+    # visible and therefore still fails the one-owner assertions below.
+    return @($items |
+        Group-Object hive, key, display_name, publisher, install_location, uninstall_string, quiet_uninstall_string, windows_installer |
+        ForEach-Object { $_.Group | Sort-Object view -Descending | Select-Object -First 1 } |
+        Sort-Object hive, key)
 }
 
 function Invoke-Checked([string] $File, [string[]] $Arguments, [string] $Label) {
@@ -325,6 +331,7 @@ function Finish-ConflictingOwnerCleanup([string] $Root, [string] $Origin, [strin
     }
     $registrations = @(Get-HonkRegistrations)
     if ($registrations.Count -ne 1) {
+        Capture-TakeoverTimeout "$Label-registration-count-failed"
         throw "$Label expected exactly one Honk300 registration, found $($registrations.Count)"
     }
     $transitions.Add([pscustomobject]@{

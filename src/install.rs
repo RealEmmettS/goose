@@ -2200,6 +2200,7 @@ struct WindowsRegisteredOwner {
     install_root: PathBuf,
     uninstall: WindowsManagedUninstall,
     registration: String,
+    logical_registration: String,
 }
 
 #[cfg(windows)]
@@ -2724,13 +2725,31 @@ fn windows_registered_owners() -> Result<Vec<WindowsRegisteredOwner>, DynError> 
                     install_root: identity.install_location,
                     uninstall,
                     registration: format!("{hive_name}:{view_name}:{key_name}"),
+                    // HKCU's uninstall key is shared between registry views on supported
+                    // Windows versions. Preserve the observed view for the journal, but treat
+                    // byte-for-byte equivalent owner evidence as one logical registration.
+                    logical_registration: format!("{hive_name}:{}", key_name.to_ascii_lowercase()),
                 });
             }
         }
     }
-    owners.sort_by(|left, right| left.registration.cmp(&right.registration));
-    owners.dedup_by(|left, right| left.registration == right.registration);
+    deduplicate_windows_registered_owners(&mut owners);
     Ok(owners)
+}
+
+#[cfg(windows)]
+fn deduplicate_windows_registered_owners(owners: &mut Vec<WindowsRegisteredOwner>) {
+    owners.sort_by(|left, right| {
+        left.logical_registration
+            .cmp(&right.logical_registration)
+            .then_with(|| left.registration.cmp(&right.registration))
+    });
+    owners.dedup_by(|left, right| {
+        left.logical_registration == right.logical_registration
+            && left.source == right.source
+            && paths_match(&left.install_root, &right.install_root)
+            && left.uninstall == right.uninstall
+    });
 }
 
 #[cfg(any(test, windows))]
@@ -6299,6 +6318,7 @@ mod tests {
                 elevated: true,
             },
             registration: "HKLM:64:{5A94FBD0-DA02-4F63-9363-7D9CE0E280F5}_is1".into(),
+            logical_registration: "HKLM:{5a94fbd0-da02-4f63-9363-7d9ce0e280f5}_is1".into(),
         };
         let invocation = windows_owner_retirement_invocation(
             Path::new(r"C:\Users\user\AppData\Local\Programs\honk300\bin\honk300.exe"),
@@ -6321,6 +6341,42 @@ mod tests {
             .contains(r#"C:\Users\user\AppData\Local\Programs\honk300\"'"#));
         assert!(!invocation.script.contains("unins000.exe"));
         assert_eq!(invocation.script.matches("Start-Process").count(), 1);
+    }
+
+    #[test]
+    fn windows_owner_inventory_collapses_only_identical_shared_view_records() {
+        let owner = WindowsRegisteredOwner {
+            source: InstallSource::ExeCorporate,
+            install_root: PathBuf::from(r"C:\Users\user\AppData\Local\Programs\honk300"),
+            uninstall: WindowsManagedUninstall::Exe {
+                uninstaller: PathBuf::from(
+                    r"C:\Users\user\AppData\Local\Programs\honk300\unins000.exe",
+                ),
+                elevated: false,
+            },
+            registration: "HKCU:64:{A072F01B-0AE8-4ED9-B67F-845ADF7831F9}_is1".into(),
+            logical_registration: "HKCU:{a072f01b-0ae8-4ed9-b67f-845adf7831f9}_is1".into(),
+        };
+        let mut shared_views = vec![
+            owner.clone(),
+            WindowsRegisteredOwner {
+                registration: owner.registration.replacen(":64:", ":32:", 1),
+                ..owner.clone()
+            },
+        ];
+        deduplicate_windows_registered_owners(&mut shared_views);
+        assert_eq!(shared_views.len(), 1);
+
+        let mut conflicting_views = vec![
+            owner.clone(),
+            WindowsRegisteredOwner {
+                install_root: PathBuf::from(r"C:\Users\user\AppData\Local\Programs\foreign"),
+                registration: owner.registration.replacen(":64:", ":32:", 1),
+                ..owner
+            },
+        ];
+        deduplicate_windows_registered_owners(&mut conflicting_views);
+        assert_eq!(conflicting_views.len(), 2);
     }
 
     #[test]

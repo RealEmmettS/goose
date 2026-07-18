@@ -93,7 +93,9 @@ Global MSI and EXE registrations must be protected machine records, Corporate In
 per-user record, and Corporate Windows Installer product inventory may legitimately appear in
 HKCU or protected HKLM while its payload and receipt remain per-user in LocalAppData. Every form
 still requires the exact display name, publisher, product/Inno identity, root, and uninstall
-command before it can authorize cleanup.
+command before it can authorize cleanup. Because the HKCU uninstall inventory is shared across
+32- and 64-bit registry views, identical hive/key/root/command evidence collapses to one logical
+owner; differing evidence never collapses and remains a conflict.
 
 Windows scope is an authority boundary, not something the updater may bypass. In particular, a
 per-user Corporate installer cannot remove or outrank an existing machine-wide PATH/registration
