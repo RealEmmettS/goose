@@ -2707,11 +2707,11 @@ fn windows_registered_owners() -> Result<Vec<WindowsRegisteredOwner>, DynError> 
                 } else {
                     continue;
                 };
-                if matches!(source, InstallSource::MsiGlobal | InstallSource::ExeGlobal)
-                    != (hive == HKEY_LOCAL_MACHINE)
-                {
+                if !windows_registration_hive_is_valid(source, hive == HKEY_LOCAL_MACHINE) {
                     // Never elevate an uninstall command discovered in a user-writable fake
-                    // Global registration. Corporate is per-user; Global is machine-wide.
+                    // Global registration. Corporate EXE is per-user. Windows Installer can
+                    // register the per-user Corporate MSI in either HKCU or its protected HKLM
+                    // product inventory while retaining a LocalAppData payload and user scope.
                     continue;
                 }
                 let Some(uninstall) =
@@ -2731,6 +2731,16 @@ fn windows_registered_owners() -> Result<Vec<WindowsRegisteredOwner>, DynError> 
     owners.sort_by(|left, right| left.registration.cmp(&right.registration));
     owners.dedup_by(|left, right| left.registration == right.registration);
     Ok(owners)
+}
+
+#[cfg(any(test, windows))]
+fn windows_registration_hive_is_valid(source: InstallSource, machine_hive: bool) -> bool {
+    match source {
+        InstallSource::MsiGlobal | InstallSource::ExeGlobal => machine_hive,
+        InstallSource::MsiCorporate => true,
+        InstallSource::ExeCorporate => !machine_hive,
+        _ => false,
+    }
 }
 
 #[cfg(windows)]
@@ -6156,6 +6166,42 @@ mod tests {
             &foreign
         )
         .is_none());
+    }
+
+    #[test]
+    fn windows_registration_hive_follows_installer_registration_semantics() {
+        assert!(windows_registration_hive_is_valid(
+            InstallSource::MsiGlobal,
+            true
+        ));
+        assert!(!windows_registration_hive_is_valid(
+            InstallSource::MsiGlobal,
+            false
+        ));
+        assert!(windows_registration_hive_is_valid(
+            InstallSource::ExeGlobal,
+            true
+        ));
+        assert!(!windows_registration_hive_is_valid(
+            InstallSource::ExeGlobal,
+            false
+        ));
+        assert!(windows_registration_hive_is_valid(
+            InstallSource::MsiCorporate,
+            true
+        ));
+        assert!(windows_registration_hive_is_valid(
+            InstallSource::MsiCorporate,
+            false
+        ));
+        assert!(!windows_registration_hive_is_valid(
+            InstallSource::ExeCorporate,
+            true
+        ));
+        assert!(windows_registration_hive_is_valid(
+            InstallSource::ExeCorporate,
+            false
+        ));
     }
 
     #[test]

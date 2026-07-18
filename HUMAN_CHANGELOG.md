@@ -112,8 +112,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   than trying to force the file closed.
 - **Switching between all-users and workplace installs no longer leaves the old command ahead.**
   One quiet administrator-approved cleanup removes only the retired installation's startup and
-  command entries, then confirms the new location wins. This avoids a second prompt and makes the
-  user's newest successful install the one their commands actually open.
+  command entries, then confirms the new location wins. It recognizes the supported Windows
+  Installer record even when Windows stores that per-user package in its protected system list,
+  while still refusing user-made copies of all-users records. This avoids a second prompt and
+  makes the user's newest successful install the one their commands actually open.
 - **Goose notes no longer involve Notepad at all.** The Goose owns its little editable note
   window, so Windows cannot restore an unrelated user tab and the program cannot accidentally
   surface or run a script. Closing the Goose's own note still behaves like closing the prank.

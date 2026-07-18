@@ -88,6 +88,12 @@ only that retired root's exact persisted PATH and Run entries when roots differ,
 active root's PATH before returning. This prevents a permanent MSI component from leaving a stale
 higher-precedence command without adding a second elevation prompt. A failed or cancelled UAC
 grant leaves the new slot and receipt intact but returns nonzero with an assisted cleanup command.
+Registration validation follows the native installer rather than inferring ownership from scope:
+Global MSI and EXE registrations must be protected machine records, Corporate Inno must be a
+per-user record, and Corporate Windows Installer product inventory may legitimately appear in
+HKCU or protected HKLM while its payload and receipt remain per-user in LocalAppData. Every form
+still requires the exact display name, publisher, product/Inno identity, root, and uninstall
+command before it can authorize cleanup.
 
 Windows scope is an authority boundary, not something the updater may bypass. In particular, a
 per-user Corporate installer cannot remove or outrank an existing machine-wide PATH/registration
