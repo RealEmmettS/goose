@@ -97,9 +97,10 @@ assert receipt["origin"] == sys.argv[3]
 assert receipt["installer_family"] == {"shell": "shell", "mac-app": "dmg"}[sys.argv[3]]
 assert isinstance(receipt["active_release"], str) and receipt["active_release"]
 assert receipt["tag"] == sys.argv[2]
-assert receipt["autostart"] == {
-    "enabled": False,
-    "owner": "honk300-installer",
+assert receipt["autostart"]["enabled"] is False
+assert receipt["autostart"]["owner"] in {
+    "honk300-installer",
+    "honk300-install",
 }
 PY
 

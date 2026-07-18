@@ -26,6 +26,20 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-07-18
+
+### Fixed
+- **Semantic public Mac receipt verification** - the post-release shell/DMG takeover smoke now
+  accepts the two exact autostart writer identities emitted by the managed shell bootstrap and
+  the native app installer while still requiring autostart to remain disabled around a foreign
+  LaunchAgent. v1.2.4's Mac installs, signatures, and release metadata were valid; only the
+  verifier's transport-specific owner assertion failed after the successful DMG takeover.
+- **PowerShell public-bootstrap qualification** - the post-release Windows takeover smoke now
+  lets the verified public bootstrap own its required exclusive lifecycle lease instead of
+  preoccupying that lease with a synthetic holder. Live-old-slot survival remains independently
+  required on x64 and ARM64, and every installer subprocess now preserves stdout/stderr evidence
+  so a future public-byte failure identifies the actual failing transaction.
+
 ## [1.2.4] - 2026-07-18
 
 ### Changed

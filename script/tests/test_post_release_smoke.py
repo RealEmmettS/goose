@@ -47,7 +47,10 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn('receipt["schema"] == "honk300.install.v2"', UNIX_SMOKE)
         self.assertIn('receipt["tag"] == sys.argv[2]', UNIX_SMOKE)
         self.assertIn('receipt["origin"] == sys.argv[3]', UNIX_SMOKE)
-        self.assertIn('receipt["autostart"] == {', UNIX_SMOKE)
+        self.assertIn('receipt["autostart"]["enabled"] is False', UNIX_SMOKE)
+        self.assertIn('receipt["autostart"]["owner"] in {', UNIX_SMOKE)
+        self.assertIn('"honk300-installer"', UNIX_SMOKE)
+        self.assertIn('"honk300-install"', UNIX_SMOKE)
         self.assertNotIn(
             'grep -F \'"autostart": { "enabled": false', UNIX_SMOKE
         )

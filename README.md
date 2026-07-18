@@ -8,16 +8,15 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.2.2](https://github.com/RealEmmettS/goose/releases/tag/v1.2.2),
-published from exact commit `bbbe86367d185fe8910af6326a7d51c04b282aec`. It completes the
-provenance-preserving updater release with semantic receipt verification across both compact and
-pretty-printed forms. Candidate, same-SHA main, atomic publication, and all eight fresh-public-byte
-macOS, Windows, Debian, and shell-managed Linux jobs passed before promotion.
+**Current stable release:** [v1.2.4](https://github.com/RealEmmettS/goose/releases/tag/v1.2.4),
+published from exact commit `03ae458a880c6b0faf1c1cf96fb28a69ac2936f2`. It makes the official
+versionless PowerShell/shell bootstrap the recommended managed install while native packages
+remain supported alternatives and updates preserve their proven origin.
 
-The immutable v1.2.3 tag passed candidate and same-SHA main qualification but failed closed before
-draft publication when one hosted Windows shell could not expose a tray rectangle. This source
-tree is preparing the v1.2.4 fix-forward. Until it completes every gate, the links below continue
-to resolve to v1.2.2.
+The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation; v1.2.4
+fixed that qualification boundary and passed candidate, same-SHA main, and atomic publication.
+Its public Mac install and trust checks succeeded, but the post-release harness rejected a valid
+DMG receipt writer identity. This source tree is preparing the verifier-only v1.2.5 fix-forward.
 
 ## Install
 
@@ -288,7 +287,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.2.4
+dist plan --tag=v1.2.5
 cargo audit --version 0.22.2
 ```
 
@@ -322,7 +321,9 @@ semantic receipt-verifier fix-forward, candidate, same-SHA main, publication, an
 qualification. The v1.2.0/v1.2.1 reports preserve their immutable release evidence.
 [`docs/readiness/v1.2.3-readiness.md`](docs/readiness/v1.2.3-readiness.md) preserves the immutable
 failed-before-publication evidence. [`docs/readiness/v1.2.4-readiness.md`](docs/readiness/v1.2.4-readiness.md)
-tracks the active command-first fix-forward and release gate.
+records the public release and failed Mac verifier assertion.
+[`docs/readiness/v1.2.5-readiness.md`](docs/readiness/v1.2.5-readiness.md) tracks the active
+verifier-only fix-forward.
 
 ## License and assets
 

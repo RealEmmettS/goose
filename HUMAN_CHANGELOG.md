@@ -55,6 +55,16 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   advanced command from leaving two competing copies.
 
 ### Fixed
+- **The Mac public-release checker now recognizes both legitimate installation writers.** The
+  terminal installer and graphical app use different internal owner labels for the same protected
+  start-at-login setting. The checker still requires the setting to stay off around an unrelated
+  startup file, but no longer reports a successful signed Mac takeover as a failure just because
+  the trusted writer changed. This lets the full public-byte gate describe the real install state.
+- **The Windows public-release checker no longer asks two update coordinators to hold the same
+  lock.** The official PowerShell installer now gets to own its safety lock during the test, while
+  a separate check still proves an older running Goose survives release-slot changes on both PC
+  architectures. Installer output is also saved so any future failure explains itself instead of
+  ending with only a generic exit code.
 - **A flaky hosted Windows desktop check no longer blocks an otherwise verified release.** The
   exception is allowed only when the test can still find the Goose's real control owner and a
   separate ordinary tray icon fails the same Windows check. The suite continues testing the real

@@ -192,10 +192,23 @@ function Get-HonkRegistrations {
 
 function Invoke-Checked([string] $File, [string[]] $Arguments, [string] $Label) {
     Write-TakeoverProgress "$Label started"
-    $process = Start-Process -FilePath $File -ArgumentList $Arguments -WindowStyle Hidden -PassThru
+    $safeLabel = (($Label -replace '[^A-Za-z0-9.-]', '-').Trim('-').ToLowerInvariant())
+    $stdoutPath = Join-Path $evidence "$safeLabel.stdout.log"
+    $stderrPath = Join-Path $evidence "$safeLabel.stderr.log"
+    $process = Start-Process -FilePath $File -ArgumentList $Arguments `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $stdoutPath `
+        -RedirectStandardError $stderrPath `
+        -PassThru
     Wait-CheckedProcess $process $Label -KillTree
     if ($process.ExitCode -ne 0) {
-        throw "$Label failed with exit $($process.ExitCode)"
+        $stdout = if (Test-Path -LiteralPath $stdoutPath) {
+            Get-Content -LiteralPath $stdoutPath -Raw
+        } else { '' }
+        $stderr = if (Test-Path -LiteralPath $stderrPath) {
+            Get-Content -LiteralPath $stderrPath -Raw
+        } else { '' }
+        throw "$Label failed with exit $($process.ExitCode)`nstdout:`n$stdout`nstderr:`n$stderr"
     }
     Write-TakeoverProgress "$Label completed"
 }
@@ -384,7 +397,18 @@ try {
     Install-Msi $globalMsiPath 'Global MSI baseline'
     Assert-Active $globalRoot 'msi-global'
 
-    $held = Start-HeldOldProcess (Join-Path $globalRoot 'bin\honk300.exe')
+    if ($null -eq $powerShellInstallerPath) {
+        # Candidate qualification invokes the exact rendered MSI transaction directly, so retain
+        # a synthetic old-slot owner here to prove that transaction never replaces live payload.
+        $held = Start-HeldOldProcess (Join-Path $globalRoot 'bin\honk300.exe')
+    } else {
+        # The public bootstrap is itself the lifecycle coordinator: it downloads a verified
+        # portable helper and acquires the exclusive lease before invoking the MSI. A second
+        # synthetic lease holder would only test that exclusivity rejects a competing mutation.
+        # Immutable-slot survival with a live old process is already exercised independently by
+        # smoke_windows_slot_update.ps1 on both Windows architectures.
+        Write-TakeoverProgress 'public PowerShell bootstrap will own the lifecycle lease'
+    }
     Install-PowerShellChannel 'PowerShell bootstrap takeover'
     Finish-ConflictingOwnerCleanup $globalRoot 'powershell' 'global-msi-to-powershell'
     Stop-HeldOldProcess

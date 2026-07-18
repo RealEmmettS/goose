@@ -494,6 +494,12 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertIn("global-msi-to-powershell", takeover_smoke)
         self.assertIn("powershell-to-global-msi", takeover_smoke)
         self.assertIn("HONK300ORIGIN=$Origin", takeover_smoke)
+        self.assertIn("$null -eq $powerShellInstallerPath", takeover_smoke)
+        self.assertIn("public PowerShell bootstrap will own the lifecycle lease", takeover_smoke)
+        self.assertIn("smoke_windows_slot_update.ps1", takeover_smoke)
+        self.assertIn("-RedirectStandardOutput $stdoutPath", takeover_smoke)
+        self.assertIn("-RedirectStandardError $stderrPath", takeover_smoke)
+        self.assertIn("stdout:`n$stdout`nstderr:`n$stderr", takeover_smoke)
         self.assertNotIn("if ((Get-HonkRegistrations).Count", takeover_smoke)
         self.assertNotIn("$activeState.Count", takeover_smoke)
 
