@@ -871,6 +871,7 @@ being implemented three more times.
 | R10 / v1.2.0 (ADR 0031) | provenance-preserving v2 receipts, synchronous self-update, immutable Windows/Linux release slots, neutral selectors, DMG-origin app-ZIP updates, and latest-intent downgrade/takeover semantics | live-old-process Windows slot proof, rollback injection, four-family/two-architecture installer matrix, managed Mac and Debian/shell origin proof, one-object JSON, exact-tag/latest identity, and complete candidate/main/post-release gates |
 | R10.1 / v1.2.0 (ADR 0032) | owned Windows note windows, shared monitor-relative uncropped prop fitting, offscreen walk-in/graceful exit plus explicit force, and receipt-owned login-start config | native prop bounds/image evidence, zero-Notepad contract, Windows lifecycle matrix, one startup owner per provenance, installer-intent precedence, and cross-platform config/package gates |
 | R10.2 / v1.2.0 (ADR 0033) | separate console CLI and GUI-subsystem Windows app launcher, independently hashed slot ownership, no-console login/background start, and disposable-CI-only full-desktop compositor surfaces | PE-subsystem/header checks, all-four-installer shortcut/Run/receipt/repair/uninstall proof, no-shell launch contract, randomized process-owned tray-Quit routing, and native x64/ARM64 disposable runner gates |
+| R10.3 / v1.2.1 (ADRs 0031–0033) | immutable fix-forward for macOS/Linux foreign login-start ownership: installer receipts enable autostart only for marker-owned entries; foreign files, symlinks, and directories are preserved and treated as disabled | focused ownership/mutation tests plus complete candidate, same-SHA main, signed Mac, Linux shell, Debian, Windows, atomic publication, stable/latest, and post-release public-byte gates |
 
 Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
 and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus
@@ -1020,5 +1021,5 @@ intentionally limited.
   is governed by code, accepted ADRs, completed v1.0.1 release task `#m20q`, completed stable
   v1.0.2 task `#v102`, completed hardware-verification task `#v1a`, completed v1.0.3 release task
   `#r103`, completed tray tasks `#trayc`/`#wtray`/`#ltray`, completed v1.1.0 release task `#r110`,
-  active v1.2.0 updater/release tasks `#u31`/`#r120`, and the readiness evidence.
+  active v1.2.1 fix-forward updater/release tasks `#u31`/`#r120`, and the readiness evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).

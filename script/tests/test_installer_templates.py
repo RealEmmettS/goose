@@ -215,6 +215,22 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertIn("archive contains links; refusing extraction", SHELL)
         self.assertNotIn('cp -R "$assets_source"', SHELL)
 
+    def test_shell_bootstrap_carries_forward_only_owned_login_start(self) -> None:
+        self.assertEqual(SHELL.count('autostart_path='), 2)
+        self.assertEqual(SHELL.count('[ ! -L "$autostart_path" ]'), 2)
+        self.assertIn("grep -F 'honk300.install.v1'", SHELL)
+        self.assertIn(
+            "grep -F 'X-Honk300-Owner=honk300.install.v1'", SHELL
+        )
+        self.assertNotIn(
+            '[ ! -f "$HOME/Library/LaunchAgents/dev.emmetts.honk300.plist" ] || autostart=true',
+            SHELL,
+        )
+        self.assertNotIn(
+            '[ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/honk300.desktop" ] || autostart=true',
+            SHELL,
+        )
+
     def test_powershell_bootstrap_installs_only_verified_global_msi(self) -> None:
         for token in [
             "__VERSION__",

@@ -548,7 +548,11 @@ if [ "$OS" = Darwin ]; then
   layout=mac-app
   ACTIVE_RELEASE="$DEST"
   autostart=false
-  [ ! -f "$HOME/Library/LaunchAgents/dev.emmetts.honk300.plist" ] || autostart=true
+  autostart_path="$HOME/Library/LaunchAgents/dev.emmetts.honk300.plist"
+  if [ -f "$autostart_path" ] && [ ! -L "$autostart_path" ] && \
+    grep -F 'honk300.install.v1' "$autostart_path" >/dev/null 2>&1; then
+    autostart=true
+  fi
 else
   validate_tar "$PAYLOAD"
   mkdir -p "$STAGE_ROOT/extracted" "$STAGE_ROOT/install/bin"
@@ -566,7 +570,11 @@ else
   layout=linux-slots-v1
   ACTIVE_RELEASE="$NEW_RELEASE"
   autostart=false
-  [ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/honk300.desktop" ] || autostart=true
+  autostart_path="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/honk300.desktop"
+  if [ -f "$autostart_path" ] && [ ! -L "$autostart_path" ] && \
+    grep -F 'X-Honk300-Owner=honk300.install.v1' "$autostart_path" >/dev/null 2>&1; then
+    autostart=true
+  fi
   applications="$DATA_HOME/applications"
   mkdir -p "$applications"
   DESKTOP_PATH="$applications/honk300.desktop"

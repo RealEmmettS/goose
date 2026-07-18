@@ -8,18 +8,16 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.1.0](https://github.com/RealEmmettS/goose/releases/tag/v1.1.0),
-published from exact commit `e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`. Its complete Windows,
-macOS, Linux, and Debian matrix, ordinary same-SHA CI, atomic publication, and live post-release
-installer smokes passed. The Mac app and DMG are Developer ID-signed, notarized, stapled, and
-independently Gatekeeper-verified. While the goose runs, macOS, Windows, and compatible Linux
-desktops expose the same accessible Configure and animated-Quit control surface.
+**Current stable release:** [v1.2.0](https://github.com/RealEmmettS/goose/releases/tag/v1.2.0),
+published from exact commit `fcbb6337830a14cb187c93cfe3e499a3f2f73945`. Its candidate, same-SHA
+main, atomic 47-asset publication, signed/notarized/stapled Mac, Windows x64/ARM64, Debian, and
+managed-Mac public-byte gates passed. The public Linux shell smoke then exposed a foreign
+autostart ownership regression; v1.2.1 is the immutable fix-forward candidate.
 
-**Next release candidate:** v1.2.0 adds provenance-preserving synchronous self-update, immutable
-Windows/Linux release slots, exact installer-family continuity, transactional fresh-install
-takeover, one-object JSON results, owned monitor-bounded props, explicit graceful/forced lifecycle,
-provenance-owned login start, and windowless Windows app/login launch under ADRs 0031–0033 and
-task `#r120`.
+**Next release candidate:** v1.2.1 preserves the v1.2.0 provenance-preserving updater, bounded
+props, graceful/forced lifecycle, configurable login start, and windowless Windows app launch,
+while treating unrelated macOS/Linux startup entries as preserved foreign state instead of
+mistaking their mere existence for Honk300-owned autostart.
 
 ## Install
 
@@ -271,7 +269,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.2.0
+dist plan --tag=v1.2.1
 cargo audit --version 0.22.2
 ```
 
@@ -296,10 +294,10 @@ owned bounded windows and defines monitor-relative image fitting, graceful versu
 and the one provenance-owned login-start setting. ADR 0033 makes Windows app/login/background
 launch windowless while preserving normal intentional CLI behavior, and moves every full-desktop
 compositor surface to disposable CI; product startup performs no calibration.
-[`docs/readiness/v1.2.0-readiness.md`](docs/readiness/v1.2.0-readiness.md) tracks the in-flight
-exact candidate, same-SHA main, publication, and public-byte qualification. The completed
-[`v1.1.0 readiness report`](docs/readiness/v1.1.0-readiness.md) and earlier reports remain
-immutable-release history.
+[`docs/readiness/v1.2.1-readiness.md`](docs/readiness/v1.2.1-readiness.md) tracks the immutable
+fix-forward candidate, same-SHA main, publication, and public-byte qualification. The v1.2.0
+report records its successful publication and failed Linux shell public-byte gate; earlier
+reports remain immutable-release history.
 
 ## License and assets
 

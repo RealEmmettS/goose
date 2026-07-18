@@ -85,7 +85,7 @@ verify_install() {
   grep -F '"release_track": "stable"' "$RECEIPT" >/dev/null
   grep -F '"active_release": ' "$RECEIPT" >/dev/null
   grep -F "\"tag\": \"$TAG\"" "$RECEIPT" >/dev/null
-  grep -F '"autostart": { "enabled": true, "owner": "honk300-installer" }' "$RECEIPT" >/dev/null
+  grep -F '"autostart": { "enabled": false, "owner": "honk300-installer" }' "$RECEIPT" >/dev/null
 
   for link in \
     "$HOME/.local/bin/honk300" \

@@ -41,6 +41,10 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn("HONK300_TEST_FAIL_AFTER_SWAP=1", UNIX_SMOKE)
         self.assertIn("snapshot_state", UNIX_SMOKE)
         self.assertIn('cmp "$BEFORE_STATE" "$AFTER_STATE"', UNIX_SMOKE)
+        self.assertIn(
+            '"autostart": { "enabled": false, "owner": "honk300-installer" }',
+            UNIX_SMOKE,
+        )
         for owned_state in (
             "install-receipt.json",
             "honk300.desktop",

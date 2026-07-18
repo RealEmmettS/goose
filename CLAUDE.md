@@ -8,9 +8,10 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.1.0 is the public stable/latest release at exact source commit
-`e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`; v1.2.0 is the in-flight provenance-preserving
-self-updater and owned-lifecycle candidate under ADRs 0031–0033 and `#r120`.** M0-M19 are implemented
+**Current stage: v1.2.0 is the public stable/latest release at exact source commit
+`fcbb6337830a14cb187c93cfe3e499a3f2f73945`; its post-release Linux shell smoke exposed a
+foreign-autostart receipt regression, so v1.2.1 is the immutable fix-forward candidate under
+ADRs 0031–0033 and `#r120`.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -403,7 +404,7 @@ family's local gate:
 - `cargo build --release`
 - Windows local lifecycle only, and only when the operator welcomes visible testing: `pwsh -File script/smoke_windows_overlay.ps1 -Binary target/release/honk300.exe -EvidenceDirectory target/windows-overlay-evidence -LifecycleOnly`. Full paired-color compositor proof is disposable-CI-only; `-AllowInteractiveDesktopObscuration` is intentionally rejected locally.
 - Linux host only: `HONK300_BIN="$PWD/target/release/honk300" bash script/smoke_m17_m18_linux.sh`
-- `dist plan --tag=v1.2.0`
+- `dist plan --tag=v1.2.1`
 - `cargo audit --version 0.22.2`
 
 Release packaging uses **cargo-dist** for portable archives plus project-owned atomic release,

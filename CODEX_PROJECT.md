@@ -3,10 +3,11 @@
 ## TL;DR
 
 Honk300 is a Rust 1.95, cross-platform procedural desktop goose for Windows, macOS, X11, and
-native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.1.0 is the
+native Wayland reduced mode. M0-M19 and the v0.3.x stabilization work are in-tree. v1.2.0 is the
 public stable/latest release at exact source commit
-`e58b5ec09ea140e22927e3f8e8cf339b5a7d5bea`; v1.2.0 is the in-flight provenance-preserving
-self-updater and owned-lifecycle candidate under ADRs 0031–0033 and `#r120`. The project retains v1.0.1's native macOS qualification,
+`fcbb6337830a14cb187c93cfe3e499a3f2f73945`; its post-release Linux shell smoke exposed a
+foreign-autostart receipt regression, so v1.2.1 is the immutable fix-forward candidate under
+ADRs 0031–0033 and `#r120`. The project retains v1.0.1's native macOS qualification,
 shared gait/edge lifecycle, Developer ID/notarized DMG delivery, Debian packages, rolling updates,
 and atomic publication while extending the shared accessible goose control from macOS to native
 Windows notification-area and compatible Linux StatusNotifier owners. Configure launches the
@@ -20,15 +21,19 @@ full-desktop compositor surfaces disposable-CI-only.
 
 ## Status
 
-- Default branch `main` contains the post-release v1.1.0 closure; release work is isolated on
-  `codex/release-v1.2.0` until its exact candidate passes. Prior public tags/releases remain
-  untouched history.
+- Default branch `main` contains the exact published v1.2.0 source plus the in-flight v1.2.1
+  fix-forward. Prior public tags/releases remain untouched history.
 - Completed release/evidence cards: v1.0.3 `#r103`, v1.0.2 `#v102`, v1.0.1 `#m20q`, native Mac
   evidence `#m16r`, Alienware verification `#v1a`, and tray implementation `#trayc`/`#wtray`/
-  `#ltray`. v1.1.0 publication task `#r110` is complete; v1.2.0 updater/release tasks `#u31` and
-  `#r120` are active. The shared board lives under `.tasks/`.
-- Version: 1.2.0 in candidate source; 1.1.0 remains public stable/latest until qualification and
-  atomic publication complete.
+  `#ltray`. v1.1.0 publication task `#r110` is complete; v1.2.0/v1.2.1 updater-release tasks
+  `#u31` and `#r120` are active. The shared board lives under `.tasks/`.
+- Version: 1.2.1 in fix-forward source; 1.2.0 remains public stable/latest until complete
+  qualification and atomic publication.
+- v1.2.0 release evidence: candidate `29649872307` attempt 2, same-SHA main CI `29650347708`,
+  and atomic publication `29650650643` passed at exact commit
+  `fcbb6337830a14cb187c93cfe3e499a3f2f73945`. Public-byte run `29651013524` passed both Mac,
+  both Debian, and both Windows architectures but failed both Linux shell jobs on the same
+  foreign-autostart receipt defect; v1.2.1 fixes forward without moving the tag.
 - v1.1.0 release evidence: candidate `29588487072`, same-SHA main CI `29589048598`, atomic
   publication `29589698302`, and post-release smoke `29590274819` all passed at the exact commit.
   The immutable GitHub Release contains 22 payloads plus sidecars/manifest for 47 assets.
@@ -249,13 +254,13 @@ full-desktop compositor surfaces disposable-CI-only.
 
 ## Verification Source Of Truth
 
-- In-flight v1.2.0 release gate: `docs/readiness/v1.2.0-readiness.md`; the completed v1.1.0 and
-  earlier readiness reports remain immutable-release history.
+- In-flight v1.2.1 fix-forward gate: `docs/readiness/v1.2.1-readiness.md`; the v1.2.0 report
+  records its immutable publication and public Linux shell failure.
 - Native historical/backend evidence: `docs/readiness/m16-m18-readiness.md`.
 - Board handoff and activity: `.tasks/tasks/v102.md` and `.tasks/tasks/v1a.md`.
 - Canonical product plan: `honk300_plan.md`.
 - Required local gate: fmt, workspace clippy with warnings denied, workspace tests, release build,
-  universal Apple builds, `dist plan --tag=v1.2.0`, complete Python contracts, cargo-audit
+  universal Apple builds, `dist plan --tag=v1.2.1`, complete Python contracts, cargo-audit
   0.22.2, actionlint, and diff check.
 
 ## Current Workspace Tree

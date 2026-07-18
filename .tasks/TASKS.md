@@ -9,10 +9,10 @@
 ## To-Do
 
 ## Active
-- [ ] **Publish v1.2.0 provenance-preserving self-updater** - qualify, publish, independently verify, merge to main, and close the immutable cross-platform updater release (owner codex) (needs #u31) #r120
-  - [x] Synchronize v1.2.0 version, readiness, board, public guidance, and both changelogs.
-  - [~] Pass the complete local, cross-target, packaging, audit, and exact-candidate gate.
-    > The noninteractive local/cross-target gate is complete; disposable native candidate jobs own the remaining Windows lifecycle/compositor, Mac, GNU Linux, and exact assembly proof.
+- [ ] **Close the v1.2.1 provenance-preserving updater fix-forward** - preserve immutable v1.2.0, qualify/publish its foreign-autostart correction, verify public bytes, and clean every branch (owner codex) (needs #u31) #r120
+  - [x] Synchronize v1.2.1 version, readiness, board, public guidance, and both changelogs.
+  - [x] Pass the complete v1.2.0 local, cross-target, packaging, audit, and exact-candidate gate.
+    > Candidate 29649872307 attempt 2 passed at fcbb6337830a14cb187c93cfe3e499a3f2f73945.
   - [x] Diagnose the reported Windows white-screen event and retire full-desktop calibration from local/product execution.
     > The white/blank display was the developer compositor fixture, not product rendering. Product startup has no calibration; the former local obscuration opt-in now refuses, and strict paired-color surfaces run only on disposable CI.
   - [x] Make Windows shortcuts, login startup, and background helpers windowless and non-activating while preserving intentional CLI terminals.
@@ -23,8 +23,14 @@
     > Shared Windows/macOS sizing tests pass; live Windows proof measured a 614x346 note and a full-source 648x518 image on a 1920x1080 monitor, captured the image, and completed graceful cleanup.
   - [x] Add a cross-platform login-autostart config option that reconciles through each install family's existing owned startup mechanism.
     > Default-off TOML/TUI state now uses only receipt-owned HKLM/HKCU Run, LaunchAgent, or XDG autostart; fresh installer intent wins over stale config, foreign owners fail closed, and all four x64 Windows packages compile with exact selected state in the receipt.
-  - [ ] Merge the candidate-proven SHA to main and pass same-SHA ordinary CI.
-  - [ ] Publish atomically, pass post-release public-byte qualification, and verify stable/latest/site identity.
+  - [x] Merge the v1.2.0 candidate-proven SHA to main and pass same-SHA ordinary CI.
+    > Main CI 29650347708 passed the exact candidate SHA.
+  - [~] Publish v1.2.0 atomically and preserve its public-byte failure as immutable evidence.
+    > Atomic run 29650650643 published 47 assets. Public run 29651013524 passed Mac, Debian, and Windows but both Linux shell jobs caught the same foreign-autostart receipt defect.
+  - [~] Fix forward as v1.2.1 and repeat candidate, same-SHA main, publication, public-byte, latest, and site gates.
+    > Foreign files, symlinks, and directories are now preserved and treated as Honk300 autostart off; enabling still refuses ownership conflicts.
+  - [x] Pass the v1.2.1 noninteractive local, cross-target, audit, parser, and package preflight.
+    > 434 Rust tests, 83 focused contracts with two POSIX skips, strict native/musl Clippy, ARM64 Windows check, RustSec, actionlint, cargo-dist, shell/PowerShell parsing, and package-list preflight pass without launching the app.
   - [ ] Return to clean main and remove every non-main local and remote branch after preserving merged work.
 - [ ] **Provenance-preserving slot-based self-updater** - implement synchronous same-origin updates, atomic Windows release slots, DMG-managed Mac updates, and release qualification (owner codex) #u31
   - [x] Record ADR 0031 and the versioned receipt/provenance contract.
@@ -33,7 +39,7 @@
   - [x] Preserve DMG, Debian, shell, and PowerShell update origins without cross-channel conversion.
   - [x] Update installers, unversioned release artifacts, workflows, and public guidance.
   - [~] Pass focused fault tests and the complete local/release qualification gate.
-    > Focused/local tests and the complete x64/native-ARM64 four-installer matrix pass at a16b8b5; the exact all-platform candidate, same-SHA main, publication, and fresh-public-byte gates remain.
+    > v1.2.0 candidate/main/publication and every public-byte path except Linux shell passed. v1.2.1 owns the symmetric shell regression and full repeated closure gate.
 
 ## Done
 - [x] **Publish v1.1.0 cross-platform tray parity** - published and independently verified the immutable Windows/Linux tray-parity release across the complete Windows, macOS, Linux, Debian, stable/latest, and production-site matrix (done 2026-07-17) #r110

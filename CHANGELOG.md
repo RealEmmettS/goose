@@ -26,6 +26,16 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-07-18
+
+### Fixed
+- **Foreign login-start ownership during shell updates** - the macOS/Linux bootstrap now records
+  login start as enabled only when the existing LaunchAgent or XDG desktop entry carries
+  Honk300's ownership marker. A foreign regular file, symlink, or directory is preserved and
+  treated as Honk300 autostart being off; disabling remains a no-op for foreign state, while
+  enabling still refuses the ownership conflict. This fixes the v1.2.0 public Linux shell smoke
+  regression without weakening mutation preflights.
+
 ## [1.2.0] - 2026-07-18
 
 ### Added

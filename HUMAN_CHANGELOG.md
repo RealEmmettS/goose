@@ -33,6 +33,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Fixed
+- **An unrelated startup file no longer prevents the Goose from launching.** Mac and Linux
+  terminal installs now turn on start-at-login only when the existing startup entry genuinely
+  belongs to the Goose. Unfamiliar files remain untouched and count as the Goose's setting being
+  off, which keeps another program's setup safe without blocking normal launch.
+
 ### Added
 - **Updates now remember exactly how the Goose was installed.** A protected installation record
   keeps the all-users, workplace, Mac, Linux-package, and terminal-install choices separate, while

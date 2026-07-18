@@ -191,7 +191,7 @@ fn owned_autostart_state(identity: &ManagedAutostartIdentity) -> Result<bool, Dy
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(test, target_os = "linux", target_os = "macos"))]
 fn owned_text_autostart_state(path: &Path, marker: &str) -> Result<bool, DynError> {
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
@@ -199,19 +199,16 @@ fn owned_text_autostart_state(path: &Path, marker: &str) -> Result<bool, DynErro
         Err(error) => return Err(error.into()),
     };
     if !metadata.is_file() || metadata.file_type().is_symlink() {
-        return Err(format!(
-            "login-start integration is not a regular owned file: {}",
-            path.display()
-        )
-        .into());
+        // A directory, device, or symlink at the conventional location is foreign state. It is
+        // never considered enabled and is never mutated by the disable path.
+        return Ok(false);
     }
     let contents = fs::read_to_string(path)?;
     if !contents.contains(marker) {
-        return Err(format!(
-            "refusing foreign login-start integration: {}",
-            path.display()
-        )
-        .into());
+        // A foreign file at our conventional path is not evidence that Honk300 owns or enabled
+        // login start. Preserve it and report our preference as disabled; mutation paths retain
+        // their stricter ownership preflight before they create or replace anything.
+        return Ok(false);
     }
     Ok(true)
 }
@@ -391,16 +388,12 @@ fn reconcile_linux_autostart(
     enabled: bool,
 ) -> Result<(), DynError> {
     let path = linux_autostart_path()?;
-    preflight_owned_text_file(&path, OWNERSHIP_MARKER)?;
-    if enabled {
-        write_owned_text_file(
-            &path,
-            &linux_desktop_entry(&identity.program),
-            OWNERSHIP_MARKER,
-        )?;
-    } else {
-        remove_owned_text_file(&path, OWNERSHIP_MARKER)?;
-    }
+    reconcile_owned_text_autostart_file(
+        &path,
+        enabled,
+        &linux_desktop_entry(&identity.program),
+        OWNERSHIP_MARKER,
+    )?;
     update_receipt_autostart(identity, enabled)
 }
 
@@ -410,17 +403,29 @@ fn reconcile_macos_autostart(
     enabled: bool,
 ) -> Result<(), DynError> {
     let path = macos_launch_agent_path()?;
-    preflight_owned_text_file(&path, OWNERSHIP_MARKER)?;
-    if enabled {
-        write_owned_text_file(
-            &path,
-            &macos_launch_agent_plist(&identity.program),
-            OWNERSHIP_MARKER,
-        )?;
-    } else {
-        remove_owned_text_file(&path, OWNERSHIP_MARKER)?;
-    }
+    reconcile_owned_text_autostart_file(
+        &path,
+        enabled,
+        &macos_launch_agent_plist(&identity.program),
+        OWNERSHIP_MARKER,
+    )?;
     update_receipt_autostart(identity, enabled)
+}
+
+#[cfg(any(test, target_os = "linux", target_os = "macos"))]
+fn reconcile_owned_text_autostart_file(
+    path: &Path,
+    enabled: bool,
+    contents: &str,
+    marker: &str,
+) -> io::Result<()> {
+    if enabled {
+        preflight_owned_text_file(path, marker)?;
+        write_owned_text_file(path, contents, marker)?;
+    } else {
+        remove_owned_text_file(path, marker)?;
+    }
+    Ok(())
 }
 
 pub fn detect_install_source() -> InstallSource {
@@ -5313,7 +5318,7 @@ fn preflight_owned_macos_receipt(path: &Path, root: &Path) -> io::Result<()> {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(test, target_os = "linux", target_os = "macos"))]
 fn preflight_owned_text_file(path: &Path, marker: &str) -> io::Result<()> {
     match fs::symlink_metadata(path) {
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
@@ -6012,6 +6017,21 @@ mod tests {
         let path = root.join("honk300.desktop");
         fs::create_dir_all(&root).unwrap();
         fs::write(&path, "foreign desktop entry\n").unwrap();
+        assert!(!owned_text_autostart_state(&path, OWNERSHIP_MARKER).unwrap());
+        reconcile_owned_text_autostart_file(
+            &path,
+            false,
+            &format!("# {OWNERSHIP_MARKER}\nowned\n"),
+            OWNERSHIP_MARKER,
+        )
+        .unwrap();
+        assert!(reconcile_owned_text_autostart_file(
+            &path,
+            true,
+            &format!("# {OWNERSHIP_MARKER}\nowned\n"),
+            OWNERSHIP_MARKER,
+        )
+        .is_err());
         assert!(write_owned_text_file(&path, "replacement", OWNERSHIP_MARKER).is_err());
         assert_eq!(
             fs::read_to_string(&path).unwrap(),
@@ -6021,6 +6041,7 @@ mod tests {
         assert!(path.exists());
 
         fs::write(&path, format!("# {OWNERSHIP_MARKER}\nowned\n")).unwrap();
+        assert!(owned_text_autostart_state(&path, OWNERSHIP_MARKER).unwrap());
         write_owned_text_file(
             &path,
             &format!("# {OWNERSHIP_MARKER}\nupdated\n"),
@@ -6029,6 +6050,10 @@ mod tests {
         .unwrap();
         assert!(remove_owned_text_file(&path, OWNERSHIP_MARKER).unwrap());
         assert!(!path.exists());
+
+        let foreign_directory = root.join("foreign-directory.desktop");
+        fs::create_dir(&foreign_directory).unwrap();
+        assert!(!owned_text_autostart_state(&foreign_directory, OWNERSHIP_MARKER).unwrap());
         let _ = fs::remove_dir_all(root);
     }
 
