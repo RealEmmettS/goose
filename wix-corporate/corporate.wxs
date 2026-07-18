@@ -4,6 +4,7 @@
 <?ifndef Commit ?><?define Commit = "0000000000000000000000000000000000000000" ?><?endif ?>
 <?ifndef TargetTriple ?><?define TargetTriple = "x86_64-pc-windows-msvc" ?><?endif ?>
 <?ifndef PayloadSha256 ?><?define PayloadSha256 = "0000000000000000000000000000000000000000000000000000000000000000" ?><?endif ?>
+<?ifndef LauncherSha256 ?><?define LauncherSha256 = "0000000000000000000000000000000000000000000000000000000000000000" ?><?endif ?>
 
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
     <Product
@@ -157,7 +158,7 @@
             Id='SetActivateSlotData'
             Property='ActivateWindowsSlot'
             HideTarget='yes'
-            Value='__wsa -r &quot;[APPLICATIONFOLDER]&quot; -o &quot;msi-corporate&quot; -c &quot;$(var.Commit)&quot; -a &quot;[OriginalDatabase]&quot; -u &quot;[HONK300AUTOSTART]&quot;'/>
+            Value='__wsa -r &quot;[APPLICATIONFOLDER]&quot; -o &quot;msi-corporate&quot; -c &quot;$(var.Commit)&quot; -a &quot;[OriginalDatabase]&quot; -l &quot;$(var.LauncherSha256)&quot; -u &quot;[HONK300AUTOSTART]&quot;'/>
         <CustomAction Id='ActivateWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='[CustomActionData]' Execute='deferred' Impersonate='yes' Return='check' HideTarget='yes'/>
         <CustomAction Id='SetCommitSlotData' Property='CommitWindowsSlot' Value='__windows-slot-commit --root &quot;[APPLICATIONFOLDER]&quot;'/>
         <CustomAction Id='CommitWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='[CustomActionData]' Execute='commit' Impersonate='yes' Return='check'/>

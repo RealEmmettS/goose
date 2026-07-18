@@ -397,6 +397,7 @@ class InstallerTemplateTests(unittest.TestCase):
             self.assertIn("<Component Id='LoginAutostart' Guid='*'>", wix)
             self.assertNotIn("<Component Id='LoginAutostart' Guid='*' Permanent='yes'>", wix)
             self.assertIn("__wsa -r", wix)
+            self.assertIn('-l &quot;$(var.LauncherSha256)&quot;', wix)
             self.assertIn("__windows-slot-rollback", wix)
             self.assertIn("__windows-slot-commit", wix)
             self.assertIn("__windows-slot-uninstall", wix)
@@ -418,6 +419,7 @@ class InstallerTemplateTests(unittest.TestCase):
 
         for token in [
             "-dPayloadSha256=$payloadSha256",
+            "-dLauncherSha256=$launcherSha256",
             "/DPayloadSha256=$payloadSha256",
             "smoke_windows_slot_update.ps1",
             "smoke_windows_installer_takeover.ps1",

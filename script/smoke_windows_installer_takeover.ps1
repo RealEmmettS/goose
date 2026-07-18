@@ -97,7 +97,9 @@ function Read-PeSubsystem([string] $Path) {
 }
 
 function Install-Msi([string] $Path, [string] $Label) {
-    Invoke-Checked $msiexec @('/i', "`"$Path`"", '/qn', '/norestart') $Label
+    $logName = (($Label -replace '[^A-Za-z0-9.-]', '-').Trim('-').ToLowerInvariant()) + '.msi.log'
+    $logPath = Join-Path $evidence $logName
+    Invoke-Checked $msiexec @('/i', "`"$Path`"", '/qn', '/norestart', '/l*v', "`"$logPath`"") $Label
 }
 
 function Install-Exe([string] $Path, [string] $Label) {

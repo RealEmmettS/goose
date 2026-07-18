@@ -1916,7 +1916,6 @@ pub fn run_windows_slot_protocol() -> Result<bool, DynError> {
             let artifact_name = canonical_windows_artifact_name(origin, target)?;
             let payload_sha256 =
                 crate::update::compute_sha256_for_install(&std::env::current_exe()?)?;
-            let launcher_sha256 = current_windows_app_launcher_hash()?;
             windows_slot_activate(WindowsSlotActivation {
                 root: required_internal_short_path(&values, "r")?,
                 origin,
@@ -1927,7 +1926,11 @@ pub fn run_windows_slot_protocol() -> Result<bool, DynError> {
                 artifact_name,
                 artifact_path: required_internal_short_path(&values, "a")?,
                 payload_sha256,
-                launcher_sha256,
+                // WiX executes Binary-table custom actions from an isolated temporary path, so
+                // there cannot be a sibling honk300-app.exe to inspect here. The exact launcher
+                // hash is compiled into the MSI and delivered in hidden CustomActionData; the
+                // activation transaction verifies that identity against the staged slot.
+                launcher_sha256: required_internal_short_arg(&values, "l")?.to_owned(),
                 autostart: required_internal_bool_short(&values, "u")?,
             })?;
             Ok(true)

@@ -227,6 +227,7 @@ jobs:
           $binDir = "target\${{ matrix.triple }}\release"
           $sourceRoot = (Get-Location).Path
           $payloadSha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk300.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+          $launcherSha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk300-app.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
           New-Item -ItemType Directory -Force -Path target\wix | Out-Null
           & $candle -arch ${{ matrix.wix_arch }} `
             "-dVersion=${{ steps.tag.outputs.version }}" `
@@ -234,6 +235,7 @@ jobs:
             "-dCommit=${{ inputs.commit }}" `
             "-dTargetTriple=${{ matrix.triple }}" `
             "-dPayloadSha256=$payloadSha256" `
+            "-dLauncherSha256=$launcherSha256" `
             "-dCargoTargetBinDir=$binDir" `
             "-dSourceRoot=$sourceRoot" `
             -out target\wix\corporate.wixobj `
@@ -245,6 +247,7 @@ jobs:
             "-dCommit=${{ inputs.commit }}" `
             "-dTargetTriple=${{ matrix.triple }}" `
             "-dPayloadSha256=$payloadSha256" `
+            "-dLauncherSha256=$launcherSha256" `
             "-dCargoTargetBinDir=$binDir" `
             "-dSourceRoot=$sourceRoot" `
             -out target\wix\global.wixobj `
