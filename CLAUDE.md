@@ -258,6 +258,8 @@ are done.
   intentionally downgrade and becomes the user's latest intent. Conflicting Windows registrations
   are retired only after commit through a protected journal; an opposite-scope cleanup that lacks
   an administrator grant stays nonzero `cleanup_pending` and must not claim public alias takeover.
+  One hidden elevated active-slot coordinator runs the validated native uninstall and retires only
+  that old root's exact PATH/Run entries before verifying the active PATH; it must not prompt twice.
 - `[lifecycle].autostart_on_login` is default-off and reconciles only through the receipt-owned
   Windows Run value, managed Mac LaunchAgent, or per-user Linux XDG entry. Fresh installer intent
   outranks stale config; later explicit config edits update the same owned mechanism. Foreign or

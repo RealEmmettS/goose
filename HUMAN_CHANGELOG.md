@@ -110,6 +110,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   moves a stable pointer to the checked new copy while the old command finishes normally, then
   confirms all three Goose command names work. This avoids the locked-running-file problem rather
   than trying to force the file closed.
+- **Switching between all-users and workplace installs no longer leaves the old command ahead.**
+  One quiet administrator-approved cleanup removes only the retired installation's startup and
+  command entries, then confirms the new location wins. This avoids a second prompt and makes the
+  user's newest successful install the one their commands actually open.
 - **Goose notes no longer involve Notepad at all.** The Goose owns its little editable note
   window, so Windows cannot restore an unrelated user tab and the program cannot accidentally
   surface or run a script. Closing the Goose's own note still behaves like closing the prank.

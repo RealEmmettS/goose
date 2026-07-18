@@ -134,9 +134,10 @@ class WindowsPackagingTests(unittest.TestCase):
     def test_every_windows_app_entrypoint_uses_the_gui_subsystem_launcher(self) -> None:
         for wix in (GLOBAL_WIX, CORPORATE_WIX):
             self.assertIn("Name='honk300-app.exe'", wix)
-            self.assertIn("Target='[Bin]honk300-app.exe'", wix)
-            self.assertIn("Value='\"[Bin]honk300-app.exe\"'", wix)
-            self.assertNotIn("Target='[Bin]honk300.exe' Arguments='start'", wix)
+            self.assertIn("Target='[APPLICATIONFOLDER]bin\\honk300-app.exe'", wix)
+            self.assertIn("Value='\"[APPLICATIONFOLDER]bin\\honk300-app.exe\"'", wix)
+            self.assertNotIn("Target='[APPLICATIONFOLDER]bin\\honk300.exe' Arguments='start'", wix)
+            self.assertNotIn("<Directory Id='Bin'", wix)
         for inno in (GLOBAL_INNO, CORPORATE_INNO):
             self.assertIn(r'Source: "{#SourceBinDir}\honk300-app.exe"', inno)
             self.assertIn(r'Filename: "{app}\bin\honk300-app.exe"', inno)
@@ -146,6 +147,9 @@ class WindowsPackagingTests(unittest.TestCase):
             "windows_autostart_command",
             "legacy_windows_autostart_command",
             'creation_flags(CREATE_NO_WINDOW)',
+            '"__windows-retire-owner"',
+            "remove_windows_retired_owner_integrations",
+            "windows_public_path_contains",
         ):
             self.assertIn(required, INSTALL_RS)
         for required in (

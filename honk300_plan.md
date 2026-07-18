@@ -733,8 +733,11 @@ terminates the updater's mapped old release. A first slot-aware install may reti
 
 After activation, a protected journal records only strictly validated conflicting Honk300
 MSI/Inno registrations. The updater retries those exact native uninstallers and clears the journal
-only after registration and public-alias verification. Opposite-scope takeover is bounded by
-Windows authority: a per-user Corporate install cannot retire or outrank a machine-wide PATH
+only after registration and public-alias verification. The same hidden elevated coordinator that
+retires a machine-wide owner also removes only that retired root's exact PATH/Run entries and
+verifies the active root's PATH, so one UAC grant completes the public-command handoff.
+Opposite-scope takeover is bounded by Windows authority: a per-user Corporate install cannot
+retire or outrank a machine-wide PATH
 without an administrator grant. If that grant is denied, the new slot remains staged/selected but
 the operation is nonzero `cleanup_pending`; it never claims the public command has switched.
 

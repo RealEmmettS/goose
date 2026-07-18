@@ -75,6 +75,10 @@ All notable changes to this project are documented here. Format based on
   unlock dependency. Installer-owned activation now verifies staged payloads, retargets neutral
   selectors in place, commits the protected receipt, and lets the initiating CLI verify the final
   version, target, aliases, and artifact identity while still running from its old release.
+- **Cross-scope Windows PATH retirement** - runs each validated old owner and its exact PATH/Run
+  cleanup inside one hidden coordinator under the same required administrator grant, then verifies
+  the active root's persisted PATH. Permanent MSI components can no longer leave an older
+  machine-wide command ahead of a newly authoritative Corporate install.
 - **Transactional receipt rollback** - preserves the prior protected receipt when activation
   fails before its backup is created, restores source markers with the selector, and retains an
   already-existing same-version Linux slot during injected post-activation rollback.

@@ -47,7 +47,9 @@ If that change crosses from a machine-wide install to a per-user Corporate insta
 require one administrator grant to retire the old machine owner. Cancelling that grant preserves
 the new staged slot but reports `cleanup_pending`; Honk300 does not pretend the older machine PATH
 has stopped winning. Running the new slot's `honk300 update` retries only the validated Honk300
-registration and clears the pending state after the public aliases are verified.
+registration. The same hidden elevated coordinator removes only that retired root's exact PATH
+and login-start entries, verifies the active PATH, and clears the pending state without a second
+elevation prompt.
 
 Windows users on v1.0.2 or earlier must rerun the current installer once. Those older immutable
 executables cannot self-repair their update-discovery bug; v1.0.3 and later perform subsequent

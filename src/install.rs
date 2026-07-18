@@ -1969,6 +1969,17 @@ pub fn run_windows_slot_protocol() -> Result<bool, DynError> {
             windows_slot_uninstall(&root, origin)?;
             Ok(true)
         }
+        "__windows-retire-owner" => {
+            let values = parse_internal_named_args(&args[1..])?;
+            let root = required_internal_path(&values, "root")?;
+            let origin = InstallSource::from_marker(required_internal_arg(&values, "origin")?);
+            retire_windows_registered_owner(
+                &root,
+                origin,
+                required_internal_arg(&values, "registration")?,
+            )?;
+            Ok(true)
+        }
         _ => Ok(false),
     }
 }
@@ -2848,35 +2859,26 @@ fn refresh_windows_owner_cleanup_journal(root: &Path) -> Result<usize, DynError>
 }
 
 #[cfg(windows)]
-fn windows_owner_uninstall_invocation(
+fn windows_owner_retirement_invocation(
+    active_executable: &Path,
+    active_root: &Path,
+    active_origin: InstallSource,
     owner: &WindowsRegisteredOwner,
-    system_msiexec: &Path,
 ) -> WindowsPostExitInvocation {
-    let (file, arguments, elevated) = match &owner.uninstall {
-        WindowsManagedUninstall::Msi {
-            product_code,
-            elevated,
-        } => (
-            system_msiexec.to_string_lossy().into_owned(),
-            format!(
-                "@('/x','{}','/passive','/norestart')",
-                powershell_literal(product_code)
-            ),
-            *elevated,
-        ),
-        WindowsManagedUninstall::Exe {
-            uninstaller,
-            elevated,
-        } => (
-            uninstaller.to_string_lossy().into_owned(),
-            "@('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART')".to_owned(),
-            *elevated,
-        ),
+    // Start-Process joins ArgumentList into one Windows command line. Preserve explicit quotes
+    // around the root so Program Files remains one argv value in the elevated coordinator.
+    let quoted_root = format!("\"{}\"", active_root.display());
+    let elevation = if owner.uninstall.requires_elevation() {
+        " -Verb RunAs"
+    } else {
+        ""
     };
-    let elevation = if elevated { " -Verb RunAs" } else { "" };
     let script = format!(
-        "$ErrorActionPreference='Stop'; $process=Start-Process -FilePath '{}' -ArgumentList {arguments} -WindowStyle Hidden -Wait -PassThru{elevation}; if ($process.ExitCode -notin @(0,1605)) {{ exit $process.ExitCode }}",
-        powershell_literal(&file)
+        "$ErrorActionPreference='Stop'; $process=Start-Process -FilePath '{}' -ArgumentList @('__windows-retire-owner','--root','{}','--origin','{}','--registration','{}') -WindowStyle Hidden -Wait -PassThru{elevation}; exit $process.ExitCode",
+        powershell_literal(&active_executable.to_string_lossy()),
+        powershell_literal(&quoted_root),
+        active_origin.marker_value(),
+        powershell_literal(&owner.registration),
     );
     WindowsPostExitInvocation {
         args: vec![
@@ -2890,6 +2892,107 @@ fn windows_owner_uninstall_invocation(
         ],
         script,
     }
+}
+
+#[cfg(windows)]
+fn retire_windows_registered_owner(
+    root: &Path,
+    expected_origin: InstallSource,
+    registration: &str,
+) -> Result<(), DynError> {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let journal = root.join(WINDOWS_OWNER_CLEANUP_JOURNAL);
+    let metadata = fs::symlink_metadata(&journal)
+        .map_err(|error| format!("conflicting-owner cleanup journal is unavailable: {error}"))?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err("conflicting-owner cleanup journal is not a protected regular file".into());
+    }
+    let (active_origin, _) = active_windows_slot_identity(root)?;
+    if !windows_origins_share_registration(active_origin, expected_origin) {
+        return Err("conflicting-owner coordinator belongs to a different active origin".into());
+    }
+    let mut matching = pending_windows_registered_owners(active_origin, root)?
+        .into_iter()
+        .filter(|owner| owner.registration == registration)
+        .collect::<Vec<_>>();
+    if matching.len() != 1 {
+        return Err(format!(
+            "conflicting-owner coordinator expected exactly one protected registration `{registration}`, found {}",
+            matching.len()
+        )
+        .into());
+    }
+    let owner = matching.pop().expect("length checked");
+    let mut command = match &owner.uninstall {
+        WindowsManagedUninstall::Msi { product_code, .. } => {
+            let mut command = std::process::Command::new(system_windows_msiexec_path()?);
+            command.args(["/x", product_code, "/qn", "/norestart"]);
+            command
+        }
+        WindowsManagedUninstall::Exe { uninstaller, .. } => {
+            let mut command = std::process::Command::new(uninstaller);
+            command.args(["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"]);
+            command
+        }
+    };
+    let status = command
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()
+        .map_err(|error| {
+            format!(
+                "could not start protected conflicting owner {}: {error}",
+                owner.registration
+            )
+        })?;
+    if !status.success() && status.code() != Some(1605) {
+        return Err(format!(
+            "protected conflicting owner {} exited {}; reboot-deferred results are not accepted",
+            owner.registration,
+            status.code().unwrap_or(-1)
+        )
+        .into());
+    }
+    if windows_registered_owners()?
+        .iter()
+        .any(|candidate| candidate.registration == owner.registration)
+    {
+        return Err(format!(
+            "protected conflicting owner {} remained registered after its uninstaller returned",
+            owner.registration
+        )
+        .into());
+    }
+
+    // Native installer tables can intentionally retain shared PATH components across an
+    // in-place family takeover. Once a differently rooted owner is gone, explicitly retire only
+    // that owner's exact stable bin and Run value. This executes in the same elevated coordinator
+    // as a machine-wide uninstall, so it cannot leave a stale higher-precedence public command.
+    if !paths_match(root, &owner.install_root) {
+        remove_windows_retired_owner_integrations(&owner.install_root, owner.source)?;
+    }
+    let (verified_origin, _) = active_windows_slot_identity(root)?;
+    if !windows_origins_share_registration(verified_origin, expected_origin) {
+        return Err("active Windows owner changed during conflicting-owner retirement".into());
+    }
+    if !windows_public_path_contains(root, verified_origin)? {
+        return Err(format!(
+            "active Windows owner {} is missing its exact persisted public PATH entry",
+            verified_origin.marker_value()
+        )
+        .into());
+    }
+    if !paths_match(root, &owner.install_root)
+        && windows_public_path_contains(&owner.install_root, owner.source)?
+    {
+        return Err(format!(
+            "retired Windows owner {} still owns its persisted public PATH entry",
+            owner.registration
+        )
+        .into());
+    }
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -2921,12 +3024,12 @@ pub(crate) fn retry_windows_owner_cleanup(
     }
     let powershell = system_windows_powershell_path()
         .map_err(|error| format!("could not resolve system Windows PowerShell: {error}"))?;
-    let msiexec = system_windows_msiexec_path()
-        .map_err(|error| format!("could not resolve system Windows Installer: {error}"))?;
+    let active_executable = root.join("bin").join("honk300.exe");
     let owners = pending_windows_registered_owners(active_origin, root)
         .map_err(|error| format!("could not discover conflicting Windows owners: {error}"))?;
     for owner in owners {
-        let invocation = windows_owner_uninstall_invocation(&owner, &msiexec);
+        let invocation =
+            windows_owner_retirement_invocation(&active_executable, root, active_origin, &owner);
         let status = std::process::Command::new(&powershell)
             .args(&invocation.args)
             .creation_flags(CREATE_NO_WINDOW)
@@ -3078,13 +3181,94 @@ fn remove_windows_registry_path(key: &winreg::RegKey, removed: &Path) -> io::Res
     key.set_raw_value("Path", &raw)
 }
 
+#[cfg(windows)]
+fn remove_windows_retired_owner_integrations(
+    root: &Path,
+    origin: InstallSource,
+) -> Result<(), DynError> {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_QUERY_VALUE, KEY_SET_VALUE};
+    use winreg::RegKey;
+
+    let (hive, environment_key) = match origin {
+        InstallSource::MsiGlobal | InstallSource::ExeGlobal | InstallSource::PowerShell => (
+            HKEY_LOCAL_MACHINE,
+            "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+        ),
+        InstallSource::MsiCorporate | InstallSource::ExeCorporate => {
+            (HKEY_CURRENT_USER, "Environment")
+        }
+        _ => return Err("unsupported retired Windows integration owner".into()),
+    };
+    let registry = RegKey::predef(hive);
+    match registry.open_subkey_with_flags(environment_key, KEY_QUERY_VALUE | KEY_SET_VALUE) {
+        Ok(environment) => remove_windows_registry_path(&environment, &root.join("bin"))?,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    match registry.open_subkey_with_flags(
+        "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+        KEY_QUERY_VALUE | KEY_SET_VALUE,
+    ) {
+        Ok(run) => {
+            let command: String = run.get_value("Honk300").unwrap_or_default();
+            if command_executable_path(&command)
+                .is_some_and(|executable| path_is_within(&executable, root))
+            {
+                run.delete_value("Honk300")?;
+            }
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn windows_public_path_contains(root: &Path, origin: InstallSource) -> Result<bool, DynError> {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_QUERY_VALUE};
+    use winreg::RegKey;
+
+    let (hive, environment_key) = match origin {
+        InstallSource::MsiGlobal | InstallSource::ExeGlobal | InstallSource::PowerShell => (
+            HKEY_LOCAL_MACHINE,
+            "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+        ),
+        InstallSource::MsiCorporate | InstallSource::ExeCorporate => {
+            (HKEY_CURRENT_USER, "Environment")
+        }
+        _ => return Err("unsupported active Windows PATH owner".into()),
+    };
+    let registry = RegKey::predef(hive);
+    let environment = match registry.open_subkey_with_flags(environment_key, KEY_QUERY_VALUE) {
+        Ok(environment) => environment,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    let current: String = match environment.get_value("Path") {
+        Ok(current) => current,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    Ok(current
+        .split(';')
+        .any(|entry| windows_path_entry_matches(entry, &root.join("bin"))))
+}
+
+#[cfg(any(test, windows))]
+fn windows_path_entry_matches(entry: &str, expected: &Path) -> bool {
+    entry
+        .trim()
+        .trim_end_matches(['\\', '/'])
+        .eq_ignore_ascii_case(expected.to_string_lossy().trim_end_matches(['\\', '/']))
+}
+
 #[cfg(any(test, windows))]
 fn windows_path_without_entry(current: &str, removed: &Path) -> Option<String> {
     let parts = current.split(';').collect::<Vec<_>>();
     let kept = parts
         .iter()
         .copied()
-        .filter(|part| !part.trim().eq_ignore_ascii_case(&removed.to_string_lossy()))
+        .filter(|part| !windows_path_entry_matches(part, removed))
         .collect::<Vec<_>>();
     (kept.len() != parts.len()).then(|| kept.join(";"))
 }
@@ -3472,6 +3656,15 @@ enum WindowsManagedUninstall {
         uninstaller: PathBuf,
         elevated: bool,
     },
+}
+
+#[cfg(any(test, windows))]
+impl WindowsManagedUninstall {
+    fn requires_elevation(&self) -> bool {
+        match self {
+            Self::Msi { elevated, .. } | Self::Exe { elevated, .. } => *elevated,
+        }
+    }
 }
 
 #[cfg(any(test, windows))]
@@ -6034,6 +6227,48 @@ mod tests {
             windows_path_without_entry(r"C:\Windows;C:\Tools", removed),
             None
         );
+        assert_eq!(
+            windows_path_without_entry(
+                r"C:\Windows;C:\Program Files\honk300\bin\;C:\Tools",
+                removed
+            ),
+            Some(r"C:\Windows;C:\Tools".into())
+        );
+        assert!(windows_path_entry_matches(
+            r" C:\Program Files\honk300\bin\ ",
+            removed
+        ));
+    }
+
+    #[test]
+    fn windows_owner_retirement_uses_one_hidden_elevated_active_slot_coordinator() {
+        let owner = WindowsRegisteredOwner {
+            source: InstallSource::ExeGlobal,
+            install_root: PathBuf::from(r"C:\Program Files\honk300"),
+            uninstall: WindowsManagedUninstall::Exe {
+                uninstaller: PathBuf::from(r"C:\Program Files\honk300\unins000.exe"),
+                elevated: true,
+            },
+            registration: "HKLM:64:{5A94FBD0-DA02-4F63-9363-7D9CE0E280F5}_is1".into(),
+        };
+        let invocation = windows_owner_retirement_invocation(
+            Path::new(r"C:\Users\user\AppData\Local\Programs\honk300\bin\honk300.exe"),
+            Path::new(r"C:\Users\user\AppData\Local\Programs\honk300"),
+            InstallSource::MsiCorporate,
+            &owner,
+        );
+        assert!(invocation
+            .args
+            .windows(2)
+            .any(|args| args == ["-WindowStyle", "Hidden"]));
+        assert!(invocation.script.contains("__windows-retire-owner"));
+        assert!(invocation.script.contains("-Verb RunAs"));
+        assert!(invocation.script.contains("msi-corporate"));
+        assert!(invocation
+            .script
+            .contains(r#"'"C:\Users\user\AppData\Local\Programs\honk300"'"#));
+        assert!(!invocation.script.contains("unins000.exe"));
+        assert_eq!(invocation.script.matches("Start-Process").count(), 1);
     }
 
     #[test]

@@ -82,7 +82,11 @@ as `cleanup_pending`; it must not roll back the user's new intent.
 After slot commit, the helper inventories only strictly validated Honk300 MSI/Inno registrations.
 Any conflicting owner is recorded in a protected cleanup journal and in the receipt. A later
 `honk300 update` retries those exact registered uninstallers, verifies that each registration is
-gone, and clears the journal only after all conflicts are retired. A failed or cancelled UAC
+gone, and clears the journal only after all conflicts are retired. Machine-wide retirement uses
+one hidden elevated active-slot coordinator: it runs the validated native uninstaller, removes
+only that retired root's exact persisted PATH and Run entries when roots differ, and verifies the
+active root's PATH before returning. This prevents a permanent MSI component from leaving a stale
+higher-precedence command without adding a second elevation prompt. A failed or cancelled UAC
 grant leaves the new slot and receipt intact but returns nonzero with an assisted cleanup command.
 
 Windows scope is an authority boundary, not something the updater may bypass. In particular, a
