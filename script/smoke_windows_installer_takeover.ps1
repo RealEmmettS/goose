@@ -6,6 +6,7 @@ param(
     [Parameter(Mandatory = $true)] [string] $CorporateExe,
     [Parameter(Mandatory = $true)] [string] $ExpectedVersion,
     [string] $EvidenceDirectory = 'target/windows-installer-takeover-evidence',
+    [ValidateRange(30, 600)] [int] $ChildTimeoutSeconds = 180,
     [switch] $AllowMachineMutation
 )
 
@@ -26,6 +27,27 @@ $msiexec = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::
 $held = $null
 $transitions = [Collections.Generic.List[object]]::new()
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+$progressPath = Join-Path $evidence 'progress.log'
+
+function Write-TakeoverProgress([string] $Message) {
+    $line = "$([DateTime]::UtcNow.ToString('o')) $Message"
+    Write-Host "installer takeover: $Message"
+    Add-Content -LiteralPath $progressPath -Value $line -Encoding utf8
+}
+
+function Wait-CheckedProcess(
+    [Diagnostics.Process] $Process,
+    [string] $Label,
+    [switch] $KillTree
+) {
+    if (-not $Process.WaitForExit($ChildTimeoutSeconds * 1000)) {
+        try { $Process.Kill([bool]$KillTree) } catch {}
+        try { $Process.WaitForExit() } catch {}
+        throw "$Label timed out after $ChildTimeoutSeconds seconds"
+    }
+    # A second parameterless wait completes redirected stream event handling on .NET.
+    $Process.WaitForExit()
+}
 
 function Get-HonkRegistrations {
     $items = @()
@@ -56,10 +78,13 @@ function Get-HonkRegistrations {
 }
 
 function Invoke-Checked([string] $File, [string[]] $Arguments, [string] $Label) {
-    $process = Start-Process -FilePath $File -ArgumentList $Arguments -WindowStyle Hidden -Wait -PassThru
+    Write-TakeoverProgress "$Label started"
+    $process = Start-Process -FilePath $File -ArgumentList $Arguments -WindowStyle Hidden -PassThru
+    Wait-CheckedProcess $process $Label -KillTree
     if ($process.ExitCode -ne 0) {
         throw "$Label failed with exit $($process.ExitCode)"
     }
+    Write-TakeoverProgress "$Label completed"
 }
 
 function Read-PeSubsystem([string] $Path) {
@@ -80,6 +105,7 @@ function Install-Exe([string] $Path, [string] $Label) {
 }
 
 function Start-HeldOldProcess([string] $Binary) {
+    Write-TakeoverProgress "held old process starting from $Binary"
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $Binary
     $start.UseShellExecute = $false
@@ -89,11 +115,17 @@ function Start-HeldOldProcess([string] $Binary) {
     $start.RedirectStandardError = $true
     $start.Environment['HONK300_INTERNAL_HOLD_LIFECYCLE_LEASE'] = '1'
     $process = [Diagnostics.Process]::Start($start)
-    $ready = $process.StandardOutput.ReadLine()
+    $readyTask = $process.StandardOutput.ReadLineAsync()
+    if (-not $readyTask.Wait(30000)) {
+        try { $process.Kill($true) } catch {}
+        throw 'old process did not acquire its lifecycle lease within 30 seconds'
+    }
+    $ready = $readyTask.Result
     if ($ready -ne 'HONK300_INTERNAL_LIFECYCLE_LEASE_READY') {
         try { $process.Kill($true) } catch {}
         throw "old process did not acquire its lifecycle lease: $ready $($process.StandardError.ReadToEnd())"
     }
+    Write-TakeoverProgress "held old process ready at PID $($process.Id)"
     return $process
 }
 
@@ -107,6 +139,7 @@ function Stop-HeldOldProcess {
     if ($script:held.ExitCode -ne 0) { throw "held old process exited $($script:held.ExitCode)" }
     $script:held.Dispose()
     $script:held = $null
+    Write-TakeoverProgress 'held old process stopped cleanly'
 }
 
 function Assert-Active([string] $Root, [string] $Origin) {
@@ -155,12 +188,14 @@ function Assert-PublicPathOwner([string] $Root, [string] $Origin) {
 }
 
 function Finish-ConflictingOwnerCleanup([string] $Root, [string] $Origin, [string] $Label) {
+    Write-TakeoverProgress "$Label cleanup retry started"
     $binary = Join-Path $Root 'bin\honk300.exe'
     $stdout = Join-Path $evidence "$Label.stdout.json"
     $stderr = Join-Path $evidence "$Label.stderr.txt"
     $process = Start-Process -FilePath $binary -ArgumentList @('update', '--json') `
         -WindowStyle Hidden `
-        -RedirectStandardOutput $stdout -RedirectStandardError $stderr -Wait -PassThru
+        -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+    Wait-CheckedProcess $process "$Label cleanup retry" -KillTree
     if ($process.ExitCode -ne 0) {
         throw "$Label cleanup retry failed with $($process.ExitCode): $(Get-Content -LiteralPath $stdout -Raw)"
     }
@@ -189,6 +224,7 @@ function Finish-ConflictingOwnerCleanup([string] $Root, [string] $Origin, [strin
         registration = $registrations[0]
         update_result = $result
     })
+    Write-TakeoverProgress "$Label cleanup retry completed"
 }
 
 try {
@@ -232,11 +268,14 @@ try {
 finally {
     Stop-HeldOldProcess
     if (Test-Path -LiteralPath (Join-Path $globalRoot 'install-receipt.json')) {
+        Write-TakeoverProgress 'final Global MSI cleanup started'
         $cleanup = Start-Process -FilePath $msiexec `
             -ArgumentList @('/x', "`"$globalMsiPath`"", '/qn', '/norestart') `
-            -WindowStyle Hidden -Wait -PassThru
+            -WindowStyle Hidden -PassThru
+        Wait-CheckedProcess $cleanup 'final Global MSI cleanup' -KillTree
         if ($cleanup.ExitCode -notin @(0, 1605)) {
             Write-Error "final Global MSI cleanup failed with $($cleanup.ExitCode)"
         }
+        Write-TakeoverProgress 'final Global MSI cleanup completed'
     }
 }

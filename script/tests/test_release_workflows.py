@@ -229,6 +229,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "qualification-windows-installer-takeover-aarch64-pc-windows-msvc",
         ):
             self.assertIn(required, WINDOWS)
+        self.assertGreaterEqual(WINDOWS.count("timeout-minutes: 30"), 2)
         for required in (
             "same-sha-windows-installers:",
             "uses: ./.github/workflows/windows-installers.yml",
@@ -246,6 +247,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "post-release-windows-takeover-$triple",
         ):
             self.assertIn(required, POST_RELEASE)
+        self.assertIn("timeout-minutes: 30", POST_RELEASE)
 
 
 if __name__ == "__main__":

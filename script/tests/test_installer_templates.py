@@ -432,6 +432,10 @@ class InstallerTemplateTests(unittest.TestCase):
         )
         self.assertIn("@(Get-HonkRegistrations).Count", takeover_smoke)
         self.assertIn("@($activeState).Count", takeover_smoke)
+        self.assertIn("[int] $ChildTimeoutSeconds = 180", takeover_smoke)
+        self.assertIn("Wait-CheckedProcess", takeover_smoke)
+        self.assertIn("progress.log", takeover_smoke)
+        self.assertIn("ReadLineAsync()", takeover_smoke)
         self.assertNotIn("if ((Get-HonkRegistrations).Count", takeover_smoke)
         self.assertNotIn("$activeState.Count", takeover_smoke)
 

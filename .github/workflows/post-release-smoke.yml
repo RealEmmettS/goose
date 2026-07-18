@@ -87,6 +87,7 @@ jobs:
             -AllowUnobservableTrayRecoveryHost:('${{ matrix.triple }}' -eq 'x86_64-pc-windows-msvc') `
             -OverlayEvidenceDirectory 'target/post-release-windows-overlay-${{ matrix.triple }}'
       - name: Download exact public four-family installers and qualify takeover
+        timeout-minutes: 30
         env:
           HONK300_SMOKE_TAG: ${{ inputs.tag }}
         shell: pwsh

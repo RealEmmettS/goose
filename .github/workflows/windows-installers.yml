@@ -354,6 +354,7 @@ jobs:
 
       - name: Qualify real x64 four-family takeover ordering
         if: ${{ matrix.triple == 'x86_64-pc-windows-msvc' }}
+        timeout-minutes: 30
         shell: pwsh
         run: |
           ./script/smoke_windows_installer_takeover.ps1 `
@@ -569,6 +570,7 @@ jobs:
           -EvidenceDirectory target/windows-slot-update-evidence-arm64
 
       - name: Qualify real native ARM64 four-family takeover ordering
+        timeout-minutes: 30
         shell: pwsh
         run: |
           $stage = 'target/qualification-input-aarch64-pc-windows-msvc'
