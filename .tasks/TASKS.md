@@ -17,7 +17,8 @@
     > The white/blank display was the developer compositor fixture, not product rendering. Product startup has no calibration; the former local obscuration opt-in now refuses, and strict paired-color surfaces run only on disposable CI.
   - [x] Make Windows shortcuts, login startup, and background helpers windowless and non-activating while preserving intentional CLI terminals.
     > Console-subsystem public aliases stay scriptable; independently hashed GUI-subsystem `honk300-app.exe` starts the exact sibling with `CREATE_NO_WINDOW`, no shell/PowerShell intermediary, and is wired through all MSI/EXE/manual shortcut and Run owners.
-  - [ ] Prove disposable-CI offscreen walk-in, graceful stop/quit/tray walk-off, and immediate every-alias `--force` shutdown without global input.
+  - [x] Prove disposable-CI offscreen walk-in, graceful stop/quit/tray walk-off, and immediate every-alias `--force` shutdown without global input.
+    > Focused exact-SHA Windows run 29649183286 passed x64 and native ARM64 lifecycle/compositor proof plus every installer-origin takeover while each old process stayed mapped.
   - [x] Prove owned note and image windows stay readable, aspect-correct, uncropped, and bounded to the active monitor without taking over the screen.
     > Shared Windows/macOS sizing tests pass; live Windows proof measured a 614x346 note and a full-source 648x518 image on a 1920x1080 monitor, captured the image, and completed graceful cleanup.
   - [x] Add a cross-platform login-autostart config option that reconciles through each install family's existing owned startup mechanism.
@@ -31,7 +32,8 @@
   - [x] Implement Windows immutable release slots, stable junctions, and safe legacy migration/takeover.
   - [x] Preserve DMG, Debian, shell, and PowerShell update origins without cross-channel conversion.
   - [x] Update installers, unversioned release artifacts, workflows, and public guidance.
-  - [ ] Pass focused fault tests and the complete local/release qualification gate.
+  - [~] Pass focused fault tests and the complete local/release qualification gate.
+    > Focused/local tests and the complete x64/native-ARM64 four-installer matrix pass at a16b8b5; the exact all-platform candidate, same-SHA main, publication, and fresh-public-byte gates remain.
 
 ## Done
 - [x] **Publish v1.1.0 cross-platform tray parity** - published and independently verified the immutable Windows/Linux tray-parity release across the complete Windows, macOS, Linux, Debian, stable/latest, and production-site matrix (done 2026-07-17) #r110

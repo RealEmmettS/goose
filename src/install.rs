@@ -3692,6 +3692,7 @@ enum WindowsManagedUninstall {
 
 #[cfg(any(test, windows))]
 impl WindowsManagedUninstall {
+    #[cfg(windows)]
     fn requires_elevation(&self) -> bool {
         match self {
             Self::Msi { elevated, .. } | Self::Exe { elevated, .. } => *elevated,
@@ -6308,6 +6309,7 @@ mod tests {
         ));
     }
 
+    #[cfg(windows)]
     #[test]
     fn windows_owner_retirement_uses_one_hidden_elevated_active_slot_coordinator() {
         let owner = WindowsRegisteredOwner {
@@ -6343,6 +6345,7 @@ mod tests {
         assert_eq!(invocation.script.matches("Start-Process").count(), 1);
     }
 
+    #[cfg(windows)]
     #[test]
     fn windows_owner_inventory_collapses_only_identical_shared_view_records() {
         let owner = WindowsRegisteredOwner {
