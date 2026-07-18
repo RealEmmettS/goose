@@ -427,6 +427,12 @@ class InstallerTemplateTests(unittest.TestCase):
         ]:
             self.assertIn(token, WINDOWS_WORKFLOW)
 
+        takeover_smoke = (ROOT / "script" / "smoke_windows_installer_takeover.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("@(Get-HonkRegistrations).Count", takeover_smoke)
+        self.assertNotIn("if ((Get-HonkRegistrations).Count", takeover_smoke)
+
         self.assertIn("PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
         self.assertIn("Installed AND PREVIOUSHONK300ORIGIN", WIX_GLOBAL)
 

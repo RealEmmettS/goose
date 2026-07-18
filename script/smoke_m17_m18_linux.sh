@@ -351,6 +351,42 @@ capture_wayland_background_pairs() {
   exit 1
 }
 
+wait_for_wayland_background() {
+  color="$1"
+  expected="${color#\#}"
+  first_capture="${WORK}/wayland-background-ready-first.png"
+  second_capture="${WORK}/wayland-background-ready-second.png"
+  for _ in $(seq 1 80); do
+    if grim -o "${WAYLAND_FIRST_OUTPUT}" "${first_capture}" >/dev/null 2>&1 \
+      && grim -o "${WAYLAND_SECOND_OUTPUT}" "${second_capture}" >/dev/null 2>&1 \
+      && python3 - "${expected}" "${first_capture}" "${second_capture}" <<'PY'
+import sys
+from PIL import Image
+
+expected_hex, *paths = sys.argv[1:]
+expected = tuple(bytes.fromhex(expected_hex))
+for path in paths:
+    image = Image.open(path).convert("RGB")
+    step = max(1, min(image.size) // 64)
+    samples = [
+        image.getpixel((x, y))
+        for y in range(0, image.height, step)
+        for x in range(0, image.width, step)
+    ]
+    matching = sum(pixel == expected for pixel in samples)
+    if not samples or matching / len(samples) < 0.90:
+        raise SystemExit(1)
+PY
+    then
+      return 0
+    fi
+    sleep 0.10
+  done
+  cat "${WORK}/sway.log" >&2 || true
+  echo "smoke_m17_m18_linux: Wayland background did not settle to ${color} on both outputs" >&2
+  exit 1
+}
+
 set_wayland_background() {
   color="$1"
   case "${color}" in
@@ -367,7 +403,10 @@ set_wayland_background() {
   # forcing swaybg's ordinary image-buffer path.
   swaymsg output "${WAYLAND_FIRST_OUTPUT}" bg "${image}" tile >/dev/null
   swaymsg output "${WAYLAND_SECOND_OUTPUT}" bg "${image}" tile >/dev/null
-  sleep 0.20
+  # swaymsg acknowledges the output rule before the replacement swaybg surfaces necessarily
+  # commit. Capture only after both outputs actually contain the requested color; the 90% floor
+  # permits Honk300's small foreground pixels during the post-launch paired proof.
+  wait_for_wayland_background "${color}"
 }
 
 validate_wayland_capture_baseline() {

@@ -191,6 +191,9 @@ class LinuxOverlaySmokeContractTests(unittest.TestCase):
             "set_wayland_background",
             'swaymsg output "${WAYLAND_FIRST_OUTPUT}" bg "${image}" tile',
             'swaymsg output "${WAYLAND_SECOND_OUTPUT}" bg "${image}" tile',
+            "wait_for_wayland_background",
+            "matching / len(samples) < 0.90",
+            "Wayland background did not settle",
             "validate_wayland_capture_baseline",
             "wayland-baseline-first-dark.png",
             "wayland-baseline-second-light.png",
@@ -200,6 +203,10 @@ class LinuxOverlaySmokeContractTests(unittest.TestCase):
             self.assertIn(required, smoke)
         self.assertNotIn("output * bg", smoke)
         self.assertNotIn('bg "${color}" solid_color', smoke)
+        self.assertNotIn(
+            'swaymsg output "${WAYLAND_SECOND_OUTPUT}" bg "${image}" tile >/dev/null\n  sleep 0.20',
+            smoke,
+        )
         self.assertNotIn("WLR_LIBINPUT_NO_DEVICES=1 sway -d", smoke)
 
     def test_x11_background_is_a_disposable_lowered_client_not_an_app_surface(self) -> None:
