@@ -99,6 +99,13 @@ function Capture-TakeoverTimeout([string] $Label) {
     } catch {
         Add-Content -LiteralPath $progressPath -Value "timeout PATH capture failed: $($_.Exception.Message)" -Encoding utf8
     }
+    try {
+        @(Get-HonkRegistrations) |
+            ConvertTo-Json -Depth 4 |
+            Set-Content -LiteralPath (Join-Path $evidence "$safeLabel.registrations.json") -Encoding utf8
+    } catch {
+        Add-Content -LiteralPath $progressPath -Value "timeout registration capture failed: $($_.Exception.Message)" -Encoding utf8
+    }
 }
 
 function Wait-CheckedProcess(
@@ -118,30 +125,57 @@ function Wait-CheckedProcess(
 
 function Get-HonkRegistrations {
     $items = @()
-    foreach ($base in @(
-        'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
-        'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+    $knownInnoKeys = @(
+        '{5A94FBD0-DA02-4F63-9363-7D9CE0E280F5}_is1',
+        '{A072F01B-0AE8-4ED9-B67F-845ADF7831F9}_is1'
+    )
+    foreach ($hive in @(
+        [pscustomobject]@{ Name = 'HKLM'; Value = [Microsoft.Win32.RegistryHive]::LocalMachine },
+        [pscustomobject]@{ Name = 'HKCU'; Value = [Microsoft.Win32.RegistryHive]::CurrentUser }
     )) {
-        if (-not (Test-Path -LiteralPath $base)) { continue }
-        $items += @(Get-ChildItem -LiteralPath $base | ForEach-Object {
-            $value = Get-ItemProperty -LiteralPath $_.PSPath
-            $publisher = $value.PSObject.Properties['Publisher']
-            $displayName = $value.PSObject.Properties['DisplayName']
-            if ($null -ne $publisher -and $null -ne $displayName -and
-                $publisher.Value -eq 'Emmett S' -and
-                $displayName.Value -in @('honk300', 'honk300 (Corporate Edition)')) {
-                $location = $value.PSObject.Properties['InstallLocation']
-                $windowsInstaller = $value.PSObject.Properties['WindowsInstaller']
-                [pscustomobject]@{
-                    key = $_.PSChildName
-                    display_name = $displayName.Value
-                    install_location = if ($null -eq $location) { '' } else { [string]$location.Value }
-                    windows_installer = if ($null -eq $windowsInstaller) { 0 } else { [int]$windowsInstaller.Value }
+        foreach ($view in @(
+            [pscustomobject]@{ Name = '64'; Value = [Microsoft.Win32.RegistryView]::Registry64 },
+            [pscustomobject]@{ Name = '32'; Value = [Microsoft.Win32.RegistryView]::Registry32 }
+        )) {
+            $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive.Value, $view.Value)
+            try {
+                $uninstall = $base.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall')
+                if ($null -eq $uninstall) { continue }
+                try {
+                    foreach ($keyName in $uninstall.GetSubKeyNames()) {
+                        $key = $uninstall.OpenSubKey($keyName)
+                        if ($null -eq $key) { continue }
+                        try {
+                            $publisher = [string]$key.GetValue('Publisher', '')
+                            $displayName = [string]$key.GetValue('DisplayName', '')
+                            if (($publisher -eq 'Emmett S' -and
+                                $displayName -in @('honk300', 'honk300 (Corporate Edition)')) -or
+                                $keyName -in $knownInnoKeys) {
+                                $items += [pscustomobject]@{
+                                    hive = $hive.Name
+                                    view = $view.Name
+                                    key = $keyName
+                                    display_name = $displayName
+                                    publisher = $publisher
+                                    install_location = [string]$key.GetValue('InstallLocation', '')
+                                    uninstall_string = [string]$key.GetValue('UninstallString', '')
+                                    quiet_uninstall_string = [string]$key.GetValue('QuietUninstallString', '')
+                                    windows_installer = [int]$key.GetValue('WindowsInstaller', 0)
+                                }
+                            }
+                        } finally {
+                            $key.Dispose()
+                        }
+                    }
+                } finally {
+                    $uninstall.Dispose()
                 }
+            } finally {
+                $base.Dispose()
             }
-        })
+        }
     }
-    return @($items)
+    return @($items | Sort-Object hive, view, key -Unique)
 }
 
 function Invoke-Checked([string] $File, [string[]] $Arguments, [string] $Label) {
