@@ -46,10 +46,10 @@ Windows x64/ARM64 artifacts contain the GUI-subsystem branded launcher.
 
 ## Status
 
-Active for stable v1.3.0. Implementation and bounded physical x64 proof are complete; the package
-version and changelog now target the new minor release. The final verification and publication
-subtasks stay open until one exact commit passes candidate, unchanged-main, atomic publication,
-fresh-public-byte, and live-site gates.
+Done. v1.3.0 is public stable/latest from exact source
+`c350b06d1dbf6c2057eb2d5ebd625da2da9419b8`; candidate, unchanged-main, atomic publication,
+all eight fresh-public-byte lanes, exact/latest aliases, and production deployment verification
+are complete.
 
 ## Activity
 
@@ -113,3 +113,10 @@ fresh-public-byte, and live-site gates.
   Focused Windows tests, strict Clippy, x64 release and ARM64 target builds, and the complete
   physical lifecycle smoke pass with this nonblocking implementation.
   (agent: codex)
+- 2026-07-19 — exact candidate `29700210929` passed all 19 jobs at `c350b06d`, including signed
+  Mac production, strict x64 recovery, native ARM64 degradation/compositor/MSI/lifecycle, Linux,
+  Debian, and final assembly. Unchanged-main CI `29700548745` then passed all 11 required jobs.
+  Atomic publication `29700897715` passed all 19 jobs and published 47 immutable assets with 22
+  manifest payloads. Fresh-public-byte run `29701222408` passed all eight Windows/Mac/Linux/Debian
+  lanes. Exact/latest manifest and installer bytes match; the production deployment serves the
+  same v1.3.0 manifest and versionless commands. Task complete. (agent: codex)

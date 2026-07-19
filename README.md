@@ -8,17 +8,19 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.2.6](https://github.com/RealEmmettS/goose/releases/tag/v1.2.6),
-published from exact commit `c0ddb2c2c7cd4334040e324c72187eb6f3d4a644`. It makes the official
-versionless PowerShell/shell bootstrap the recommended managed install while native packages
-remain supported alternatives and updates preserve their proven origin.
+**Current stable release:** [v1.3.0](https://github.com/RealEmmettS/goose/releases/tag/v1.3.0),
+published from exact commit `c350b06d1dbf6c2057eb2d5ebd625da2da9419b8`. On Windows, every typed
+start now returns after handing the goose to the branded app launcher and hidden runtime, so the
+originating terminal can close while the goose and notification-area controls remain alive.
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
 successfully. Its public Mac/Linux/Debian lanes passed, while Windows exposed that the bootstrap
 still assumed `Get-FileHash` existed. v1.2.6 replaces that optional dependency with direct .NET
 SHA-256 and passed the complete candidate, same-SHA main, atomic publication, and eight-lane
-fresh-public-byte matrix on Windows, macOS, and Linux.
+fresh-public-byte matrix on Windows, macOS, and Linux. v1.3.0 adds terminal-independent Windows
+start, a branded pinnable launcher icon, singleton-preserving app handoff, and nonblocking tray
+recovery for immediate restarts; its complete release matrix passed on both Windows architectures.
 
 ## Install
 
@@ -296,7 +298,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.2.6
+dist plan --tag=v1.3.0
 cargo audit --version 0.22.2
 ```
 
@@ -335,7 +337,9 @@ failed-before-publication evidence. [`docs/readiness/v1.2.4-readiness.md`](docs/
 records the public release and failed Mac verifier assertion.
 [`docs/readiness/v1.2.6-readiness.md`](docs/readiness/v1.2.6-readiness.md) records the completed
 Windows compatibility fix-forward, public-byte matrix, latest-alias audit, and production-site
-qualification.
+qualification. [`docs/readiness/v1.3.0-readiness.md`](docs/readiness/v1.3.0-readiness.md) records
+the detached Windows app-launch handoff, tray-recovery fix-forwards, native x64/ARM64 gates,
+atomic publication, and fresh-public-byte closure.
 
 ## License and assets
 

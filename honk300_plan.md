@@ -882,7 +882,7 @@ being implemented three more times.
 | R10.6 / v1.2.4 (ADR 0035) | immutable fix-forward after v1.2.3 failed before publication on one hosted Windows tray-rectangle observation | exact owner plus independent fixed-GUID hosted-shell evidence, strict unwaived Windows CI, remaining native tray/lifecycle proof, and complete candidate/main/public-byte matrix |
 | R10.7 / v1.2.5 (ADRs 0034–0035) | immutable verifier-only fix-forward after the public Mac DMG takeover produced a valid native app autostart writer identity | semantic receipt validation for both exact managed writers plus the complete candidate/main/public-byte matrix |
 | R10.8 / v1.2.6 (ADRs 0031, 0034–0035) | immutable Windows bootstrap compatibility fix-forward after public v1.2.5 proved `Get-FileHash` can be absent from supported system PowerShell | direct .NET SHA-256 for the public bootstrap and CLI coordinator, exact regular-file/reparse/size/hash contracts, and the complete candidate/main/public-byte matrix |
-| R11 / v1.3.0 (ADR 0036) | route every typed Windows start through the branded transient app launcher and a hidden exact-sibling runtime so terminal lifetime no longer owns the goose | hidden-command/help and option-forwarding tests, app-only multi-resolution PE icon, missing/spawn/early-exit/timeout diagnostics, concurrent-start readiness, public-shell detachment lifecycle proof, and native x64/ARM64 package gates |
+| R11 / v1.3.0 (ADR 0036) | route every typed Windows start through the branded transient app launcher and a hidden exact-sibling runtime so terminal lifetime no longer owns the goose; retain nonblocking fixed-GUID tray recovery across immediate restart | hidden-command/help and option-forwarding tests, app-only multi-resolution PE icon, missing/spawn/early-exit/timeout diagnostics, singleton-preserving public-shell detachment, strict tray recovery/degradation evidence, and completed native x64/ARM64 candidate/main/public-byte gates |
 
 Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
 and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus
@@ -1034,5 +1034,6 @@ intentionally limited.
   `#r103`, completed tray tasks `#trayc`/`#wtray`/`#ltray`, completed v1.1.0 release task `#r110`,
   completed v1.2.2 closure tasks `#u31`/`#r120`, immutable failed-before-publication v1.2.3,
   immutable public v1.2.4/v1.2.5 evidence, completed v1.2.6 Windows compatibility fix-forward
-  task `#cli123`, and the readiness evidence.
+  task `#cli123`, completed v1.3.0 detached Windows start task `#wstart`, and the readiness
+  evidence.
 - **Canonical:** this file supersedes `claude_plan.md` and `codex_plan.md` (retained as reference).
