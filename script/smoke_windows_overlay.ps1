@@ -1418,7 +1418,23 @@ function Test-PublicStartDetachment {
         if (Get-Process -Id $runtimeInfo[0].ParentProcessId -ErrorAction SilentlyContinue) {
             throw "$($case.Label) retained runtime still depends on its transient app parent"
         }
-        $trayOwner = [Honk300TraySmoke]::FindWindow('honk300_status_tray_owner', 'Honk300 controls')
+        # IPC readiness intentionally precedes platform control-surface setup. Give the
+        # runtime a bounded opportunity to create its tray-owner window before proving
+        # that ownership, especially when starts are exercised back-to-back in CI.
+        $trayOwner = [IntPtr]::Zero
+        $trayOwnerDeadline = [DateTime]::UtcNow.AddSeconds(5)
+        while ($trayOwner -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $trayOwnerDeadline) {
+            if ($runtimeProcess.HasExited) {
+                throw "$($case.Label) hidden runtime exited before creating its notification-area owner"
+            }
+            $trayOwner = [Honk300TraySmoke]::FindWindow(
+                'honk300_status_tray_owner',
+                'Honk300 controls'
+            )
+            if ($trayOwner -eq [IntPtr]::Zero) {
+                Start-Sleep -Milliseconds 50
+            }
+        }
         $tray = if ($trayOwner -eq [IntPtr]::Zero) {
             if (-not $AllowUnavailableTrayHost) {
                 throw "$($case.Label) exact hidden runtime has no notification-area owner"

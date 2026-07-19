@@ -79,3 +79,11 @@ fresh-public-byte, and live-site gates.
   typed start and the branded app identity are user-facing functionality rather than a corrective
   `v1.2.x` patch. Opened the exact candidate/main/publication/public-byte closure sequence while
   preserving immutable v1.2.6. (agent: codex)
+- 2026-07-19 — exact candidate `29698609939` at immutable failed commit `451103d` failed closed
+  before publication. The ARM64 portable lane found that LLVM-RC resolves icon paths from the
+  resource directory, and the x64 lifecycle lane found that IPC can become ready just before its
+  runtime-owned tray window is observable on a back-to-back start. Fixed forward with an explicit
+  resource include directory and a strict bounded tray-owner wait; no waiver was broadened.
+  Focused packaging/smoke contracts, x64 release build, ARM64 target check, and the complete local
+  Windows compositor/lifecycle smoke now pass. A new exact candidate remains required.
+  (agent: codex)

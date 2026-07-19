@@ -210,9 +210,10 @@ class WindowsPackagingTests(unittest.TestCase):
                 ico_sizes(APP_ICON)
             )
         )
-        self.assertIn('1 ICON "Assets/UI/honk300-app.ico"', APP_RESOURCE)
+        self.assertIn('1 ICON "honk300-app.ico"', APP_RESOURCE)
         self.assertIn('"Assets/UI/honk300-app.rc"', BUILD_RS)
         self.assertIn('["honk300-app"]', BUILD_RS)
+        self.assertIn('ParamsIncludeDirs(["Assets/UI"])', BUILD_RS)
         self.assertIn("manifest_required", BUILD_RS)
         self.assertIn('embed-resource = "3.0.11"', CARGO_TOML)
         self.assertIn('"/build.rs"', CARGO_TOML)
@@ -221,6 +222,8 @@ class WindowsPackagingTests(unittest.TestCase):
         self.assertIn("function Test-PublicStartDetachment", WINDOWS_OVERLAY_SMOKE)
         self.assertIn("public-start-detachment.txt", WINDOWS_OVERLAY_SMOKE)
         self.assertIn("dead_app_parent_pid", WINDOWS_OVERLAY_SMOKE)
+        self.assertIn("$trayOwnerDeadline", WINDOWS_OVERLAY_SMOKE)
+        self.assertIn("AddSeconds(5)", WINDOWS_OVERLAY_SMOKE)
         self.assertIn(
             "@('__windows-app-runtime', '--config'", WINDOWS_OVERLAY_SMOKE
         )

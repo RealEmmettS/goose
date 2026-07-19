@@ -4,7 +4,7 @@ fn main() {
     embed_resource::compile_for(
         "Assets/UI/honk300-app.rc",
         ["honk300-app"],
-        embed_resource::NONE,
+        embed_resource::ParamsIncludeDirs(["Assets/UI"]),
     )
     .manifest_required()
     .unwrap();
