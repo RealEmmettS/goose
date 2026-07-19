@@ -103,3 +103,13 @@ fresh-public-byte, and live-site gates.
   readiness deadline; permanent shell failure still degrades explicitly. Windows backend tests,
   strict Clippy, focused packaging contracts, release build, and the complete physical lifecycle
   smoke—including the exact failed transition—now pass. (agent: codex)
+- 2026-07-19 — fourth candidate `29699787617` at immutable failed commit `fe0700c` passed every
+  producer, then showed that synchronous retry was still the wrong boundary: both x64 consumers
+  retained the old Explorer GUID beyond three seconds, and native ARM64 consumed enough of the
+  launcher deadline to return status 10. Moved recovery into nonblocking runtime maintenance:
+  retain the exact owner immediately, preserve IPC readiness, retry every 100 ms, report explicit
+  degradation after three seconds, and keep recovering afterward. ARM64's unavailable-host proof
+  still requires an independently failed stock fixed-GUID probe; strict x64 remains unwaived.
+  Focused Windows tests, strict Clippy, x64 release and ARM64 target builds, and the complete
+  physical lifecycle smoke pass with this nonblocking implementation.
+  (agent: codex)

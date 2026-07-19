@@ -3,8 +3,7 @@ use std::collections::VecDeque;
 use std::ffi::{c_void, OsStr};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
-use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tiny_skia::Pixmap;
 use windows::core::{w, Error, PCWSTR};
 use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
@@ -30,8 +29,9 @@ const NIN_KEYSELECT: u32 = NIN_SELECT + 1;
 const CONFIGURE_COMMAND_ID: usize = 1;
 const QUIT_COMMAND_ID: usize = 2;
 const TRAY_ICON_ID: u32 = 1;
-const INITIAL_ADD_ATTEMPTS: usize = 31;
-const INITIAL_ADD_RETRY_DELAY: Duration = Duration::from_millis(100);
+const ADD_RETRY_DELAY: Duration = Duration::from_millis(100);
+const ADD_FAILURE_NOTICE_AFTER: Duration = Duration::from_secs(3);
+const DEGRADED_ADD_RETRY_DELAY: Duration = Duration::from_secs(1);
 const TRAY_ICON_GUID: windows::core::GUID =
     windows::core::GUID::from_u128(0x1282_821f_82b6_42e2_945b_ef2f_e8d9_fbda);
 const STATUS_ICON_PNG: &[u8] = include_bytes!("../../../Assets/UI/honk300-status-goose@2x.png");
@@ -61,6 +61,10 @@ pub struct StatusTray {
     hwnd: HWND,
     icon: windows::Win32::UI::WindowsAndMessaging::HICON,
     added: bool,
+    next_add_attempt: Instant,
+    add_failure_started: Option<Instant>,
+    unavailable_reported: bool,
+    taskbar_restore_pending: bool,
 }
 
 impl StatusTray {
@@ -113,11 +117,18 @@ impl StatusTray {
                 hwnd,
                 icon,
                 added: false,
+                next_add_attempt: Instant::now(),
+                add_failure_started: None,
+                unavailable_reported: false,
+                taskbar_restore_pending: false,
             };
-            if let Err(error) = tray.add_to_shell_with_retry() {
-                let _ = DestroyIcon(icon);
-                let _ = DestroyWindow(hwnd);
-                return Err(error);
+            if let Err(error) = tray.add_to_shell() {
+                let now = Instant::now();
+                tray.add_failure_started = Some(now);
+                tray.next_add_attempt = now + ADD_RETRY_DELAY;
+                eprintln!(
+                    "honk300: Windows notification-area controls are not ready; retrying while CLI controls remain active ({error})"
+                );
             }
             Ok(tray)
         }
@@ -125,10 +136,44 @@ impl StatusTray {
 
     /// Re-adds the retained icon after Explorer/taskbar recreation.
     pub fn maintain(&mut self) -> windows::core::Result<()> {
-        if TASKBAR_READD_REQUESTED.swap(false, Ordering::AcqRel) {
+        let now = Instant::now();
+        let restoring_taskbar = TASKBAR_READD_REQUESTED.swap(false, Ordering::AcqRel);
+        if restoring_taskbar {
             self.added = false;
-            self.add_to_shell()?;
-            eprintln!("honk300: Windows taskbar recreated; restored Honk300 controls.");
+            self.next_add_attempt = now;
+            self.add_failure_started.get_or_insert(now);
+            self.taskbar_restore_pending = true;
+        }
+        if !self.added && now >= self.next_add_attempt {
+            match self.add_to_shell() {
+                Ok(()) => {
+                    if self.taskbar_restore_pending {
+                        eprintln!("honk300: Windows taskbar recreated; restored Honk300 controls.");
+                    } else if self.add_failure_started.is_some() {
+                        eprintln!("honk300: Windows notification-area controls are now available.");
+                    }
+                    self.add_failure_started = None;
+                    self.unavailable_reported = false;
+                    self.taskbar_restore_pending = false;
+                }
+                Err(error) => {
+                    let started = *self.add_failure_started.get_or_insert(now);
+                    if !self.unavailable_reported
+                        && now.saturating_duration_since(started) >= ADD_FAILURE_NOTICE_AFTER
+                    {
+                        eprintln!(
+                            "honk300: Windows notification-area controls are unavailable; CLI controls remain active ({error})"
+                        );
+                        self.unavailable_reported = true;
+                    }
+                    self.next_add_attempt = now
+                        + if self.unavailable_reported {
+                            DEGRADED_ADD_RETRY_DELAY
+                        } else {
+                            ADD_RETRY_DELAY
+                        };
+                }
+            }
         }
         Ok(())
     }
@@ -151,24 +196,6 @@ impl StatusTray {
             self.added = true;
             Ok(())
         }
-    }
-
-    fn add_to_shell_with_retry(&mut self) -> windows::core::Result<()> {
-        let mut last_error = None;
-        for attempt in 0..INITIAL_ADD_ATTEMPTS {
-            match self.add_to_shell() {
-                Ok(()) => return Ok(()),
-                Err(error) => last_error = Some(error),
-            }
-            if attempt + 1 < INITIAL_ADD_ATTEMPTS {
-                // Explorer removes a fixed-GUID notification item asynchronously. An immediate
-                // restart can therefore race the prior runtime's successful NIM_DELETE even
-                // though the old process and owner HWND are already gone. Keep this retry inside
-                // the app launcher's existing ten-second readiness deadline.
-                thread::sleep(INITIAL_ADD_RETRY_DELAY);
-            }
-        }
-        Err(last_error.expect("at least one notification-area add was attempted"))
     }
 
     fn notify_data(&self) -> NOTIFYICONDATAW {
@@ -446,8 +473,8 @@ fn failure(message: impl AsRef<str>) -> Error {
 mod tests {
     use super::{
         command_for_menu_selection, compose_tray_bgra, point_from_callback,
-        smoke_tray_quit_message_name, write_utf16, CONFIGURE_COMMAND_ID, INITIAL_ADD_ATTEMPTS,
-        INITIAL_ADD_RETRY_DELAY, QUIT_COMMAND_ID, STATUS_ICON_PNG,
+        smoke_tray_quit_message_name, write_utf16, ADD_FAILURE_NOTICE_AFTER, ADD_RETRY_DELAY,
+        CONFIGURE_COMMAND_ID, DEGRADED_ADD_RETRY_DELAY, QUIT_COMMAND_ID, STATUS_ICON_PNG,
     };
     use honk_control::ControlSurfaceCommand;
     use std::ffi::OsStr;
@@ -470,10 +497,11 @@ mod tests {
     }
 
     #[test]
-    fn initial_registration_retry_stays_inside_launcher_readiness_deadline() {
-        let retry_budget = INITIAL_ADD_RETRY_DELAY * (INITIAL_ADD_ATTEMPTS as u32 - 1);
-        assert_eq!(retry_budget, std::time::Duration::from_secs(3));
-        assert!(retry_budget < std::time::Duration::from_secs(10));
+    fn initial_registration_retry_is_nonblocking_and_reports_bounded_degradation() {
+        assert_eq!(ADD_RETRY_DELAY, std::time::Duration::from_millis(100));
+        assert_eq!(ADD_FAILURE_NOTICE_AFTER, std::time::Duration::from_secs(3));
+        assert_eq!(DEGRADED_ADD_RETRY_DELAY, std::time::Duration::from_secs(1));
+        assert!(ADD_FAILURE_NOTICE_AFTER < std::time::Duration::from_secs(10));
     }
 
     #[test]

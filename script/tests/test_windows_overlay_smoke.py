@@ -536,6 +536,11 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
             smoke,
         )
         self.assertIn("if ($independentRegistrationProbe)", smoke)
+        self.assertIn("if ($AllowUnavailableTrayHost)", smoke)
+        self.assertIn(
+            "Windows tray registration stayed unavailable without explicit runtime degradation",
+            smoke,
+        )
         self.assertIn("availability=registration-unobservable", smoke)
         self.assertIn(
             "independent_registration_probe=$($independentRegistrationProbe", smoke

@@ -322,6 +322,24 @@ runtime_message=$($runtimeMessage.Trim())
         if ($independentRegistrationProbe) {
             throw "Windows tray icon did not materialize even though an independent stock-icon fixed-GUID registration/recovery probe succeeded (HRESULT $before after $initialRegistrationPollAttempts polls; runtime: $runtimeMessage)"
         }
+        if ($AllowUnavailableTrayHost) {
+            if ($runtimeMessage -notmatch 'Windows notification-area controls are unavailable; CLI controls remain active') {
+                throw "Windows tray registration stayed unavailable without explicit runtime degradation (HRESULT $before after $initialRegistrationPollAttempts polls; runtime: $runtimeMessage)"
+            }
+            Set-Content -LiteralPath $EvidencePath -Encoding utf8NoBOM -Value @"
+availability=unavailable
+reason=independent stock-icon fixed-GUID registration/recovery probe failed in the explicitly waived runner
+owner=0x$($owner.ToInt64().ToString('X'))
+guid=$guid
+accessible_name=Honk300 controls
+independent_shell_probe=$($independentProbe.ToString().ToLowerInvariant())
+independent_registration_probe=$($independentRegistrationProbe.ToString().ToLowerInvariant())
+registration_hresult=$before
+initial_registration_poll_attempts=$initialRegistrationPollAttempts
+runtime_message=$runtimeMessage
+"@
+            return 'unavailable'
+        }
         if (-not $AllowUnobservableTrayRecoveryHost) {
             throw "tray registration is unobservable and this host has no explicit waiver (HRESULT $before after $initialRegistrationPollAttempts polls; independent fixed-GUID registration/recovery probe failed; runtime: $runtimeMessage)"
         }

@@ -36,9 +36,9 @@ All notable changes to this project are documented here. Format based on
   process owns the singleton, overlay, IPC, and notification-area item independently of the
   originating terminal. Missing launchers, spawn failure, early runtime exit, and timeout are
   nonzero; concurrent starts converge on the existing authoritative singleton without a shell or
-  fallback launch path. Initial tray registration also retries for a bounded three seconds inside
-  the same readiness deadline so an immediate restart cannot lose its controls while Explorer
-  finishes deleting the prior fixed-GUID item.
+  fallback launch path. Initial tray registration also retries without blocking IPC readiness so
+  an immediate restart recovers its controls after Explorer finishes deleting the prior fixed-GUID
+  item; a shell that stays unavailable reports explicit CLI-only degradation after three seconds.
 
 ### Added
 - **Branded Windows app launcher** - `honk300-app.exe` now carries a multi-resolution icon derived

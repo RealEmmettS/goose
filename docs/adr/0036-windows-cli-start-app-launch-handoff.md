@@ -54,10 +54,11 @@ running status is observed. Spawn failure, a child that exits unsuccessfully bef
 readiness timeout have distinct internal exit codes which the public controller translates into
 readable diagnostics.
 
-The runtime may spend up to three seconds of that same readiness window retrying its initial
-fixed-GUID notification-area registration. This covers Explorer's asynchronous deletion of the
-prior runtime's item during an immediate restart; a permanently unavailable tray host still
-fails the bounded registration and degrades explicitly to CLI/TUI controls.
+The runtime creates and retains its notification-area owner before readiness but never blocks IPC
+readiness on Explorer. If initial fixed-GUID registration races asynchronous deletion of the prior
+runtime's item, the ordinary message-pump loop retries every 100 ms. A shell that remains
+unavailable for three seconds is reported explicitly as CLI/TUI-only degradation while the owner
+and recovery attempts remain alive.
 
 Concurrent starts are intentionally harmless. More than one transient app may race, but the
 hidden runtimes contend for the existing authoritative singleton. A launcher whose child exits
