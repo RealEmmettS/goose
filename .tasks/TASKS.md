@@ -12,7 +12,7 @@
 - [~] **Publish v1.3.1 Windows updater permission fix** - qualify and publish the immutable cross-platform patch, then install official bytes on the Alienware and prove normal unelevated updating plus the v1.3.0 app handoff (owner codex) #r131
   - [x] Reproduce and repair the unnecessary protected-receipt write with live non-mutating proof.
   - [x] Bump the patch version and synchronize changelog, plan, readiness, and board evidence.
-  - [ ] Pass the complete local and committed-tree v1.3.1 qualification gate.
+  - [x] Pass the complete local and committed-tree v1.3.1 qualification gate.
   - [ ] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
   - [ ] Publish immutable v1.3.1 and pass all eight fresh-public-byte plus production-site checks.
   - [ ] Install official v1.3.1 on the Alienware and verify ownership, aliases, updater JSON, launcher, and detached runtime.
