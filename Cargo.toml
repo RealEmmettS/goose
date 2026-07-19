@@ -3,8 +3,8 @@
 # A deliberate divergence from the single-crate *300 sibling repos (TR300/ND300/WB300):
 # the workspace forces the platform-agnostic engine (`honk-engine`) to never `use` an OS
 # crate. The shipped product runtime remains one public binary installed under three names;
-# Windows packages additionally carry one internal GUI-subsystem launcher for windowless app and
-# login startup.
+# Windows packages additionally carry one branded GUI-subsystem launcher for typed start,
+# shortcuts, and login startup; its hidden console-free sibling process owns the runtime.
 #
 # M19 owns the release metadata and installer/update lifecycle. Round R3 (ADR 0017) adds the two
 # Apple targets so cargo-dist emits darwin tar.xz archives and the shell installer covers macOS;
@@ -44,7 +44,7 @@ tiny-skia = { version = "0.11", features = ["png-format"] }
 # Windows overlay; M10 adds CLI/IPC control, and M12 owns the full config TUI.
 [package]
 name = "honk300"
-version = "1.2.6"
+version = "1.3.0"
 description = "Cross-platform Desktop Goose — a procedural goose that roams your screen"
 edition.workspace = true
 rust-version.workspace = true
@@ -53,6 +53,7 @@ license.workspace = true
 repository.workspace = true
 default-run = "honk300"
 include = [
+    "/build.rs",
     "/Cargo.lock",
     "/Cargo.toml",
     "/LICENSE",
@@ -91,6 +92,9 @@ honk-control = { path = "crates/honk-control" }
 honk-engine = { path = "crates/honk-engine" }
 serde_json = "1"
 sha2 = "0.10"
+
+[build-dependencies]
+embed-resource = "3.0.11"
 
 [target.'cfg(windows)'.dependencies]
 honk-platform-windows = { path = "crates/honk-platform-windows" }

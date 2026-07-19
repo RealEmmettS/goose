@@ -10,6 +10,17 @@
 
 ## Active
 
+- [ ] **Publish v1.3.0 detached Windows app-start** - make every Windows start surface hand off to the branded GUI launcher and a console-free runtime, then close the complete immutable release gate (owner codex) #wstart
+  - [x] Route public Windows start commands through the exact sibling app launcher and add a hidden runtime-only command.
+  - [x] Bound launcher readiness, failure cleanup, and singleton races without adding a shell or fallback launch path.
+  - [x] Embed the shared goose artwork as the app launcher's Windows icon and preserve shortcut/autostart ownership.
+  - [ ] Add unit, packaging, x64/ARM64, and disposable lifecycle proof for terminal-independent runtime ownership.
+  - [x] Record ADR 0036 and synchronize current guidance plus both changelogs.
+  - [ ] Pass the exact v1.3.0 candidate across every platform producer and final assembly.
+  - [ ] Fast-forward the unchanged candidate SHA to main and pass ordinary same-SHA CI.
+  - [ ] Publish immutable v1.3.0 and pass all eight fresh-public-byte jobs plus live-site verification.
+  - [ ] Close readiness and board evidence, then remove the merged temporary release branch.
+
 ## Done
 - [x] **Publish v1.2.6 command-first managed installation compatibility fix-forward** - completed exact candidate/main/release/public-byte qualification for the official versionless CLI bootstrap while preserving exact updater provenance and authoritative fresh-installer takeover (done 2026-07-18) (owner codex) #cli123
   - [x] Record the command-first managed-channel contract in ADR 0034 and synchronize public/project guidance.

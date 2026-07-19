@@ -256,10 +256,13 @@ are done.
   outranks stale config; later explicit config edits update the same owned mechanism. Foreign or
   ambiguous startup ownership fails closed and must never create a duplicate persistence path.
 - Windows keeps the three public aliases as console-subsystem commands for intentional CLI use.
-  Start Menu/desktop shortcuts and login startup target the independently hashed GUI-subsystem
-  `honk300-app.exe`, which starts only its exact sibling with `CREATE_NO_WINDOW`, null handles,
-  and no shell intermediary. Background restarts/helpers must never create or focus a terminal.
-  Product startup performs no screen calibration; full-desktop compositor surfaces are
+  Every typed start spelling is a bounded controller that invokes the exact sibling independently
+  hashed GUI-subsystem `honk300-app.exe`, forwards all start options, waits for IPC readiness, and
+  returns. Start Menu/desktop shortcuts and login startup target the same branded app directly.
+  The app starts only `honk300.exe __windows-app-runtime` with `CREATE_NO_WINDOW`, a new process
+  group, null handles, and no shell intermediary; that hidden process owns the runtime and tray
+  independently of terminal lifetime. Background restarts/helpers must never create or focus a
+  terminal. Product startup performs no screen calibration; full-desktop compositor surfaces are
   disposable-CI-only.
 - Starting, stopping, and configuration remain **CLI/TUI over local IPC** on every platform.
   The macOS menu-bar item, Windows notification-area item, and compatible Linux StatusNotifier
@@ -340,6 +343,10 @@ are done.
 - The narrowly evidence-gated hosted x64 tray-registration observation boundary lives in
   `docs/adr/0035-hosted-windows-tray-registration-qualification-boundary.md`; ordinary Windows
   CI remains strict and unwaived.
+- Typed Windows start detachment, bounded app-launcher readiness, the hidden exact-sibling runtime,
+  and the branded launcher icon live in
+  `docs/adr/0036-windows-cli-start-app-launch-handoff.md`; it supersedes only ADR 0033's
+  foreground-lifetime behavior for typed `start`.
 
 ## Task management system
 

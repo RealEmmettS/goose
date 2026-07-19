@@ -355,7 +355,11 @@ fn spawn_start(config_path: &Path) -> std::io::Result<(Child, bool)> {
     let exe = std::env::current_exe()?;
     #[cfg(target_os = "macos")]
     let launcher_may_exit = macos_bundle_root_from_exe(&exe).is_some();
-    #[cfg(not(target_os = "macos"))]
+    // Windows `start` is now a bounded controller around the GUI-subsystem app launcher. The
+    // controller may exit successfully as soon as the hidden runtime answers IPC readiness.
+    #[cfg(windows)]
+    let launcher_may_exit = true;
+    #[cfg(not(any(windows, target_os = "macos")))]
     let launcher_may_exit = false;
     let mut command = build_start_command(exe, config_path);
     command.spawn().map(|child| (child, launcher_may_exit))

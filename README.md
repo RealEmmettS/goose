@@ -71,6 +71,12 @@ The fixed product icon returns after Explorer recreates the taskbar. If an unusu
 session cannot host notification icons, Honk300 reports the limitation and keeps CLI/TUI/IPC
 control available.
 
+On Windows, typing `honk300 start` (or the equivalent `honk`/`goose`, bare, or `plz` spelling)
+uses the branded app launcher and returns the prompt only after the hidden runtime answers its
+readiness check. The PowerShell or terminal window is then only a controller and may be closed;
+the runtime and notification-area icon continue independently. A developer build must include
+both `honk300.exe` and its exact sibling `honk300-app.exe`.
+
 ### macOS
 
 The recommended Apple Silicon/Intel install is the official versionless terminal bootstrap:
@@ -172,7 +178,7 @@ not published to crates.io.
 ## Use
 
 ```text
-honk300 start                 Start the goose
+honk300 start                 Start the goose (returns after readiness on Windows)
 honk300 status                Show runtime and platform capabilities
 honk300 config                Open the terminal settings editor
 honk300 reload                Apply reloadable saved settings
@@ -224,9 +230,10 @@ installer: the matching Windows machine/user Run value, the managed Mac LaunchAg
 current Linux user's XDG autostart entry. A fresh installer's selection is latest intent; later
 config saves update that same integration. Unknown ownership and foreign startup entries are
 refused instead of duplicated. On Windows, shortcuts and login startup target the internal
-GUI-subsystem `honk300-app.exe`, which starts the exact sibling runtime with no console window;
-the public `honk300`/`honk`/`goose` commands remain ordinary console programs only for a terminal
-the user intentionally opened.
+GUI-subsystem `honk300-app.exe`. Typed starts remain ordinary console commands for diagnostics,
+but they now hand their start options to that same exact sibling launcher, wait for runtime
+readiness, and return; its console-free child owns the overlay, IPC, and tray after the terminal
+closes. Other commands and the configuration TUI continue to use the user's intentional terminal.
 
 User notes and PNG memes can be added without modifying the program:
 
@@ -318,6 +325,8 @@ official managed commands the recommended fresh install while retaining native-p
 same-origin updates, authoritative fresh intent, and raw Cargo's unmanaged boundary.
 ADR 0035 permits one narrow hosted x64 observation fallback only when an independent fixed-GUID
 tray probe fails identically; ordinary Windows CI still proves actual registration and recovery.
+ADR 0036 routes typed Windows starts through the branded GUI launcher and a hidden console-free
+runtime, while retaining bounded readiness, exact-sibling ownership, and terminal TUI behavior.
 [`docs/readiness/v1.2.2-readiness.md`](docs/readiness/v1.2.2-readiness.md) records the completed
 semantic receipt-verifier fix-forward, candidate, same-SHA main, publication, and public-byte
 qualification. The v1.2.0/v1.2.1 reports preserve their immutable release evidence.

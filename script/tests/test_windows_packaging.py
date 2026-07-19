@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import struct
 import unittest
 from pathlib import Path
 
@@ -11,11 +12,20 @@ CORPORATE_WIX = (ROOT / "wix-corporate" / "corporate.wxs").read_text(encoding="u
 GLOBAL_INNO = (ROOT / "inno" / "global.iss").read_text(encoding="utf-8")
 CORPORATE_INNO = (ROOT / "inno" / "corporate.iss").read_text(encoding="utf-8")
 INSTALL_RS = (ROOT / "src" / "install.rs").read_text(encoding="utf-8")
+MAIN_RS = (ROOT / "src" / "main.rs").read_text(encoding="utf-8")
 WINDOWS_APP = (ROOT / "src" / "bin" / "honk300-app.rs").read_text(encoding="utf-8")
 CONFIG_TUI = (ROOT / "crates" / "honk-config-tui" / "src" / "lib.rs").read_text(
     encoding="utf-8"
 )
 CARGO_TOML = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
+BUILD_RS = (ROOT / "build.rs").read_text(encoding="utf-8")
+APP_ICON = ROOT / "Assets" / "UI" / "honk300-app.ico"
+APP_RESOURCE = (ROOT / "Assets" / "UI" / "honk300-app.rc").read_text(
+    encoding="utf-8"
+)
+WINDOWS_OVERLAY_SMOKE = (
+    ROOT / "script" / "smoke_windows_overlay.ps1"
+).read_text(encoding="utf-8")
 WINDOWS_WORKFLOW = (
     ROOT / ".github" / "workflows" / "windows-installers.yml"
 ).read_text(encoding="utf-8")
@@ -60,6 +70,18 @@ def normalize_license_markdown(markdown: str) -> str:
         if line:
             lines.append(re.sub(r"\s+", " ", line))
     return "\n".join(lines)
+
+
+def ico_sizes(path: Path) -> set[tuple[int, int]]:
+    data = path.read_bytes()
+    reserved, kind, count = struct.unpack_from("<HHH", data)
+    if (reserved, kind) != (0, 1):
+        raise AssertionError("Windows app icon is not an ICO resource")
+    sizes = set()
+    for index in range(count):
+        width, height = struct.unpack_from("<BB", data, 6 + index * 16)
+        sizes.add((width or 256, height or 256))
+    return sizes
 
 
 class WindowsPackagingTests(unittest.TestCase):
@@ -155,7 +177,10 @@ class WindowsPackagingTests(unittest.TestCase):
         for required in (
             '#![cfg_attr(windows, windows_subsystem = "windows")]',
             "Command::new(runtime)",
-            '.arg("start")',
+            '.arg("__windows-app-runtime")',
+            ".args(forwarded)",
+            "READINESS_TIMEOUT",
+            "stop_unready_child",
             ".creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP)",
             ".stdin(Stdio::null())",
             ".stdout(Stdio::null())",
@@ -164,6 +189,10 @@ class WindowsPackagingTests(unittest.TestCase):
             self.assertIn(required, WINDOWS_APP)
         self.assertNotIn("powershell", WINDOWS_APP.lower())
         self.assertNotIn("cmd.exe", WINDOWS_APP.lower())
+        self.assertNotIn("DETACHED_PROCESS", WINDOWS_APP)
+        self.assertIn("windows_app_launcher_path", MAIN_RS)
+        self.assertIn("append_windows_start_options", MAIN_RS)
+        self.assertIn("Command::WindowsAppRuntime", MAIN_RS)
         self.assertIn(
             'x86_64-pc-windows-msvc = ["honk300", "honk300-app"]', CARGO_TOML
         )
@@ -171,7 +200,30 @@ class WindowsPackagingTests(unittest.TestCase):
             'aarch64-pc-windows-msvc = ["honk300", "honk300-app"]', CARGO_TOML
         )
         self.assertIn("CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP", CONFIG_TUI)
+        self.assertIn("let launcher_may_exit = true;", CONFIG_TUI)
         self.assertNotIn("DETACHED_PROCESS", CONFIG_TUI)
+
+    def test_windows_app_launcher_has_a_branded_multi_resolution_resource(self) -> None:
+        self.assertTrue(APP_ICON.is_file())
+        self.assertTrue(
+            {(16, 16), (32, 32), (48, 48), (256, 256)}.issubset(
+                ico_sizes(APP_ICON)
+            )
+        )
+        self.assertIn('1 ICON "Assets/UI/honk300-app.ico"', APP_RESOURCE)
+        self.assertIn('"Assets/UI/honk300-app.rc"', BUILD_RS)
+        self.assertIn('["honk300-app"]', BUILD_RS)
+        self.assertIn("manifest_required", BUILD_RS)
+        self.assertIn('embed-resource = "3.0.11"', CARGO_TOML)
+        self.assertIn('"/build.rs"', CARGO_TOML)
+
+    def test_windows_smoke_separates_public_detachment_from_private_runtime_evidence(self) -> None:
+        self.assertIn("function Test-PublicStartDetachment", WINDOWS_OVERLAY_SMOKE)
+        self.assertIn("public-start-detachment.txt", WINDOWS_OVERLAY_SMOKE)
+        self.assertIn("dead_app_parent_pid", WINDOWS_OVERLAY_SMOKE)
+        self.assertIn(
+            "@('__windows-app-runtime', '--config'", WINDOWS_OVERLAY_SMOKE
+        )
 
     def test_embedded_runtime_assets_are_not_duplicated_in_installer_trees(self) -> None:
         self.assertNotIn('Source: "..\\Assets\\*"', GLOBAL_INNO)

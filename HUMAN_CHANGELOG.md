@@ -44,6 +44,14 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   and Linux checks refuse unsafe package collisions before touching the active copy.
 
 ### Improved
+- **Starting the Goose on Windows no longer ties it to that terminal window.** The command now
+  returns after the Goose is genuinely ready, and closing the PowerShell or terminal that started
+  it leaves both the Goose and its tray controls running. Shortcuts, start-at-login, and all three
+  friendly command names use the same quiet app launch path; the terminal settings screen still
+  opens as a normal terminal when requested.
+- **The Windows app launcher now has its own Goose icon.** Its shortcut is easier to recognize and
+  can be pinned by the user, while the running Goose stays unobtrusively in the notification area
+  instead of holding a taskbar window.
 - **A fresh Mac terminal install now means what the user just asked for.** Running the public
   command deliberately makes the terminal installer the current choice. An ordinary update still
   remembers whether the app originally came from the graphical disk image or the terminal, and

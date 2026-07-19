@@ -95,6 +95,13 @@ pub enum Command {
         #[arg(long)]
         reset: bool,
     },
+    /// Internal console-free runtime entry point used only by the exact Windows app launcher.
+    #[cfg(windows)]
+    #[command(name = "__windows-app-runtime", hide = true)]
+    WindowsAppRuntime {
+        #[command(flatten)]
+        options: StartOptions,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -226,6 +233,8 @@ fn invoked_name(arg0: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
+    use clap::CommandFactory;
 
     #[test]
     fn empty_command_defaults_to_start() {
@@ -485,6 +494,31 @@ mod tests {
 
         let cli = Cli::try_parse_normalized(["goose", "--silent", "plz"]).unwrap();
         assert!(cli.is_start());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn internal_windows_runtime_parses_start_options_but_stays_out_of_help() {
+        let cli = Cli::try_parse_normalized([
+            "honk300",
+            "__windows-app-runtime",
+            "--no-sound",
+            "--no-mouse-steal",
+            "--no-window-ride",
+            "--config",
+            "C:/tmp/goose.toml",
+        ])
+        .unwrap();
+        let Some(Command::WindowsAppRuntime { options }) = cli.command else {
+            panic!("hidden Windows runtime command should parse explicitly");
+        };
+        assert!(options.no_sound);
+        assert!(options.no_mouse_steal);
+        assert!(options.no_window_ride);
+        assert_eq!(options.config, Some(PathBuf::from("C:/tmp/goose.toml")));
+
+        let help = Cli::command().render_long_help().to_string();
+        assert!(!help.contains("__windows-app-runtime"));
     }
 
     #[test]

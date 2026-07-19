@@ -26,6 +26,24 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-19
+
+### Changed
+- **Terminal-independent Windows start (ADR 0036)** - every public `start`, bare, and `plz`
+  spelling through `honk300`, `honk`, or `goose` now forwards the complete start option vector to
+  the exact sibling GUI-subsystem `honk300-app.exe`. The transient console controller and app wait
+  for bounded IPC readiness and return, while the hidden `honk300.exe __windows-app-runtime`
+  process owns the singleton, overlay, IPC, and notification-area item independently of the
+  originating terminal. Missing launchers, spawn failure, early runtime exit, and timeout are
+  nonzero; concurrent starts converge on the existing authoritative singleton without a shell or
+  fallback launch path.
+
+### Added
+- **Branded Windows app launcher** - `honk300-app.exe` now carries a multi-resolution icon derived
+  from the canonical goose status artwork through a binary-specific Windows resource build. The
+  build script and resource inputs ship in packaged source, while public aliases remain console
+  subsystem 3 and the app launcher remains GUI subsystem 2 and user-pinnable.
+
 ## [1.2.6] - 2026-07-18
 
 ### Fixed

@@ -723,6 +723,7 @@ jobs:
           trap 'sudo dpkg --remove honk300 >/dev/null 2>&1 || true; rm -f "$alias"' EXIT
           ln -s "$HOME/.local/share/honk300/install/current/bin/honk300" "$alias"
           set +e
+          # shellcheck disable=SC2024 # the caller intentionally owns this evidence file
           sudo apt-get install --yes "$PWD/release-assets/honk300-amd64.deb" \
             > "$evidence/debian-preinst-collision.log" 2>&1
           status=$?

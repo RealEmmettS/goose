@@ -30,6 +30,15 @@ use honk_control::{
 use runtime::RuntimeOptions;
 use std::io::{self, Write};
 
+#[cfg(windows)]
+const WINDOWS_APP_LAUNCHER_NAME: &str = "honk300-app.exe";
+#[cfg(windows)]
+const WINDOWS_APP_LAUNCH_FAILURE: i32 = 10;
+#[cfg(windows)]
+const WINDOWS_APP_RUNTIME_EXITED: i32 = 11;
+#[cfg(windows)]
+const WINDOWS_APP_READINESS_TIMEOUT: i32 = 12;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(windows)]
     if install::run_windows_config_autostart_protocol()? {
@@ -86,6 +95,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::Update { json }) => update::run(json),
         Some(Command::Setup { config, reset }) => run_setup(config, reset),
         Some(Command::Start { options }) => run_start(options),
+        #[cfg(windows)]
+        Some(Command::WindowsAppRuntime { options }) => run_windows_runtime(options),
         None => run_start(StartOptions::default()),
         Some(Command::Stop { .. } | Command::Reload | Command::Status | Command::Do { .. }) => {
             unreachable!()
@@ -119,6 +130,10 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             | Command::Setup { .. },
         )
         | None => unreachable!("non-client commands are handled separately"),
+        #[cfg(windows)]
+        Some(Command::WindowsAppRuntime { .. }) => {
+            unreachable!("the private runtime command is handled before client dispatch")
+        }
     };
     let response = match send_command(command) {
         Ok(response) => response,
@@ -259,6 +274,106 @@ fn run_setup(
 
 #[cfg(windows)]
 fn run_start(options: StartOptions) -> Result<(), Box<dyn std::error::Error>> {
+    use std::os::windows::process::CommandExt;
+    use std::process::Stdio;
+
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    let current_exe = std::env::current_exe()?;
+    let launcher = require_windows_app_launcher(&current_exe)?;
+    let bin = launcher
+        .parent()
+        .ok_or("honk300: Windows app launcher has no parent directory")?;
+    let mut command = std::process::Command::new(&launcher);
+    append_windows_start_options(&mut command, &options);
+    let status = command
+        .current_dir(bin)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP)
+        .status()
+        .map_err(|error| {
+            format!(
+                "honk300: could not launch the Windows app at {}: {error}",
+                launcher.display()
+            )
+        })?;
+    if !status.success() {
+        let detail = match status.code() {
+            Some(WINDOWS_APP_LAUNCH_FAILURE) => {
+                "the app launcher could not resolve or spawn its exact sibling runtime"
+            }
+            Some(WINDOWS_APP_RUNTIME_EXITED) => "the hidden runtime exited before it became ready",
+            Some(WINDOWS_APP_READINESS_TIMEOUT) => {
+                "the hidden runtime did not become ready within 10 seconds and was stopped"
+            }
+            _ => "the app launcher returned an unexpected failure",
+        };
+        return Err(
+            format!("honk300: Windows start failed: {detail} (launcher status {status}).").into(),
+        );
+    }
+
+    match send_command(ControlCommand::Status)? {
+        ControlResponse::Status(status) if status.running => {
+            println!("honk300: goose started; controls are available in the notification area.");
+            Ok(())
+        }
+        _ => Err("honk300: Windows app launcher exited without a ready runtime.".into()),
+    }
+}
+
+#[cfg(windows)]
+fn windows_app_launcher_path(
+    public_executable: &std::path::Path,
+) -> io::Result<std::path::PathBuf> {
+    let bin = public_executable.parent().ok_or_else(|| {
+        io::Error::other("honk300: current Windows executable has no parent directory")
+    })?;
+    Ok(bin.join(WINDOWS_APP_LAUNCHER_NAME))
+}
+
+#[cfg(windows)]
+fn require_windows_app_launcher(
+    public_executable: &std::path::Path,
+) -> io::Result<std::path::PathBuf> {
+    let launcher = windows_app_launcher_path(public_executable)?;
+    if launcher.is_file() {
+        Ok(launcher)
+    } else {
+        Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "honk300: Windows app launcher is missing: {}. Repair the installation or build both binaries with `cargo build --release --bins`.",
+                launcher.display()
+            ),
+        ))
+    }
+}
+
+#[cfg(windows)]
+fn append_windows_start_options(command: &mut std::process::Command, options: &StartOptions) {
+    if options.no_sound {
+        command.arg("--no-sound");
+    }
+    if options.no_mouse_steal {
+        command.arg("--no-mouse-steal");
+    }
+    if options.no_window_ride {
+        command.arg("--no-window-ride");
+    }
+    if let Some(config) = options.config.as_deref() {
+        command.arg("--config").arg(config);
+    }
+    if options.wayland {
+        command.arg("--wayland");
+    }
+}
+
+#[cfg(windows)]
+fn run_windows_runtime(options: StartOptions) -> Result<(), Box<dyn std::error::Error>> {
     let (_singleton, status) = Singleton::acquire()?;
     if status == honk_control::SingletonStatus::AlreadyRunning {
         println!("honk300: a goose is already running. Use `honk300 stop` to stop it.");
@@ -445,5 +560,59 @@ mod tests {
         };
         assert_eq!(fs::read(backup).unwrap(), original);
         assert_eq!(Config::load_existing(&path).unwrap(), Config::default());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_start_forwards_every_runtime_option_to_the_app_launcher() {
+        let options = StartOptions {
+            no_sound: true,
+            no_mouse_steal: true,
+            no_window_ride: true,
+            config: Some(std::path::PathBuf::from("C:/tmp/goose.toml")),
+            wayland: true,
+        };
+        let mut command = std::process::Command::new("honk300-app.exe");
+        append_windows_start_options(&mut command, &options);
+        let arguments = command
+            .get_args()
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            arguments,
+            [
+                "--no-sound",
+                "--no-mouse-steal",
+                "--no-window-ride",
+                "--config",
+                "C:/tmp/goose.toml",
+                "--wayland",
+            ]
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_app_launcher_is_the_exact_sibling_of_every_public_alias() {
+        for alias in ["honk300.exe", "honk.exe", "goose.exe"] {
+            let executable = std::path::Path::new("C:/Honk300/bin").join(alias);
+            assert_eq!(
+                windows_app_launcher_path(&executable).unwrap(),
+                std::path::PathBuf::from("C:/Honk300/bin/honk300-app.exe")
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_start_requires_the_exact_sibling_app_launcher() {
+        let root = tempfile::tempdir().unwrap();
+        let public_executable = root.path().join("honk300.exe");
+        fs::write(&public_executable, b"test public alias").unwrap();
+
+        let error = require_windows_app_launcher(&public_executable).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::NotFound);
+        assert!(error.to_string().contains("honk300-app.exe"));
+        assert!(error.to_string().contains("cargo build --release --bins"));
     }
 }

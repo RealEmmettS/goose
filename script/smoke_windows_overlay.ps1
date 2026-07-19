@@ -701,6 +701,10 @@ $resolvedBinary = (Resolve-Path -LiteralPath $Binary).Path
 if (-not (Test-Path -LiteralPath $resolvedBinary -PathType Leaf)) {
     throw "exact built binary is missing: $resolvedBinary"
 }
+$resolvedAppLauncher = Join-Path (Split-Path -Parent $resolvedBinary) 'honk300-app.exe'
+if (-not (Test-Path -LiteralPath $resolvedAppLauncher -PathType Leaf)) {
+    throw "exact Windows app launcher is missing: $resolvedAppLauncher"
+}
 $evidence = [System.IO.Path]::GetFullPath($EvidenceDirectory)
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 
@@ -1297,7 +1301,7 @@ function Start-ExactRuntime {
             'Process'
         )
         $process = Start-Process -FilePath $resolvedBinary `
-            -ArgumentList @('start', '--config', "`"$config`"", '--no-sound', '--no-mouse-steal', '--no-window-ride') `
+            -ArgumentList @('__windows-app-runtime', '--config', "`"$config`"", '--no-sound', '--no-mouse-steal', '--no-window-ride') `
             -WindowStyle Hidden `
             -RedirectStandardOutput $stdout `
             -RedirectStandardError $stderr `
@@ -1338,6 +1342,111 @@ function Start-ExactRuntime {
     return $process
 }
 
+function Test-PublicStartDetachment {
+    $stage = Join-Path $work 'public-start'
+    New-Item -ItemType Directory -Force -Path $stage | Out-Null
+    foreach ($name in @('honk300.exe', 'honk.exe', 'goose.exe')) {
+        Copy-Item -LiteralPath $resolvedBinary -Destination (Join-Path $stage $name) -Force
+    }
+    Copy-Item -LiteralPath $resolvedAppLauncher `
+        -Destination (Join-Path $stage 'honk300-app.exe') -Force
+
+    $shellExecutable = (Get-Process -Id $PID).Path
+    $escapedConfig = $config.Replace("'", "''")
+    $cases = @(
+        [pscustomobject]@{
+            Label = 'honk300-start'
+            Client = (Join-Path $stage 'honk300.exe')
+            Arguments = "start --config '$escapedConfig' --no-sound --no-mouse-steal --no-window-ride"
+        },
+        [pscustomobject]@{
+            Label = 'honk-plz'
+            Client = (Join-Path $stage 'honk.exe')
+            Arguments = "plz --config '$escapedConfig' --no-sound --no-mouse-steal --no-window-ride"
+        },
+        [pscustomobject]@{
+            Label = 'goose-bare'
+            Client = (Join-Path $stage 'goose.exe')
+            Arguments = "--config '$escapedConfig' --no-sound --no-mouse-steal --no-window-ride"
+        }
+    )
+
+    $records = [System.Collections.Generic.List[string]]::new()
+    foreach ($case in $cases) {
+        $escapedClient = $case.Client.Replace("'", "''")
+        $shellScript = "& '$escapedClient' $($case.Arguments); exit `$LASTEXITCODE"
+        $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($shellScript))
+        $stdout = Join-Path $evidence "$($case.Label)-shell.stdout.log"
+        $stderr = Join-Path $evidence "$($case.Label)-shell.stderr.log"
+        $shell = Start-Process -FilePath $shellExecutable `
+            -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', $encoded) `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $stdout `
+            -RedirectStandardError $stderr `
+            -PassThru
+        if (-not $shell.WaitForExit(15000)) {
+            $shell.Kill($true)
+            throw "$($case.Label) origin shell did not return after bounded readiness"
+        }
+        if ($shell.ExitCode -ne 0) {
+            $detail = Get-Content -LiteralPath $stderr -Raw -ErrorAction SilentlyContinue
+            throw "$($case.Label) origin shell failed with $($shell.ExitCode): $detail"
+        }
+        $startOutput = Get-Content -LiteralPath $stdout -Raw
+        if ($startOutput -notmatch '(?m)^honk300: goose started; controls are available in the notification area\.\s*$') {
+            throw "$($case.Label) did not report bounded runtime readiness: $startOutput"
+        }
+
+        $expectedRuntime = Join-Path $stage 'honk300.exe'
+        $runtimeInfo = @(
+            Get-CimInstance Win32_Process | Where-Object {
+                $_.Name -eq 'honk300.exe' -and
+                $_.ExecutablePath -and
+                [System.IO.Path]::GetFullPath($_.ExecutablePath) -eq [System.IO.Path]::GetFullPath($expectedRuntime) -and
+                $_.CommandLine -match '(?i)(^|\s)__windows-app-runtime(\s|$)'
+            }
+        )
+        if ($runtimeInfo.Count -ne 1) {
+            throw "$($case.Label) expected one exact hidden runtime, got $($runtimeInfo.Count)"
+        }
+        $runtimeProcess = Get-Process -Id $runtimeInfo[0].ProcessId
+        $status = Invoke-ExactClient -Client $case.Client -Arguments @('status') `
+            -EvidenceName "$($case.Label)-status.txt"
+        if ($status -notmatch '(?m)^honk300: running\s*$') {
+            throw "$($case.Label) hidden runtime did not answer status after its shell exited"
+        }
+        if (Get-Process -Id $runtimeInfo[0].ParentProcessId -ErrorAction SilentlyContinue) {
+            throw "$($case.Label) retained runtime still depends on its transient app parent"
+        }
+        $trayOwner = [Honk300TraySmoke]::FindWindow('honk300_status_tray_owner', 'Honk300 controls')
+        $tray = if ($trayOwner -eq [IntPtr]::Zero) {
+            if (-not $AllowUnavailableTrayHost) {
+                throw "$($case.Label) exact hidden runtime has no notification-area owner"
+            }
+            'unavailable-host-waiver'
+        }
+        else {
+            $ownerPid = [Honk300TraySmoke]::WindowProcessId($trayOwner)
+            if ($ownerPid -ne [uint32]$runtimeProcess.Id) {
+                throw "$($case.Label) tray owner belongs to PID $ownerPid, expected $($runtimeProcess.Id)"
+            }
+            'runtime-owned'
+        }
+        $records.Add(
+            "$($case.Label)=ready shell_pid=$($shell.Id) runtime_pid=$($runtimeProcess.Id) dead_app_parent_pid=$($runtimeInfo[0].ParentProcessId) tray=$tray"
+        )
+
+        Invoke-ExactClient -Client $case.Client -Arguments @('stop', '--force') `
+            -EvidenceName "$($case.Label)-stop.txt" | Out-Null
+        if (-not $runtimeProcess.WaitForExit(5000)) {
+            $runtimeProcess.Kill($true)
+            throw "$($case.Label) hidden runtime did not stop after detachment proof"
+        }
+    }
+    Set-Content -LiteralPath (Join-Path $evidence 'public-start-detachment.txt') `
+        -Encoding utf8NoBOM -Value ($records -join "`n")
+}
+
 $background = $null
 $runtime = $null
 $runtimeSuspended = $false
@@ -1348,11 +1457,18 @@ $captureMode = 'paired-dwm'
 $presenterRectTolerancePixels = 3
 $rendererPresentPath = Join-Path $work 'renderer-present.bgra'
 $initialHash = (Get-FileHash -LiteralPath $resolvedBinary -Algorithm SHA256).Hash.ToLowerInvariant()
+$initialLauncherHash = (Get-FileHash -LiteralPath $resolvedAppLauncher -Algorithm SHA256).Hash.ToLowerInvariant()
 Set-Content -LiteralPath (Join-Path $evidence 'exact-binary.sha256.txt') `
     -Value "$initialHash  $resolvedBinary" -Encoding ascii
+Set-Content -LiteralPath (Join-Path $evidence 'exact-app-launcher.sha256.txt') `
+    -Value "$initialLauncherHash  $resolvedAppLauncher" -Encoding ascii
 
 try {
     Initialize-SmokeConfig
+
+    if (-not ($NoticeOnly -or $PropsOnly)) {
+        Test-PublicStartDetachment
+    }
 
     if ($NoticeOnly -or $PropsOnly) {
         $ownedNoteText = "I brought you a note.`r`nIt should be readable without taking over your screen."
@@ -1451,8 +1567,19 @@ result=visible-bounded-aspect-preserved-and-uncropped
             -RuntimeStderrPath (Join-Path $evidence 'first-runtime.stderr.log')
         $duplicate = Invoke-ExactBinary -Arguments @('start', '--config', $config, '--no-sound') `
             -EvidenceName 'single-instance.txt'
-        if ($duplicate -notmatch 'already running') {
-            throw "second start did not prove single-instance enforcement: $duplicate"
+        if ($duplicate -notmatch '(?m)^honk300: goose started; controls are available in the notification area\.\s*$') {
+            throw "second start did not report the existing ready singleton: $duplicate"
+        }
+        $duplicateRuntime = @(
+            Get-CimInstance Win32_Process | Where-Object {
+                $_.ProcessId -eq $runtime.Id -and
+                $_.ExecutablePath -and
+                [System.IO.Path]::GetFullPath($_.ExecutablePath) -eq [System.IO.Path]::GetFullPath($resolvedBinary) -and
+                $_.CommandLine -match '(?i)(^|\s)__windows-app-runtime(\s|$)'
+            }
+        )
+        if ($duplicateRuntime.Count -ne 1) {
+            throw "second start did not preserve the one authoritative hidden runtime"
         }
         Wait-ForVisibleGoose -Process $runtime | Out-Null
         $visualPassed = $true
@@ -1575,8 +1702,19 @@ light_sha256=$lightProofHash
 
     $duplicate = Invoke-ExactBinary -Arguments @('start', '--config', $config, '--no-sound') `
         -EvidenceName 'single-instance.txt'
-    if ($duplicate -notmatch 'already running') {
-        throw "second start did not prove single-instance enforcement: $duplicate"
+    if ($duplicate -notmatch '(?m)^honk300: goose started; controls are available in the notification area\.\s*$') {
+        throw "second start did not report the existing ready singleton: $duplicate"
+    }
+    $duplicateRuntime = @(
+        Get-CimInstance Win32_Process | Where-Object {
+            $_.ProcessId -eq $runtime.Id -and
+            $_.ExecutablePath -and
+            [System.IO.Path]::GetFullPath($_.ExecutablePath) -eq [System.IO.Path]::GetFullPath($resolvedBinary) -and
+            $_.CommandLine -match '(?i)(^|\s)__windows-app-runtime(\s|$)'
+        }
+    )
+    if ($duplicateRuntime.Count -ne 1) {
+        throw "second start did not preserve the one authoritative hidden runtime"
     }
 
     # Each wander picks a fresh target. Retry until the exact running binary exposes one complete
@@ -1882,12 +2020,18 @@ light_sha256=$lightProofHash
     if ($finalHash -ne $initialHash) {
         throw "exact built binary changed during smoke: $initialHash -> $finalHash"
     }
+    $finalLauncherHash = (Get-FileHash -LiteralPath $resolvedAppLauncher -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($finalLauncherHash -ne $initialLauncherHash) {
+        throw "exact app launcher changed during smoke: $initialLauncherHash -> $finalLauncherHash"
+    }
     Set-Content -LiteralPath (Join-Path $evidence 'summary.txt') -Encoding utf8NoBOM -Value @"
 exact_binary=$resolvedBinary
 sha256=$initialHash
+exact_app_launcher=$resolvedAppLauncher
+app_launcher_sha256=$initialLauncherHash
 first_pid=$firstPid
 visual_capture=$captureMode
-lifecycle=offscreen-walk-in,status,single-instance,reload,all-alias-all-synonym-graceful,graceful-native-tray-quit,all-alias-all-synonym-force
+lifecycle=public-shell-detachment,offscreen-walk-in,status,single-instance,reload,all-alias-all-synonym-graceful,graceful-native-tray-quit,all-alias-all-synonym-force
 tray_availability=$trayAvailability
 "@
     Write-Output "Windows layered-overlay $captureMode and lifecycle smoke passed for $resolvedBinary ($initialHash)"
