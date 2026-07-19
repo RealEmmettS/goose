@@ -48,7 +48,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   returns after the Goose is genuinely ready, and closing the PowerShell or terminal that started
   it leaves both the Goose and its tray controls running. Shortcuts, start-at-login, and all three
   friendly command names use the same quiet app launch path; the terminal settings screen still
-  opens as a normal terminal when requested.
+  opens as a normal terminal when requested. Rapid restarts also wait briefly for Windows to
+  finish retiring the old tray item instead of coming back without controls.
 - **The Windows app launcher now has its own Goose icon.** Its shortcut is easier to recognize and
   can be pinned by the user, while the running Goose stays unobtrusively in the notification area
   instead of holding a taskbar window.

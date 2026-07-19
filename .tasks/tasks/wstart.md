@@ -95,3 +95,11 @@ fresh-public-byte, and live-site gates.
   proves both duplicate starts preserve its PID and every app parent exits, then performs one
   graceful cleanup. The separate lifecycle matrix retains force-stop and restart coverage. The
   focused contracts and complete 79-second physical x64 smoke pass. (agent: codex)
+- 2026-07-19 — third candidate `29699310086` at immutable failed commit `f927cf2` passed the
+  signed Mac producer, every portable producer, and both Windows builds, then both x64 consumers
+  independently exposed a real immediate-restart defect. Explorer retained the old fixed tray
+  GUID after process exit, Honk300's single add failed, and a stock icon succeeded moments later.
+  Fixed the runtime with 31 bounded 100 ms registration attempts inside the existing ten-second
+  readiness deadline; permanent shell failure still degrades explicitly. Windows backend tests,
+  strict Clippy, focused packaging contracts, release build, and the complete physical lifecycle
+  smoke—including the exact failed transition—now pass. (agent: codex)

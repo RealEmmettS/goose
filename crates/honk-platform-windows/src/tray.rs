@@ -3,6 +3,8 @@ use std::collections::VecDeque;
 use std::ffi::{c_void, OsStr};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
+use std::thread;
+use std::time::Duration;
 use tiny_skia::Pixmap;
 use windows::core::{w, Error, PCWSTR};
 use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
@@ -28,6 +30,8 @@ const NIN_KEYSELECT: u32 = NIN_SELECT + 1;
 const CONFIGURE_COMMAND_ID: usize = 1;
 const QUIT_COMMAND_ID: usize = 2;
 const TRAY_ICON_ID: u32 = 1;
+const INITIAL_ADD_ATTEMPTS: usize = 31;
+const INITIAL_ADD_RETRY_DELAY: Duration = Duration::from_millis(100);
 const TRAY_ICON_GUID: windows::core::GUID =
     windows::core::GUID::from_u128(0x1282_821f_82b6_42e2_945b_ef2f_e8d9_fbda);
 const STATUS_ICON_PNG: &[u8] = include_bytes!("../../../Assets/UI/honk300-status-goose@2x.png");
@@ -110,7 +114,7 @@ impl StatusTray {
                 icon,
                 added: false,
             };
-            if let Err(error) = tray.add_to_shell() {
+            if let Err(error) = tray.add_to_shell_with_retry() {
                 let _ = DestroyIcon(icon);
                 let _ = DestroyWindow(hwnd);
                 return Err(error);
@@ -147,6 +151,24 @@ impl StatusTray {
             self.added = true;
             Ok(())
         }
+    }
+
+    fn add_to_shell_with_retry(&mut self) -> windows::core::Result<()> {
+        let mut last_error = None;
+        for attempt in 0..INITIAL_ADD_ATTEMPTS {
+            match self.add_to_shell() {
+                Ok(()) => return Ok(()),
+                Err(error) => last_error = Some(error),
+            }
+            if attempt + 1 < INITIAL_ADD_ATTEMPTS {
+                // Explorer removes a fixed-GUID notification item asynchronously. An immediate
+                // restart can therefore race the prior runtime's successful NIM_DELETE even
+                // though the old process and owner HWND are already gone. Keep this retry inside
+                // the app launcher's existing ten-second readiness deadline.
+                thread::sleep(INITIAL_ADD_RETRY_DELAY);
+            }
+        }
+        Err(last_error.expect("at least one notification-area add was attempted"))
     }
 
     fn notify_data(&self) -> NOTIFYICONDATAW {
@@ -424,8 +446,8 @@ fn failure(message: impl AsRef<str>) -> Error {
 mod tests {
     use super::{
         command_for_menu_selection, compose_tray_bgra, point_from_callback,
-        smoke_tray_quit_message_name, write_utf16, CONFIGURE_COMMAND_ID, QUIT_COMMAND_ID,
-        STATUS_ICON_PNG,
+        smoke_tray_quit_message_name, write_utf16, CONFIGURE_COMMAND_ID, INITIAL_ADD_ATTEMPTS,
+        INITIAL_ADD_RETRY_DELAY, QUIT_COMMAND_ID, STATUS_ICON_PNG,
     };
     use honk_control::ControlSurfaceCommand;
     use std::ffi::OsStr;
@@ -445,6 +467,13 @@ mod tests {
         assert!(output
             .chunks_exact(4)
             .any(|pixel| pixel[3] == 255 && pixel[0] == 255 && pixel[1] == 255));
+    }
+
+    #[test]
+    fn initial_registration_retry_stays_inside_launcher_readiness_deadline() {
+        let retry_budget = INITIAL_ADD_RETRY_DELAY * (INITIAL_ADD_ATTEMPTS as u32 - 1);
+        assert_eq!(retry_budget, std::time::Duration::from_secs(3));
+        assert!(retry_budget < std::time::Duration::from_secs(10));
     }
 
     #[test]

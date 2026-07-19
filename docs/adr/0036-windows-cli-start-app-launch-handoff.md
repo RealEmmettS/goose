@@ -54,6 +54,11 @@ running status is observed. Spawn failure, a child that exits unsuccessfully bef
 readiness timeout have distinct internal exit codes which the public controller translates into
 readable diagnostics.
 
+The runtime may spend up to three seconds of that same readiness window retrying its initial
+fixed-GUID notification-area registration. This covers Explorer's asynchronous deletion of the
+prior runtime's item during an immediate restart; a permanently unavailable tray host still
+fails the bounded registration and degrades explicitly to CLI/TUI controls.
+
 Concurrent starts are intentionally harmless. More than one transient app may race, but the
 hidden runtimes contend for the existing authoritative singleton. A launcher whose child exits
 successfully because another runtime won continues observing that winner until it becomes ready or
