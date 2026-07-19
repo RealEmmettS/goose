@@ -222,8 +222,11 @@ class WindowsPackagingTests(unittest.TestCase):
         self.assertIn("function Test-PublicStartDetachment", WINDOWS_OVERLAY_SMOKE)
         self.assertIn("public-start-detachment.txt", WINDOWS_OVERLAY_SMOKE)
         self.assertIn("dead_app_parent_pid", WINDOWS_OVERLAY_SMOKE)
+        self.assertIn("singleton=$singletonResult", WINDOWS_OVERLAY_SMOKE)
+        self.assertIn("left $($appInfo.Count) transient app launcher", WINDOWS_OVERLAY_SMOKE)
         self.assertIn("$trayOwnerDeadline", WINDOWS_OVERLAY_SMOKE)
         self.assertIn("AddSeconds(5)", WINDOWS_OVERLAY_SMOKE)
+        self.assertIn("retained public-start runtime did not complete", WINDOWS_OVERLAY_SMOKE)
         self.assertIn(
             "@('__windows-app-runtime', '--config'", WINDOWS_OVERLAY_SMOKE
         )

@@ -87,3 +87,11 @@ fresh-public-byte, and live-site gates.
   Focused packaging/smoke contracts, x64 release build, ARM64 target check, and the complete local
   Windows compositor/lifecycle smoke now pass. A new exact candidate remains required.
   (agent: codex)
+- 2026-07-19 — replacement candidate `29698948076` at immutable failed commit `ef6f76b` proved
+  the repaired ARM64 resource producer and all Windows/Apple portable lanes, then failed closed
+  before publication because the new harness force-restarted between aliases. That sequencing
+  contradicted the required singleton convergence and raced Explorer's asynchronous fixed-GUID
+  cleanup. The public phase now keeps one runtime/tray across all three short-lived alias shells,
+  proves both duplicate starts preserve its PID and every app parent exits, then performs one
+  graceful cleanup. The separate lifecycle matrix retains force-stop and restart coverage. The
+  focused contracts and complete 79-second physical x64 smoke pass. (agent: codex)

@@ -1372,91 +1372,127 @@ function Test-PublicStartDetachment {
     )
 
     $records = [System.Collections.Generic.List[string]]::new()
-    foreach ($case in $cases) {
-        $escapedClient = $case.Client.Replace("'", "''")
-        $shellScript = "& '$escapedClient' $($case.Arguments); exit `$LASTEXITCODE"
-        $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($shellScript))
-        $stdout = Join-Path $evidence "$($case.Label)-shell.stdout.log"
-        $stderr = Join-Path $evidence "$($case.Label)-shell.stderr.log"
-        $shell = Start-Process -FilePath $shellExecutable `
-            -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', $encoded) `
-            -WindowStyle Hidden `
-            -RedirectStandardOutput $stdout `
-            -RedirectStandardError $stderr `
-            -PassThru
-        if (-not $shell.WaitForExit(15000)) {
-            $shell.Kill($true)
-            throw "$($case.Label) origin shell did not return after bounded readiness"
-        }
-        if ($shell.ExitCode -ne 0) {
-            $detail = Get-Content -LiteralPath $stderr -Raw -ErrorAction SilentlyContinue
-            throw "$($case.Label) origin shell failed with $($shell.ExitCode): $detail"
-        }
-        $startOutput = Get-Content -LiteralPath $stdout -Raw
-        if ($startOutput -notmatch '(?m)^honk300: goose started; controls are available in the notification area\.\s*$') {
-            throw "$($case.Label) did not report bounded runtime readiness: $startOutput"
-        }
+    $retainedRuntime = $null
+    $retainedRuntimePid = $null
+    try {
+        foreach ($case in $cases) {
+            $escapedClient = $case.Client.Replace("'", "''")
+            $shellScript = "& '$escapedClient' $($case.Arguments); exit `$LASTEXITCODE"
+            $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($shellScript))
+            $stdout = Join-Path $evidence "$($case.Label)-shell.stdout.log"
+            $stderr = Join-Path $evidence "$($case.Label)-shell.stderr.log"
+            $shell = Start-Process -FilePath $shellExecutable `
+                -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', $encoded) `
+                -WindowStyle Hidden `
+                -RedirectStandardOutput $stdout `
+                -RedirectStandardError $stderr `
+                -PassThru
+            if (-not $shell.WaitForExit(15000)) {
+                $shell.Kill($true)
+                throw "$($case.Label) origin shell did not return after bounded readiness"
+            }
+            if ($shell.ExitCode -ne 0) {
+                $detail = Get-Content -LiteralPath $stderr -Raw -ErrorAction SilentlyContinue
+                throw "$($case.Label) origin shell failed with $($shell.ExitCode): $detail"
+            }
+            $startOutput = Get-Content -LiteralPath $stdout -Raw
+            if ($startOutput -notmatch '(?m)^honk300: goose started; controls are available in the notification area\.\s*$') {
+                throw "$($case.Label) did not report bounded runtime readiness: $startOutput"
+            }
 
-        $expectedRuntime = Join-Path $stage 'honk300.exe'
-        $runtimeInfo = @(
-            Get-CimInstance Win32_Process | Where-Object {
-                $_.Name -eq 'honk300.exe' -and
-                $_.ExecutablePath -and
-                [System.IO.Path]::GetFullPath($_.ExecutablePath) -eq [System.IO.Path]::GetFullPath($expectedRuntime) -and
-                $_.CommandLine -match '(?i)(^|\s)__windows-app-runtime(\s|$)'
-            }
-        )
-        if ($runtimeInfo.Count -ne 1) {
-            throw "$($case.Label) expected one exact hidden runtime, got $($runtimeInfo.Count)"
-        }
-        $runtimeProcess = Get-Process -Id $runtimeInfo[0].ProcessId
-        $status = Invoke-ExactClient -Client $case.Client -Arguments @('status') `
-            -EvidenceName "$($case.Label)-status.txt"
-        if ($status -notmatch '(?m)^honk300: running\s*$') {
-            throw "$($case.Label) hidden runtime did not answer status after its shell exited"
-        }
-        if (Get-Process -Id $runtimeInfo[0].ParentProcessId -ErrorAction SilentlyContinue) {
-            throw "$($case.Label) retained runtime still depends on its transient app parent"
-        }
-        # IPC readiness intentionally precedes platform control-surface setup. Give the
-        # runtime a bounded opportunity to create its tray-owner window before proving
-        # that ownership, especially when starts are exercised back-to-back in CI.
-        $trayOwner = [IntPtr]::Zero
-        $trayOwnerDeadline = [DateTime]::UtcNow.AddSeconds(5)
-        while ($trayOwner -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $trayOwnerDeadline) {
-            if ($runtimeProcess.HasExited) {
-                throw "$($case.Label) hidden runtime exited before creating its notification-area owner"
-            }
-            $trayOwner = [Honk300TraySmoke]::FindWindow(
-                'honk300_status_tray_owner',
-                'Honk300 controls'
+            $expectedRuntime = Join-Path $stage 'honk300.exe'
+            $runtimeInfo = @(
+                Get-CimInstance Win32_Process | Where-Object {
+                    $_.Name -eq 'honk300.exe' -and
+                    $_.ExecutablePath -and
+                    [System.IO.Path]::GetFullPath($_.ExecutablePath) -eq [System.IO.Path]::GetFullPath($expectedRuntime) -and
+                    $_.CommandLine -match '(?i)(^|\s)__windows-app-runtime(\s|$)'
+                }
             )
-            if ($trayOwner -eq [IntPtr]::Zero) {
-                Start-Sleep -Milliseconds 50
+            if ($runtimeInfo.Count -ne 1) {
+                throw "$($case.Label) expected one exact hidden runtime, got $($runtimeInfo.Count)"
             }
-        }
-        $tray = if ($trayOwner -eq [IntPtr]::Zero) {
-            if (-not $AllowUnavailableTrayHost) {
-                throw "$($case.Label) exact hidden runtime has no notification-area owner"
+            $runtimeProcess = Get-Process -Id $runtimeInfo[0].ProcessId
+            $singletonResult = if ($null -eq $retainedRuntimePid) {
+                $retainedRuntime = $runtimeProcess
+                $retainedRuntimePid = $runtimeProcess.Id
+                'created'
             }
-            'unavailable-host-waiver'
-        }
-        else {
-            $ownerPid = [Honk300TraySmoke]::WindowProcessId($trayOwner)
-            if ($ownerPid -ne [uint32]$runtimeProcess.Id) {
-                throw "$($case.Label) tray owner belongs to PID $ownerPid, expected $($runtimeProcess.Id)"
+            elseif ($runtimeProcess.Id -eq $retainedRuntimePid) {
+                'preserved'
             }
-            'runtime-owned'
+            else {
+                throw "$($case.Label) replaced singleton PID $retainedRuntimePid with $($runtimeProcess.Id)"
+            }
+            $status = Invoke-ExactClient -Client $case.Client -Arguments @('status') `
+                -EvidenceName "$($case.Label)-status.txt"
+            if ($status -notmatch '(?m)^honk300: running\s*$') {
+                throw "$($case.Label) hidden runtime did not answer status after its shell exited"
+            }
+            if (Get-Process -Id $runtimeInfo[0].ParentProcessId -ErrorAction SilentlyContinue) {
+                throw "$($case.Label) retained runtime still depends on its transient app parent"
+            }
+            $appInfo = @(
+                Get-CimInstance Win32_Process | Where-Object {
+                    $_.Name -eq 'honk300-app.exe' -and
+                    $_.ExecutablePath -and
+                    [System.IO.Path]::GetFullPath($_.ExecutablePath) -eq
+                        [System.IO.Path]::GetFullPath((Join-Path $stage 'honk300-app.exe'))
+                }
+            )
+            if ($appInfo.Count -ne 0) {
+                throw "$($case.Label) left $($appInfo.Count) transient app launcher process(es) alive"
+            }
+            # IPC readiness intentionally precedes platform control-surface setup. Give the
+            # runtime a bounded opportunity to create its tray-owner window before proving it.
+            $trayOwner = [IntPtr]::Zero
+            $trayOwnerDeadline = [DateTime]::UtcNow.AddSeconds(5)
+            while ($trayOwner -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $trayOwnerDeadline) {
+                if ($runtimeProcess.HasExited) {
+                    throw "$($case.Label) hidden runtime exited before creating its notification-area owner"
+                }
+                $trayOwner = [Honk300TraySmoke]::FindWindow(
+                    'honk300_status_tray_owner',
+                    'Honk300 controls'
+                )
+                if ($trayOwner -eq [IntPtr]::Zero) {
+                    Start-Sleep -Milliseconds 50
+                }
+            }
+            $tray = if ($trayOwner -eq [IntPtr]::Zero) {
+                if (-not $AllowUnavailableTrayHost) {
+                    throw "$($case.Label) exact hidden runtime has no notification-area owner"
+                }
+                'unavailable-host-waiver'
+            }
+            else {
+                $ownerPid = [Honk300TraySmoke]::WindowProcessId($trayOwner)
+                if ($ownerPid -ne [uint32]$runtimeProcess.Id) {
+                    throw "$($case.Label) tray owner belongs to PID $ownerPid, expected $($runtimeProcess.Id)"
+                }
+                'runtime-owned'
+            }
+            $records.Add(
+                "$($case.Label)=ready shell_pid=$($shell.Id) runtime_pid=$($runtimeProcess.Id) singleton=$singletonResult dead_app_parent_pid=$($runtimeInfo[0].ParentProcessId) tray=$tray"
+            )
         }
-        $records.Add(
-            "$($case.Label)=ready shell_pid=$($shell.Id) runtime_pid=$($runtimeProcess.Id) dead_app_parent_pid=$($runtimeInfo[0].ParentProcessId) tray=$tray"
-        )
 
-        Invoke-ExactClient -Client $case.Client -Arguments @('stop', '--force') `
-            -EvidenceName "$($case.Label)-stop.txt" | Out-Null
-        if (-not $runtimeProcess.WaitForExit(5000)) {
-            $runtimeProcess.Kill($true)
-            throw "$($case.Label) hidden runtime did not stop after detachment proof"
+        Invoke-ExactClient -Client $cases[0].Client -Arguments @('stop') `
+            -EvidenceName 'public-start-stop.txt' | Out-Null
+        if (-not $retainedRuntime.WaitForExit(15000)) {
+            throw 'retained public-start runtime did not complete its graceful walk-off'
+        }
+    }
+    finally {
+        if ($null -ne $retainedRuntime -and -not $retainedRuntime.HasExited) {
+            try {
+                Invoke-ExactClient -Client $cases[0].Client -Arguments @('stop', '--force') `
+                    -EvidenceName 'public-start-cleanup.txt' | Out-Null
+                $retainedRuntime.WaitForExit(5000) | Out-Null
+            }
+            catch {
+                if (-not $retainedRuntime.HasExited) { $retainedRuntime.Kill($true) }
+            }
         }
     }
     Set-Content -LiteralPath (Join-Path $evidence 'public-start-detachment.txt') `
