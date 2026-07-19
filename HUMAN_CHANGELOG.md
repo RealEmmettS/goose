@@ -44,6 +44,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   and Linux checks refuse unsafe package collisions before touching the active copy.
 
 ### Improved
+- **Checking for updates on Windows no longer asks for protected-folder access too early.** A
+  normal terminal now leaves an already-correct install record alone while it checks for a newer
+  Goose. Windows can still request approval when the verified installer actually needs to make
+  system changes.
 - **Starting the Goose on Windows no longer ties it to that terminal window.** The command now
   returns after the Goose is genuinely ready, and closing the PowerShell or terminal that started
   it leaves both the Goose and its tray controls running. Shortcuts, start-at-login, and all three

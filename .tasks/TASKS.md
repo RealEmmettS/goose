@@ -9,8 +9,22 @@
 ## To-Do
 
 ## Active
+- [~] **Publish v1.3.1 Windows updater permission fix** - qualify and publish the immutable cross-platform patch, then install official bytes on the Alienware and prove normal unelevated updating plus the v1.3.0 app handoff (owner codex) #r131
+  - [x] Reproduce and repair the unnecessary protected-receipt write with live non-mutating proof.
+  - [x] Bump the patch version and synchronize changelog, plan, readiness, and board evidence.
+  - [ ] Pass the complete local and committed-tree v1.3.1 qualification gate.
+  - [ ] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
+  - [ ] Publish immutable v1.3.1 and pass all eight fresh-public-byte plus production-site checks.
+  - [ ] Install official v1.3.1 on the Alienware and verify ownership, aliases, updater JSON, launcher, and detached runtime.
+  - [ ] Close readiness and board evidence, then remove the merged temporary release branch.
 
 ## Done
+- [x] **Repair unelevated Windows update discovery** - stopped the updater from rewriting an already-current protected receipt before download, retained v1.3.0 app-launcher identity checks, and proved the installed PowerShell/MSI-compatible path (done 2026-07-19) (owner codex) #uacl
+  - [x] Reproduce the installed v1.2.6 failure and identify the exact pre-download protected-root write.
+  - [x] Cross-check the v1.3.0 CLI-to-app handoff, launcher receipt identity, and current Windows registration.
+  - [x] Make cleanup-state persistence idempotent and add a protected-receipt regression.
+  - [x] Run focused updater, Windows packaging, strict Rust, and live non-mutating validation.
+  - [x] Synchronize changelogs and record the release/workaround boundary for already-published binaries.
 - [x] **Publish v1.3.0 detached Windows app-start** - made every Windows start surface hand off to the branded GUI launcher and console-free runtime, then closed the complete immutable release gate (done 2026-07-19) (owner codex) #wstart
   - [x] Route public Windows start commands through the exact sibling app launcher and add a hidden runtime-only command.
   - [x] Bound launcher readiness, failure cleanup, and singleton races without adding a shell or fallback launch path.

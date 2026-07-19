@@ -26,6 +26,15 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-07-19
+
+### Fixed
+- **Unelevated Windows update discovery** - owner-cleanup discovery no longer rewrites an
+  already-current protected install receipt before downloading an update. Ordinary administrator
+  terminals can reach the existing verified installer/UAC boundary, while real cleanup-state
+  changes, conflicting-owner journals, slot identity, and the independently hashed
+  `honk300-app.exe` remain fail closed.
+
 ## [1.3.0] - 2026-07-19
 
 ### Changed

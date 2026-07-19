@@ -2834,6 +2834,13 @@ fn set_windows_receipt_cleanup_state(
     mut receipt: serde_json::Value,
     state: &str,
 ) -> Result<(), DynError> {
+    if receipt
+        .pointer("/cleanup/state")
+        .and_then(serde_json::Value::as_str)
+        == Some(state)
+    {
+        return Ok(());
+    }
     receipt["cleanup"] = serde_json::json!({ "state": state });
     let path = root.join("install-receipt.json");
     let temp = root.join(format!(
@@ -6442,6 +6449,46 @@ mod tests {
             InstallSource::MsiGlobal,
             corporate,
         ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_cleanup_discovery_does_not_rewrite_an_already_current_receipt() {
+        let root = test_dir("cleanup-receipt-idempotent");
+        fs::create_dir_all(&root).unwrap();
+        let receipt_path = root.join("install-receipt.json");
+        let receipt = serde_json::json!({
+            "schema": INSTALL_RECEIPT_V2,
+            "cleanup": { "state": "inactive_releases_retained" }
+        });
+        let original = serde_json::to_vec_pretty(&receipt).unwrap();
+        fs::write(&receipt_path, &original).unwrap();
+
+        let original_permissions = fs::metadata(&receipt_path).unwrap().permissions();
+        let mut read_only_permissions = original_permissions.clone();
+        read_only_permissions.set_readonly(true);
+        fs::set_permissions(&receipt_path, read_only_permissions).unwrap();
+
+        let result =
+            set_windows_receipt_cleanup_state(&root, receipt, "inactive_releases_retained");
+
+        fs::set_permissions(&receipt_path, original_permissions).unwrap();
+        assert!(result.is_ok());
+        assert_eq!(fs::read(&receipt_path).unwrap(), original);
+        assert!(!root
+            .join(format!(
+                ".install-receipt.cleanup.{}.tmp",
+                std::process::id()
+            ))
+            .exists());
+
+        let receipt: serde_json::Value =
+            serde_json::from_slice(&fs::read(&receipt_path).unwrap()).unwrap();
+        set_windows_receipt_cleanup_state(&root, receipt, "cleanup_pending").unwrap();
+        let updated: serde_json::Value =
+            serde_json::from_slice(&fs::read(&receipt_path).unwrap()).unwrap();
+        assert_eq!(updated["cleanup"]["state"], "cleanup_pending");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
