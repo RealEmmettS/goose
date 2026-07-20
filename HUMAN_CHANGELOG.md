@@ -44,6 +44,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   and Linux checks refuse unsafe package collisions before touching the active copy.
 
 ### Improved
+- **The Windows start command now returns from app-owned command runners too.** Some integrated
+  terminals keep every descendant inside one Windows job even after the terminal command itself
+  finishes. The quiet Goose launcher now steps the long-running Goose out of that job when Windows
+  permits it, so the command runner becomes available again while the Goose and tray controls stay
+  alive. Managed workplace jobs that forbid this still use the original safe background launch.
 - **The official Windows install command now works from app-hosted terminals too.** Some terminal
   apps intentionally leave out the usual processor label. The installer now asks Windows itself
   which kind of computer it is before choosing the x64 or ARM64 download, so the same documented

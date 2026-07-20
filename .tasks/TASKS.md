@@ -9,16 +9,25 @@
 ## To-Do
 
 ## Active
-- [~] **Publish v1.3.2 app-terminal bootstrap repair** - make the official Windows command resolve native architecture even when Codex strips processor variables, then publish and install the exact public patch on the Alienware (owner codex) #r132
+- [~] **Publish v1.3.3 Windows terminal-job detachment repair** - let the hidden runtime leave a breakaway-permitted Codex/integrated-terminal job, then publish, reinstall, and prove the origin command returns while the transparent runtime remains alive (owner codex) #r133
+  - [x] Separate the black clipboard captures from the real DWM surface with raw-presenter and CAPTUREBLT evidence.
+  - [x] Reproduce Codex job retention and implement breakaway-first, access-denied-fallback launch.
+  - [x] Prove a local release build returns the exact Codex origin shell while the hidden runtime remains responsive.
+  - [x] Pass the complete local and committed-tree v1.3.3 qualification gate.
+  - [ ] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
+  - [ ] Publish immutable v1.3.3 and pass all eight fresh-public-byte plus production-site checks.
+  - [ ] Install official v1.3.3 and prove receipt/updater identity plus detached transparent runtime behavior.
+  - [ ] Close readiness/board evidence and clean the grouped v1.3.1-v1.3.3 release branches.
+
+## Done
+- [x] **Publish v1.3.2 app-terminal bootstrap repair** - published and installed the immutable architecture-detection patch, passed public/site/updater proof, and transferred the Codex job-containment gap exposed by the final runtime check to #r133 (done 2026-07-19) (owner codex) #r132
   - [x] Reproduce the v1.3.1 public bootstrap failure from the Codex app terminal without mutating the v1.2.6 install.
   - [x] Add machine/runtime architecture fallbacks and a scrubbed-environment execution regression.
   - [x] Pass the complete local and committed-tree v1.3.2 qualification gate.
-  - [ ] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
-  - [ ] Publish immutable v1.3.2 and pass all eight fresh-public-byte plus production-site checks.
-  - [ ] Install official v1.3.2 from the Codex terminal and verify ownership, aliases, updater JSON, launcher, and detached runtime.
-  - [ ] Close readiness and board evidence, then remove both merged temporary release branches.
-
-## Done
+  - [x] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
+  - [x] Publish immutable v1.3.2 and pass all eight fresh-public-byte plus production-site checks.
+  - [x] Install official v1.3.2 from the Codex terminal and verify ownership, aliases, updater JSON, and launcher identity.
+  - [x] Record the terminal-job retention gap and transfer its immutable fix-forward plus grouped branch cleanup to #r133.
 - [x] **Publish v1.3.1 Windows updater permission fix** - published the immutable cross-platform patch and passed candidate, main, atomic publication, eight fresh-public-byte, and production-site gates; transferred the Alienware install to v1.3.2 after the official command exposed a scrubbed-environment bootstrap defect before UAC (done 2026-07-19) (owner codex) #r131
   - [x] Reproduce and repair the unnecessary protected-receipt write with live non-mutating proof.
   - [x] Bump the patch version and synchronize changelog, plan, readiness, and board evidence.

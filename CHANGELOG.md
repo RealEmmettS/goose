@@ -26,6 +26,16 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-07-19
+
+### Fixed
+- **Windows app start from job-contained terminals (ADR 0037)** - the transient GUI launcher now
+  breaks its hidden runtime out of an integrated terminal's breakaway-permitted Windows job, so
+  command runners such as Codex return after readiness instead of tracking the goose for its full
+  lifetime. Jobs that explicitly deny breakaway retain the original safe windowless launch; exact
+  sibling identity, null handles, no-shell startup, singleton/readiness checks, and graceful or
+  forced control semantics are unchanged.
+
 ## [1.3.2] - 2026-07-19
 
 ### Fixed

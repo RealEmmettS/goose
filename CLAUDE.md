@@ -8,13 +8,14 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.3.0 is the public stable/latest release at exact source commit
-`c350b06d1dbf6c2057eb2d5ebd625da2da9419b8`; candidate `29700210929`, same-SHA main CI
-`29700548745`, atomic publication `29700897715`, and all-eight-lane fresh-public-byte run
-`29701222408` passed under ADR 0036. The immutable release has 47 assets and 22 manifest payloads;
-exact-tag/latest manifest and command-first bootstrap bytes match. The production deployment
-serves the same v1.3.0 manifest and versionless Windows/Mac/Linux commands. Task `#wstart` is
-complete.** M0-M19 are implemented
+**Current stage: v1.3.2 is the public stable/latest release at exact source commit
+`656b9295f095df486255f80854a63a77a5f31e6c`; candidate `29708871482`, same-SHA main CI
+`29709167422`, atomic publication `29709410451` attempt 3, and all-eight-lane fresh-public-byte
+run `29711678501` passed. The immutable release has 47 assets and 22 manifest payloads;
+exact-tag/latest manifest and command-first bootstrap bytes match, production serves v1.3.2, and
+the official Codex-terminal machine install plus no-op updater proof passed. Task `#r132` is
+complete. v1.3.3/ADR 0037 task `#r133` is active to let the hidden Windows runtime leave a
+breakaway-permitted integrated-terminal job.** M0-M19 are implemented
 in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -274,10 +275,12 @@ are done.
   hashed GUI-subsystem `honk300-app.exe`, forwards all start options, waits for IPC readiness, and
   returns. Start Menu/desktop shortcuts and login startup target the same branded app directly.
   The app starts only `honk300.exe __windows-app-runtime` with `CREATE_NO_WINDOW`, a new process
-  group, null handles, and no shell intermediary; that hidden process owns the runtime and tray
-  independently of terminal lifetime. Background restarts/helpers must never create or focus a
-  terminal. Product startup performs no screen calibration; full-desktop compositor surfaces are
-  disposable-CI-only.
+  group, null handles, and no shell intermediary. When its parent job permits breakaway, the app
+  also uses `CREATE_BREAKAWAY_FROM_JOB` so integrated command runners do not retain the runtime;
+  an access-denied job falls back to the same original windowless launch. That hidden process owns
+  the runtime and tray independently of terminal lifetime. Background restarts/helpers must never
+  create or focus a terminal. Product startup performs no screen calibration; full-desktop
+  compositor surfaces are disposable-CI-only.
 - Starting, stopping, and configuration remain **CLI/TUI over local IPC** on every platform.
   The macOS menu-bar item, Windows notification-area item, and compatible Linux StatusNotifier
   item expose the same shared icon, accessible naming, existing-TUI Configure action, and engine-
@@ -361,6 +364,9 @@ are done.
   and the branded launcher icon live in
   `docs/adr/0036-windows-cli-start-app-launch-handoff.md`; it supersedes only ADR 0033's
   foreground-lifetime behavior for typed `start`.
+- Integrated-terminal Windows job breakaway and its access-denied fallback live in
+  `docs/adr/0037-windows-terminal-job-breakaway.md`; it supersedes only ADR 0036's hidden-runtime
+  creation flags and job-containment assumption.
 
 ## Task management system
 

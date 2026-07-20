@@ -13,6 +13,14 @@ const LAUNCH_FAILURE: i32 = 10;
 const RUNTIME_EXITED: i32 = 11;
 #[cfg(windows)]
 const READINESS_TIMEOUT: i32 = 12;
+#[cfg(windows)]
+const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+#[cfg(windows)]
+const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+#[cfg(windows)]
+const BASE_RUNTIME_CREATION_FLAGS: u32 = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
 
 #[cfg(windows)]
 fn main() {
@@ -21,12 +29,6 @@ fn main() {
 
 #[cfg(windows)]
 fn run() -> Result<i32, i32> {
-    use std::os::windows::process::CommandExt;
-    use std::process::Stdio;
-
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
     if probe_runtime() == RuntimeProbe::Ready {
         return Ok(0);
     }
@@ -39,16 +41,7 @@ fn run() -> Result<i32, i32> {
     }
 
     let forwarded = std::env::args_os().skip(1).collect::<Vec<_>>();
-    let mut child = std::process::Command::new(runtime)
-        .arg("__windows-app-runtime")
-        .args(forwarded)
-        .current_dir(bin)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP)
-        .spawn()
-        .map_err(|_| LAUNCH_FAILURE)?;
+    let mut child = spawn_runtime(&runtime, bin, &forwarded).map_err(|_| LAUNCH_FAILURE)?;
 
     let started = std::time::Instant::now();
     let mut child_state = ChildState::Running;
@@ -81,6 +74,56 @@ fn run() -> Result<i32, i32> {
             }
         }
     }
+}
+
+#[cfg(windows)]
+fn spawn_runtime(
+    runtime: &std::path::Path,
+    bin: &std::path::Path,
+    forwarded: &[std::ffi::OsString],
+) -> std::io::Result<std::process::Child> {
+    // Integrated terminals commonly place the launching shell in a kill-on-close job. A new
+    // process group does not escape that job, so the terminal's command runner can continue
+    // waiting on the otherwise independent runtime. Prefer an explicit job breakaway while the
+    // app is still transient. Corporate jobs may deliberately deny breakaway; access-denied is
+    // therefore the one safe fallback to the original windowless launch rather than a startup
+    // failure or a shell intermediary.
+    match runtime_command(
+        runtime,
+        bin,
+        forwarded,
+        BASE_RUNTIME_CREATION_FLAGS | CREATE_BREAKAWAY_FROM_JOB,
+    )
+    .spawn()
+    {
+        Ok(child) => Ok(child),
+        Err(error) if error.raw_os_error() == Some(5) => {
+            runtime_command(runtime, bin, forwarded, BASE_RUNTIME_CREATION_FLAGS).spawn()
+        }
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(windows)]
+fn runtime_command(
+    runtime: &std::path::Path,
+    bin: &std::path::Path,
+    forwarded: &[std::ffi::OsString],
+    creation_flags: u32,
+) -> std::process::Command {
+    use std::os::windows::process::CommandExt;
+    use std::process::Stdio;
+
+    let mut command = std::process::Command::new(runtime);
+    command
+        .arg("__windows-app-runtime")
+        .args(forwarded)
+        .current_dir(bin)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .creation_flags(creation_flags);
+    command
 }
 
 #[cfg(windows)]
@@ -225,6 +268,16 @@ mod tests {
                 true
             ),
             ReadinessDecision::TimedOut
+        );
+    }
+
+    #[test]
+    fn hidden_runtime_prefers_terminal_job_breakaway_without_detached_process() {
+        assert_eq!(CREATE_BREAKAWAY_FROM_JOB, 0x0100_0000);
+        assert_eq!(BASE_RUNTIME_CREATION_FLAGS, 0x0800_0200);
+        assert_eq!(
+            BASE_RUNTIME_CREATION_FLAGS | CREATE_BREAKAWAY_FROM_JOB,
+            0x0900_0200
         );
     }
 }

@@ -1301,7 +1301,7 @@ dependencies = [
 
 [[package]]
 name = "honk300"
-version = "1.3.2"
+version = "1.3.3"
 dependencies = [
  "clap",
  "embed-resource",
