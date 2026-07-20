@@ -12,7 +12,7 @@
 - [~] **Publish v1.3.2 app-terminal bootstrap repair** - make the official Windows command resolve native architecture even when Codex strips processor variables, then publish and install the exact public patch on the Alienware (owner codex) #r132
   - [x] Reproduce the v1.3.1 public bootstrap failure from the Codex app terminal without mutating the v1.2.6 install.
   - [x] Add machine/runtime architecture fallbacks and a scrubbed-environment execution regression.
-  - [ ] Pass the complete local and committed-tree v1.3.2 qualification gate.
+  - [x] Pass the complete local and committed-tree v1.3.2 qualification gate.
   - [ ] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
   - [ ] Publish immutable v1.3.2 and pass all eight fresh-public-byte plus production-site checks.
   - [ ] Install official v1.3.2 from the Codex terminal and verify ownership, aliases, updater JSON, launcher, and detached runtime.
