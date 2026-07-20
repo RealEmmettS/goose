@@ -316,6 +316,36 @@ class InstallerTemplateTests(unittest.TestCase):
         )
         self.assertNotIn("corporate", POWERSHELL.lower())
 
+    def test_powershell_bootstrap_resolves_arch_without_process_environment(self) -> None:
+        shell = shutil.which("pwsh") or shutil.which("powershell")
+        if not shell:
+            self.skipTest("PowerShell is unavailable")
+
+        architecture_prefix = POWERSHELL.split("\n$artifact =", 1)[0]
+        rendered_prefix = re.sub(r"__[A-Z0-9_]+__", "1", architecture_prefix)
+        with tempfile.TemporaryDirectory() as directory:
+            probe = Path(directory) / "architecture-probe.ps1"
+            probe.write_text(
+                rendered_prefix + "\n[Console]::Out.Write($triple)\n",
+                encoding="utf-8",
+            )
+            environment = os.environ.copy()
+            environment.pop("PROCESSOR_ARCHITECTURE", None)
+            environment.pop("PROCESSOR_ARCHITEW6432", None)
+            result = subprocess.run(
+                [shell, "-NoProfile", "-File", str(probe)],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=environment,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            result.stdout,
+            {"x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"},
+        )
+
     def test_powershell_bootstrap_template_parses_when_powershell_is_available(self) -> None:
         shell = shutil.which("pwsh") or shutil.which("powershell")
         if not shell:

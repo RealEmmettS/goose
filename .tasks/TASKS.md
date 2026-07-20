@@ -9,16 +9,24 @@
 ## To-Do
 
 ## Active
-- [~] **Publish v1.3.1 Windows updater permission fix** - qualify and publish the immutable cross-platform patch, then install official bytes on the Alienware and prove normal unelevated updating plus the v1.3.0 app handoff (owner codex) #r131
+- [~] **Publish v1.3.2 app-terminal bootstrap repair** - make the official Windows command resolve native architecture even when Codex strips processor variables, then publish and install the exact public patch on the Alienware (owner codex) #r132
+  - [x] Reproduce the v1.3.1 public bootstrap failure from the Codex app terminal without mutating the v1.2.6 install.
+  - [x] Add machine/runtime architecture fallbacks and a scrubbed-environment execution regression.
+  - [ ] Pass the complete local and committed-tree v1.3.2 qualification gate.
+  - [ ] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
+  - [ ] Publish immutable v1.3.2 and pass all eight fresh-public-byte plus production-site checks.
+  - [ ] Install official v1.3.2 from the Codex terminal and verify ownership, aliases, updater JSON, launcher, and detached runtime.
+  - [ ] Close readiness and board evidence, then remove both merged temporary release branches.
+
+## Done
+- [x] **Publish v1.3.1 Windows updater permission fix** - published the immutable cross-platform patch and passed candidate, main, atomic publication, eight fresh-public-byte, and production-site gates; transferred the Alienware install to v1.3.2 after the official command exposed a scrubbed-environment bootstrap defect before UAC (done 2026-07-19) (owner codex) #r131
   - [x] Reproduce and repair the unnecessary protected-receipt write with live non-mutating proof.
   - [x] Bump the patch version and synchronize changelog, plan, readiness, and board evidence.
   - [x] Pass the complete local and committed-tree v1.3.1 qualification gate.
-  - [ ] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
-  - [ ] Publish immutable v1.3.1 and pass all eight fresh-public-byte plus production-site checks.
-  - [ ] Install official v1.3.1 on the Alienware and verify ownership, aliases, updater JSON, launcher, and detached runtime.
-  - [ ] Close readiness and board evidence, then remove the merged temporary release branch.
-
-## Done
+  - [x] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
+  - [x] Publish immutable v1.3.1 and pass all eight fresh-public-byte plus production-site checks.
+  - [x] Preserve the untouched v1.2.6 install when the v1.3.1 bootstrap failed before UAC, then move official installation proof to #r132.
+  - [x] Record the immutable release evidence and open the narrow fix-forward instead of changing v1.3.1 assets.
 - [x] **Repair unelevated Windows update discovery** - stopped the updater from rewriting an already-current protected receipt before download, retained v1.3.0 app-launcher identity checks, and proved the installed PowerShell/MSI-compatible path (done 2026-07-19) (owner codex) #uacl
   - [x] Reproduce the installed v1.2.6 failure and identify the exact pre-download protected-root write.
   - [x] Cross-check the v1.3.0 CLI-to-app handoff, launcher receipt identity, and current Windows registration.

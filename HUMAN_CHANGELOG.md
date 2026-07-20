@@ -44,6 +44,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   and Linux checks refuse unsafe package collisions before touching the active copy.
 
 ### Improved
+- **The official Windows install command now works from app-hosted terminals too.** Some terminal
+  apps intentionally leave out the usual processor label. The installer now asks Windows itself
+  which kind of computer it is before choosing the x64 or ARM64 download, so the same documented
+  command works without setting a hidden environment value by hand.
 - **Checking for updates on Windows no longer asks for protected-folder access too early.** A
   normal terminal now leaves an already-correct install record alone while it checks for a newer
   Goose. Windows can still request approval when the verified installer actually needs to make

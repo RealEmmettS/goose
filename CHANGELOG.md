@@ -26,6 +26,15 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-07-19
+
+### Fixed
+- **Windows bootstrap architecture detection in app-hosted terminals** - the versionless public
+  PowerShell installer now falls back to Windows' machine-scoped processor architecture and then
+  .NET's OS architecture when the launching app deliberately omits the inherited processor
+  variables. The Codex app terminal can therefore run the documented command without an operator
+  workaround, while x64/ARM64 selection and the exact-tag size/SHA-256 checks stay fail closed.
+
 ## [1.3.1] - 2026-07-19
 
 ### Fixed

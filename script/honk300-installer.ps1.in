@@ -8,10 +8,41 @@ $Version = '__VERSION__'
 $Tag = '__TAG__'
 $Commit = '__COMMIT__'
 $Repository = 'https://github.com/RealEmmettS/goose'
-$arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+function Get-NativeWindowsArchitecture {
+    if ($env:PROCESSOR_ARCHITEW6432) {
+        return $env:PROCESSOR_ARCHITEW6432
+    }
+    if ($env:PROCESSOR_ARCHITECTURE) {
+        return $env:PROCESSOR_ARCHITECTURE
+    }
+
+    # App-hosted terminals can deliberately scrub the inherited processor variables. The
+    # machine-scoped value is the same Windows-owned architecture signal without depending on
+    # the launching app's environment. RuntimeInformation is a final fallback for other stripped
+    # hosts and reports X64 or Arm64 on supported Windows versions.
+    try {
+        $machineArchitecture = [Environment]::GetEnvironmentVariable(
+            'PROCESSOR_ARCHITECTURE',
+            [EnvironmentVariableTarget]::Machine
+        )
+        if ($machineArchitecture) {
+            return $machineArchitecture
+        }
+    } catch {
+        # Continue to the runtime-owned fallback below.
+    }
+
+    try {
+        return [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+    } catch {
+        return $null
+    }
+}
+
+$arch = Get-NativeWindowsArchitecture
 
 switch -Regex ($arch) {
-    '^(AMD64|x86_64)$' {
+    '^(AMD64|x86_64|X64)$' {
         $triple = 'x86_64-pc-windows-msvc'
         $expectedHash = '__SHA_WINDOWS_X64_MSI__'
         $expectedSize = [int64]"__SIZE_WINDOWS_X64_MSI__"
