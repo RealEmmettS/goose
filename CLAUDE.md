@@ -385,6 +385,22 @@ Relevant skills: `tasks-start`, `tasks-management`, `tasks-update`, `tasks-memor
 `tasks-remove`. Companion skills such as `ttdr`, `personal-productivity`, `iterative-plan`, or
 `git-workflow` are optional if installed.
 
+### Skill routing and current guidance
+
+Use `/tasks-start` to initialize, repair, upgrade, relaunch, or resume the board.
+`/tasks-create` is the preferred way to add a well-formed milestone, task, or proper
+dashboard-visible subtask; `tasks-management` is the format and completion contract.
+Use `/tasks-update` to upgrade and reconcile the existing board, sync/triage current
+work, and refresh memory. `tasks-memory` governs that memory, `tasks-boards` governs
+live-server identity, and `/tasks-remove` decommissions the system. As work changes,
+keep `.tasks/TASKS.md` plus each Active task's `## Status` and `## Activity` current.
+
+If the installed tasks plugin is missing or may be older than the board, first try the
+harness-native plugin update. If that is unavailable, fails, or still leaves freshness
+uncertain, use the GitHub skill/connector to read the relevant current `main` file under
+`RealEmmettS/shaughv-tasks/skills/<skill-name>/SKILL.md` and use it as the latest
+operating guidance: https://github.com/RealEmmettS/shaughv-tasks/tree/main/skills
+
 ## Gotchas (cross-platform overlay / desktop-pet)
 
 - **softbuffer cannot do per-pixel alpha on a Windows layered window** — present via
