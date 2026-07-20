@@ -9,17 +9,17 @@
 ## To-Do
 
 ## Active
-- [~] **Publish v1.3.3 Windows terminal-job detachment repair** - let the hidden runtime leave a breakaway-permitted Codex/integrated-terminal job, then publish, reinstall, and prove the origin command returns while the transparent runtime remains alive (owner codex) #r133
+
+## Done
+- [x] **Publish v1.3.3 Windows terminal-job detachment repair** - published and installed the immutable app-job detachment patch, passed candidate/main/public/site/physical proof, and preserved the black clipboard rectangle as a non-layered-aware capture artifact rather than changing the transparent renderer (done 2026-07-19) (owner codex) #r133
   - [x] Separate the black clipboard captures from the real DWM surface with raw-presenter and CAPTUREBLT evidence.
   - [x] Reproduce Codex job retention and implement breakaway-first, access-denied-fallback launch.
   - [x] Prove a local release build returns the exact Codex origin shell while the hidden runtime remains responsive.
   - [x] Pass the complete local and committed-tree v1.3.3 qualification gate.
-  - [ ] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
-  - [ ] Publish immutable v1.3.3 and pass all eight fresh-public-byte plus production-site checks.
-  - [ ] Install official v1.3.3 and prove receipt/updater identity plus detached transparent runtime behavior.
-  - [ ] Close readiness/board evidence and clean the grouped v1.3.1-v1.3.3 release branches.
-
-## Done
+  - [x] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
+  - [x] Publish immutable v1.3.3 and pass all eight fresh-public-byte plus production-site checks.
+  - [x] Install official v1.3.3 and prove receipt/updater identity plus detached transparent runtime behavior.
+  - [x] Close readiness/board evidence and clean the grouped v1.3.1-v1.3.3 release branches.
 - [x] **Publish v1.3.2 app-terminal bootstrap repair** - published and installed the immutable architecture-detection patch, passed public/site/updater proof, and transferred the Codex job-containment gap exposed by the final runtime check to #r133 (done 2026-07-19) (owner codex) #r132
   - [x] Reproduce the v1.3.1 public bootstrap failure from the Codex app terminal without mutating the v1.2.6 install.
   - [x] Add machine/runtime architecture fallbacks and a scrubbed-environment execution regression.
