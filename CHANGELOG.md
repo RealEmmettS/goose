@@ -26,6 +26,8 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.3.4] - 2026-07-21
+
 ### Added
 - **One-click native tray updates (ADR 0038)** - Windows notification-area, macOS status-menu,
   and compatible Linux StatusNotifier controls now include an always-visible **Update

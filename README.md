@@ -8,10 +8,10 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.3.3](https://github.com/RealEmmettS/goose/releases/tag/v1.3.3),
-published from exact commit `43b018473a105dd30910b6804a73edc240486c8e`. The v1.3.4 release target
-adds a terminal-backed **Update Honk300…** action to every supported native control surface while
-preserving the same provenance-aware command updater and detached runtime lifecycle.
+**Current stable release:** [v1.3.4](https://github.com/RealEmmettS/goose/releases/tag/v1.3.4),
+published from exact commit `ee4d1f5fa135093591f802e828e86a0f03482bfc`. It adds a terminal-backed
+**Update Honk300…** action to every supported native control surface while preserving the same
+provenance-aware command updater and detached runtime lifecycle.
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
@@ -21,9 +21,10 @@ SHA-256 and passed the complete candidate, same-SHA main, atomic publication, an
 fresh-public-byte matrix on Windows, macOS, and Linux. v1.3.0 adds terminal-independent Windows
 start, a branded pinnable launcher icon, singleton-preserving app handoff, and nonblocking tray
 recovery for immediate restarts; v1.3.1 keeps current protected-receipt discovery read-only,
-v1.3.2 hardens bootstrap architecture detection in app-hosted terminals, and v1.3.3 detaches the
-hidden runtime from breakaway-permitted integrated-terminal jobs. Each immutable patch completed
-the required cross-platform release and installed-Windows gate.
+v1.3.2 hardens bootstrap architecture detection in app-hosted terminals, v1.3.3 detaches the
+hidden runtime from breakaway-permitted integrated-terminal jobs, and v1.3.4 gives tray users a
+one-click verified update and restart path. Each immutable patch completed the required
+cross-platform release and installed-Windows gate.
 
 ## Install
 
@@ -352,9 +353,10 @@ Windows compatibility fix-forward, public-byte matrix, latest-alias audit, and p
 qualification. [`docs/readiness/v1.3.0-readiness.md`](docs/readiness/v1.3.0-readiness.md) records
 the detached Windows app-launch handoff, tray-recovery fix-forwards, native x64/ARM64 gates,
 atomic publication, and fresh-public-byte closure. [`docs/readiness/v1.3.3-readiness.md`](docs/readiness/v1.3.3-readiness.md)
-records the integrated-terminal job-breakaway release and installed proof. The active
-[`docs/readiness/v1.3.4-readiness.md`](docs/readiness/v1.3.4-readiness.md) gate tracks the
-cross-platform tray updater through immutable publication and physical Windows acceptance.
+records the integrated-terminal job-breakaway release and installed proof.
+[`docs/readiness/v1.3.4-readiness.md`](docs/readiness/v1.3.4-readiness.md) records the completed
+cross-platform tray updater, immutable publication, public-byte matrix, production site, and
+physical Windows acceptance.
 
 ## License and assets
 

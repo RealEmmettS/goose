@@ -8,18 +8,14 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.3.3 is the public stable/latest release at exact source commit
-`43b018473a105dd30910b6804a73edc240486c8e`; candidate `29713238162`, same-SHA main CI
-`29713577406`, atomic publication `29713944564`, and all-eight-lane fresh-public-byte run
-`29714354769` passed. The immutable release has 47 assets and 22 manifest payloads;
-exact-tag/latest manifest and command-first bootstrap bytes match, production serves v1.3.3, and
-the official stripped-Codex-terminal machine install, no-op receipt immutability, detached runtime,
-and physical no-obscuration/lifecycle proof passed. Task `#r133` is complete.**
-
-**v1.3.4 is active on `codex/v1.3.4-tray-update` under task `#r134`: it adds the explicit
-terminal-backed Update action, serialized helper, receipt-owned relaunch/recovery, and retained
-completion screens on all three native control surfaces. No v1.3.4 tag exists until the full
-candidate and unchanged-main gates pass.**
+**Current stage: v1.3.4 is the public stable/latest release at exact source commit
+`ee4d1f5fa135093591f802e828e86a0f03482bfc`; candidate `29890799498`, same-SHA main CI
+`29891307523`, atomic publication `29891756284`, and all-eight-lane fresh-public-byte run
+`29892244915` passed. The immutable release has 47 assets and 22 manifest payloads;
+exact-tag/latest manifest and command-first bootstrap bytes match, production serves v1.3.4, and
+the official public machine install, physical tray Update action, retained no-op screen, protected-
+receipt immutability, detached runtime readiness, and compositor proof passed. Task `#r134` is
+complete.**
 
 M0-M19 are implemented in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.

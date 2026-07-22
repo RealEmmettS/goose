@@ -9,18 +9,18 @@
 ## To-Do
 
 ## Active
-- [ ] **Publish v1.3.4 cross-platform tray updater** - add a one-click terminal-backed Update action to every supported native tray, preserve updater provenance/lifecycle safety, and publish/install the fully qualified immutable patch (owner codex) #r134
+
+## Done
+- [x] **Publish v1.3.4 cross-platform tray updater** - added a one-click terminal-backed Update action to every supported native tray, preserved updater provenance/lifecycle safety, and published/installed the fully qualified immutable patch (done 2026-07-21) (owner codex) #r134
   - [x] Record the shared tray-helper and relaunch contract in ADR 0038.
   - [x] Implement the private update helper, one-at-a-time guard, typed outcome, recovery relaunch, and 100 cute no-op messages.
   - [x] Add the Update action to Windows, macOS, and Linux native control surfaces.
   - [x] Integrate the signed Mac command resource and cross-platform packaging checks.
   - [x] Pass focused tests, the complete local gate, and independent adversarial review.
-  - [ ] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
-  - [ ] Publish immutable v1.3.4 and pass all fresh-public-byte plus production-site checks.
-  - [ ] Install official v1.3.4 and physically verify the tray action, helper screen, ownership, relaunch, and rendering.
-  - [ ] Close readiness/board evidence and remove the merged release branch.
-
-## Done
+  - [x] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
+  - [x] Publish immutable v1.3.4 and pass all fresh-public-byte plus production-site checks.
+  - [x] Install official v1.3.4 and physically verify the tray action, helper screen, ownership, relaunch, and rendering.
+  - [x] Close readiness/board evidence and remove the merged release branch.
 - [x] **Publish v1.3.3 Windows terminal-job detachment repair** - published and installed the immutable app-job detachment patch, passed candidate/main/public/site/physical proof, and preserved the black clipboard rectangle as a non-layered-aware capture artifact rather than changing the transparent renderer (done 2026-07-19) (owner codex) #r133
   - [x] Separate the black clipboard captures from the real DWM surface with raw-presenter and CAPTUREBLT evidence.
   - [x] Reproduce Codex job retention and implement breakaway-first, access-denied-fallback launch.
