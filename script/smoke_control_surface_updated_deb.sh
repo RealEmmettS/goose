@@ -36,6 +36,8 @@ trap cleanup EXIT HUP INT TERM
 
 mkdir -p "$SOURCE" "$EVIDENCE_DIR" "$ROOT/home" "$ROOT/runtime"
 chmod 700 "$ROOT/runtime"
+printf 'source_commit=%s\n' "$(git -C "$PROJECT_ROOT" rev-parse HEAD)" \
+  >"$EVIDENCE_DIR/fixture-input.txt"
 git -C "$PROJECT_ROOT" archive --format=tar HEAD | tar -xf - -C "$SOURCE"
 
 python3 - "$SOURCE/Cargo.toml" "$SOURCE/Cargo.lock" "$FIXTURE_VERSION" <<'PY'
@@ -74,14 +76,19 @@ test "$("$FIXTURE_BINARY" --version | awk '{ print $NF }')" = "$FIXTURE_VERSION"
 COMMIT="$(git -C "$PROJECT_ROOT" rev-parse HEAD)"
 SOURCE_DATE_EPOCH="$(git -C "$PROJECT_ROOT" show -s --format=%ct HEAD)"
 PACKAGE="$ROOT/honk300-fixture-amd64.deb"
-python3 "$PROJECT_ROOT/script/package_deb.py" \
-  --binary "$FIXTURE_BINARY" \
-  --output "$PACKAGE" \
-  --version "$FIXTURE_VERSION" \
-  --tag "$FIXTURE_TAG" \
-  --commit "$COMMIT" \
-  --architecture amd64 \
-  --source-date-epoch "$SOURCE_DATE_EPOCH"
+(
+  # dpkg-deb requires DEBIAN to be traversable. Keep the outer fixture private while letting the
+  # deterministic package builder create ordinary 0755 package directories.
+  umask 022
+  python3 "$PROJECT_ROOT/script/package_deb.py" \
+    --binary "$FIXTURE_BINARY" \
+    --output "$PACKAGE" \
+    --version "$FIXTURE_VERSION" \
+    --tag "$FIXTURE_TAG" \
+    --commit "$COMMIT" \
+    --architecture amd64 \
+    --source-date-epoch "$SOURCE_DATE_EPOCH"
+)
 sudo apt-get install --yes "$PACKAGE"
 
 export HOME="$ROOT/home"
