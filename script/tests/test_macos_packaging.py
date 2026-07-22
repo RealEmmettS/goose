@@ -358,6 +358,7 @@ class MacosPackagingTests(unittest.TestCase):
         self.assertIn('HOME="$home" "$update_command"', WORKFLOW)
         self.assertIn("There was nothing to update.", WORKFLOW)
         self.assertIn("Honk300 is already up to date and running.", WORKFLOW)
+        self.assertIn("HONK! ALL DONE", WORKFLOW)
         self.assertIn("You may now close this window.", WORKFLOW)
         self.assertIn('kill -0 "$helper_pid"', WORKFLOW)
         self.assertIn('HOME="$home" "$binary" status', WORKFLOW)

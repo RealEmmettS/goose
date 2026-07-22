@@ -139,6 +139,7 @@ until grep -F 'Update complete.' "$EVIDENCE_DIR/helper.stdout.txt" >/dev/null 2>
 done
 
 grep -F 'Honk300 has restarted.' "$EVIDENCE_DIR/helper.stdout.txt" >/dev/null
+grep -F 'HONK! ALL DONE' "$EVIDENCE_DIR/helper.stdout.txt" >/dev/null
 grep -F 'You may now close this window.' "$EVIDENCE_DIR/helper.stdout.txt" >/dev/null
 kill -0 "$HELPER_PID"
 UPDATED_VERSION="$("$INSTALLED" --version | awk '{ print $NF }')"

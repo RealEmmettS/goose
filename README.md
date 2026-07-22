@@ -13,6 +13,9 @@ published from exact commit `ee4d1f5fa135093591f802e828e86a0f03482bfc`. It adds 
 **Update Honk300…** action to every supported native control surface while preserving the same
 provenance-aware command updater and detached runtime lifecycle.
 
+The v1.3.5 patch target gives that retained updater window a high-contrast ASCII completion panel,
+so the close instruction remains unmistakable without relying on terminal color support.
+
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
 successfully. Its public Mac/Linux/Debian lanes passed, while Windows exposed that the bootstrap
@@ -308,7 +311,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.3.4
+dist plan --tag=v1.3.5
 cargo audit --version 0.22.2
 ```
 

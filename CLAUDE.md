@@ -17,6 +17,10 @@ the official public machine install, physical tray Update action, retained no-op
 receipt immutability, detached runtime readiness, and compositor proof passed. Task `#r134` is
 complete.**
 
+**v1.3.5 is active on `codex/v1.3.5-update-result-panel` under task `#r135`: it keeps ADR 0038's
+helper/lifecycle contract unchanged and makes the retained close instruction visually distinct
+with a fixed-width, color-independent success/attention panel.**
+
 M0-M19 are implemented in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as

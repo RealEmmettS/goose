@@ -26,6 +26,14 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Changed
+- **A close cue that cannot blend into updater prose** - every retained tray-update result now
+  separates the terminal status from a fixed-width ASCII panel. Successful and no-op results end
+  with **HONK! ALL DONE** above the explicit close instruction; failures use **HONK! NEEDS
+  ATTENTION** while preserving their diagnostics. The panel is structural rather than color-only,
+  so it remains conspicuous in Windows Terminal, Apple Terminal, Linux terminals, redirected
+  smoke output, and limited-color profiles.
+
 ## [1.3.4] - 2026-07-21
 
 ### Added

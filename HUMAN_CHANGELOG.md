@@ -33,6 +33,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Changed
+- **The updater's final instruction now looks like a final instruction.** A blank line and a
+  prominent text box separate the result from **You may now close this window.** Successful and
+  no-change checks say **HONK! ALL DONE**; a problem says **HONK! NEEDS ATTENTION** and keeps the
+  useful error details above it. The box stays readable even when terminal colors are unavailable.
+
 ### Added
 - **The Goose can now update itself from its tray menu.** Windows, Mac, and compatible Linux
   desktops show an **Update Honk300…** choice beside settings and quit. Clicking it opens a

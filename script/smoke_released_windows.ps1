@@ -365,6 +365,7 @@ try {
         )
         if ($HelperText -notmatch 'There was nothing to update\.' -or
             $HelperText -notmatch 'Honk300 is already up to date and running\.' -or
+            $HelperText -notmatch 'HONK! ALL DONE' -or
             $HelperText -notmatch 'You may now close this window\.') {
             $HelperError = if (Test-Path -LiteralPath $HelperStderr) {
                 Get-Content -LiteralPath $HelperStderr -Raw

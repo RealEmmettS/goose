@@ -49,13 +49,22 @@ Successful activation clears the terminal and shows only:
 ```text
 Update complete.
 Honk300 has restarted.
-You may now close this window.
+
++------------------------------------------+
+|              HONK! ALL DONE              |
+|     You may now close this window.       |
++------------------------------------------+
 ```
 
 A no-op also clears the terminal and selects one of exactly 100 unique goose-themed lines, then
 always states that nothing was updated, Honk300 is current and running, and the window may be
 closed. Flavor text cannot replace those invariant state lines. Failure retains progress and
 diagnostics, appends the IPC-proven recovery status, and stays visible.
+
+The v1.3.5 presentation refinement gives every final state the same separated, fixed-width ASCII
+panel. Success and no-op use **HONK! ALL DONE**; failures and recovery problems use **HONK! NEEDS
+ATTENTION**. The close instruction remains literal in both variants, and color is never required
+for hierarchy or meaning.
 
 The helper deliberately remains alive after every final screen until the user closes the terminal
 window (or terminates it). Automatic close is out of scope because the terminal profile, not

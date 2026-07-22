@@ -30,6 +30,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "__control-surface-update",
             "Update complete.",
             "Honk300 has restarted.",
+            "HONK! ALL DONE",
             "You may now close this window.",
             "kill -0 \"$HELPER_PID\"",
             "dpkg-query --search",

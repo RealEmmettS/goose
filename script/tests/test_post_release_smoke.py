@@ -121,6 +121,7 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn("Stop-InstalledRuntimeBounded -Executable $Binary", WINDOWS_SMOKE)
         self.assertIn("There was nothing to update\\.", WINDOWS_SMOKE)
         self.assertIn("Honk300 is already up to date and running\\.", WINDOWS_SMOKE)
+        self.assertIn("HONK! ALL DONE", WINDOWS_SMOKE)
         self.assertIn("You may now close this window\\.", WINDOWS_SMOKE)
         self.assertIn("public update helper did not remain alive", WINDOWS_SMOKE)
         self.assertIn("public no-op update helper mutated the protected receipt", WINDOWS_SMOKE)

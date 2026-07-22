@@ -16,6 +16,16 @@ type DynError = Box<dyn Error>;
 
 const READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 const READINESS_INTERVAL: Duration = Duration::from_millis(100);
+const CLOSE_WINDOW_PANEL: &str = "\n\
++------------------------------------------+\n\
+|              HONK! ALL DONE              |\n\
+|     You may now close this window.       |\n\
++------------------------------------------+\n";
+const ATTENTION_CLOSE_WINDOW_PANEL: &str = "\n\
++------------------------------------------+\n\
+|          HONK! NEEDS ATTENTION           |\n\
+|     You may now close this window.       |\n\
++------------------------------------------+\n";
 
 /// Exactly one hundred deliberately small bits of goose flavor. The explicit invariant lines in
 /// `up_to_date_text` carry the actual state, so none of this copy can make the result ambiguous.
@@ -135,11 +145,7 @@ pub(crate) fn run() -> Result<(), DynError> {
         // that handle while this informational window stays open: if the real helper closes, a
         // stale duplicate window must not keep the named object alive and block the next update.
         drop(guard);
-        render_cleared(
-            "Another Honk300 update window is already open.\n\
-             No second update was started.\n\
-             You may now close this window.\n",
-        );
+        render_cleared(&duplicate_text());
         keep_terminal_alive();
     }
     let _guard = guard;
@@ -151,40 +157,28 @@ pub(crate) fn run() -> Result<(), DynError> {
     let result = update::run_for_control_surface();
     match result {
         Ok(UpdateOutcome::Updated) => match ensure_runtime_ready(None) {
-            Ok(()) => render_cleared(
-                "Update complete.\n\
-                 Honk300 has restarted.\n\
-                 You may now close this window.\n",
-            ),
+            Ok(()) => render_cleared(&updated_text()),
             Err(error) => {
-                eprintln!("\nUpdate was activated, but Honk300 could not restart: {error}");
-                eprintln!(
-                    "Recovery status: the verified update remains installed, but the app is not ready."
-                );
-                eprintln!("You may now close this window.");
+                eprint!("{}", updated_restart_failure_text(&error.to_string()));
             }
         },
         Ok(UpdateOutcome::UpToDate) => match ensure_runtime_ready(recovery_executable.as_deref()) {
             Ok(()) => render_cleared(&up_to_date_text(selected_no_update_flavor())),
             Err(error) => {
-                eprintln!(
-                    "\nNothing required updating, but Honk300 could not be confirmed running: {error}"
-                );
-                eprintln!("Recovery status: the installed version was left unchanged.");
-                eprintln!("You may now close this window.");
+                eprint!("{}", no_update_restart_failure_text(&error.to_string()));
             }
         },
         Err(error) => {
-            eprintln!("\nUpdate failed: {error}");
-            match ensure_runtime_ready(recovery_executable.as_deref()) {
-                Ok(()) => eprintln!(
-                    "Recovery status: Honk300 is running from the authoritative installed release."
-                ),
-                Err(recovery_error) => eprintln!(
-                    "Recovery status: Honk300 could not be restarted automatically: {recovery_error}"
-                ),
-            }
-            eprintln!("You may now close this window.");
+            let recovery_status = match ensure_runtime_ready(recovery_executable.as_deref()) {
+                Ok(()) => "Honk300 is running from the authoritative installed release.".to_owned(),
+                Err(recovery_error) => {
+                    format!("Honk300 could not be restarted automatically: {recovery_error}")
+                }
+            };
+            eprint!(
+                "{}",
+                update_failure_text(&error.to_string(), &recovery_status)
+            );
         }
     }
 
@@ -383,20 +377,52 @@ fn selected_no_update_flavor() -> &'static str {
 }
 
 fn guard_acquisition_failure_text(error: &dyn std::fmt::Display) -> String {
-    format!(
-        "Honk300 could not start the update helper: {error}\n\
-         No update was started.\n\
-         You may now close this window."
-    )
+    with_attention_panel(&format!(
+        "Honk300 could not start the update helper: {error}\nNo update was started.\n"
+    ))
 }
 
 fn up_to_date_text(flavor: &str) -> String {
     format!(
         "{flavor}\n\
          There was nothing to update.\n\
-         Honk300 is already up to date and running.\n\
-         You may now close this window.\n"
+         Honk300 is already up to date and running.\n{CLOSE_WINDOW_PANEL}"
     )
+}
+
+fn updated_text() -> String {
+    format!("Update complete.\nHonk300 has restarted.\n{CLOSE_WINDOW_PANEL}")
+}
+
+fn duplicate_text() -> String {
+    format!(
+        "Another Honk300 update window is already open.\n\
+         No second update was started.\n{CLOSE_WINDOW_PANEL}"
+    )
+}
+
+fn updated_restart_failure_text(error: &str) -> String {
+    with_attention_panel(&format!(
+        "\nUpdate was activated, but Honk300 could not restart: {error}\n\
+         Recovery status: the verified update remains installed, but the app is not ready.\n"
+    ))
+}
+
+fn no_update_restart_failure_text(error: &str) -> String {
+    with_attention_panel(&format!(
+        "\nNothing required updating, but Honk300 could not be confirmed running: {error}\n\
+         Recovery status: the installed version was left unchanged.\n"
+    ))
+}
+
+fn update_failure_text(error: &str, recovery_status: &str) -> String {
+    with_attention_panel(&format!(
+        "\nUpdate failed: {error}\nRecovery status: {recovery_status}\n"
+    ))
+}
+
+fn with_attention_panel(message: &str) -> String {
+    format!("{message}{ATTENTION_CLOSE_WINDOW_PANEL}")
 }
 
 fn render_cleared(message: &str) {
@@ -449,6 +475,54 @@ mod tests {
             let text = up_to_date_text(flavor);
             assert!(text.contains("There was nothing to update."));
             assert!(text.contains("Honk300 is already up to date and running."));
+            assert!(text.contains("You may now close this window."));
+        }
+    }
+
+    #[test]
+    fn completion_panels_are_aligned_and_visually_separated() {
+        for panel in [CLOSE_WINDOW_PANEL, ATTENTION_CLOSE_WINDOW_PANEL] {
+            assert!(panel.starts_with('\n'));
+            let lines = panel.trim().lines().collect::<Vec<_>>();
+            assert_eq!(lines.len(), 4);
+            assert!(lines.iter().all(|line| line.chars().count() == 44));
+            assert_eq!(lines.first(), lines.last());
+            assert!(panel.contains("You may now close this window."));
+        }
+
+        let updated = updated_text();
+        assert!(updated.starts_with("Update complete.\nHonk300 has restarted.\n\n"));
+        assert!(updated.contains("HONK! ALL DONE"));
+
+        let no_update = up_to_date_text("The goose checked.");
+        assert!(no_update.contains("up to date and running.\n\n+---"));
+        assert!(no_update.contains("HONK! ALL DONE"));
+    }
+
+    #[test]
+    fn every_terminal_outcome_routes_to_the_expected_panel() {
+        let done = [
+            updated_text(),
+            duplicate_text(),
+            up_to_date_text("All current."),
+        ];
+        for text in done {
+            assert!(text.contains("HONK! ALL DONE"));
+            assert!(!text.contains("HONK! NEEDS ATTENTION"));
+            assert!(text.contains("\n\n+------------------------------------------+"));
+        }
+
+        let lock_error = io::Error::new(io::ErrorKind::PermissionDenied, "lock denied");
+        let attention = [
+            guard_acquisition_failure_text(&lock_error),
+            updated_restart_failure_text("restart deadline expired"),
+            no_update_restart_failure_text("runtime unavailable"),
+            update_failure_text("hash mismatch", "the prior release is running."),
+        ];
+        for text in attention {
+            assert!(text.contains("HONK! NEEDS ATTENTION"));
+            assert!(!text.contains("HONK! ALL DONE"));
+            assert!(text.contains("\n\n+------------------------------------------+"));
             assert!(text.contains("You may now close this window."));
         }
     }
@@ -516,25 +590,28 @@ mod tests {
         assert!(text.contains("could not start the update helper"));
         assert!(text.contains("lock denied"));
         assert!(text.contains("No update was started."));
+        assert!(text.contains("HONK! NEEDS ATTENTION"));
         assert!(text.contains("You may now close this window."));
     }
 
     #[test]
     fn terminal_clear_failure_keeps_a_visible_fallback_and_result() {
+        let message = updated_text();
         let mut output = Vec::new();
         render_after_clear(
             &mut output,
             Err(io::Error::other("unsupported clear")),
-            "Update complete.\n",
+            &message,
         )
         .unwrap();
         let output = String::from_utf8(output).unwrap();
         assert!(output.contains("--- Honk300 update result ---"));
-        assert!(output.ends_with("Update complete.\n"));
+        assert!(output.ends_with(&message));
+        assert!(output.contains("HONK! ALL DONE"));
 
         let mut cleared = Vec::new();
-        render_after_clear(&mut cleared, Ok(()), "Update complete.\n").unwrap();
-        assert_eq!(String::from_utf8(cleared).unwrap(), "Update complete.\n");
+        render_after_clear(&mut cleared, Ok(()), &message).unwrap();
+        assert_eq!(String::from_utf8(cleared).unwrap(), message);
     }
 
     #[test]
