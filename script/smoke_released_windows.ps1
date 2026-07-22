@@ -74,6 +74,66 @@ function Require-MsiSuccess {
     }
 }
 
+function Stop-InstalledRuntimeBounded {
+    param([Parameter(Mandatory = $true)] [string] $Executable)
+
+    $stopProcess = $null
+    $stopStdout = $null
+    $stopStderr = $null
+    $stopStarted = $false
+    try {
+        $stopStart = [Diagnostics.ProcessStartInfo]::new()
+        $stopStart.FileName = $Executable
+        [void]$stopStart.ArgumentList.Add('stop')
+        [void]$stopStart.ArgumentList.Add('--force')
+        $stopStart.UseShellExecute = $false
+        $stopStart.CreateNoWindow = $true
+        $stopStart.RedirectStandardOutput = $true
+        $stopStart.RedirectStandardError = $true
+        $stopProcess = [Diagnostics.Process]::new()
+        $stopProcess.StartInfo = $stopStart
+        if (-not $stopProcess.Start()) {
+            Write-Warning 'final runtime stop controller did not start'
+            return
+        }
+        $stopStarted = $true
+        $stopStdout = $stopProcess.StandardOutput.ReadToEndAsync()
+        $stopStderr = $stopProcess.StandardError.ReadToEndAsync()
+        if (-not $stopProcess.WaitForExit(5000)) {
+            try {
+                $stopProcess.Kill($true)
+            }
+            catch [InvalidOperationException] {
+                # The controller may exit between the bounded wait and Kill.
+            }
+            if (-not $stopProcess.WaitForExit(5000)) {
+                Write-Warning "final runtime stop controller PID $($stopProcess.Id) survived tree kill"
+                return
+            }
+            Write-Warning 'final runtime stop controller exceeded five seconds and was terminated'
+        }
+        foreach ($drain in @($stopStdout, $stopStderr)) {
+            if ($null -ne $drain -and -not $drain.Wait(5000)) {
+                Write-Warning 'final runtime stop controller output did not close within five seconds'
+                return
+            }
+        }
+        if ($stopProcess.ExitCode -ne 0) {
+            Write-Warning "final runtime stop controller returned $($stopProcess.ExitCode)"
+        }
+    }
+    catch {
+        Write-Warning "final bounded runtime stop failed: $($_.Exception.Message)"
+    }
+    finally {
+        if ($stopStarted -and -not $stopProcess.HasExited) {
+            try { $stopProcess.Kill($true) } catch { Write-Warning $_ }
+            [void]$stopProcess.WaitForExit(5000)
+        }
+        if ($null -ne $stopProcess) { $stopProcess.Dispose() }
+    }
+}
+
 function Reported-Version {
     if (-not (Test-Path -LiteralPath $Binary -PathType Leaf)) { return $null }
     return ((& $Binary --version | Select-Object -Last 1).Trim() -replace '^.*\s', '')
@@ -246,16 +306,14 @@ try {
     $HelperStderrCopy = $null
     $HelperStarted = $false
     try {
-        Write-Output 'Starting public update-helper no-op smoke.'
-        & $Binary start | Out-Null
-        if ((& $Binary status | Out-String) -notmatch 'honk300: running') {
-            throw 'public update-helper smoke could not start the installed runtime'
-        }
+        # The compositor/lifecycle smoke above ends after force-stopping and waiting for its final
+        # runtime. Leave it stopped here so the UpToDate helper itself must resolve the receipt-owned
+        # executable, launch the detached app path, and wait for IPC readiness.
+        Write-Output 'Starting public update-helper no-op smoke from the stopped runtime state.'
 
-        # Start-Process's file-redirection path can wait for a redirected console child to exit on
-        # some native ARM64 hosts. The helper deliberately never exits after rendering, so such a
-        # wait bypasses the deadline below forever. Start the exact binary through ProcessStartInfo
-        # and drain both pipes asynchronously into files that remain share-readable by this poller.
+        # The helper deliberately never exits after rendering. Start the exact binary through
+        # ProcessStartInfo and drain both pipes asynchronously so its lifetime cannot prevent this
+        # parent from enforcing the result deadline or inspecting the retained screen.
         $HelperStart = [Diagnostics.ProcessStartInfo]::new()
         $HelperStart.FileName = $Binary
         [void]$HelperStart.ArgumentList.Add('__control-surface-update')
@@ -331,7 +389,7 @@ try {
             "receipt_sha256=$ReceiptHashAfterHelper",
             "receipt_timestamp_ticks=$ReceiptTimeAfterHelper",
             "helper_pid=$($HelperProcess.Id)",
-            'helper_result=up_to_date_running_and_held'
+            'helper_result=up_to_date_restarted_and_held'
         ) | Set-Content -LiteralPath (Join-Path $OverlayEvidenceDirectory 'update-helper.txt') -Encoding utf8
     }
     finally {
@@ -361,7 +419,7 @@ try {
             if ($null -ne $HelperStdoutStream) { $HelperStdoutStream.Dispose() }
             if ($null -ne $HelperStderrStream) { $HelperStderrStream.Dispose() }
             if ($null -ne $HelperProcess) { $HelperProcess.Dispose() }
-            & $Binary stop --force 2>$null | Out-Null
+            Stop-InstalledRuntimeBounded -Executable $Binary
         }
     }
 

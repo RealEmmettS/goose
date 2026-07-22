@@ -111,12 +111,15 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn(".Kill($true)", WINDOWS_SMOKE)
         self.assertIn(".WaitForExit(5000)", WINDOWS_SMOKE)
         self.assertNotIn("-RedirectStandardOutput $HelperStdout", WINDOWS_SMOKE)
+        self.assertNotIn("& $Binary start | Out-Null", WINDOWS_SMOKE)
+        self.assertIn("from the stopped runtime state", WINDOWS_SMOKE)
+        self.assertIn("Stop-InstalledRuntimeBounded -Executable $Binary", WINDOWS_SMOKE)
         self.assertIn("There was nothing to update\\.", WINDOWS_SMOKE)
         self.assertIn("Honk300 is already up to date and running\\.", WINDOWS_SMOKE)
         self.assertIn("You may now close this window\\.", WINDOWS_SMOKE)
         self.assertIn("public update helper did not remain alive", WINDOWS_SMOKE)
         self.assertIn("public no-op update helper mutated the protected receipt", WINDOWS_SMOKE)
-        self.assertIn("helper_result=up_to_date_running_and_held", WINDOWS_SMOKE)
+        self.assertIn("helper_result=up_to_date_restarted_and_held", WINDOWS_SMOKE)
 
     def test_linux_post_release_smokes_exact_installed_binary_with_persistent_evidence(self) -> None:
         self.assertIn('HONK300_BIN="$BINARY"', UNIX_SMOKE)
