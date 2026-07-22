@@ -95,6 +95,10 @@ export HOME="$ROOT/home"
 export XDG_DATA_HOME="$ROOT/data"
 export XDG_CONFIG_HOME="$ROOT/config"
 export XDG_RUNTIME_DIR="$ROOT/runtime"
+# This fixture qualifies update/lifecycle integration; the adjacent Linux smoke owns real
+# compositor pixels. Keeping this process headless avoids making helper correctness depend on a
+# second compositor inside xvfb-run while still exercising the real singleton and IPC endpoints.
+export HONK300_ALLOW_HEADLESS=1
 mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
 
 INSTALLED=/usr/lib/honk300/honk300
