@@ -22,8 +22,8 @@ use honk_engine::{
 };
 use honk_platform_macos::{
     accessibility_state, local_time, main_bundle_release_metadata, open_accessibility_settings,
-    open_configuration_tui, presence_state, request_accessibility_prompt, warp_cursor,
-    AccessibilityState, CollectWindowController, ForeignWindowWatcher, Overlay,
+    open_configuration_tui, open_update_helper, presence_state, request_accessibility_prompt,
+    warp_cursor, AccessibilityState, CollectWindowController, ForeignWindowWatcher, Overlay,
 };
 
 pub fn run(
@@ -130,10 +130,14 @@ pub fn run(
         }
 
         if let Some(command) = overlay.take_status_menu_command() {
-            if let Err(err) =
-                control_surface::handle_command(command, &mut world, open_configuration_tui)
-            {
-                eprintln!("honk300: Configure could not open ({err})");
+            let action = control_surface::command_name(command);
+            if let Err(err) = control_surface::handle_command(
+                command,
+                &mut world,
+                open_configuration_tui,
+                open_update_helper,
+            ) {
+                eprintln!("honk300: {action} action could not start ({err})");
             }
         }
 

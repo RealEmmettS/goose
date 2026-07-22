@@ -47,3 +47,5 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0034 — Command-First Managed Installation](./0034-command-first-managed-installation.md)
 - [0035 — Hosted Windows Tray Registration Qualification Boundary](./0035-hosted-windows-tray-registration-qualification-boundary.md)
 - [0036 — Windows CLI Start App-Launcher Handoff](./0036-windows-cli-start-app-launch-handoff.md)
+- [0037 — Windows Integrated-Terminal Job Breakaway](./0037-windows-terminal-job-breakaway.md)
+- [0038 — Cross-Platform Tray Update Helper](./0038-cross-platform-tray-update-helper.md)

@@ -68,7 +68,7 @@ still build the full installer matrix because matching the `*300` family is an e
 | **Notes** | Copy screened original notepad messages 1:1 for personal-use builds and add **one custom goose-voiced counterpart per original**. Present them only in Honk300-owned native windows; never launch or type into the user's editor. |
 | **Config** | **TOML** (`config.toml`), original keys preserved at verified values, versioned + tolerant loader. No `EnableMods` key. |
 | **Modding** | **No external mods** (no DLL/`.so`/`.dylib`, no WASM, no third-party data mods). Autumn becomes a **built-in** season/task. Extensibility = **documented internal seams**. |
-| **Control** | **No global quit key.** Starting, stopping, and configuration use the CLI/TUI over a **single-instance + IPC command channel** (`stop` / `do` / `reload`). ADRs 0024/0028/0030 add macOS, Windows, and compatible Linux control items which open that same TUI or request the same graceful stop; they are not a second settings model. Ordinary stop/quit/exit walks offscreen; the explicit `--force` variants terminate immediately. |
+| **Control** | **No global quit key.** Starting, stopping, configuration, and update use the existing CLI/TUI/lifecycle paths. ADRs 0024/0028/0030/0038 add macOS, Windows, and compatible Linux control items which open that same TUI, launch the same verified updater in an explicit terminal, or request the same graceful stop; they are not a second settings model. Opening a menu performs no network check. Ordinary stop/quit/exit walks offscreen; the explicit `--force` variants terminate immediately. |
 | **Collected prop bounds** | Windows/macOS notes and images use one shared active-monitor fit: readable notes, hard 48% per-axis ceiling, complete aspect-preserving images, downscale only, never crop or stretch. Linux remains explicitly unsupported. |
 | **Login start** | Default-off `[lifecycle].autostart_on_login` reconciles only through the active install receipt's existing Windows Run, Mac LaunchAgent, or Linux XDG owner. Fresh installer intent outranks stale config; foreign ownership fails closed. |
 | **Windows launch surfaces** | Public aliases remain console-subsystem commands for a user-chosen terminal, but every start spelling is a bounded controller that invokes the exact-slot GUI-subsystem `honk300-app.exe`, waits for IPC readiness, and returns. Shortcuts/login startup target the same branded app directly. It starts the hidden exact-sibling runtime with no console or shell intermediary; that runtime owns the overlay, IPC, and tray independently of the originating terminal. Product startup performs no calibration; full-desktop compositor fixtures are disposable-CI-only. |
@@ -94,8 +94,8 @@ by default**: no telemetry, no network on its own, clean uninstall, explicit use
 ### 2.2 Non-Goals (out of scope for v1)
 Bit-for-bit binary compatibility with the original; loading the original .NET/Mono mods; **any
 external mod surface** (DLL/WASM/data); mobile platforms; a windowed GUI settings app; a
-native preferences model or tray actions beyond the finite Configure/graceful-Quit contract in
-ADRs 0028/0030; multi-goose "as a service"; runtime natural-language command parsing (the goose-speak
+native preferences model or tray actions beyond the finite Configure/Update/graceful-Quit contract
+in ADRs 0028/0030/0038; multi-goose "as a service"; runtime natural-language command parsing (the goose-speak
 grammar is a fixed, finite phrase map — no model at runtime); networked features.
 
 ### 2.3 Guiding principles
@@ -253,7 +253,7 @@ TUI **Poke** panel.
 | Detect window move-start/end (perch & ride) | ✅ `SetWinEventHook(MOVESIZESTART/END)` | ✅ AX observers | ✅ ConfigureNotify / `_NET_WM_STATE` | ❌ self-skips |
 | Present owned editable collect note | ✅ native edit HWND | ✅ owned AppKit window | ❌ unsupported | ❌ unsupported |
 | CLI/TUI control (`start`/`stop`/`config`) | ✅ named pipe | ✅ unix socket | ✅ unix socket | ✅ unix socket |
-| Graphical Configure/Quit shortcut | ✅ notification-area item → existing TUI/graceful stop | ✅ menu-bar item → existing TUI/graceful stop | ✅ when a StatusNotifier host exists | ✅ independent of reduced compositor mode when a StatusNotifier host exists |
+| Graphical Configure/Update/Quit shortcut | ✅ notification-area item → existing TUI/terminal updater/graceful stop | ✅ menu-bar item → existing TUI/terminal updater/graceful stop | ✅ when a StatusNotifier host exists | ✅ independent of reduced compositor mode when a StatusNotifier host exists |
 | DND/fullscreen detect (quiet hours) | ✅ `SHQueryUserNotificationState` | ✅ NSWorkspace / Focus | ✅ EWMH fullscreen / idle | ⚠️ best-effort |
 | Single-instance + IPC (stop/do/reload) | ✅ named pipe/event | ✅ unix socket | ✅ unix socket | ✅ unix socket |
 | Audio | ✅ `rodio` | ✅ | ✅ | ✅ |
@@ -886,6 +886,7 @@ being implemented three more times.
 | R11.1 / v1.3.1 (ADRs 0031, 0034, 0036) | keep compatible Windows owner-cleanup discovery read-only when the protected receipt already records the requested state, so unelevated update checks reach the verified installer/UAC boundary | read-only receipt byte-stability plus real-transition regression, live Program Files no-mutation proof, preserved app-launcher hash verification, exact-SHA cross-platform release gates, and official Alienware install/update proof |
 | R11.2 / v1.3.2 (ADRs 0034, 0036) | make the documented Windows bootstrap independent of processor variables inherited from the launching terminal by falling back to the machine and runtime architecture signals | scrubbed-environment template execution, unchanged x64/ARM64 exact-artifact selection and pinning, exact-SHA cross-platform release gates, and official Codex-terminal Alienware install/update proof |
 | R11.3 / v1.3.3 (ADR 0037) | let the transient Windows app launcher break the hidden runtime out of a breakaway-permitted integrated-terminal job so the command runner itself returns while the goose remains alive | exact Codex-job origin-shell return with retained runtime/status proof, access-denied fallback contract, unchanged no-shell/windowless identity, strict raw-presenter plus CAPTUREBLT transparency evidence, and complete immutable release/install gates |
+| R11.4 / v1.3.4 (ADR 0038) | add an always-visible Update action to every native control surface; launch one serialized out-of-process terminal helper from the exact executable, retain the public updater contract, relaunch the receipt owner, and keep explicit success/no-op/failure screens visible | Configure/Update/Quit native routing, literal launcher/package-shape proof, exactly 100 invariant no-op flavors, helper crash recovery, activation/restart/failure recovery fixtures, unchanged JSON/no-op receipt evidence, full exact-SHA candidate/main/public-byte matrix, and official Windows tray acceptance |
 
 Implementation note (2026-07-01): the Linux control-runtime foundation, X11 visible overlay path,
 and native Wayland reduced layer-shell path have landed in `honk-platform-linux` plus

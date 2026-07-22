@@ -65,7 +65,7 @@ impl ksni::Tray for LinuxTray {
             icon_name: String::new(),
             icon_pixmap: vec![self.icon.clone()],
             title: "Honk300 controls".into(),
-            description: "Configure Honk300 or send the goose home".into(),
+            description: "Configure or update Honk300, or send the goose home".into(),
         }
     }
 
@@ -76,6 +76,12 @@ impl ksni::Tray for LinuxTray {
                 activate: Box::new(|tray: &mut LinuxTray| {
                     tray.emit(ControlSurfaceCommand::Configure)
                 }),
+                ..Default::default()
+            }
+            .into(),
+            StandardItem {
+                label: "Update Honk300…".into(),
+                activate: Box::new(|tray: &mut LinuxTray| tray.emit(ControlSurfaceCommand::Update)),
                 ..Default::default()
             }
             .into(),
@@ -217,7 +223,15 @@ mod tests {
             _ => panic!("Configure should be a standard menu item"),
         };
         configure(&mut tray);
-        let quit = match &mut menu[2] {
+        let update = match &mut menu[1] {
+            ksni::MenuItem::Standard(item) => {
+                std::mem::replace(&mut item.activate, Box::new(|_: &mut LinuxTray| {}))
+            }
+            _ => panic!("Update should be a standard menu item"),
+        };
+        update(&mut tray);
+        assert!(matches!(menu[2], ksni::MenuItem::Separator));
+        let quit = match &mut menu[3] {
             ksni::MenuItem::Standard(item) => {
                 std::mem::replace(&mut item.activate, Box::new(|_: &mut LinuxTray| {}))
             }
@@ -225,6 +239,7 @@ mod tests {
         };
         quit(&mut tray);
         assert_eq!(receiver.recv().unwrap(), ControlSurfaceCommand::Configure);
+        assert_eq!(receiver.recv().unwrap(), ControlSurfaceCommand::Update);
         assert_eq!(receiver.recv().unwrap(), ControlSurfaceCommand::Quit);
         assert!(receiver.try_recv().is_err());
     }

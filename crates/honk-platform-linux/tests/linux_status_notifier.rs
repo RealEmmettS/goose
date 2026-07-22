@@ -184,10 +184,15 @@ fn hosted_protocol_actions_and_watcher_recovery() {
     let (_, layout): (u32, LayoutTuple) = menu
         .call("GetLayout", &(0_i32, -1_i32, Vec::<String>::new()))
         .expect("menu layout");
+    let update = find_menu_item(layout, "Update Honk300…").expect("Update menu item");
+    let (_, layout): (u32, LayoutTuple) = menu
+        .call("GetLayout", &(0_i32, -1_i32, Vec::<String>::new()))
+        .expect("menu layout");
     let quit = find_menu_item(layout, "Quit Honk300").expect("Quit menu item");
 
     for (id, expected) in [
         (configure, ControlSurfaceCommand::Configure),
+        (update, ControlSurfaceCommand::Update),
         (quit, ControlSurfaceCommand::Quit),
     ] {
         menu.call::<_, _, ()>(

@@ -231,10 +231,84 @@ try {
         }
     }
 
+    # Exercise the private terminal helper against the real public no-op path. Redirecting its
+    # terminal streams lets the smoke inspect the invariant result while proving the helper stays
+    # alive after rendering. Native menu tests own click routing; this lane owns released bytes,
+    # protected-receipt immutability, runtime readiness, and the deliberate terminal hold.
+    $ReceiptHashBeforeHelper = (Get-FileHash -LiteralPath $receiptPath -Algorithm SHA256).Hash
+    $ReceiptTimeBeforeHelper = (Get-Item -LiteralPath $receiptPath).LastWriteTimeUtc.Ticks
+    $HelperStdout = Join-Path $Root 'update-helper.stdout.txt'
+    $HelperStderr = Join-Path $Root 'update-helper.stderr.txt'
+    $HelperProcess = $null
+    try {
+        & $Binary start | Out-Null
+        if ((& $Binary status | Out-String) -notmatch 'honk300: running') {
+            throw 'public update-helper smoke could not start the installed runtime'
+        }
+
+        $HelperProcess = Start-Process `
+            -FilePath $Binary `
+            -ArgumentList '__control-surface-update' `
+            -RedirectStandardOutput $HelperStdout `
+            -RedirectStandardError $HelperStderr `
+            -PassThru
+        $HelperDeadline = [DateTime]::UtcNow.AddMinutes(2)
+        do {
+            Start-Sleep -Milliseconds 250
+            $HelperProcess.Refresh()
+            $HelperText = if (Test-Path -LiteralPath $HelperStdout) {
+                Get-Content -LiteralPath $HelperStdout -Raw
+            } else { '' }
+            if ($HelperProcess.HasExited -and $HelperText -notmatch 'There was nothing to update\.') {
+                $HelperError = if (Test-Path -LiteralPath $HelperStderr) {
+                    Get-Content -LiteralPath $HelperStderr -Raw
+                } else { '' }
+                throw "public update helper exited before its result screen: $HelperError"
+            }
+        } until (
+            $HelperText -match 'There was nothing to update\.' -or
+            [DateTime]::UtcNow -ge $HelperDeadline
+        )
+        if ($HelperText -notmatch 'There was nothing to update\.' -or
+            $HelperText -notmatch 'Honk300 is already up to date and running\.' -or
+            $HelperText -notmatch 'You may now close this window\.') {
+            throw 'public update helper did not render the explicit no-op result contract'
+        }
+        $HelperProcess.Refresh()
+        if ($HelperProcess.HasExited) {
+            throw 'public update helper did not remain alive after rendering its result'
+        }
+        if ((& $Binary status | Out-String) -notmatch 'honk300: running') {
+            throw 'public update helper did not preserve a ready runtime after a no-op'
+        }
+        $ReceiptHashAfterHelper = (Get-FileHash -LiteralPath $receiptPath -Algorithm SHA256).Hash
+        $ReceiptTimeAfterHelper = (Get-Item -LiteralPath $receiptPath).LastWriteTimeUtc.Ticks
+        if ($ReceiptHashAfterHelper -ne $ReceiptHashBeforeHelper -or
+            $ReceiptTimeAfterHelper -ne $ReceiptTimeBeforeHelper) {
+            throw 'public no-op update helper mutated the protected receipt'
+        }
+        @(
+            "receipt_sha256=$ReceiptHashAfterHelper",
+            "receipt_timestamp_ticks=$ReceiptTimeAfterHelper",
+            "helper_pid=$($HelperProcess.Id)",
+            'helper_result=up_to_date_running_and_held'
+        ) | Set-Content -LiteralPath (Join-Path $OverlayEvidenceDirectory 'update-helper.txt') -Encoding utf8
+    }
+    finally {
+        if ($null -ne $HelperProcess) {
+            $HelperProcess.Refresh()
+            if (-not $HelperProcess.HasExited) {
+                Stop-Process -Id $HelperProcess.Id -Force -ErrorAction SilentlyContinue
+                Wait-Process -Id $HelperProcess.Id -ErrorAction SilentlyContinue
+            }
+        }
+        & $Binary stop --force 2>$null | Out-Null
+    }
+
     Require-MsiSuccess -Mode '/x' -Path $CurrentMsi
     if (Test-Path -LiteralPath $Binary -PathType Leaf) { throw 'MSI uninstall left honk300.exe behind' }
     if (Test-Path -LiteralPath $AppLauncher -PathType Leaf) { throw 'MSI uninstall left honk300-app.exe behind' }
-    Write-Output "native Windows $TargetTriple $Tag rollback, slot upgrade, repair, compositor, and uninstall smoke passed"
+    Write-Output "native Windows $TargetTriple $Tag rollback, slot upgrade, repair, compositor, update-helper, and uninstall smoke passed"
 }
 finally {
     foreach ($package in @($CurrentMsi, $PreviousMsi)) {

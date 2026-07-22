@@ -5,6 +5,7 @@
 //! allowed desktop goose instance.
 
 mod cli;
+mod control_surface_update;
 #[cfg(not(windows))]
 mod debian;
 mod install;
@@ -93,6 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::Install { autostart }) => install::install(autostart),
         Some(Command::Uninstall { purge }) => install::uninstall(purge),
         Some(Command::Update { json }) => update::run(json),
+        Some(Command::ControlSurfaceUpdate) => control_surface_update::run(),
         Some(Command::Setup { config, reset }) => run_setup(config, reset),
         Some(Command::Start { options }) => run_start(options),
         #[cfg(windows)]
@@ -127,6 +129,7 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             | Command::Install { .. }
             | Command::Uninstall { .. }
             | Command::Update { .. }
+            | Command::ControlSurfaceUpdate
             | Command::Setup { .. },
         )
         | None => unreachable!("non-client commands are handled separately"),

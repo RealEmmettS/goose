@@ -11,6 +11,7 @@ PACKAGE = (ROOT / "script" / "package_macos_app.sh").read_text(encoding="utf-8")
 HELPER_PACKAGE_PATH = ROOT / "script" / "package_macos_installer_helper.sh"
 HELPER_SOURCE_PATH = ROOT / "packaging" / "macos" / "InstallHonk300" / "main.swift"
 CONFIGURE_LAUNCHER_PATH = ROOT / "packaging" / "macos" / "Configure Honk300.command"
+UPDATE_LAUNCHER_PATH = ROOT / "packaging" / "macos" / "Update Honk300.command"
 STATUS_ICON_PATH = ROOT / "Assets" / "UI" / "honk300-status-goose.svg"
 STATUS_ICON_RUNTIME_PATH = ROOT / "Assets" / "UI" / "honk300-status-goose@2x.png"
 HELPER_PACKAGE = HELPER_PACKAGE_PATH.read_text(encoding="utf-8")
@@ -91,6 +92,11 @@ class MacosPackagingTests(unittest.TestCase):
         )
         self.assertIn('chmod 755 "$RESOURCES_DIR/Configure Honk300.command"', PACKAGE)
         self.assertIn(
+            'ditto "$ROOT/packaging/macos/Update Honk300.command"',
+            PACKAGE,
+        )
+        self.assertIn('chmod 755 "$RESOURCES_DIR/Update Honk300.command"', PACKAGE)
+        self.assertIn(
             'ditto "$ROOT/Assets/UI/honk300-status-goose.svg"',
             PACKAGE,
         )
@@ -119,6 +125,23 @@ class MacosPackagingTests(unittest.TestCase):
         self.assertNotIn("sudo", launcher)
         self.assertLess(
             PACKAGE.index('chmod 755 "$RESOURCES_DIR/Configure Honk300.command"'),
+            PACKAGE.index('codesign --force --options runtime --sign - "$BIN"'),
+        )
+
+    def test_menu_bar_update_launcher_runs_the_bundled_hidden_helper(self) -> None:
+        self.assertTrue(UPDATE_LAUNCHER_PATH.is_file())
+        launcher = UPDATE_LAUNCHER_PATH.read_text(encoding="utf-8")
+        self.assertIn("#!/bin/sh", launcher)
+        self.assertIn("CONTENTS_DIR=", launcher)
+        self.assertIn(
+            'exec "$CONTENTS_DIR/MacOS/honk300" __control-surface-update',
+            launcher,
+        )
+        self.assertNotIn("sudo", launcher)
+        self.assertNotIn("curl", launcher)
+        self.assertNotIn("sh -c", launcher)
+        self.assertLess(
+            PACKAGE.index('chmod 755 "$RESOURCES_DIR/Update Honk300.command"'),
             PACKAGE.index('codesign --force --options runtime --sign - "$BIN"'),
         )
 
@@ -194,6 +217,10 @@ class MacosPackagingTests(unittest.TestCase):
         self.assertIn('test -d "$mount/Install Honk300.app"', WORKFLOW)
         self.assertIn(
             'test -x "$mount/Honk300.app/Contents/Resources/Configure Honk300.command"',
+            WORKFLOW,
+        )
+        self.assertIn(
+            'test -x "$mount/Honk300.app/Contents/Resources/Update Honk300.command"',
             WORKFLOW,
         )
         self.assertIn(
@@ -325,6 +352,16 @@ class MacosPackagingTests(unittest.TestCase):
         self.assertIn("vtool -show-build", WORKFLOW)
         self.assertIn("helper-deployment.txt", WORKFLOW)
         self.assertIn("minos 11.0", WORKFLOW)
+
+    def test_signed_installed_update_helper_is_executed_and_retained(self) -> None:
+        self.assertIn('update_command="$app/Contents/Resources/Update Honk300.command"', WORKFLOW)
+        self.assertIn('HOME="$home" "$update_command"', WORKFLOW)
+        self.assertIn("There was nothing to update.", WORKFLOW)
+        self.assertIn("Honk300 is already up to date and running.", WORKFLOW)
+        self.assertIn("You may now close this window.", WORKFLOW)
+        self.assertIn('kill -0 "$helper_pid"', WORKFLOW)
+        self.assertIn('HOME="$home" "$binary" status', WORKFLOW)
+        self.assertIn("update-helper.stdout.txt", WORKFLOW)
 
 
 if __name__ == "__main__":

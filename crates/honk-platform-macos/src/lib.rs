@@ -186,7 +186,27 @@ mod platform {
     #[derive(Debug, Default)]
     struct StatusMenuTargetIvars {
         configure_requested: Cell<bool>,
+        update_requested: Cell<bool>,
         quit_requested: Cell<bool>,
+    }
+
+    impl StatusMenuTargetIvars {
+        fn take_command(&self) -> Option<ControlSurfaceCommand> {
+            if self.quit_requested.replace(false) {
+                self.configure_requested.set(false);
+                self.update_requested.set(false);
+                Some(ControlSurfaceCommand::Quit)
+            } else if self.update_requested.replace(false) {
+                // One event-pump cycle may drain several clicks. Update is the higher-priority
+                // terminal action, so consuming it must not leave a queued Configure terminal.
+                self.configure_requested.set(false);
+                Some(ControlSurfaceCommand::Update)
+            } else if self.configure_requested.replace(false) {
+                Some(ControlSurfaceCommand::Configure)
+            } else {
+                None
+            }
+        }
     }
 
     define_class!(
@@ -210,6 +230,13 @@ mod platform {
 
             // SAFETY: This selector is installed only on an NSMenuItem action and the sender is
             // passed as an Objective-C object.
+            #[unsafe(method(updateHonk300:))]
+            fn update_honk300(&self, _sender: Option<&AnyObject>) {
+                self.ivars().update_requested.set(true);
+            }
+
+            // SAFETY: This selector is installed only on an NSMenuItem action and the sender is
+            // passed as an Objective-C object.
             #[unsafe(method(quitHonk300:))]
             fn quit_honk300(&self, _sender: Option<&AnyObject>) {
                 self.ivars().quit_requested.set(true);
@@ -225,14 +252,7 @@ mod platform {
         }
 
         fn take_command(&self) -> Option<ControlSurfaceCommand> {
-            if self.ivars().quit_requested.replace(false) {
-                self.ivars().configure_requested.set(false);
-                Some(ControlSurfaceCommand::Quit)
-            } else if self.ivars().configure_requested.replace(false) {
-                Some(ControlSurfaceCommand::Configure)
-            } else {
-                None
-            }
+            self.ivars().take_command()
         }
     }
 
@@ -294,6 +314,21 @@ mod platform {
             // strictly longer than the item remains installed in the status bar.
             unsafe { configure.setTarget(Some(&target)) };
             menu.addItem(&configure);
+
+            let update = unsafe {
+                NSMenuItem::initWithTitle_action_keyEquivalent(
+                    NSMenuItem::alloc(mtm),
+                    &NSString::from_str("Update Honk300…"),
+                    Some(sel!(updateHonk300:)),
+                    &NSString::from_str(""),
+                )
+            };
+            update.setToolTip(Some(&NSString::from_str(
+                "Open a terminal and update Honk300",
+            )));
+            // SAFETY: See the retained-target invariant above.
+            unsafe { update.setTarget(Some(&target)) };
+            menu.addItem(&update);
             menu.addItem(&NSMenuItem::separatorItem(mtm));
 
             let quit = unsafe {
@@ -457,6 +492,34 @@ mod platform {
             } else {
                 Err(io::Error::other(
                     "macOS could not open the Honk300 terminal settings interface",
+                ))
+            }
+        })
+    }
+
+    pub fn open_update_helper() -> io::Result<()> {
+        let _main_thread = MainThreadMarker::new().ok_or_else(|| {
+            io::Error::other("the Honk300 update menu must run on the main thread")
+        })?;
+        autoreleasepool(|_| {
+            let bundle = NSBundle::mainBundle();
+            let launcher = bundle
+                .URLForResource_withExtension(
+                    Some(&NSString::from_str("Update Honk300")),
+                    Some(&NSString::from_str("command")),
+                )
+                .filter(|url| url.isFileURL())
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::NotFound,
+                        "the signed app bundle is missing Update Honk300.command; reinstall Honk300.app",
+                    )
+                })?;
+            if NSWorkspace::sharedWorkspace().openURL(&launcher) {
+                Ok(())
+            } else {
+                Err(io::Error::other(
+                    "macOS could not open the Honk300 terminal update helper",
                 ))
             }
         })
@@ -1907,15 +1970,24 @@ mod platform {
             assert_eq!(image.size(), NSSize::new(18.0, 18.0));
             assert!(image.isTemplate());
         }
+
+        #[test]
+        fn queued_update_consumes_a_simultaneous_configure_request() {
+            let requests = StatusMenuTargetIvars::default();
+            requests.configure_requested.set(true);
+            requests.update_requested.set(true);
+            assert_eq!(requests.take_command(), Some(ControlSurfaceCommand::Update));
+            assert_eq!(requests.take_command(), None);
+        }
     }
 }
 
 #[cfg(target_os = "macos")]
 pub use platform::{
     accessibility_state, local_time, main_bundle_release_metadata, open_accessibility_settings,
-    open_configuration_tui, presence_state, request_accessibility_prompt, warp_cursor,
-    AccessibilityState, CollectWindowController, ForeignWindowWatcher, MacBundleReleaseMetadata,
-    Overlay,
+    open_configuration_tui, open_update_helper, presence_state, request_accessibility_prompt,
+    warp_cursor, AccessibilityState, CollectWindowController, ForeignWindowWatcher,
+    MacBundleReleaseMetadata, Overlay,
 };
 
 #[cfg(test)]

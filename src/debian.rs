@@ -11,8 +11,26 @@ const PACKAGE_NAME: &str = "honk300";
 type DynError = Box<dyn std::error::Error>;
 
 pub(crate) fn prove_current_executable(current_exe: &Path) -> Result<PathBuf, DynError> {
+    let expected = prove_installed_executable()?;
+    if !paths_equivalent(current_exe, &expected) {
+        return Err(format!(
+            "honk300: current executable {} is not the Debian package executable {}",
+            current_exe.display(),
+            expected.display()
+        )
+        .into());
+    }
+    Ok(expected)
+}
+
+/// Prove the fixed Debian package owner after dpkg may have replaced the still-running image.
+///
+/// This deliberately does not compare `/proc/self/exe`: after an atomic package upgrade that
+/// link can identify the old deleted inode even though dpkg now authoritatively owns the new
+/// executable at the fixed path.
+pub(crate) fn prove_installed_executable() -> Result<PathBuf, DynError> {
     let expected = Path::new(INSTALLED_EXECUTABLE);
-    prove_package_files(current_exe, expected)?;
+    prove_package_files(expected)?;
     let output = Command::new("dpkg-query")
         .arg("--search")
         .arg(expected)
@@ -29,15 +47,7 @@ pub(crate) fn prove_current_executable(current_exe: &Path) -> Result<PathBuf, Dy
     Ok(expected.to_path_buf())
 }
 
-fn prove_package_files(current_exe: &Path, expected: &Path) -> Result<(), DynError> {
-    if !paths_equivalent(current_exe, expected) {
-        return Err(format!(
-            "honk300: current executable {} is not the Debian package executable {}",
-            current_exe.display(),
-            expected.display()
-        )
-        .into());
-    }
+fn prove_package_files(expected: &Path) -> Result<(), DynError> {
     let executable = fs::symlink_metadata(expected)?;
     if !executable.is_file() || executable.file_type().is_symlink() {
         return Err("honk300: Debian package executable is not a regular owned file".into());
@@ -149,7 +159,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn package_file_proof_rejects_wrong_path_and_marker() {
+    fn package_file_proof_rejects_wrong_marker() {
         let temp = tempfile::tempdir().unwrap();
         let installed = temp.path().join("usr/lib/honk300/honk300");
         fs::create_dir_all(installed.parent().unwrap()).unwrap();
@@ -159,14 +169,13 @@ mod tests {
             b"deb\n",
         )
         .unwrap();
-        prove_package_files(&installed, &installed).unwrap();
-        assert!(prove_package_files(&temp.path().join("other"), &installed).is_err());
+        prove_package_files(&installed).unwrap();
         fs::write(
             installed.parent().unwrap().join("install-source.txt"),
             b"shell\n",
         )
         .unwrap();
-        assert!(prove_package_files(&installed, &installed).is_err());
+        assert!(prove_package_files(&installed).is_err());
     }
 
     #[test]

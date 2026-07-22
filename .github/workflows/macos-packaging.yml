@@ -213,11 +213,13 @@ jobs:
           helper="target/dist/macos-universal2/Install Honk300.app"
           app_bin="$app/Contents/MacOS/honk300"
           configure_launcher="$app/Contents/Resources/Configure Honk300.command"
+          update_launcher="$app/Contents/Resources/Update Honk300.command"
           status_icon="$app/Contents/Resources/honk300-status-goose.svg"
           status_icon_runtime="$app/Contents/Resources/honk300-status-goose@2x.png"
           helper_bin="$helper/Contents/MacOS/Install Honk300"
           test -d "$app" && test -d "$helper"
           test -x "$configure_launcher"
+          test -x "$update_launcher"
           test -f "$status_icon"
           test -f "$status_icon_runtime"
           lipo "$app_bin" -verify_arch x86_64 arm64
@@ -279,6 +281,7 @@ jobs:
           ditto -x -k "$output/honk300-universal2.app.zip" "$extracted"
           test -d "$extracted/Honk300.app"
           test -x "$extracted/Honk300.app/Contents/Resources/Configure Honk300.command"
+          test -x "$extracted/Honk300.app/Contents/Resources/Update Honk300.command"
           test -f "$extracted/Honk300.app/Contents/Resources/honk300-status-goose.svg"
           test -f "$extracted/Honk300.app/Contents/Resources/honk300-status-goose@2x.png"
           codesign --verify --strict --verbose=4 "$extracted/Honk300.app"
@@ -327,6 +330,7 @@ jobs:
           test -d "$mount/Honk300.app"
           test -d "$mount/Install Honk300.app"
           test -x "$mount/Honk300.app/Contents/Resources/Configure Honk300.command"
+          test -x "$mount/Honk300.app/Contents/Resources/Update Honk300.command"
           test -f "$mount/Honk300.app/Contents/Resources/honk300-status-goose.svg"
           test -f "$mount/Honk300.app/Contents/Resources/honk300-status-goose@2x.png"
           test -f "$mount/Read Me.txt"
@@ -368,6 +372,7 @@ jobs:
           codesign --verify --strict --verbose=4 "$mount/Honk300.app"
           codesign --verify --strict --verbose=4 "$mount/Install Honk300.app"
           test -x "$mount/Honk300.app/Contents/Resources/Configure Honk300.command"
+          test -x "$mount/Honk300.app/Contents/Resources/Update Honk300.command"
           test -f "$mount/Honk300.app/Contents/Resources/honk300-status-goose.svg"
           test -f "$mount/Honk300.app/Contents/Resources/honk300-status-goose@2x.png"
           spctl --assess --type execute --verbose=4 "$mount/Honk300.app"
@@ -466,12 +471,46 @@ jobs:
           test "$(receipt_origin)" = shell
           codesign --verify --deep --strict "$home/Applications/Honk300.app"
 
+          app="$home/Applications/Honk300.app"
+          binary="$app/Contents/MacOS/honk300"
+          update_command="$app/Contents/Resources/Update Honk300.command"
+          helper_stdout="target/notarization-evidence/update-helper.stdout.txt"
+          helper_stderr="target/notarization-evidence/update-helper.stderr.txt"
+          HOME="$home" "$update_command" >"$helper_stdout" 2>"$helper_stderr" &
+          helper_pid=$!
+          cleanup_helper() {
+            kill "$helper_pid" >/dev/null 2>&1 || true
+            wait "$helper_pid" >/dev/null 2>&1 || true
+            HOME="$home" "$binary" stop --force >/dev/null 2>&1 || true
+          }
+          trap cleanup_helper EXIT
+          deadline=$((SECONDS + 120))
+          while ! grep -F 'There was nothing to update.' "$helper_stdout" >/dev/null 2>&1; do
+            kill -0 "$helper_pid" >/dev/null 2>&1 || {
+              cat "$helper_stderr" >&2
+              echo 'signed Mac update helper exited before its retained result' >&2
+              exit 1
+            }
+            test "$SECONDS" -lt "$deadline" || {
+              cat "$helper_stderr" >&2
+              echo 'signed Mac update helper timed out' >&2
+              exit 1
+            }
+            sleep 0.25
+          done
+          grep -F 'Honk300 is already up to date and running.' "$helper_stdout"
+          grep -F 'You may now close this window.' "$helper_stdout"
+          kill -0 "$helper_pid"
+          HOME="$home" "$binary" status | grep -F 'honk300: running'
+          cleanup_helper
+          trap - EXIT
+
       - name: Preserve notarization evidence for this workflow run
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
         with:
           name: internal-macos-notarization-evidence
-          path: target/notarization-evidence/*.json
+          path: target/notarization-evidence/*
           if-no-files-found: error
           retention-days: 30
 

@@ -154,12 +154,14 @@ pub fn run(
             status_tray = None;
         }
         while let Some(command) = status_tray.as_ref().and_then(StatusTray::take_command) {
+            let action = control_surface::command_name(command);
             if let Err(error) = control_surface::handle_command(
                 command,
                 &mut world,
                 control_surface::open_configuration_tui,
+                control_surface::open_update_helper,
             ) {
-                eprintln!("honk300: Configure could not open ({error})");
+                eprintln!("honk300: {action} action could not start ({error})");
             }
         }
 

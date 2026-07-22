@@ -86,6 +86,9 @@ pub enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Internal terminal helper launched only by an operating-system control surface.
+    #[command(name = "__control-surface-update", hide = true)]
+    ControlSurfaceUpdate,
     /// Create or refresh the user config file.
     Setup {
         /// Use a specific config.toml instead of the per-user default.
@@ -233,7 +236,6 @@ fn invoked_name(arg0: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(windows)]
     use clap::CommandFactory;
 
     #[test]
@@ -425,6 +427,15 @@ mod tests {
 
         let update = Cli::try_parse_normalized(["honk300", "update", "--json"]).unwrap();
         assert_eq!(update.command, Some(Command::Update { json: true }));
+    }
+
+    #[test]
+    fn internal_control_surface_update_parses_but_stays_out_of_help() {
+        let cli = Cli::try_parse_normalized(["honk300", "__control-surface-update"]).unwrap();
+        assert_eq!(cli.command, Some(Command::ControlSurfaceUpdate));
+
+        let help = Cli::command().render_long_help().to_string();
+        assert!(!help.contains("__control-surface-update"));
     }
 
     #[test]

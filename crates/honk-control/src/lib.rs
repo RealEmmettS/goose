@@ -10,7 +10,7 @@ mod protocol;
 pub use platform::CommandServer;
 pub use platform::{
     send_command, wait_for_shutdown, wait_for_shutdown_lease, LifecycleLease, Singleton,
-    SingletonStatus,
+    SingletonStatus, UpdateGuard,
 };
 pub use protocol::{
     BundleStatus, CapabilityStatus, ControlCommand, ControlResponse, PlatformStatus, ProtocolError,
@@ -20,10 +20,12 @@ pub use protocol::{
 /// A user action emitted by an operating-system control surface.
 ///
 /// This is intentionally smaller than [`ControlCommand`]. Native trays and the macOS menu bar
-/// may open the existing configuration TUI or request the existing graceful shutdown, but they
-/// do not gain a second configuration model or a new IPC command namespace.
+/// may open the existing configuration TUI, launch the verified updater helper, or request the
+/// existing graceful shutdown, but they do not gain a second configuration model or a new IPC
+/// command namespace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ControlSurfaceCommand {
     Configure,
+    Update,
     Quit,
 }

@@ -593,6 +593,16 @@ struct UpdateReport {
     message: String,
 }
 
+/// Successful semantic result of one updater transaction.
+///
+/// The public command still owns all stdout formatting. The tray helper consumes this typed
+/// result so it can render a human completion screen without parsing the command's prose or JSON.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UpdateOutcome {
+    Updated,
+    UpToDate,
+}
+
 impl UpdateReport {
     fn new() -> Self {
         Self {
@@ -634,6 +644,52 @@ pub fn run(json: bool) -> Result<(), DynError> {
         eprintln!("{}", report.message);
     }
     result
+}
+
+/// Run the same verified updater transaction for the native control-surface helper.
+///
+/// Progress remains on stderr, exactly like the public command, but the helper owns the final
+/// terminal screen. Keeping this entry point typed also protects `update --json`'s one-object
+/// stdout contract from menu-specific output.
+pub(crate) fn run_for_control_surface() -> Result<UpdateOutcome, DynError> {
+    let mut report = UpdateReport::new();
+    run_inner(&mut report, false)?;
+    match report.result.as_str() {
+        "updated" => Ok(UpdateOutcome::Updated),
+        "up_to_date" => Ok(UpdateOutcome::UpToDate),
+        other => Err(format!(
+            "honk300 update: successful transaction returned unexpected result {other}"
+        )
+        .into()),
+    }
+}
+
+/// Resolve the executable owned by the currently authoritative protected receipt.
+///
+/// This is deliberately recomputed after an update or failure: an activated immutable slot may
+/// differ from the helper's still-mapped old executable, while a failed transaction may leave the
+/// old slot authoritative. Relaunch must follow the receipt, never the helper image or PATH.
+pub(crate) fn authoritative_installed_executable() -> Result<PathBuf, DynError> {
+    let target = current_release_target()
+        .ok_or("honk300 update: this OS/architecture is not part of the release matrix")?;
+    let source = detect_install_source();
+    // A Debian update atomically replaces the helper's mapped image. If ordinary discovery can
+    // no longer associate `/proc/self/exe` with the new path, exact dpkg ownership plus the fixed
+    // marker remains authoritative for recovery/relaunch; no install-path guess is accepted.
+    #[cfg(target_os = "linux")]
+    let source = if source == InstallSource::Unknown
+        && matches!(
+            target,
+            ReleaseTarget::LinuxX64Gnu | ReleaseTarget::LinuxArm64Gnu
+        )
+        && crate::debian::prove_installed_executable().is_ok()
+    {
+        InstallSource::Deb
+    } else {
+        source
+    };
+    let plan = select_update_plan(source, target)?;
+    strategy_owned_executable(plan.strategy, source, target)
 }
 
 fn run_inner(report: &mut UpdateReport, json: bool) -> Result<(), DynError> {
@@ -1205,7 +1261,7 @@ fn strategy_owned_executable(
                 "honk300 update: Debian package provenance does not match this target".into(),
             );
         }
-        return crate::debian::prove_current_executable(&std::env::current_exe()?);
+        return crate::debian::prove_installed_executable();
     }
     if strategy != UpdateStrategy::Shell || !(target.is_linux() || target.is_macos()) {
         return Err("honk300 update: no receipt-owned executable exists for this strategy".into());

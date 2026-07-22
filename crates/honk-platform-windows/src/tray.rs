@@ -28,6 +28,7 @@ const TRAY_CALLBACK_MESSAGE: u32 = WM_USER + 0x300;
 const NIN_KEYSELECT: u32 = NIN_SELECT + 1;
 const CONFIGURE_COMMAND_ID: usize = 1;
 const QUIT_COMMAND_ID: usize = 2;
+const UPDATE_COMMAND_ID: usize = 3;
 const TRAY_ICON_ID: u32 = 1;
 const ADD_RETRY_DELAY: Duration = Duration::from_millis(100);
 const ADD_FAILURE_NOTICE_AFTER: Duration = Duration::from_secs(3);
@@ -283,6 +284,12 @@ unsafe fn show_menu(hwnd: HWND, mut point: POINT) {
             CONFIGURE_COMMAND_ID,
             PCWSTR(wide("Configure Honk300…").as_ptr()),
         )?;
+        AppendMenuW(
+            menu,
+            MF_STRING,
+            UPDATE_COMMAND_ID,
+            PCWSTR(wide("Update Honk300…").as_ptr()),
+        )?;
         AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null())?;
         AppendMenuW(
             menu,
@@ -323,6 +330,7 @@ unsafe fn show_menu(hwnd: HWND, mut point: POINT) {
 fn command_for_menu_selection(selection: usize) -> Option<ControlSurfaceCommand> {
     match selection {
         CONFIGURE_COMMAND_ID => Some(ControlSurfaceCommand::Configure),
+        UPDATE_COMMAND_ID => Some(ControlSurfaceCommand::Update),
         QUIT_COMMAND_ID => Some(ControlSurfaceCommand::Quit),
         _ => None,
     }
@@ -475,6 +483,7 @@ mod tests {
         command_for_menu_selection, compose_tray_bgra, point_from_callback,
         smoke_tray_quit_message_name, write_utf16, ADD_FAILURE_NOTICE_AFTER, ADD_RETRY_DELAY,
         CONFIGURE_COMMAND_ID, DEGRADED_ADD_RETRY_DELAY, QUIT_COMMAND_ID, STATUS_ICON_PNG,
+        UPDATE_COMMAND_ID,
     };
     use honk_control::ControlSurfaceCommand;
     use std::ffi::OsStr;
@@ -528,6 +537,10 @@ mod tests {
         assert_eq!(
             command_for_menu_selection(CONFIGURE_COMMAND_ID),
             Some(ControlSurfaceCommand::Configure)
+        );
+        assert_eq!(
+            command_for_menu_selection(UPDATE_COMMAND_ID),
+            Some(ControlSurfaceCommand::Update)
         );
         assert_eq!(
             command_for_menu_selection(QUIT_COMMAND_ID),

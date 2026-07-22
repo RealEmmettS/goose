@@ -221,6 +221,12 @@ jobs:
           dbus-run-session --
           cargo test --locked -p honk-platform-linux --test linux_status_notifier --
           --ignored --test-threads=1
+      - name: Staged tray-helper Debian update and restart
+        if: ${{ matrix.gnu_target == 'x86_64-unknown-linux-gnu' }}
+        run: >-
+          xvfb-run -a -s '-screen 0 1920x1080x24'
+          env HONK300_EVIDENCE_DIR="$PWD/target/control-surface-updated-evidence"
+          sh script/smoke_control_surface_updated_deb.sh
       - name: Linux X11 and Wayland smoke
         run: |
           cargo build --locked --bin honk300
@@ -233,6 +239,13 @@ jobs:
         with:
           name: honk300-linux-overlay-ci-${{ matrix.gnu_target }}
           path: target/linux-overlay-evidence-${{ matrix.gnu_target }}
+          if-no-files-found: error
+      - name: Upload staged tray-helper update evidence
+        if: ${{ always() && matrix.gnu_target == 'x86_64-unknown-linux-gnu' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: honk300-control-surface-updated-ci
+          path: target/control-surface-updated-evidence
           if-no-files-found: error
       - name: Linux target checks
         env:

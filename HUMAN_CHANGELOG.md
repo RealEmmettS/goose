@@ -34,6 +34,24 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Latest — July 2026
 
 ### Added
+- **The Goose can now update itself from its tray menu.** Windows, Mac, and compatible Linux
+  desktops show an **Update Honk300…** choice beside settings and quit. Clicking it opens a
+  terminal and does the complete verified update without asking the person to type a command.
+  Opening the menu alone does not contact the internet.
+- **Updates finish with a clear, friendly result.** After installing a newer copy, Honk300 starts
+  again and the terminal clears to say the update is complete. If nothing changed, it picks one of
+  100 small goose messages but always plainly says there was nothing to update, the Goose is
+  current and running, and the window can be closed. Failures leave the useful details on screen
+  and say whether the installed Goose was successfully brought back. The window stays open until
+  the person closes it, so terminal settings cannot make the result vanish unexpectedly.
+
+### Improved
+- **The convenient button keeps the same update safety as the command.** It remembers whether the
+  Goose came from a Windows installer, Mac app, Linux package, or terminal install; checks the
+  exact download and owner; prevents two update windows from racing; and restarts only the copy
+  named by the verified installation record. Script-friendly update output is unchanged.
+
+### Added
 - **The easiest install is now one official command on every platform.** Windows shows the
   PowerShell command first, while Mac and Linux show the terminal command first. These are real
   managed installers that check the exact download, remember their ownership, and verify every

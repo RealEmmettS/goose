@@ -8,10 +8,10 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.3.0](https://github.com/RealEmmettS/goose/releases/tag/v1.3.0),
-published from exact commit `c350b06d1dbf6c2057eb2d5ebd625da2da9419b8`. On Windows, every typed
-start now returns after handing the goose to the branded app launcher and hidden runtime, so the
-originating terminal can close while the goose and notification-area controls remain alive.
+**Current stable release:** [v1.3.3](https://github.com/RealEmmettS/goose/releases/tag/v1.3.3),
+published from exact commit `43b018473a105dd30910b6804a73edc240486c8e`. The v1.3.4 release target
+adds a terminal-backed **Update Honk300…** action to every supported native control surface while
+preserving the same provenance-aware command updater and detached runtime lifecycle.
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
@@ -20,7 +20,10 @@ still assumed `Get-FileHash` existed. v1.2.6 replaces that optional dependency w
 SHA-256 and passed the complete candidate, same-SHA main, atomic publication, and eight-lane
 fresh-public-byte matrix on Windows, macOS, and Linux. v1.3.0 adds terminal-independent Windows
 start, a branded pinnable launcher icon, singleton-preserving app handoff, and nonblocking tray
-recovery for immediate restarts; its complete release matrix passed on both Windows architectures.
+recovery for immediate restarts; v1.3.1 keeps current protected-receipt discovery read-only,
+v1.3.2 hardens bootstrap architecture detection in app-hosted terminals, and v1.3.3 detaches the
+hidden runtime from breakaway-permitted integrated-terminal jobs. Each immutable patch completed
+the required cross-platform release and installed-Windows gate.
 
 ## Install
 
@@ -68,7 +71,10 @@ update checks correctly. Supported installer upgrades preserve settings and user
 
 While Honk300 is running, an accessible **Honk300 controls** notification-area icon offers
 **Configure Honk300…**, which launches the exact running copy's existing terminal settings
-screen, and **Quit Honk300**, which sends the goose through its normal full walk-off before exit.
+screen; **Update Honk300…**, which opens a new terminal and completes the verified update without
+manual typing; and **Quit Honk300**, which sends the goose through its normal full walk-off before
+exit. Opening the menu performs no update check. The update terminal stays open with an explicit
+success, no-op, or failure/recovery result until the user closes it.
 The fixed product icon returns after Explorer recreates the taskbar. If an unusual interactive
 session cannot host notification icons, Honk300 reports the limitation and keeps CLI/TUI/IPC
 control available.
@@ -106,11 +112,12 @@ Desktop pranks require Accessibility permission.
 
 Launch the installed app by double-clicking `~/Applications/Honk300.app`, or keep that app in
 the Dock as a launcher. While Honk300 is running, an accessible goose menu-bar icon offers
-**Configure Honk300…**, which opens the existing terminal settings screen, and **Quit Honk300**,
-which sends the goose walking fully offscreen before the app exits. The item exists only while
-the Mac app is running. Honk300 remains an agent app with no native settings window or running
-Dock control surface. v1.1.0 applies this same shared-icon and action contract to Windows and
-compatible Linux desktops.
+**Configure Honk300…**, which opens the existing terminal settings screen; **Update Honk300…**,
+which opens the signed bundle's exact update command in Terminal; and **Quit Honk300**, which sends
+the goose walking fully offscreen before the app exits. The update helper relaunches the verified
+installed app and leaves its final terminal result visible until the user closes it. The item
+exists only while the Mac app is running. Honk300 remains an agent app with no native settings
+window or running Dock control surface.
 
 When the exact managed app starts without Accessibility permission, it records a secure
 per-update prompt marker before asking macOS for consent and opening Privacy & Security >
@@ -166,9 +173,11 @@ exact immutable tag and verifies the selected platform artifact's kind, target, 
 before changing an owned installation.
 
 While Honk300 is running, desktops with a StatusNotifier watcher and host show the shared
-**Honk300 controls** item with the same Configure and graceful-Quit actions. Configure prefers
-`xdg-terminal-exec` and then known terminal argument-vector interfaces; it never interpolates a
-shell command. The icon is embedded in portable binaries, and Debian packages also own its
+**Honk300 controls** item with Configure, Update, and graceful-Quit actions. Configure and Update
+prefer `xdg-terminal-exec` and then known terminal argument-vector interfaces; they pass the exact
+executable and command as literal arguments and never interpolate a shell command. Update runs in
+a terminal, restarts the receipt-owned app after activation, and retains its final result until the
+window is closed. The icon is embedded in portable binaries, and Debian packages also own its
 hicolor-theme copy. Sessions without a compatible host or session bus log the explicit non-fatal
 reason while overlays, CLI/TUI/IPC, and supported mischief continue independently.
 
@@ -268,9 +277,9 @@ zero means the selected release, receipt, selector, and aliases were activated a
 
 | Platform | Architectures | Desktop path |
 | --- | --- | --- |
-| Windows | x64, ARM64 | PMv2 layered overlays, one per monitor; Configure/Quit notification-area item |
-| macOS 11+ | Intel, Apple Silicon | Universal LSUIElement app; capture-safe AppKit RGBA overlays, one per display; Configure/Quit menu-bar item |
-| Linux X11/XWayland | x64/ARM64, GNU/musl | Full overlay and supported mischief; Configure/Quit when a StatusNotifier host exists |
+| Windows | x64, ARM64 | PMv2 layered overlays, one per monitor; Configure/Update/Quit notification-area item |
+| macOS 11+ | Intel, Apple Silicon | Universal LSUIElement app; capture-safe AppKit RGBA overlays, one per display; Configure/Update/Quit menu-bar item |
+| Linux X11/XWayland | x64/ARM64, GNU/musl | Full overlay and supported mischief; Configure/Update/Quit when a StatusNotifier host exists |
 | Linux native Wayland | x64/ARM64, GNU/musl | Opt-in reduced overlay mode; independent StatusNotifier control when hosted |
 
 Linux collect-window behavior is unsupported and reported honestly. Exact signed-app macOS
@@ -298,7 +307,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.3.0
+dist plan --tag=v1.3.4
 cargo audit --version 0.22.2
 ```
 
@@ -329,6 +338,9 @@ ADR 0035 permits one narrow hosted x64 observation fallback only when an indepen
 tray probe fails identically; ordinary Windows CI still proves actual registration and recovery.
 ADR 0036 routes typed Windows starts through the branded GUI launcher and a hidden console-free
 runtime, while retaining bounded readiness, exact-sibling ownership, and terminal TUI behavior.
+ADR 0037 adds integrated-terminal Windows job breakaway with an access-denied-only fallback. ADR
+0038 extends the shared control surface with the out-of-process, serialized, terminal-backed
+update helper, receipt-owned relaunch/recovery, and explicit retained result screens.
 [`docs/readiness/v1.2.2-readiness.md`](docs/readiness/v1.2.2-readiness.md) records the completed
 semantic receipt-verifier fix-forward, candidate, same-SHA main, publication, and public-byte
 qualification. The v1.2.0/v1.2.1 reports preserve their immutable release evidence.
@@ -339,7 +351,10 @@ records the public release and failed Mac verifier assertion.
 Windows compatibility fix-forward, public-byte matrix, latest-alias audit, and production-site
 qualification. [`docs/readiness/v1.3.0-readiness.md`](docs/readiness/v1.3.0-readiness.md) records
 the detached Windows app-launch handoff, tray-recovery fix-forwards, native x64/ARM64 gates,
-atomic publication, and fresh-public-byte closure.
+atomic publication, and fresh-public-byte closure. [`docs/readiness/v1.3.3-readiness.md`](docs/readiness/v1.3.3-readiness.md)
+records the integrated-terminal job-breakaway release and installed proof. The active
+[`docs/readiness/v1.3.4-readiness.md`](docs/readiness/v1.3.4-readiness.md) gate tracks the
+cross-platform tray updater through immutable publication and physical Windows acceptance.
 
 ## License and assets
 

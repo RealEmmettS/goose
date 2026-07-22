@@ -112,6 +112,22 @@ impl Singleton {
     }
 }
 
+/// Exclusive ownership of a user-initiated update-helper transaction.
+///
+/// This guard is independent of the runtime singleton and [`LifecycleLease`]: it prevents two
+/// tray helpers from racing one another before either helper reaches the lifecycle transaction.
+/// Its platform lock is released by the kernel if the helper exits or crashes.
+pub struct UpdateGuard {
+    _imp: imp::UpdateGuard,
+}
+
+impl UpdateGuard {
+    /// Try to become the one active update helper for the current user.
+    pub fn acquire() -> io::Result<(Self, SingletonStatus)> {
+        imp::UpdateGuard::acquire().map(|(imp, status)| (Self { _imp: imp }, status))
+    }
+}
+
 /// Exclusive ownership of the process singleton for a managed lifecycle transaction.
 ///
 /// Unlike [`wait_for_shutdown`], this guard deliberately retains the singleton after the old
@@ -452,6 +468,44 @@ mod imp {
         }
     }
 
+    pub struct UpdateGuard {
+        handle: Option<HANDLE>,
+    }
+
+    impl UpdateGuard {
+        pub fn acquire() -> io::Result<(Self, SingletonStatus)> {
+            Self::acquire_named(&update_mutex_name())
+        }
+
+        fn acquire_named(name: &str) -> io::Result<(Self, SingletonStatus)> {
+            let name = wide_null(name);
+            let handle = unsafe { CreateMutexW(None, true, PCWSTR(name.as_ptr())) }
+                .map_err(|_| io::Error::last_os_error())?;
+            if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
+                unsafe {
+                    let _ = CloseHandle(handle);
+                }
+                return Ok((Self { handle: None }, SingletonStatus::AlreadyRunning));
+            }
+            Ok((
+                Self {
+                    handle: Some(handle),
+                },
+                SingletonStatus::Acquired,
+            ))
+        }
+    }
+
+    impl Drop for UpdateGuard {
+        fn drop(&mut self) {
+            if let Some(handle) = self.handle.take() {
+                unsafe {
+                    let _ = CloseHandle(handle);
+                }
+            }
+        }
+    }
+
     pub struct CommandServer {
         shutdown: Arc<AtomicBool>,
         join: Option<JoinHandle<()>>,
@@ -592,6 +646,10 @@ mod imp {
 
     fn mutex_name() -> String {
         format!("Local\\honk300-{}", user_hash())
+    }
+
+    fn update_mutex_name() -> String {
+        format!("Local\\honk300-update-{}", user_hash())
     }
 
     fn pipe_path() -> String {
@@ -784,6 +842,33 @@ mod imp {
         use super::*;
 
         #[test]
+        fn update_mutex_is_user_scoped_and_distinct_from_the_runtime_singleton() {
+            let name = update_mutex_name();
+            assert!(name.starts_with("Local\\honk300-update-"));
+            assert_ne!(name, mutex_name());
+        }
+
+        #[test]
+        fn update_mutex_denies_a_concurrent_helper_and_recovers_after_release() {
+            let name = format!(
+                "Local\\honk300-update-test-{}-{}",
+                std::process::id(),
+                Instant::now().elapsed().as_nanos()
+            );
+            let (first, status) = UpdateGuard::acquire_named(&name).unwrap();
+            assert_eq!(status, SingletonStatus::Acquired);
+
+            let (second, status) = UpdateGuard::acquire_named(&name).unwrap();
+            assert_eq!(status, SingletonStatus::AlreadyRunning);
+            drop(first);
+
+            let (third, status) = UpdateGuard::acquire_named(&name).unwrap();
+            assert_eq!(status, SingletonStatus::Acquired);
+            drop(second);
+            drop(third);
+        }
+
+        #[test]
         fn named_pipe_rejects_remote_clients() {
             assert_ne!(pipe_mode().0 & PIPE_REJECT_REMOTE_CLIENTS.0, 0);
         }
@@ -887,6 +972,33 @@ mod imp {
         fn acquire_at(path: &Path) -> io::Result<(Self, SingletonStatus)> {
             // Open (creating if needed) without truncating: the file is a lock target only, and a
             // concurrent holder's inode must be preserved so its lock stays meaningful.
+            let file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(path)?;
+            match flock(&file, FlockOperation::NonBlockingLockExclusive) {
+                Ok(()) => Ok((Self { _lock: Some(file) }, SingletonStatus::Acquired)),
+                Err(err) if err == Errno::WOULDBLOCK || err == Errno::AGAIN => {
+                    Ok((Self { _lock: None }, SingletonStatus::AlreadyRunning))
+                }
+                Err(err) => Err(io::Error::from(err)),
+            }
+        }
+    }
+
+    pub struct UpdateGuard {
+        _lock: Option<File>,
+    }
+
+    impl UpdateGuard {
+        pub fn acquire() -> io::Result<(Self, SingletonStatus)> {
+            let dir = secure_runtime_dir()?;
+            Self::acquire_at(&dir.join("update.lock"))
+        }
+
+        fn acquire_at(path: &Path) -> io::Result<(Self, SingletonStatus)> {
             let file = OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -1203,6 +1315,34 @@ mod imp {
 
             let _ = fs::remove_dir_all(&dir);
         }
+
+        #[test]
+        fn update_flock_is_exclusive_and_recovers_after_release() {
+            let dir = std::env::temp_dir().join(format!(
+                "honk300-update-flock-test-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|duration| duration.as_nanos())
+                    .unwrap_or_default()
+            ));
+            fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("update.lock");
+
+            let (first, status) = UpdateGuard::acquire_at(&path).unwrap();
+            assert_eq!(status, SingletonStatus::Acquired);
+            let (second, status) = UpdateGuard::acquire_at(&path).unwrap();
+            assert_eq!(status, SingletonStatus::AlreadyRunning);
+            drop(second);
+            drop(first);
+
+            assert!(path.exists());
+            let (third, status) = UpdateGuard::acquire_at(&path).unwrap();
+            assert_eq!(status, SingletonStatus::Acquired);
+            drop(third);
+
+            let _ = fs::remove_dir_all(&dir);
+        }
     }
 }
 
@@ -1215,6 +1355,14 @@ mod imp {
     pub struct Singleton;
 
     impl Singleton {
+        pub fn acquire() -> io::Result<(Self, SingletonStatus)> {
+            Ok((Self, SingletonStatus::Acquired))
+        }
+    }
+
+    pub struct UpdateGuard;
+
+    impl UpdateGuard {
         pub fn acquire() -> io::Result<(Self, SingletonStatus)> {
             Ok((Self, SingletonStatus::Acquired))
         }

@@ -26,6 +26,26 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- **One-click native tray updates (ADR 0038)** - Windows notification-area, macOS status-menu,
+  and compatible Linux StatusNotifier controls now include an always-visible **Update
+  Honk300…** action. It launches a hidden private command from the exact installed executable in
+  a visible terminal, runs the existing origin-preserving updater without manual typing, and
+  performs no network check merely from opening the menu.
+- **Verified app relaunch and visible completion** - the out-of-process helper serializes clicks
+  with a crash-recoverable per-user lock, follows the protected receipt to the active executable,
+  relaunches through the detached platform app path, and requires IPC readiness. Verified updates
+  clear to one fixed completion screen; no-op checks choose from exactly 100 goose-themed lines
+  while always stating the unchanged/current/running result; failures retain diagnostics and add
+  receipt-owned recovery status. The helper deliberately stays alive until its terminal is closed.
+
+### Changed
+- **Typed internal updater outcome** - the tray helper consumes a typed updated/up-to-date result
+  without parsing prose or changing `honk300 update [--json]`. Progress remains stderr-only,
+  machine output remains exactly one stdout JSON object, and read-only no-op receipt discovery,
+  origin/channel selection, exact-tag verification, rollback, cleanup-pending, autostart, and user
+  content contracts remain unchanged.
+
 ## [1.3.3] - 2026-07-19
 
 ### Fixed

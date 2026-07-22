@@ -100,6 +100,15 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn("MSI-extracted binary does not match the exact qualified build", WINDOWS_SMOKE)
         self.assertIn("installed binary does not match", WINDOWS_SMOKE)
 
+    def test_windows_public_smoke_proves_the_retained_no_op_update_helper(self) -> None:
+        self.assertIn("__control-surface-update", WINDOWS_SMOKE)
+        self.assertIn("There was nothing to update\\.", WINDOWS_SMOKE)
+        self.assertIn("Honk300 is already up to date and running\\.", WINDOWS_SMOKE)
+        self.assertIn("You may now close this window\\.", WINDOWS_SMOKE)
+        self.assertIn("public update helper did not remain alive", WINDOWS_SMOKE)
+        self.assertIn("public no-op update helper mutated the protected receipt", WINDOWS_SMOKE)
+        self.assertIn("helper_result=up_to_date_running_and_held", WINDOWS_SMOKE)
+
     def test_linux_post_release_smokes_exact_installed_binary_with_persistent_evidence(self) -> None:
         self.assertIn('HONK300_BIN="$BINARY"', UNIX_SMOKE)
         self.assertIn("smoke_m17_m18_linux.sh", UNIX_SMOKE)

@@ -12,9 +12,34 @@ MACOS = (WORKFLOWS / "macos-packaging.yml").read_text(encoding="utf-8")
 CI = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
 POST_RELEASE = (WORKFLOWS / "post-release-smoke.yml").read_text(encoding="utf-8")
 CARGO = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
+UPDATED_HELPER_FIXTURE = (
+    ROOT / "script" / "smoke_control_surface_updated_deb.sh"
+).read_text(encoding="utf-8")
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
+    def test_linux_ci_stages_a_real_helper_driven_debian_update(self) -> None:
+        for required in (
+            "Staged tray-helper Debian update and restart",
+            "smoke_control_surface_updated_deb.sh",
+            "honk300-control-surface-updated-ci",
+            "control-surface-updated-evidence",
+        ):
+            self.assertIn(required, CI)
+        for required in (
+            "__control-surface-update",
+            "Update complete.",
+            "Honk300 has restarted.",
+            "You may now close this window.",
+            "kill -0 \"$HELPER_PID\"",
+            "dpkg-query --search",
+            "result=updated_restarted_ready_and_held",
+            "package_deb.py",
+        ):
+            self.assertIn(required, UPDATED_HELPER_FIXTURE)
+        self.assertNotIn("HONK300_TEST_RELEASE_MANIFEST", UPDATED_HELPER_FIXTURE)
+        self.assertNotIn("HONK300_DOWNLOAD_BASE", UPDATED_HELPER_FIXTURE)
+
     def test_platform_packagers_are_reusable_producers_only(self) -> None:
         for workflow in (WINDOWS, MACOS):
             self.assertIn("workflow_call:", workflow)

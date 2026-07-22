@@ -14,8 +14,14 @@ Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of 
 `29714354769` passed. The immutable release has 47 assets and 22 manifest payloads;
 exact-tag/latest manifest and command-first bootstrap bytes match, production serves v1.3.3, and
 the official stripped-Codex-terminal machine install, no-op receipt immutability, detached runtime,
-and physical no-obscuration/lifecycle proof passed. Task `#r133` is complete.** M0-M19 are implemented
-in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
+and physical no-obscuration/lifecycle proof passed. Task `#r133` is complete.**
+
+**v1.3.4 is active on `codex/v1.3.4-tray-update` under task `#r134`: it adds the explicit
+terminal-backed Update action, serialized helper, receipt-owned relaunch/recovery, and retained
+completion screens on all three native control surfaces. No v1.3.4 tag exists until the full
+candidate and unchanged-main gates pass.**
+
+M0-M19 are implemented in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
 explicit forward-verification waivers rather than stronger native claims. The repo now has a Cargo workspace, a platform-free
@@ -264,13 +270,15 @@ are done.
   also uses `CREATE_BREAKAWAY_FROM_JOB` so integrated command runners do not retain the runtime;
   an access-denied job falls back to the same original windowless launch. That hidden process owns
   the runtime and tray independently of terminal lifetime. Background restarts/helpers must never
-  create or focus a terminal. Product startup performs no screen calibration; full-desktop
+  create or focus a terminal; the explicit user-invoked control-surface Update is the sole visible
+  helper exception. Product startup performs no screen calibration; full-desktop
   compositor surfaces are disposable-CI-only.
-- Starting, stopping, and configuration remain **CLI/TUI over local IPC** on every platform.
+- Starting, stopping, configuration, and updating remain **CLI/TUI-backed** on every platform.
   The macOS menu-bar item, Windows notification-area item, and compatible Linux StatusNotifier
-  item expose the same shared icon, accessible naming, existing-TUI Configure action, and engine-
-  owned graceful Quit. There is no native preferences model or global quit key; an unavailable
-  shell host is non-fatal and does not change overlay or mischief capability claims.
+  item expose the same shared icon, accessible naming, existing-TUI Configure action, explicit
+  terminal-backed Update action, and engine-owned graceful Quit. Opening a menu performs no
+  network check. There is no native preferences model or global quit key; an unavailable shell
+  host is non-fatal and does not change overlay or mischief capability claims.
 - Terminal windows are protected: the goose may visually overlay them, but must never move,
   focus, type into, drag, ride, collect, or otherwise manipulate terminal windows, including in
   spicy/default-off modes. Conservatively treat Codex and Visual Studio Code surfaces as terminal
@@ -352,6 +360,10 @@ are done.
 - Integrated-terminal Windows job breakaway and its access-denied fallback live in
   `docs/adr/0037-windows-terminal-job-breakaway.md`; it supersedes only ADR 0036's hidden-runtime
   creation flags and job-containment assumption.
+- The cross-platform tray Update action, serialized out-of-process terminal helper, typed updater
+  outcome, receipt-owned relaunch/recovery, and retained completion screens live in
+  `docs/adr/0038-cross-platform-tray-update-helper.md`; it supersedes only the Configure/Quit-only
+  limits in ADRs 0028 and 0030.
 
 ## Task management system
 
