@@ -410,8 +410,14 @@ try {
                 }
             }
             foreach ($copy in @($HelperStdoutCopy, $HelperStderrCopy)) {
-                if ($null -ne $copy -and -not $copy.Wait(5000)) {
-                    throw 'public update helper output drain did not finish within five seconds'
+                if ($null -eq $copy) { continue }
+                try {
+                    if (-not $copy.Wait(5000)) {
+                        Write-Warning 'public update helper output drain remained pending after process-tree cleanup; disposing its streams'
+                    }
+                }
+                catch {
+                    Write-Warning "public update helper output drain ended during process-tree cleanup: $($_.Exception.Message)"
                 }
             }
         }

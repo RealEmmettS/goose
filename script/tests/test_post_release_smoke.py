@@ -111,6 +111,11 @@ class PostReleaseSmokeTests(unittest.TestCase):
         self.assertIn(".Kill($true)", WINDOWS_SMOKE)
         self.assertIn(".WaitForExit(5000)", WINDOWS_SMOKE)
         self.assertNotIn("-RedirectStandardOutput $HelperStdout", WINDOWS_SMOKE)
+        self.assertIn("output drain remained pending after process-tree cleanup", WINDOWS_SMOKE)
+        self.assertNotIn(
+            "throw 'public update helper output drain did not finish within five seconds'",
+            WINDOWS_SMOKE,
+        )
         self.assertNotIn("& $Binary start | Out-Null", WINDOWS_SMOKE)
         self.assertIn("from the stopped runtime state", WINDOWS_SMOKE)
         self.assertIn("Stop-InstalledRuntimeBounded -Executable $Binary", WINDOWS_SMOKE)
