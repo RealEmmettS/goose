@@ -26,6 +26,8 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-07-22
+
 ### Changed
 - **A close cue that cannot blend into updater prose** - every retained tray-update result now
   separates the terminal status from a fixed-width ASCII panel. Successful and no-op results end

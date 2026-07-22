@@ -8,13 +8,11 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.3.4](https://github.com/RealEmmettS/goose/releases/tag/v1.3.4),
-published from exact commit `ee4d1f5fa135093591f802e828e86a0f03482bfc`. It adds a terminal-backed
-**Update Honk300…** action to every supported native control surface while preserving the same
-provenance-aware command updater and detached runtime lifecycle.
-
-The v1.3.5 patch target gives that retained updater window a high-contrast ASCII completion panel,
-so the close instruction remains unmistakable without relying on terminal color support.
+**Current stable release:** [v1.3.5](https://github.com/RealEmmettS/goose/releases/tag/v1.3.5),
+published from exact commit `9f26dc6eebd8dcc8762ba56d0e43115e37fba1d9`. It keeps v1.3.4's
+terminal-backed **Update Honk300…** action and provenance-aware detached update lifecycle, while
+giving every retained result window a clearly separated, color-independent success or attention
+panel so the close instruction cannot blend into ordinary updater prose.
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
@@ -25,8 +23,9 @@ fresh-public-byte matrix on Windows, macOS, and Linux. v1.3.0 adds terminal-inde
 start, a branded pinnable launcher icon, singleton-preserving app handoff, and nonblocking tray
 recovery for immediate restarts; v1.3.1 keeps current protected-receipt discovery read-only,
 v1.3.2 hardens bootstrap architecture detection in app-hosted terminals, v1.3.3 detaches the
-hidden runtime from breakaway-permitted integrated-terminal jobs, and v1.3.4 gives tray users a
-one-click verified update and restart path. Each immutable patch completed the required
+hidden runtime from breakaway-permitted integrated-terminal jobs, v1.3.4 gives tray users a
+one-click verified update and restart path, and v1.3.5 makes its retained terminal result
+unmistakable. Each immutable patch completed the required
 cross-platform release and installed-Windows gate.
 
 ## Install

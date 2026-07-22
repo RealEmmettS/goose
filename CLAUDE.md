@@ -8,18 +8,15 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.3.4 is the public stable/latest release at exact source commit
-`ee4d1f5fa135093591f802e828e86a0f03482bfc`; candidate `29890799498`, same-SHA main CI
-`29891307523`, atomic publication `29891756284`, and all-eight-lane fresh-public-byte run
-`29892244915` passed. The immutable release has 47 assets and 22 manifest payloads;
-exact-tag/latest manifest and command-first bootstrap bytes match, production serves v1.3.4, and
-the official public machine install, physical tray Update action, retained no-op screen, protected-
-receipt immutability, detached runtime readiness, and compositor proof passed. Task `#r134` is
-complete.**
-
-**v1.3.5 is active on `codex/v1.3.5-update-result-panel` under task `#r135`: it keeps ADR 0038's
-helper/lifecycle contract unchanged and makes the retained close instruction visually distinct
-with a fixed-width, color-independent success/attention panel.**
+**Current stage: v1.3.5 is the public stable/latest release at exact source commit
+`9f26dc6eebd8dcc8762ba56d0e43115e37fba1d9`; candidate `29894178066`, same-SHA main CI
+`29894694389`, atomic publication `29895311551`, and all-eight-lane fresh-public-byte run
+`29896246668` passed. The immutable release has 47 assets and 22 manifest payloads;
+exact-tag/latest manifest and command-first bootstrap bytes match, production serves v1.3.5, and
+the official public machine install, operator tray acceptance, protected-receipt immutability,
+and IPC-ready runtime proof passed. v1.3.5 keeps ADR 0038's lifecycle contract unchanged and makes
+the retained close instruction visually distinct with a fixed-width, color-independent
+success/attention panel. Task `#r135` is complete.**
 
 M0-M19 are implemented in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.

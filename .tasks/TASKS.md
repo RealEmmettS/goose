@@ -9,16 +9,16 @@
 ## To-Do
 
 ## Active
-- [ ] **Publish v1.3.5 updater result panel** - make the retained tray-helper close instruction unmistakable without relying on terminal colors, then publish/install the complete immutable patch (owner codex) #r135
+
+## Done
+- [x] **Publish v1.3.5 updater result panel** - made the retained tray-helper close instruction unmistakable with a color-independent ASCII result panel and published/installed the complete immutable patch (done 2026-07-22) (owner codex) #r135
   - [x] Preserve ADR 0038 semantics and select one aligned ASCII success/attention panel.
   - [x] Implement and test the separated result panel for updated, no-op, duplicate, lock, and failure outcomes.
   - [x] Pass the complete local release gate.
-  - [ ] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
-  - [ ] Publish immutable v1.3.5 and pass all fresh-public-byte plus production-site checks.
-  - [ ] Install official v1.3.5 and physically verify the tray completion panel and runtime/receipt behavior.
-  - [ ] Close readiness/board evidence and remove the merged release branch.
-
-## Done
+  - [x] Pass exact-SHA candidate and unchanged-main CI without creating a tag early.
+  - [x] Publish immutable v1.3.5 and pass all fresh-public-byte plus production-site checks.
+  - [x] Install official v1.3.5 and physically verify the tray completion panel and runtime/receipt behavior.
+  - [x] Close readiness/board evidence and remove the merged release branch.
 - [x] **Publish v1.3.4 cross-platform tray updater** - added a one-click terminal-backed Update action to every supported native tray, preserved updater provenance/lifecycle safety, and published/installed the fully qualified immutable patch (done 2026-07-21) (owner codex) #r134
   - [x] Record the shared tray-helper and relaunch contract in ADR 0038.
   - [x] Implement the private update helper, one-at-a-time guard, typed outcome, recovery relaunch, and 100 cute no-op messages.

@@ -25,8 +25,8 @@
 
 | Project | Status | Source |
 |---|---|---|
-| Honk300 | v1.3.4 stable/latest; v1.3.5 updater-result panel active | `#r135` |
-| Desktop Goose site | Production serves v1.3.4; verify v1.3.5 after atomic publication | `C:\Users\hey\git\desktop-goose-site` |
+| Honk300 | v1.3.5 stable/latest; updater-result panel released and accepted | `#r135` |
+| Desktop Goose site | Production serves verified v1.3.5; visual simplification requested next | `C:\Users\hey\git\desktop-goose-site` |
 | Post-v1 hardware verification | Alienware plus hosted/native Mac and Linux defense-in-depth; forward patches only | `#v1a` |
 
 ## Preferences
