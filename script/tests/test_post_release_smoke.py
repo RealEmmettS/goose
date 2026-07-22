@@ -102,6 +102,15 @@ class PostReleaseSmokeTests(unittest.TestCase):
 
     def test_windows_public_smoke_proves_the_retained_no_op_update_helper(self) -> None:
         self.assertIn("__control-surface-update", WINDOWS_SMOKE)
+        self.assertIn("[Diagnostics.ProcessStartInfo]::new()", WINDOWS_SMOKE)
+        self.assertIn("CopyToAsync", WINDOWS_SMOKE)
+        self.assertIn("[IO.FileShare]::ReadWrite", WINDOWS_SMOKE)
+        self.assertIn("[IO.FileOptions]::Asynchronous", WINDOWS_SMOKE)
+        self.assertIn("$HelperStarted = $false", WINDOWS_SMOKE)
+        self.assertIn("waiting up to two minutes", WINDOWS_SMOKE)
+        self.assertIn(".Kill($true)", WINDOWS_SMOKE)
+        self.assertIn(".WaitForExit(5000)", WINDOWS_SMOKE)
+        self.assertNotIn("-RedirectStandardOutput $HelperStdout", WINDOWS_SMOKE)
         self.assertIn("There was nothing to update\\.", WINDOWS_SMOKE)
         self.assertIn("Honk300 is already up to date and running\\.", WINDOWS_SMOKE)
         self.assertIn("You may now close this window\\.", WINDOWS_SMOKE)

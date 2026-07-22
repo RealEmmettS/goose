@@ -240,18 +240,54 @@ try {
     $HelperStdout = Join-Path $Root 'update-helper.stdout.txt'
     $HelperStderr = Join-Path $Root 'update-helper.stderr.txt'
     $HelperProcess = $null
+    $HelperStdoutStream = $null
+    $HelperStderrStream = $null
+    $HelperStdoutCopy = $null
+    $HelperStderrCopy = $null
+    $HelperStarted = $false
     try {
+        Write-Output 'Starting public update-helper no-op smoke.'
         & $Binary start | Out-Null
         if ((& $Binary status | Out-String) -notmatch 'honk300: running') {
             throw 'public update-helper smoke could not start the installed runtime'
         }
 
-        $HelperProcess = Start-Process `
-            -FilePath $Binary `
-            -ArgumentList '__control-surface-update' `
-            -RedirectStandardOutput $HelperStdout `
-            -RedirectStandardError $HelperStderr `
-            -PassThru
+        # Start-Process's file-redirection path can wait for a redirected console child to exit on
+        # some native ARM64 hosts. The helper deliberately never exits after rendering, so such a
+        # wait bypasses the deadline below forever. Start the exact binary through ProcessStartInfo
+        # and drain both pipes asynchronously into files that remain share-readable by this poller.
+        $HelperStart = [Diagnostics.ProcessStartInfo]::new()
+        $HelperStart.FileName = $Binary
+        [void]$HelperStart.ArgumentList.Add('__control-surface-update')
+        $HelperStart.UseShellExecute = $false
+        $HelperStart.CreateNoWindow = $true
+        $HelperStart.RedirectStandardOutput = $true
+        $HelperStart.RedirectStandardError = $true
+        $HelperProcess = [Diagnostics.Process]::new()
+        $HelperProcess.StartInfo = $HelperStart
+        if (-not $HelperProcess.Start()) {
+            throw 'public update helper process did not start'
+        }
+        $HelperStarted = $true
+        $HelperStdoutStream = [IO.FileStream]::new(
+            $HelperStdout,
+            [IO.FileMode]::Create,
+            [IO.FileAccess]::Write,
+            [IO.FileShare]::ReadWrite,
+            1,
+            [IO.FileOptions]::Asynchronous
+        )
+        $HelperStderrStream = [IO.FileStream]::new(
+            $HelperStderr,
+            [IO.FileMode]::Create,
+            [IO.FileAccess]::Write,
+            [IO.FileShare]::ReadWrite,
+            1,
+            [IO.FileOptions]::Asynchronous
+        )
+        $HelperStdoutCopy = $HelperProcess.StandardOutput.BaseStream.CopyToAsync($HelperStdoutStream)
+        $HelperStderrCopy = $HelperProcess.StandardError.BaseStream.CopyToAsync($HelperStderrStream)
+        Write-Output "Public update helper launched as PID $($HelperProcess.Id); waiting up to two minutes for its retained result screen."
         $HelperDeadline = [DateTime]::UtcNow.AddMinutes(2)
         do {
             Start-Sleep -Milliseconds 250
@@ -272,8 +308,12 @@ try {
         if ($HelperText -notmatch 'There was nothing to update\.' -or
             $HelperText -notmatch 'Honk300 is already up to date and running\.' -or
             $HelperText -notmatch 'You may now close this window\.') {
-            throw 'public update helper did not render the explicit no-op result contract'
+            $HelperError = if (Test-Path -LiteralPath $HelperStderr) {
+                Get-Content -LiteralPath $HelperStderr -Raw
+            } else { '' }
+            throw "public update helper did not render the explicit no-op result contract before its two-minute deadline: $HelperError"
         }
+        Write-Output 'Public update helper rendered the retained no-op result screen.'
         $HelperProcess.Refresh()
         if ($HelperProcess.HasExited) {
             throw 'public update helper did not remain alive after rendering its result'
@@ -295,14 +335,34 @@ try {
         ) | Set-Content -LiteralPath (Join-Path $OverlayEvidenceDirectory 'update-helper.txt') -Encoding utf8
     }
     finally {
-        if ($null -ne $HelperProcess) {
-            $HelperProcess.Refresh()
-            if (-not $HelperProcess.HasExited) {
-                Stop-Process -Id $HelperProcess.Id -Force -ErrorAction SilentlyContinue
-                Wait-Process -Id $HelperProcess.Id -ErrorAction SilentlyContinue
+        try {
+            if ($HelperStarted) {
+                $HelperProcess.Refresh()
+                if (-not $HelperProcess.HasExited) {
+                    try {
+                        $HelperProcess.Kill($true)
+                    }
+                    catch [InvalidOperationException] {
+                        # The helper may exit between Refresh and Kill; the bounded wait below
+                        # still proves that no process remains.
+                    }
+                }
+                if (-not $HelperProcess.WaitForExit(5000)) {
+                    throw "public update helper process tree did not exit within five seconds (PID $($HelperProcess.Id))"
+                }
+            }
+            foreach ($copy in @($HelperStdoutCopy, $HelperStderrCopy)) {
+                if ($null -ne $copy -and -not $copy.Wait(5000)) {
+                    throw 'public update helper output drain did not finish within five seconds'
+                }
             }
         }
-        & $Binary stop --force 2>$null | Out-Null
+        finally {
+            if ($null -ne $HelperStdoutStream) { $HelperStdoutStream.Dispose() }
+            if ($null -ne $HelperStderrStream) { $HelperStderrStream.Dispose() }
+            if ($null -ne $HelperProcess) { $HelperProcess.Dispose() }
+            & $Binary stop --force 2>$null | Out-Null
+        }
     }
 
     Require-MsiSuccess -Mode '/x' -Path $CurrentMsi
