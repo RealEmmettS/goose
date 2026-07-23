@@ -8,15 +8,15 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.3.5](https://github.com/RealEmmettS/goose/releases/tag/v1.3.5),
-published from exact commit `9f26dc6eebd8dcc8762ba56d0e43115e37fba1d9`. It keeps v1.3.4's
-terminal-backed **Update Honk300…** action and provenance-aware detached update lifecycle, while
-giving every retained result window a clearly separated, color-independent success or attention
-panel so the close instruction cannot blend into ordinary updater prose.
+**Current stable release:** [v1.3.6](https://github.com/RealEmmettS/goose/releases/tag/v1.3.6),
+published from exact commit `1c56bf5679d04f160d09e4765a866458cad024aa`. It makes mud an
+occasional accent: natural puddle trips move to a 3–5 minute cadence, their tracking window falls
+to 10–30 seconds, and fresh/direct mud defaults to 10 seconds without replacing an existing saved
+preference.
 
-The v1.3.6 patch target makes mud an occasional accent: natural puddle trips move to a 3–5 minute
-cadence, their tracking window falls to 10–30 seconds, and fresh/direct mud defaults to 10 seconds
-without replacing an existing saved preference.
+The v1.3.7 fix-forward target repairs a Windows self-update PowerShell argument-transport defect
+that v1.3.6 installed acceptance exposed before installer launch. v1.3.5 and its protected receipt
+remained unchanged; published v1.3.6 assets remain immutable.
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
@@ -28,9 +28,10 @@ start, a branded pinnable launcher icon, singleton-preserving app handoff, and n
 recovery for immediate restarts; v1.3.1 keeps current protected-receipt discovery read-only,
 v1.3.2 hardens bootstrap architecture detection in app-hosted terminals, v1.3.3 detaches the
 hidden runtime from breakaway-permitted integrated-terminal jobs, v1.3.4 gives tray users a
-one-click verified update and restart path, and v1.3.5 makes its retained terminal result
-unmistakable. Each immutable patch completed the required
-cross-platform release and installed-Windows gate.
+one-click verified update and restart path, v1.3.5 makes its retained terminal result
+unmistakable, and v1.3.6 calms the default mud cadence. Each published patch completed the required
+cross-platform release gates; the v1.3.6 installed-updater finding is retained honestly and fixed
+forward in v1.3.7.
 
 ## Install
 
@@ -314,7 +315,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.3.6
+dist plan --tag=v1.3.7
 cargo audit --version 0.22.2
 ```
 
@@ -349,7 +350,9 @@ ADR 0037 adds integrated-terminal Windows job breakaway with an access-denied-on
 0038 extends the shared control surface with the out-of-process, serialized, terminal-backed
 update helper, receipt-owned relaunch/recovery, and explicit retained result screens. ADR 0039
 supersedes only the original mud timing defaults with a calmer cadence while preserving the
-puddle-hop story, saved user duration, footprint fade, and stable config shape.
+puddle-hop story, saved user duration, footprint fade, and stable config shape. ADR 0040 makes
+the Windows updater's generated archive-path check safe across PowerShell argument transport
+without relaxing traversal rejection or lifecycle ownership.
 [`docs/readiness/v1.2.2-readiness.md`](docs/readiness/v1.2.2-readiness.md) records the completed
 semantic receipt-verifier fix-forward, candidate, same-SHA main, publication, and public-byte
 qualification. The v1.2.0/v1.2.1 reports preserve their immutable release evidence.
@@ -366,7 +369,8 @@ records the integrated-terminal job-breakaway release and installed proof.
 cross-platform tray updater, immutable publication, public-byte matrix, production site, and
 physical Windows acceptance. [`docs/readiness/v1.3.6-readiness.md`](docs/readiness/v1.3.6-readiness.md)
 tracks the calmer-mud patch through exact candidate, publication, public bytes, and installed
-acceptance.
+acceptance. [`docs/readiness/v1.3.7-readiness.md`](docs/readiness/v1.3.7-readiness.md) tracks the
+immutable Windows updater fix-forward and final installed acceptance.
 
 ## License and assets
 

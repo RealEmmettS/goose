@@ -26,6 +26,16 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.3.7] - 2026-07-23
+
+### Fixed
+- **Windows self-update lifecycle archive handoff (ADR 0040)** - generated Windows PowerShell now
+  represents the archive-entry backslash as `[char]92` instead of transporting a quote-adjacent
+  literal through `powershell.exe -Command`. This preserves the same traversal rejection and
+  verified lease-extraction contract while preventing the expression from arriving as an empty
+  `String.Replace` search value. The v1.3.6 updater failed safely before activation and left the
+  v1.3.5 receipt/install untouched; v1.3.7 is the immutable fix-forward.
+
 ## [1.3.6] - 2026-07-23
 
 ### Changed

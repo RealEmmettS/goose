@@ -365,7 +365,7 @@ fn windows_update_helper_invocation(
            Add-Type -AssemblyName System.IO.Compression; \
            Add-Type -AssemblyName System.IO.Compression.FileSystem; \
            $zip=[IO.Compression.ZipArchive]::new($lifecycleStream,[IO.Compression.ZipArchiveMode]::Read,$true); \
-           try {{ $entries=@($zip.Entries | Where-Object {{ $_.Name -ieq 'honk300.exe' }}); if ($entries.Count -ne 1) {{ throw \"portable lifecycle archive must contain exactly one honk300.exe; found $($entries.Count)\" }}; $entry=$entries[0]; $segments=@($entry.FullName.Replace('\','/').Split('/') | Where-Object {{ $_ -ne '' }}); if ($entry.FullName.Contains('\') -or $entry.FullName.Contains(':') -or $segments.Count -eq 0 -or $segments -contains '.' -or $segments -contains '..') {{ throw 'portable lifecycle archive contains an unsafe executable path' }}; $leaseBinary=Join-Path $leaseRoot 'lifecycle-honk300.exe'; [IO.Compression.ZipFileExtensions]::ExtractToFile($entry,$leaseBinary,$false) }} finally {{ $zip.Dispose() }}; \
+            try {{ $entries=@($zip.Entries | Where-Object {{ $_.Name -ieq 'honk300.exe' }}); if ($entries.Count -ne 1) {{ throw \"portable lifecycle archive must contain exactly one honk300.exe; found $($entries.Count)\" }}; $entry=$entries[0]; $segments=@($entry.FullName.Replace([char]92,'/').Split('/') | Where-Object {{ $_ -ne '' }}); if ($entry.FullName.Contains([char]92) -or $entry.FullName.Contains(':') -or $segments.Count -eq 0 -or $segments -contains '.' -or $segments -contains '..') {{ throw 'portable lifecycle archive contains an unsafe executable path' }}; $leaseBinary=Join-Path $leaseRoot 'lifecycle-honk300.exe'; [IO.Compression.ZipFileExtensions]::ExtractToFile($entry,$leaseBinary,$false) }} finally {{ $zip.Dispose() }}; \
            $start=[Diagnostics.ProcessStartInfo]::new(); $start.FileName=$leaseBinary; $start.UseShellExecute=$false; $start.CreateNoWindow=$true; $start.RedirectStandardInput=$true; $start.RedirectStandardOutput=$true; $start.RedirectStandardError=$true; $start.EnvironmentVariables['HONK300_INTERNAL_HOLD_LIFECYCLE_LEASE']='1'; \
            $lease=[Diagnostics.Process]::new(); $lease.StartInfo=$start; if (-not $lease.Start()) {{ throw 'failed to start verified lifecycle lease holder' }}; \
            $ready=$lease.StandardOutput.ReadLine(); if ($ready -ne 'HONK300_INTERNAL_LIFECYCLE_LEASE_READY') {{ $failure=$lease.StandardError.ReadToEnd().Trim(); throw \"verified lifecycle helper could not acquire exclusive runtime ownership: $failure\" }}; \
@@ -2163,6 +2163,11 @@ mod tests {
         assert!(invocation
             .script
             .contains("[IO.Compression.ZipArchive]::new($lifecycleStream"));
+        assert!(invocation
+            .script
+            .contains(".Replace([char]92,'/').Split('/')"));
+        assert!(invocation.script.contains(".Contains([char]92)"));
+        assert!(!invocation.script.contains(r".Replace('\','/')"));
         assert!(!invocation.script.contains("rstrtmgr.dll"));
         assert!(!invocation.script.contains("AssertUnlocked"));
         assert!(invocation.script.contains("$delegateReacquires=$false"));
@@ -2271,6 +2276,26 @@ mod tests {
             );
             break;
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_powershell_argument_transport_preserves_archive_backslash_check() {
+        let probe = r#"$entry='dir\honk300.exe'; $segments=@($entry.Replace([char]92,'/').Split('/') | Where-Object { $_ -ne '' }); [Console]::Out.Write(($segments -join '|') + ';' + $entry.Contains([char]92))"#;
+        let output = Command::new("powershell")
+            .args(["-NoProfile", "-Command", probe])
+            .output()
+            .expect("Windows PowerShell must be available on Windows");
+
+        assert!(
+            output.status.success(),
+            "PowerShell argument transport changed the archive-path expression: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            "dir|honk300.exe;True"
+        );
     }
 
     #[test]

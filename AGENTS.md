@@ -8,20 +8,21 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.3.5 is the public stable/latest release at exact source commit
-`9f26dc6eebd8dcc8762ba56d0e43115e37fba1d9`; candidate `29894178066`, same-SHA main CI
-`29894694389`, atomic publication `29895311551`, and all-eight-lane fresh-public-byte run
-`29896246668` passed. The immutable release has 47 assets and 22 manifest payloads;
-exact-tag/latest manifest and command-first bootstrap bytes match, production serves v1.3.5, and
-the official public machine install, operator tray acceptance, protected-receipt immutability,
-and IPC-ready runtime proof passed. v1.3.5 keeps ADR 0038's lifecycle contract unchanged and makes
-the retained close instruction visually distinct with a fixed-width, color-independent
-success/attention panel. Task `#r135` is complete.**
+**Current stage: v1.3.6 is the public stable/latest release at exact source commit
+`1c56bf5679d04f160d09e4765a866458cad024aa`; PR CI `29984758143`, candidate `29985258824`,
+same-SHA main CI `29985922883`, atomic publication `29986578201`, and all-eight-lane
+fresh-public-byte run `29987240456` passed. The immutable release has 47 assets and 22 manifest
+payloads; exact-tag/latest manifest and command-first bootstrap bytes match, and production serves
+verified v1.3.6. ADR 0039 moves automatic puddle hops from 70–160 to 180–300 seconds apart,
+shortens their tracking from 30–90 to 10–30 seconds, and changes the fresh/direct default from 15
+to 10 seconds without migrating saved values or changing footprint fade or config schema.**
 
-**v1.3.6 is active on `codex/v1.3.6-calmer-mud` under task `#r136`: ADR 0039 moves automatic
-puddle hops from 70–160 to 180–300 seconds apart, shortens their tracking from 30–90 to 10–30
-seconds, and changes the fresh/direct default from 15 to 10 seconds without migrating saved
-values or changing footprint fade, config schema, platform, packaging, or lifecycle contracts.**
+**Official installed acceptance exposed a safe pre-activation Windows self-update defect:
+v1.3.5 selected v1.3.6, but its generated PowerShell archive-path expression arrived as an empty
+`String.Replace` search value. The installed bytes and protected receipt remained unchanged.
+v1.3.7 is active on `codex/v1.3.7-windows-update-lease-path` under `#r137`; ADR 0040 preserves
+the same archive traversal and verified-lease contract while using transport-safe `[char]92`.
+Published v1.3.6 remains immutable; `#r136` closes with v1.3.7 installed acceptance.**
 
 M0-M19 are implemented in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
@@ -369,6 +370,9 @@ are done.
 - The calmer default automatic/manual mud timing lives in
   `docs/adr/0039-calmer-default-mud-cadence.md`; it supersedes only ADR 0016's original numeric
   mud cadence and duration defaults.
+- The Windows updater's transport-safe PowerShell archive-path representation lives in
+  `docs/adr/0040-windows-updater-powershell-archive-path-transport.md`; it preserves the existing
+  traversal rejection, verified lifecycle lease, receipt, and slot contracts.
 
 ## Task management system
 

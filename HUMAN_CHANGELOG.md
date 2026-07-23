@@ -33,6 +33,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Fixed
+- **Windows updates no longer stumble over a backslash while preparing their safety helper.**
+  The failed update stopped before changing the installed Goose, and the repair keeps the same
+  checks against unsafe archive paths. This is a new patch rather than a rewrite of already
+  published downloads.
+
 ### Improved
 - **Mud is now an occasional mess instead of a near-constant one.** The Goose waits roughly
   three to five minutes between natural puddle trips and tracks new footprints for only 10–30
