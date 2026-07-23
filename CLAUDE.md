@@ -8,21 +8,22 @@ A from-scratch, cross-platform (Windows/macOS/Linux) **Rust reimplementation of 
 Goose** (Samperson's desktop-pet). Target binary: **`honk300`** — a member of this machine's
 `*300` tool family (siblings: TR300, ND300, WB300). `README.md` holds the one-paragraph brief.
 
-**Current stage: v1.3.6 is the public stable/latest release at exact source commit
-`1c56bf5679d04f160d09e4765a866458cad024aa`; PR CI `29984758143`, candidate `29985258824`,
-same-SHA main CI `29985922883`, atomic publication `29986578201`, and all-eight-lane
-fresh-public-byte run `29987240456` passed. The immutable release has 47 assets and 22 manifest
-payloads; exact-tag/latest manifest and command-first bootstrap bytes match, and production serves
-verified v1.3.6. ADR 0039 moves automatic puddle hops from 70–160 to 180–300 seconds apart,
-shortens their tracking from 30–90 to 10–30 seconds, and changes the fresh/direct default from 15
-to 10 seconds without migrating saved values or changing footprint fade or config schema.**
+**Current stage: v1.3.7 is the public stable/latest release at exact source commit
+`7174688b50c70c2eab560ab5eaed30550c9f6731`; PR CI `29988527347`, candidate `29988988972`,
+same-SHA main CI `29989644065`, atomic publication `29990311702`, and all-eight-lane
+fresh-public-byte run `29990841463` passed. The immutable release has 47 assets and 22 manifest
+payloads; exact-tag/latest manifest SHA-256
+`24087dbc43fb7ac079a9e901ab7fe8e8a132680e651bd11e1b3b96d57d2d0e1a` and PowerShell
+bootstrap SHA-256 `cd51fb23a8a7d704d9ea6de9b0ff2e4b86b89d1bfaf2027ff191f298efa0fc78`
+match, and production serves verified v1.3.7.**
 
-**Official installed acceptance exposed a safe pre-activation Windows self-update defect:
-v1.3.5 selected v1.3.6, but its generated PowerShell archive-path expression arrived as an empty
-`String.Replace` search value. The installed bytes and protected receipt remained unchanged.
-v1.3.7 is active on `codex/v1.3.7-windows-update-lease-path` under `#r137`; ADR 0040 preserves
-the same archive traversal and verified-lease contract while using transport-safe `[char]92`.
-Published v1.3.6 remains immutable; `#r136` closes with v1.3.7 installed acceptance.**
+**ADR 0039 keeps v1.3.6's calmer mud contract: automatic puddle hops move from 70–160 to
+180–300 seconds apart, tracking falls from 30–90 to 10–30 seconds, and fresh/direct mud defaults
+from 15 to 10 seconds without migrating saved values or changing footprint fade or config schema.
+ADR 0040 fixes forward the safe pre-activation Windows self-update defect exposed by v1.3.6,
+preserving the archive traversal and verified-lease contract while using transport-safe
+`[char]92`. Official installed acceptance remains open because the v1.3.7 bootstrap's Windows
+administrator prompt was not approved; v1.3.5 and its protected receipt remain unchanged.**
 
 M0-M19 are implemented in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.

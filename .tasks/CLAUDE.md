@@ -25,8 +25,8 @@
 
 | Project | Status | Source |
 |---|---|---|
-| Honk300 | v1.3.6 stable/latest; v1.3.7 Windows updater fix-forward active | `#r136`, `#r137` |
-| Desktop Goose site | Production serves verified v1.3.6; visual simplification requested next | `C:\Users\hey\git\desktop-goose-site` |
+| Honk300 | v1.3.7 stable/latest; hosted/public gates passed, Windows installed acceptance open | `#r136`, `#r137` |
+| Desktop Goose site | Production serves verified v1.3.7; visual simplification requested next | `C:\Users\hey\git\desktop-goose-site` |
 | Post-v1 hardware verification | Alienware plus hosted/native Mac and Linux defense-in-depth; forward patches only | `#v1a` |
 
 ## Preferences

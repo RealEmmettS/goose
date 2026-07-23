@@ -14,8 +14,9 @@
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
   - [x] Add exact generated-script and real PowerShell argument-transport regressions.
   - [x] Pass the complete local and committed-tree v1.3.7 release gate.
-  - [ ] Pass exact-SHA candidate/main qualification and publish immutable v1.3.7.
-  - [ ] Pass all public-byte/site checks and official Windows installed acceptance.
+  - [x] Pass exact-SHA candidate/main qualification and publish immutable v1.3.7.
+  - [x] Pass all fresh-public-byte lanes and production-site checks.
+  - [ ] Pass official Windows installed acceptance.
   - [ ] Close #r136/#r137 on synchronized main and remove every merged local/remote branch.
 - [ ] **Publish v1.3.6 calmer mud cadence** - reduce default automatic and manual mud while preserving saved config and complete immutable release qualification (owner codex) #r136
   - [x] Record ADR 0039 and implement the new automatic/manual defaults.

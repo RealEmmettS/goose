@@ -8,15 +8,12 @@ and terminal settings screen.
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.3.6](https://github.com/RealEmmettS/goose/releases/tag/v1.3.6),
-published from exact commit `1c56bf5679d04f160d09e4765a866458cad024aa`. It makes mud an
-occasional accent: natural puddle trips move to a 3–5 minute cadence, their tracking window falls
-to 10–30 seconds, and fresh/direct mud defaults to 10 seconds without replacing an existing saved
-preference.
-
-The v1.3.7 fix-forward target repairs a Windows self-update PowerShell argument-transport defect
-that v1.3.6 installed acceptance exposed before installer launch. v1.3.5 and its protected receipt
-remained unchanged; published v1.3.6 assets remain immutable.
+**Current stable release:** [v1.3.7](https://github.com/RealEmmettS/goose/releases/tag/v1.3.7),
+published from exact commit `7174688b50c70c2eab560ab5eaed30550c9f6731`. It retains v1.3.6's
+calmer mud defaults—natural puddle trips every 3–5 minutes, automatic tracking for 10–30 seconds,
+and a 10-second fresh/direct default without replacing an existing saved preference—and repairs
+the Windows self-update PowerShell archive-path handoff exposed during v1.3.6 installed
+acceptance. Published v1.3.6 assets remain immutable.
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
