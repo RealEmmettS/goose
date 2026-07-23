@@ -17,7 +17,8 @@
   - [x] Pass exact-SHA candidate/main qualification and publish immutable v1.3.7.
   - [x] Pass all fresh-public-byte lanes and production-site checks.
   - [ ] Pass official Windows installed acceptance.
-  - [ ] Close #r136/#r137 on synchronized main and remove every merged local/remote branch.
+  - [x] Remove every merged local/remote release branch and return to synchronized main.
+  - [ ] Close #r136/#r137 after official Windows installed acceptance.
 - [ ] **Publish v1.3.6 calmer mud cadence** - reduce default automatic and manual mud while preserving saved config and complete immutable release qualification (owner codex) #r136
   - [x] Record ADR 0039 and implement the new automatic/manual defaults.
   - [x] Add default-contract, compatibility, and isolated-config behavior proof.
@@ -25,7 +26,8 @@
   - [x] Pass exact-SHA candidate and unchanged-main CI before tagging.
   - [x] Publish immutable v1.3.6 and pass all fresh-public-byte plus production-site checks.
   - [ ] Install official v1.3.6 and verify public behavior, provenance, receipt, and runtime.
-  - [ ] Close evidence, merge everything to main, and remove merged local/remote branches.
+  - [x] Merge all source/evidence to main and remove merged local/remote release branches.
+  - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
 - [x] **Publish v1.3.5 updater result panel** - made the retained tray-helper close instruction unmistakable with a color-independent ASCII result panel and published/installed the complete immutable patch (done 2026-07-22) (owner codex) #r135
