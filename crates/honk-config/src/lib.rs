@@ -195,7 +195,7 @@ pub struct MudConfig {
 impl Default for MudConfig {
     fn default() -> Self {
         Self {
-            duration_to_track_seconds: 15.0,
+            duration_to_track_seconds: 10.0,
             footmark_lifetime_seconds: 8.5,
             footmark_shrink_seconds: 1.0,
         }
@@ -1403,7 +1403,38 @@ mod tests {
         assert!(!c.audio.enabled);
         assert!(c.audio.honk);
         assert_eq!(c.mouse.grab_distance, 60.0);
+        assert_eq!(c.mud.duration_to_track_seconds, 10.0);
         assert!(!c.lifecycle.autostart_on_login);
+    }
+
+    #[test]
+    fn explicit_existing_mud_duration_survives_round_trip_and_reaches_world_options() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(
+            &path,
+            format!(
+                "goose_config_version = {CONFIG_VERSION}\n\
+                 [mud]\n\
+                 duration_to_track_seconds = 15.0\n"
+            ),
+        )
+        .unwrap();
+
+        let config = Config::load_existing(&path).unwrap();
+        assert_eq!(config.mud.duration_to_track_seconds, 15.0);
+        assert_eq!(
+            config
+                .effective_options(backend(), CliOverrides::default())
+                .world
+                .parameters
+                .duration_to_track_mud,
+            15.0
+        );
+
+        config.save_atomic(&path).unwrap();
+        let reloaded = Config::load_existing(&path).unwrap();
+        assert_eq!(reloaded.mud.duration_to_track_seconds, 15.0);
     }
 
     #[test]

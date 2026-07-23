@@ -25,7 +25,7 @@
 
 | Project | Status | Source |
 |---|---|---|
-| Honk300 | v1.3.5 stable/latest; updater-result panel released and accepted | `#r135` |
+| Honk300 | v1.3.6 calmer-mud patch active from verified v1.3.5 stable/latest | `#r136` |
 | Desktop Goose site | Production serves verified v1.3.5; visual simplification requested next | `C:\Users\hey\git\desktop-goose-site` |
 | Post-v1 hardware verification | Alienware plus hosted/native Mac and Linux defense-in-depth; forward patches only | `#v1a` |
 

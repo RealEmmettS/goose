@@ -14,6 +14,10 @@ terminal-backed **Update Honk300…** action and provenance-aware detached updat
 giving every retained result window a clearly separated, color-independent success or attention
 panel so the close instruction cannot blend into ordinary updater prose.
 
+The v1.3.6 patch target makes mud an occasional accent: natural puddle trips move to a 3–5 minute
+cadence, their tracking window falls to 10–30 seconds, and fresh/direct mud defaults to 10 seconds
+without replacing an existing saved preference.
+
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
 successfully. Its public Mac/Linux/Debian lanes passed, while Windows exposed that the bootstrap
@@ -310,7 +314,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.3.5
+dist plan --tag=v1.3.6
 cargo audit --version 0.22.2
 ```
 
@@ -343,7 +347,9 @@ ADR 0036 routes typed Windows starts through the branded GUI launcher and a hidd
 runtime, while retaining bounded readiness, exact-sibling ownership, and terminal TUI behavior.
 ADR 0037 adds integrated-terminal Windows job breakaway with an access-denied-only fallback. ADR
 0038 extends the shared control surface with the out-of-process, serialized, terminal-backed
-update helper, receipt-owned relaunch/recovery, and explicit retained result screens.
+update helper, receipt-owned relaunch/recovery, and explicit retained result screens. ADR 0039
+supersedes only the original mud timing defaults with a calmer cadence while preserving the
+puddle-hop story, saved user duration, footprint fade, and stable config shape.
 [`docs/readiness/v1.2.2-readiness.md`](docs/readiness/v1.2.2-readiness.md) records the completed
 semantic receipt-verifier fix-forward, candidate, same-SHA main, publication, and public-byte
 qualification. The v1.2.0/v1.2.1 reports preserve their immutable release evidence.
@@ -358,7 +364,9 @@ atomic publication, and fresh-public-byte closure. [`docs/readiness/v1.3.3-readi
 records the integrated-terminal job-breakaway release and installed proof.
 [`docs/readiness/v1.3.4-readiness.md`](docs/readiness/v1.3.4-readiness.md) records the completed
 cross-platform tray updater, immutable publication, public-byte matrix, production site, and
-physical Windows acceptance.
+physical Windows acceptance. [`docs/readiness/v1.3.6-readiness.md`](docs/readiness/v1.3.6-readiness.md)
+tracks the calmer-mud patch through exact candidate, publication, public bytes, and installed
+acceptance.
 
 ## License and assets
 

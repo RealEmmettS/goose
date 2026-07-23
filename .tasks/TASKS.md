@@ -9,6 +9,14 @@
 ## To-Do
 
 ## Active
+- [ ] **Publish v1.3.6 calmer mud cadence** - reduce default automatic and manual mud while preserving saved config and complete immutable release qualification (owner codex) #r136
+  - [x] Record ADR 0039 and implement the new automatic/manual defaults.
+  - [x] Add default-contract, compatibility, and isolated-config behavior proof.
+  - [x] Pass the complete local release gate.
+  - [ ] Pass exact-SHA candidate and unchanged-main CI before tagging.
+  - [ ] Publish immutable v1.3.6 and pass all fresh-public-byte plus production-site checks.
+  - [ ] Install official v1.3.6 and verify public behavior, provenance, receipt, and runtime.
+  - [ ] Close evidence, merge everything to main, and remove merged local/remote branches.
 
 ## Done
 - [x] **Publish v1.3.5 updater result panel** - made the retained tray-helper close instruction unmistakable with a color-independent ASCII result panel and published/installed the complete immutable patch (done 2026-07-22) (owner codex) #r135

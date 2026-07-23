@@ -3185,7 +3185,10 @@ mod tests {
         let mut w = World::new(bounds(), 20);
         assert!(w.goose.track_mud_end_time < w.now());
         assert_eq!(w.poke(PokeAction::Mud), PokeOutcome::Applied);
-        assert!(w.goose.track_mud_end_time > w.now());
+        assert!(
+            (w.goose.track_mud_end_time - (w.now() + 10.0)).abs() < f64::EPSILON,
+            "the default direct mud command must use the ADR 0039 ten-second window"
+        );
     }
 
     #[test]

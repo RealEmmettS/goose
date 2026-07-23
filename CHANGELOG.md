@@ -26,6 +26,16 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-07-23
+
+### Changed
+- **Calmer default mud cadence (ADR 0039)** - automatic puddle hops now occur every 180–300
+  seconds instead of every 70–160 seconds, and their tracking window is 10–30 seconds instead of
+  30–90 seconds. Fresh and direct mud defaults to 10 seconds instead of 15; existing explicit
+  `mud.duration_to_track_seconds` values remain authoritative. The 8–15 second puddle trip,
+  footprint lifetime/fade, rendering, sounds, manners, deterministic task flow, config schema,
+  and TOML/TUI surface are unchanged.
+
 ## [1.3.5] - 2026-07-22
 
 ### Changed

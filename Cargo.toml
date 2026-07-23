@@ -44,7 +44,7 @@ tiny-skia = { version = "0.11", features = ["png-format"] }
 # Windows overlay; M10 adds CLI/IPC control, and M12 owns the full config TUI.
 [package]
 name = "honk300"
-version = "1.3.5"
+version = "1.3.6"
 description = "Cross-platform Desktop Goose — a procedural goose that roams your screen"
 edition.workspace = true
 rust-version.workspace = true

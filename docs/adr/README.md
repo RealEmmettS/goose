@@ -49,3 +49,4 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0036 — Windows CLI Start App-Launcher Handoff](./0036-windows-cli-start-app-launch-handoff.md)
 - [0037 — Windows Integrated-Terminal Job Breakaway](./0037-windows-terminal-job-breakaway.md)
 - [0038 — Cross-Platform Tray Update Helper](./0038-cross-platform-tray-update-helper.md)
+- [0039 — Calmer Default Mud Cadence](./0039-calmer-default-mud-cadence.md)

@@ -626,7 +626,7 @@ step_time_charged    = 0.1
 stop_radius          = -10.0
 
 [mud]
-duration_to_track_seconds = 15.0          # verified DurationToTrackMud
+duration_to_track_seconds = 10.0          # v1.3.6 tuned default (ADR 0039)
 footmark_lifetime_seconds = 8.5           # verified FootMark.Lifetime
 footmark_shrink_seconds   = 1.0           # verified FootMark.ShrinkTime
 

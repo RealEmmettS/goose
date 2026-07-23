@@ -18,6 +18,11 @@ and IPC-ready runtime proof passed. v1.3.5 keeps ADR 0038's lifecycle contract u
 the retained close instruction visually distinct with a fixed-width, color-independent
 success/attention panel. Task `#r135` is complete.**
 
+**v1.3.6 is active on `codex/v1.3.6-calmer-mud` under task `#r136`: ADR 0039 moves automatic
+puddle hops from 70–160 to 180–300 seconds apart, shortens their tracking from 30–90 to 10–30
+seconds, and changes the fresh/direct default from 15 to 10 seconds without migrating saved
+values or changing footprint fade, config schema, platform, packaging, or lifecycle contracts.**
+
 M0-M19 are implemented in-tree. M16.1 macOS Accessibility onboarding is implemented; one unchanged signed executable
 passed first-denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2.
 Exact-final-SHA, unavailable desktop-driver/Ghostty, and one-display limitations are recorded as
@@ -361,6 +366,9 @@ are done.
   outcome, receipt-owned relaunch/recovery, and retained completion screens live in
   `docs/adr/0038-cross-platform-tray-update-helper.md`; it supersedes only the Configure/Quit-only
   limits in ADRs 0028 and 0030.
+- The calmer default automatic/manual mud timing lives in
+  `docs/adr/0039-calmer-default-mud-cadence.md`; it supersedes only ADR 0016's original numeric
+  mud cadence and duration defaults.
 
 ## Task management system
 

@@ -33,6 +33,13 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Latest — July 2026
 
+### Improved
+- **Mud is now an occasional mess instead of a near-constant one.** The Goose waits roughly
+  three to five minutes between natural puddle trips and tracks new footprints for only 10–30
+  seconds after returning. Asking for mud directly also uses a shorter fresh default, while a
+  duration someone already chose remains theirs. Existing prints still fade naturally, so the
+  trail ends gently instead of disappearing.
+
 ### Changed
 - **The updater's final instruction now looks like a final instruction.** A blank line and a
   prominent text box separate the result from **You may now close this window.** Successful and

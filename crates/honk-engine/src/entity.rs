@@ -1,7 +1,7 @@
 //! The goose entity: its tunable parameter table and per-frame state.
 //!
-//! Constants are the project's frozen compatibility table. Do not "tidy" these values —
-//! they are tuned to the 120 Hz tick and pinned by the tests in this module.
+//! Defaults are the project's compatibility table. Change them only through an accepted product
+//! decision and pin the result with the tests in this module.
 
 use crate::footmarks::FootMarks;
 use crate::math::Vec2;
@@ -49,7 +49,7 @@ impl Default for ParametersTable {
             stop_radius: -10.0,
             step_time_normal: 0.2,
             step_time_charged: 0.1,
-            duration_to_track_mud: 15.0,
+            duration_to_track_mud: 10.0,
         }
     }
 }
@@ -166,7 +166,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parameter_table_matches_verified_source() {
+    fn parameter_table_matches_current_defaults() {
         let p = ParametersTable::default();
         assert_eq!(p.walk_speed, 80.0);
         assert_eq!(p.run_speed, 200.0);
@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(p.stop_radius, -10.0);
         assert_eq!(p.step_time_normal, 0.2);
         assert_eq!(p.step_time_charged, 0.1);
-        assert_eq!(p.duration_to_track_mud, 15.0);
+        assert_eq!(p.duration_to_track_mud, 10.0);
     }
 
     #[test]

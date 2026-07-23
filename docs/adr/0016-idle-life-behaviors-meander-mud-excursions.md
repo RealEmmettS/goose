@@ -2,6 +2,7 @@
 
 - Status: Accepted (2026-07-07, Emmett's live review of Renderer V2)
 - Relates to: ADR 0014 (Renderer V2), ADR 0004 (control plane), ADR 0007 (moods)
+- Superseded in part by: ADR 0039 (only the original mud cadence and duration defaults)
 - Owner: Fable (orchestrator), implemented hands-on per Emmett's direction
 
 ## Context

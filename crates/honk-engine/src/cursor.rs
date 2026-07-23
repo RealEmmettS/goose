@@ -140,13 +140,13 @@ pub struct TimingOptions {
     /// How long an errand keeps the goose off-screen.
     pub excursion_away_min: f32,
     pub excursion_away_max: f32,
-    /// Gap between quick off-screen puddle hops (the mud source).
+    /// Gap between quick off-screen puddle hops (the mud source; ADR 0039).
     pub puddle_min_gap: f32,
     pub puddle_max_gap: f32,
     /// How long a puddle hop keeps the goose off-screen.
     pub puddle_away_min: f32,
     pub puddle_away_max: f32,
-    /// How long the goose tracks mud after a puddle hop.
+    /// How long the goose tracks mud after a puddle hop (ADR 0039).
     pub puddle_mud_min: f32,
     pub puddle_mud_max: f32,
 }
@@ -161,12 +161,29 @@ impl Default for TimingOptions {
             excursion_max_gap: 420.0,
             excursion_away_min: 90.0,
             excursion_away_max: 120.0,
-            puddle_min_gap: 70.0,
-            puddle_max_gap: 160.0,
+            puddle_min_gap: 180.0,
+            puddle_max_gap: 300.0,
             puddle_away_min: 8.0,
             puddle_away_max: 15.0,
-            puddle_mud_min: 30.0,
-            puddle_mud_max: 90.0,
+            puddle_mud_min: 10.0,
+            puddle_mud_max: 30.0,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TimingOptions;
+
+    #[test]
+    fn default_puddle_cadence_matches_adr_0039() {
+        let timing = TimingOptions::default();
+
+        assert_eq!(timing.puddle_min_gap, 180.0);
+        assert_eq!(timing.puddle_max_gap, 300.0);
+        assert_eq!(timing.puddle_away_min, 8.0);
+        assert_eq!(timing.puddle_away_max, 15.0);
+        assert_eq!(timing.puddle_mud_min, 10.0);
+        assert_eq!(timing.puddle_mud_max, 30.0);
     }
 }
