@@ -9,9 +9,19 @@ pub(crate) const SETTINGS_NAME: &str = if cfg!(windows) {
 };
 
 #[cfg(windows)]
+pub(crate) const ACCESSIBILITY_NAME: &str = "honk_settings_accessibility.dll";
+
+#[cfg(windows)]
 pub(super) fn current_settings_hash() -> Result<String, DynError> {
     let path = std::env::current_exe()?.with_file_name(SETTINGS_NAME);
     Ok(crate::update::compute_sha256_for_install(&path)?)
+}
+
+#[cfg(windows)]
+pub(super) fn current_accessibility_hash() -> Result<String, DynError> {
+    Ok(crate::update::compute_sha256_for_install(
+        &std::env::current_exe()?.with_file_name(ACCESSIBILITY_NAME),
+    )?)
 }
 
 /// Source builds may intentionally install only the Rust CLI/TUI. A complete
@@ -29,6 +39,8 @@ pub(super) fn copy_settings_if_present(destination: &Path) -> io::Result<()> {
     }
     for name in [
         SETTINGS_NAME,
+        #[cfg(windows)]
+        ACCESSIBILITY_NAME,
         "NATIVE_SDK_LICENSE.txt",
         "NATIVE_SDK_FONT_LICENSE.txt",
     ] {
@@ -54,22 +66,14 @@ pub(super) fn copy_settings_if_present(destination: &Path) -> io::Result<()> {
 
 /// Keep the verified file open through process creation. On Windows the handle
 /// also denies replacement or writes until the new image has been mapped.
-pub(crate) fn verify_settings_companion(current: &Path, settings: &Path) -> Result<File, DynError> {
-    let metadata = fs::symlink_metadata(settings)?;
-    if !metadata.is_file() || metadata.file_type().is_symlink() {
-        return Err("settings companion is not a regular sibling executable".into());
-    }
-    let mut options = fs::OpenOptions::new();
-    options.read(true);
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        options.share_mode(1); // FILE_SHARE_READ; no write or delete sharing.
-    }
-    let file = options.open(settings)?;
+pub(crate) fn verify_settings_companion(
+    current: &Path,
+    settings: &Path,
+) -> Result<Vec<File>, DynError> {
+    let files = open_settings_files(settings)?;
     let source = detect_install_source();
     if matches!(source, InstallSource::Unknown | InstallSource::ManualLocal) {
-        return Ok(file);
+        return Ok(files);
     }
     for path in current_owned_receipt_candidates(current)
         .into_iter()
@@ -87,21 +91,56 @@ pub(crate) fn verify_settings_companion(current: &Path, settings: &Path) -> Resu
         if validated_receipt_source(&receipt, current) != Some(source) {
             continue;
         }
-        verify_identity(&receipt, &file, settings)?;
-        return Ok(file);
+        verify_files(&receipt, &files, settings)?;
+        return Ok(files);
     }
     Err("cannot verify the settings companion against its owned installation receipt".into())
 }
 
-fn verify_identity(
+fn open_verified_file(settings: &Path) -> Result<File, DynError> {
+    let metadata = fs::symlink_metadata(settings)?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err("settings companion is not a regular sibling executable".into());
+    }
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        options.share_mode(1); // FILE_SHARE_READ; no write or delete sharing.
+    }
+    Ok(options.open(settings)?)
+}
+
+fn open_settings_files(settings: &Path) -> Result<Vec<File>, DynError> {
+    Ok(vec![
+        open_verified_file(settings)?,
+        #[cfg(windows)]
+        open_verified_file(&settings.with_file_name(ACCESSIBILITY_NAME))?,
+    ])
+}
+
+fn verify_files(
     receipt: &serde_json::Value,
+    files: &[File],
+    settings: &Path,
+) -> Result<(), DynError> {
+    verify_identity(&receipt["settings_app"], &files[0], settings)?;
+    #[cfg(windows)]
+    verify_identity(
+        &receipt["settings_app"]["accessibility"],
+        &files[1],
+        &settings.with_file_name(ACCESSIBILITY_NAME),
+    )?;
+    Ok(())
+}
+
+fn verify_identity(
+    identity: &serde_json::Value,
     file: &File,
     settings: &Path,
 ) -> Result<(), DynError> {
     use sha2::{Digest, Sha256};
-    let identity = receipt.get("settings_app").ok_or(
-        "this install receipt has no settings companion; reinstall the complete current package",
-    )?;
     if identity.get("name").and_then(serde_json::Value::as_str)
         != settings.file_name().and_then(|name| name.to_str())
         || identity.get("size").and_then(serde_json::Value::as_u64) != Some(file.metadata()?.len())
@@ -126,7 +165,7 @@ pub(crate) fn verify_receipted_settings(
     if !metadata.is_file() || metadata.file_type().is_symlink() {
         return Err("settings companion is not a regular file".into());
     }
-    verify_identity(receipt, &File::open(settings)?, settings)
+    verify_files(receipt, &open_settings_files(settings)?, settings)
 }
 
 #[cfg(test)]
@@ -139,10 +178,10 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join(SETTINGS_NAME);
         fs::write(&path, b"verified-settings").unwrap();
-        let receipt = serde_json::json!({"settings_app": {
+        let receipt = serde_json::json!({
             "name": SETTINGS_NAME, "size": 17,
             "sha256": format!("{:x}", Sha256::digest(b"verified-settings"))
-        }});
+        });
         assert!(verify_identity(&receipt, &File::open(&path).unwrap(), &path).is_ok());
         assert!(
             verify_identity(&serde_json::json!({}), &File::open(&path).unwrap(), &path).is_err()
@@ -155,5 +194,45 @@ mod tests {
         .is_err());
         fs::write(&path, b"modified-settings").unwrap();
         assert!(verify_identity(&receipt, &File::open(&path).unwrap(), &path).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn bridge_identity_and_both_windows_file_leases_are_required() {
+        let directory = tempfile::tempdir().unwrap();
+        let settings = directory.path().join(SETTINGS_NAME);
+        let bridge = directory.path().join(ACCESSIBILITY_NAME);
+        fs::write(&settings, b"settings").unwrap();
+        assert!(open_settings_files(&settings).is_err());
+        fs::write(&bridge, b"bridge").unwrap();
+        let receipt = serde_json::json!({"settings_app": {
+            "name": SETTINGS_NAME, "size": 8,
+            "sha256": format!("{:x}", Sha256::digest(b"settings")),
+            "accessibility": {"name": ACCESSIBILITY_NAME, "size": 6,
+                "sha256": format!("{:x}", Sha256::digest(b"bridge"))}
+        }});
+        let files = open_settings_files(&settings).unwrap();
+        assert!(verify_files(&receipt, &files, &settings).is_ok());
+        for path in [&settings, &bridge] {
+            assert!(fs::write(path, b"tamper").is_err());
+            assert!(fs::rename(path, path.with_extension("replaced")).is_err());
+        }
+        drop(files);
+        fs::write(&bridge, b"tamper").unwrap();
+        assert!(verify_files(
+            &receipt,
+            &open_settings_files(&settings).unwrap(),
+            &settings
+        )
+        .is_err());
+        fs::write(&bridge, b"bridge").unwrap();
+        let mut incomplete = receipt;
+        incomplete["settings_app"]["accessibility"] = serde_json::Value::Null;
+        assert!(verify_files(
+            &incomplete,
+            &open_settings_files(&settings).unwrap(),
+            &settings
+        )
+        .is_err());
     }
 }

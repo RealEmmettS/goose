@@ -1941,6 +1941,7 @@ pub fn run_windows_slot_protocol() -> Result<bool, DynError> {
                 // activation transaction verifies that identity against the staged slot.
                 launcher_sha256: required_internal_short_arg(&values, "l")?.to_owned(),
                 settings_sha256: required_internal_short_arg(&values, "s")?.to_owned(),
+                accessibility_sha256: required_internal_short_arg(&values, "b")?.to_owned(),
                 autostart: required_internal_bool_short(&values, "u")?,
             })?;
             Ok(true)
@@ -1959,6 +1960,7 @@ pub fn run_windows_slot_protocol() -> Result<bool, DynError> {
                 payload_sha256: required_internal_arg(&values, "payload-sha256")?.to_owned(),
                 launcher_sha256: current_windows_app_launcher_hash()?,
                 settings_sha256: companions::current_settings_hash()?,
+                accessibility_sha256: companions::current_accessibility_hash()?,
                 autostart: required_internal_bool(&values, "autostart")?,
             })?;
             Ok(true)
@@ -2180,6 +2182,7 @@ struct WindowsSlotActivation {
     payload_sha256: String,
     launcher_sha256: String,
     settings_sha256: String,
+    accessibility_sha256: String,
     autostart: bool,
 }
 
@@ -2288,6 +2291,10 @@ fn windows_slot_activate(request: WindowsSlotActivation) -> Result<(), DynError>
     validate_regular_file_hash(
         &release_bin.join(companions::SETTINGS_NAME),
         &request.settings_sha256,
+    )?;
+    validate_regular_file_hash(
+        &release_bin.join(companions::ACCESSIBILITY_NAME),
+        &request.accessibility_sha256,
     )?;
     let current = root.join("current");
     let bin = root.join("bin");
@@ -2401,6 +2408,11 @@ fn validate_windows_slot_activation(request: &WindowsSlotActivation) -> Result<(
             .chars()
             .all(|c| c.is_ascii_hexdigit())
         || request.settings_sha256.len() != 64
+        || request.accessibility_sha256.len() != 64
+        || !request
+            .accessibility_sha256
+            .chars()
+            .all(|c| c.is_ascii_hexdigit())
         || !request
             .settings_sha256
             .chars()
@@ -2523,7 +2535,12 @@ fn write_windows_slot_receipt(
         "settings_app": {
             "name": companions::SETTINGS_NAME,
             "sha256": request.settings_sha256,
-            "size": fs::metadata(bin.join(companions::SETTINGS_NAME))?.len()
+            "size": fs::metadata(bin.join(companions::SETTINGS_NAME))?.len(),
+            "accessibility": {
+                "name": companions::ACCESSIBILITY_NAME,
+                "size": fs::metadata(bin.join(companions::ACCESSIBILITY_NAME))?.len(),
+                "sha256": request.accessibility_sha256
+            }
         },
         "app_launcher": {
             "path": bin.join(WINDOWS_APP_LAUNCHER_NAME).to_string_lossy(),
@@ -2572,6 +2589,10 @@ fn verify_windows_slot_activation(
     validate_regular_file_hash(
         &root.join("bin").join(companions::SETTINGS_NAME),
         &request.settings_sha256,
+    )?;
+    validate_regular_file_hash(
+        &root.join("bin").join(companions::ACCESSIBILITY_NAME),
+        &request.accessibility_sha256,
     )?;
     let value: serde_json::Value =
         serde_json::from_slice(&fs::read(root.join("install-receipt.json"))?)?;

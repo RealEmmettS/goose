@@ -10,4 +10,6 @@ The stdio protocol uses one request per child, version 1, an increasing request 
 
 Update discovery is read-only. Update now opens the established retained terminal helper, which owns installation, cancellation/failure recovery, and receipt-owned relaunch independently of this window.
 
-The two embedded Makira faces use Light for body text and Bold for headings. A second pinned patch connects the registered bold face to both measurement and painting. Native theme, high contrast, and reduced motion remain active. Windows computer-use qualification has exercised the actual window and an isolated save; native Windows/GTK screen-reader bridging remains an open acceptance item because SDK 0.5.4 does not forward its widget tree on those platforms.
+The two embedded Makira faces use Light for body text and Bold for headings. A pinned patch connects the registered bold face to both measurement and painting. Native theme, high contrast, and reduced motion remain active.
+
+The pinned AccessKit bridge forwards the existing semantics to Windows UI Automation and Linux AT-SPI (ADR 0042); macOS keeps the SDK's native implementation. On Windows, keep `honk_settings_accessibility.dll` beside the executable. The release build helper records and verifies both payload identities and includes dependency notices. Windows computer use has exercised native names, editor focus, keyboard input, and an isolated save. Hosted GTK and final assistive-technology qualification remain open.

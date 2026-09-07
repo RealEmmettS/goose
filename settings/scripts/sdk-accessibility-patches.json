@@ -1,0 +1,118 @@
+[
+  {
+    "file": "platform/windows/root.zig",
+    "sha256": "76b0c53e8f217ce177d1b4c4c5c7c3029deb26e3984706b1087785b1be404e30",
+    "edits": [
+      {
+        "before": "    audio = 18,",
+        "after": "    audio = 18,\n    honk_accessibility = 19,"
+      },
+      {
+        "before": "                .context = self,\n                .read_clipboard_fn",
+        "after": "                .context = self,\n                .update_widget_accessibility_fn = updateHonkAccessibility,\n                .read_clipboard_fn"
+      },
+      {
+        "before": "        .wake => state.emit(.wake),",
+        "after": "        .honk_accessibility => state.emit(.{ .widget_accessibility_action = .{\n            .window_id = event.window_id,\n            .label = event.view_label[0..event.view_label_len],\n            .id = event.frame_index,\n            .action = @enumFromInt(event.input_kind),\n            .text = event.input_text[0..event.input_text_len],\n        } }),\n        .wake => state.emit(.wake),"
+      },
+      {
+        "before": "t..end], ext[0..(end - offset)]);\n                offset = end;\n            }\n        }\n    }\n    return buffer[0..offset];\n}\n\ntest \"windows platform module exports type\" {\n    _ = WindowsPlatform;\n}\n",
+        "after": "t..end], ext[0..(end - offset)]);\n                offset = end;\n            }\n        }\n    }\n    return buffer[0..offset];\n}\n\ntest \"windows platform module exports type\" {\n    _ = WindowsPlatform;\n}\n\n// Honk300: publish the toolkit's semantic widget tree to Windows UI Automation.\nextern fn native_sdk_windows_honk_accessibility(host: *WindowsHost, window_id: u64, label: [*]const u8, label_len: usize, json: [*]const u8, json_len: usize) c_int;\nfn updateHonkAccessibility(context: ?*anyopaque, snapshot: platform_mod.WidgetAccessibilitySnapshot) anyerror!void {\n    const self: *WindowsPlatform = @ptrCast(@alignCast(context.?));\n    if (snapshot.nodes.len > platform_mod.max_widget_accessibility_nodes) return error.InvalidViewOptions;\n    const encoded = try std.json.Stringify.valueAlloc(std.heap.page_allocator, snapshot, .{});\n    defer std.heap.page_allocator.free(encoded);\n    if (native_sdk_windows_honk_accessibility(self.host, snapshot.window_id, snapshot.view_label.ptr, snapshot.view_label.len, encoded.ptr, encoded.len) == 0) return error.ViewNotFound;\n}\n"
+      }
+    ]
+  },
+  {
+    "file": "platform/windows/webview2_host.cpp",
+    "sha256": "93d9843a411de4364310bbd4f87be19381c085828152b1c975249064d0c6e8a3",
+    "edits": [
+      {
+        "before": "#include <windows.h>",
+        "after": "#include <windows.h>\n#include \"honk_accessibility.h\""
+      },
+      {
+        "before": "struct NativeView {",
+        "after": "struct NativeView {\n    HonkAccessibility *honk_accessibility = nullptr;"
+      },
+      {
+        "before": "    const double scale = gpuSurfaceScale(hwnd);\n    switch (message) {",
+        "after": "    const double scale = gpuSurfaceScale(hwnd);\n    if (message == WM_GETOBJECT && view->honk_accessibility) {\n        intptr_t result = 0;\n        if (honk_a11y_getobject(view->honk_accessibility, wparam, lparam, &result)) return result;\n    }\n    if (message == WM_SETFOCUS || message == WM_KILLFOCUS) {\n        honk_a11y_focus(view->honk_accessibility, message == WM_SETFOCUS);\n    }\n    if (message == WM_NCDESTROY) {\n        KillTimer(hwnd, 3);\n        auto *bridge = view->honk_accessibility;\n        view->honk_accessibility = nullptr;\n        honk_a11y_destroy(bridge);\n    }\n    if (message == WM_TIMER && wparam == 3) {\n        HonkAccessibilityAction action = {};\n        // Poll one action per message. Runtime callbacks may replace/close the view.\n        if (honk_a11y_poll(view->honk_accessibility, &action)) {\n            WindowsEvent event = {};\n            event.kind = 19;\n            event.frame_index = action.id;\n            event.input_kind = action.action;\n            event.input_text = reinterpret_cast<const char *>(action.text);\n            event.input_text_len = action.text_len;\n            emitGpuSurfaceEvent(host, *view, event);\n        }\n        return 0;\n    }\n    switch (message) {"
+      },
+      {
+        "before": "        SetTimer(hwnd, kGpuFrameTimerId, 16, nullptr);",
+        "after": "        // Initialize UIA outside WM_GETOBJECT before allowing OS tree activation.\n        host->native_views[key].honk_accessibility = honk_a11y_create(hwnd);\n        SetTimer(hwnd, 3, 30, nullptr);\n        SetTimer(hwnd, kGpuFrameTimerId, 16, nullptr);"
+      },
+      {
+        "before": "int native_sdk_windows_request_gpu_surface_frame(",
+        "after": "int native_sdk_windows_honk_accessibility(Host *host, uint64_t window_id, const char *label, size_t label_len, const uint8_t *json, size_t json_len) {\n    if (!host) return 0;\n    auto found = host->native_views.find(nativeViewKey(window_id, slice(label, label_len)));\n    if (found == host->native_views.end() || !found->second.honk_accessibility) return 0;\n    return honk_a11y_publish(found->second.honk_accessibility, json, json_len, gpuSurfaceScale(found->second.hwnd));\n}\n\nint native_sdk_windows_request_gpu_surface_frame("
+      }
+    ]
+  },
+  {
+    "file": "platform/linux/root.zig",
+    "sha256": "3b46547fbcc3e4cc80f324132630920fafd6ba769eaf42ef68bab8855fdf7fba",
+    "edits": [
+      {
+        "before": "    audio = 17,",
+        "after": "    audio = 17,\n    honk_accessibility = 18,"
+      },
+      {
+        "before": "                .context = self,\n                .read_clipboard_fn",
+        "after": "                .context = self,\n                .update_widget_accessibility_fn = updateHonkAccessibility,\n                .read_clipboard_fn"
+      },
+      {
+        "before": "        .wake => state.emit(.wake),",
+        "after": "        .honk_accessibility => state.emit(.{ .widget_accessibility_action = .{\n            .window_id = event.window_id,\n            .label = event.view_label[0..event.view_label_len],\n            .id = event.frame_index,\n            .action = @enumFromInt(event.input_kind),\n            .text = event.input_text[0..event.input_text_len],\n        } }),\n        .wake => state.emit(.wake),"
+      },
+      {
+        "before": "is the .hide declaration's, not the init path's.\n    const quit_app: platform_mod.AppInfo = .{ .app_name = \"player\" };\n    try refuseUnsupportedMainWindowClosePolicy(quit_app.resolvedMainWindow());\n}\n",
+        "after": "is the .hide declaration's, not the init path's.\n    const quit_app: platform_mod.AppInfo = .{ .app_name = \"player\" };\n    try refuseUnsupportedMainWindowClosePolicy(quit_app.resolvedMainWindow());\n}\n\n// Honk300: forward the existing widget snapshot to the native AT-SPI adapter.\nextern fn native_sdk_gtk_honk_accessibility(host: *GtkHost, window_id: u64, label: [*]const u8, label_len: usize, json: [*]const u8, json_len: usize) c_int;\nfn updateHonkAccessibility(context: ?*anyopaque, snapshot: platform_mod.WidgetAccessibilitySnapshot) anyerror!void {\n    const self: *LinuxPlatform = @ptrCast(@alignCast(context.?));\n    if (snapshot.nodes.len > platform_mod.max_widget_accessibility_nodes) return error.InvalidViewOptions;\n    const encoded = try std.json.Stringify.valueAlloc(std.heap.page_allocator, snapshot, .{});\n    defer std.heap.page_allocator.free(encoded);\n    if (native_sdk_gtk_honk_accessibility(self.host, snapshot.window_id, snapshot.view_label.ptr, snapshot.view_label.len, encoded.ptr, encoded.len) == 0) return error.ViewNotFound;\n}\n"
+      }
+    ]
+  },
+  {
+    "file": "platform/linux/gtk_host.c",
+    "sha256": "da73fa340df0f577cc09873ae0c6d5e6d94bc7ca8024a68ad51d2df94cd93af7",
+    "edits": [
+      {
+        "before": "#include <gtk/gtk.h>",
+        "after": "#include <gtk/gtk.h>\n#include \"honk_accessibility.h\"\n#ifdef GDK_WINDOWING_X11\n#include <gdk/x11/gdkx.h>\n#endif"
+      },
+      {
+        "before": "typedef struct native_sdk_gtk_native_view {",
+        "after": "typedef struct native_sdk_gtk_native_view {\n    HonkAccessibility *honk_accessibility;\n    guint honk_accessibility_timer;"
+      },
+      {
+        "before": "static void native_sdk_gpu_focus_enter(",
+        "after": "static void honk_accessibility_bounds(native_sdk_gtk_native_view_t *view) {\n#ifdef GDK_WINDOWING_X11\n    if (!view || !view->widget || !view->honk_accessibility) return;\n    GtkNative *native = gtk_widget_get_native(view->widget);\n    GdkSurface *surface = native ? gtk_native_get_surface(native) : NULL;\n    if (!surface || !GDK_IS_X11_SURFACE(surface)) return; // Wayland has no global position.\n    Display *display = gdk_x11_display_get_xdisplay(gdk_surface_get_display(surface));\n    Window child = None;\n    int x = 0, y = 0;\n    if (!XTranslateCoordinates(display, gdk_x11_surface_get_xid(surface), DefaultRootWindow(display), 0, 0, &x, &y, &child)) return;\n    graphene_point_t origin = {0}, point = {0};\n    if (!gtk_widget_compute_point(view->widget, GTK_WIDGET(native), &origin, &point)) return;\n    double scale = gtk_widget_get_scale_factor(view->widget);\n    honk_a11y_bounds(view->honk_accessibility, x + point.x * scale, y + point.y * scale,\n        gtk_widget_get_width(view->widget) * scale, gtk_widget_get_height(view->widget) * scale);\n#else\n    (void)view;\n#endif\n}\n\nstatic gboolean honk_accessibility_poll(gpointer data) {\n    native_sdk_gtk_native_view_t *view = data;\n    if (!view || !view->honk_accessibility || !view->window || !view->label) return G_SOURCE_REMOVE;\n    honk_accessibility_bounds(view);\n    HonkAccessibilityAction action = {0};\n    if (honk_a11y_poll(view->honk_accessibility, &action)) {\n        // Runtime callbacks may close the view. Do not access it after dispatch.\n        native_sdk_emit(view->window->host, (native_sdk_gtk_event_t){\n            .kind = (native_sdk_gtk_event_kind_t)18,\n            .window_id = view->window->id,\n            .view_label = view->label,\n            .view_label_len = strlen(view->label),\n            .frame_index = action.id,\n            .input_kind = action.action,\n            .input_text = (const char *)action.text,\n            .input_text_len = action.text_len,\n        });\n    }\n    return G_SOURCE_CONTINUE;\n}\n\nstatic void native_sdk_gpu_focus_enter("
+      },
+      {
+        "before": "    if (view && view->gpu_im_context) gtk_im_context_focus_in(view->gpu_im_context);",
+        "after": "    if (view) honk_a11y_focus(view->honk_accessibility, 1);\n    if (view && view->gpu_im_context) gtk_im_context_focus_in(view->gpu_im_context);"
+      },
+      {
+        "before": "    if (!view || !view->gpu_im_context) return;\n    /* Losing focus",
+        "after": "    if (view) honk_a11y_focus(view->honk_accessibility, 0);\n    if (!view || !view->gpu_im_context) return;\n    /* Losing focus"
+      },
+      {
+        "before": "    gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(view->widget), native_sdk_gpu_surface_draw, view, NULL);",
+        "after": "    view->honk_accessibility = honk_a11y_create(NULL);\n    view->honk_accessibility_timer = g_timeout_add(30, honk_accessibility_poll, view);\n    gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(view->widget), native_sdk_gpu_surface_draw, view, NULL);"
+      },
+      {
+        "before": "static void native_sdk_teardown_gpu_surface_view(native_sdk_gtk_native_view_t *view) {\n    if (!view) return;",
+        "after": "static void native_sdk_teardown_gpu_surface_view(native_sdk_gtk_native_view_t *view) {\n    if (!view) return;\n    if (view->honk_accessibility_timer) g_source_remove(view->honk_accessibility_timer);\n    view->honk_accessibility_timer = 0;\n    honk_a11y_destroy(view->honk_accessibility);\n    view->honk_accessibility = NULL;"
+      },
+      {
+        "before": "int native_sdk_gtk_request_gpu_surface_frame(",
+        "after": "int native_sdk_gtk_honk_accessibility(native_sdk_gtk_host_t *host, uint64_t window_id, const char *label, size_t label_len, const uint8_t *json, size_t json_len) {\n    native_sdk_gtk_window_t *win = native_sdk_find_window(host, window_id);\n    char *label_copy = label_len > 0 ? native_sdk_strndup(label, label_len) : NULL;\n    native_sdk_gtk_native_view_t *view = native_sdk_find_native_view(win, label_copy);\n    free(label_copy);\n    if (!view || !view->honk_accessibility) return 0;\n    honk_accessibility_bounds(view);\n    return honk_a11y_publish(view->honk_accessibility, json, json_len, gtk_widget_get_scale_factor(view->widget));\n}\n\nint native_sdk_gtk_request_gpu_surface_frame("
+      },
+      {
+        "before": "static char *native_sdk_bytes_to_string(const char *bytes, size_t len) {",
+        "after": "// Honk300 uses in-canvas dialogs only. Keep unused GTK 4.10 platform\n// dialogs out of builds on the supported Ubuntu 22.04 / GTK 4.6 floor.\n#if GTK_CHECK_VERSION(4, 10, 0)\nstatic char *native_sdk_bytes_to_string(const char *bytes, size_t len) {"
+      },
+      {
+        "before": "    if (state.response <= 0) return 0;\n    if (state.response == 1) return 1;\n    return 2;\n}\n",
+        "after": "    if (state.response <= 0) return 0;\n    if (state.response == 1) return 1;\n    return 2;\n}\n#else\nnative_sdk_gtk_open_dialog_result_t native_sdk_gtk_show_open_dialog(native_sdk_gtk_host_t *host, const native_sdk_gtk_open_dialog_opts_t *opts, char *buffer, size_t buffer_len) {\n    (void)host; (void)opts; (void)buffer; (void)buffer_len;\n    return (native_sdk_gtk_open_dialog_result_t){0};\n}\nsize_t native_sdk_gtk_show_save_dialog(native_sdk_gtk_host_t *host, const native_sdk_gtk_save_dialog_opts_t *opts, char *buffer, size_t buffer_len) {\n    (void)host; (void)opts; (void)buffer; (void)buffer_len;\n    return 0;\n}\nint native_sdk_gtk_show_message_dialog(native_sdk_gtk_host_t *host, const native_sdk_gtk_message_dialog_opts_t *opts) {\n    (void)host; (void)opts;\n    return 0;\n}\n#endif\n"
+      }
+    ]
+  }
+]

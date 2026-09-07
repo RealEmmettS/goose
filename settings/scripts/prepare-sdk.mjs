@@ -26,3 +26,4 @@ patch('primitives/canvas/text_spans.zig', 'c4c799324ee6f5f5ca31fe3a370eac15f04a8
   '    if (span.monospace) return typography.mono_font_id;',
   '    if (span.monospace) return typography.mono_font_id;\n    if (span.weight == .bold and !span.italic) {\n        if (typography.bold_font_id) |id| return id;\n    }');
 console.log('Pinned Native SDK windowless spawn and custom bold-face patches verified.');
+await import('./prepare-accessibility.mjs');

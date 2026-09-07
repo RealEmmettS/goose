@@ -17,6 +17,8 @@ if (-not $AppLauncher) {
 $launcherPath = (Resolve-Path -LiteralPath $AppLauncher).Path
 $settingsPath = (Resolve-Path -LiteralPath (Join-Path (Split-Path -Parent $binaryPath) 'honk300-settings.exe')).Path
 $settingsHash = (Get-FileHash -LiteralPath $settingsPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$accessibilityPath = Join-Path (Split-Path -Parent $settingsPath) 'honk_settings_accessibility.dll'
+$accessibilityHash = (Get-FileHash -LiteralPath $accessibilityPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $launcherHash = (Get-FileHash -LiteralPath $launcherPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $versionOutput = (& $binaryPath --version | Select-Object -Last 1).Trim()
 $version = ($versionOutput.Split()[-1] -replace '[+-].*$', '')
@@ -46,6 +48,7 @@ function Stage-Channel([string] $Channel) {
     }
     Copy-Item -LiteralPath $launcherPath -Destination (Join-Path $releaseBin 'honk300-app.exe')
     Copy-Item -LiteralPath $settingsPath -Destination (Join-Path $releaseBin 'honk300-settings.exe')
+    Copy-Item -LiteralPath $accessibilityPath -Destination (Join-Path $releaseBin 'honk_settings_accessibility.dll')
 }
 
 function Invoke-Activation([string] $Origin, [string] $Commit) {
@@ -64,7 +67,7 @@ function Invoke-Activation([string] $Origin, [string] $Commit) {
 }
 
 function Invoke-CompactActivation([string] $Origin, [string] $Commit) {
-    & $binaryPath __wsa -r $root -o $Origin -c $Commit -a $artifact -l $launcherHash -s $settingsHash -u false
+    & $binaryPath __wsa -r $root -o $Origin -c $Commit -a $artifact -l $launcherHash -s $settingsHash -b $accessibilityHash -u false
     return $LASTEXITCODE
 }
 
@@ -90,6 +93,11 @@ function Assert-Active([string] $Origin, [string] $Channel) {
     if ((Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash.ToLowerInvariant() -ne $settingsHash -or
         $receipt.settings_app.sha256 -ne $settingsHash -or (Read-PeSubsystem $settings) -ne 2) {
         throw 'settings companion identity was not retained through activation'
+    }
+    $accessibility = Join-Path $root 'bin\honk_settings_accessibility.dll'
+    if ((Get-FileHash -LiteralPath $accessibility -Algorithm SHA256).Hash.ToLowerInvariant() -ne $accessibilityHash -or
+        $receipt.settings_app.accessibility.sha256 -ne $accessibilityHash) {
+        throw 'settings accessibility identity was not retained through activation'
     }
     $launcher = Join-Path $root 'bin\honk300-app.exe'
     if ((Get-FileHash -LiteralPath $launcher -Algorithm SHA256).Hash.ToLowerInvariant() -ne $launcherHash) {

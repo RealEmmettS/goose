@@ -15,7 +15,10 @@ import shutil
 import subprocess
 import tempfile
 import time
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 
 def main() -> None:

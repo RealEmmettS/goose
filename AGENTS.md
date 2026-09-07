@@ -84,7 +84,7 @@ not public-release or physical-device acceptance. `docs/refinement-audit.md` tra
 - Windows collected notes are Honk300-owned native edit windows, never Notepad or global input.
   Windows/macOS notes and images share the ADR 0032 monitor-relative fit: hard 48% per-dimension
   ceiling, aspect-preserving complete-image downscale, no crop, and no upscaling.
-- A userâ€”not program cleanupâ€”closing a spawned note or meme gets an independent 30% annoyed
+- A user—not program cleanup—closing a spawned note or meme gets an independent 30% annoyed
   reaction roll. The reaction may chain only the existing bounded cursor nab and only after live
   capability, permission/pointer, configuration, and manners checks. Linux collect windows remain
   unsupported and therefore produce no native close trigger.

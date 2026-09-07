@@ -33,6 +33,14 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Improved
+
+Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
+
+### Behind the scenes
+
+Native builds use a consistent compiler and retain the notices for their supporting libraries, making installation checks more dependable across machines.
+
 The goose is being fully redrawn with a rounder white body, lighter wings, clearer orange feet and bill, and one continuous turn. Its body follows planted steps, settles after running, opens its bill to honk, and looks pleased when petted. Expressions can be disabled, and a reduced-motion option removes decorative movement.
 
 Drawing now reuses bounded memory and wakes on the next needed tick. A busy Wayland desktop retries the last picture instead of treating an undisplayed frame as complete, including the last clear when quitting. Audio playback now keeps a bounded, recoverable pool of voices. A pointer chase also aims the beak correctly so the goose can finish catching a stationary pointer.

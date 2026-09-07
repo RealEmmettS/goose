@@ -9,7 +9,10 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 from build_settings import TARGETS
 
@@ -28,6 +31,14 @@ def verify(directory: Path, target: str, execute: bool = False) -> Path:
     assert metadata["sha256"] == hashlib.sha256(binary.read_bytes()).hexdigest()
     assert metadata["native_sdk"] == "0.5.4" and metadata["zig"] == "0.16.0"
     if "windows" in target:
+        identity = metadata["accessibility"]
+        assert identity["name"] == "honk_settings_accessibility.dll"
+        bridge = directory / identity["name"]
+        assert bridge.is_file() and not bridge.is_symlink(), "missing native accessibility DLL"
+        assert bridge.stat().st_size == identity["size"]
+        assert hashlib.sha256(bridge.read_bytes()).hexdigest() == identity["sha256"]
+        subprocess.run([sys.executable, str(root / "script/verify_binary_architecture.py"),
+                        "--format", "pe", "--machine", "0x8664" if target.startswith("x86") else "0xAA64", str(bridge)], check=True)
         arguments = ["--format", "pe", "--machine", "0x8664" if target.startswith("x86") else "0xAA64", "--subsystem", "2"]
     elif "linux" in target:
         arguments = ["--format", "elf", "--machine", "62" if target.startswith("x86") else "183"]

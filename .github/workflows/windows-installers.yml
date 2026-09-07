@@ -243,6 +243,7 @@ jobs:
           $payloadSha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk300.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
           $launcherSha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk300-app.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
           $settingsSha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk300-settings.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+          $accessibilitySha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk_settings_accessibility.dll') -Algorithm SHA256).Hash.ToLowerInvariant()
           New-Item -ItemType Directory -Force -Path target\wix | Out-Null
           & $candle -arch ${{ matrix.wix_arch }} `
             "-dVersion=${{ steps.tag.outputs.version }}" `
@@ -252,6 +253,7 @@ jobs:
             "-dPayloadSha256=$payloadSha256" `
             "-dLauncherSha256=$launcherSha256" `
             "-dSettingsSha256=$settingsSha256" `
+            "-dAccessibilitySha256=$accessibilitySha256" `
             "-dCargoTargetBinDir=$binDir" `
             "-dSourceRoot=$sourceRoot" `
             -out target\wix\corporate.wixobj `
@@ -265,6 +267,7 @@ jobs:
             "-dPayloadSha256=$payloadSha256" `
             "-dLauncherSha256=$launcherSha256" `
             "-dSettingsSha256=$settingsSha256" `
+            "-dAccessibilitySha256=$accessibilitySha256" `
             "-dCargoTargetBinDir=$binDir" `
             "-dSourceRoot=$sourceRoot" `
             -out target\wix\global.wixobj `

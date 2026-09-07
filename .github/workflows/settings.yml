@@ -42,7 +42,7 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
             ca-certificates curl git build-essential pkg-config libgtk-4-dev libasound2-dev \
-            xvfb xauth dbus-x11 xz-utils unzip
+            xvfb xauth dbus-x11 xz-utils unzip python3 python-is-python3 python3-tomli
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.commit || github.sha }}
@@ -53,11 +53,12 @@ jobs:
           cache: npm
           cache-dependency-path: settings/package-lock.json
       - uses: actions/setup-python@v6
+        if: ${{ !contains(matrix.target, '-linux-gnu') }}
         with:
           python-version: '3.12'
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
-          toolchain: 1.95.0
+          toolchain: '1.95'
           targets: ${{ matrix.target }}
       - name: Build exact Rust settings service
         run: cargo build --locked --release --target ${{ matrix.target }} --bin honk300
@@ -116,7 +117,7 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
-          toolchain: 1.95.0
+          toolchain: '1.95'
           targets: ${{ matrix.target }}
       - name: Build matching musl Rust service
         run: |
@@ -127,6 +128,9 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/work" -w /work alpine:3.21.3 sh -eu -c '
             apk add --no-cache nodejs npm python3 build-base pkgconf gtk4.0-dev curl xz git xvfb xauth dbus
+            curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/honk-rustup.sh
+            sh /tmp/honk-rustup.sh -y --profile minimal --default-toolchain 1.95
+            . /root/.cargo/env
             python3 script/build_settings.py --target "${{ matrix.target }}" --output "target/${{ matrix.target }}/release" --automation --test
             xvfb-run -a -s "-screen 0 1280x900x24" dbus-run-session -- python3 script/smoke_settings.py --binary "target/${{ matrix.target }}/release/honk300-settings" --evidence target/settings-ui-evidence
             python3 script/build_settings.py --target "${{ matrix.target }}" --output "target/settings-release/${{ matrix.target }}" --skip-install

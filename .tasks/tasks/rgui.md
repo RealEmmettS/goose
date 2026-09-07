@@ -35,7 +35,7 @@ The requested behavior runs through its production path and the supporting evide
 ## Status
 
 Active: Rust settings service and native window implemented; interactive and package qualification in progress.
-Windows computer-use mouse/save and actual Makira font rendering passed with an isolated config. Native Windows/GTK screen-reader bridging remains open; the SDK automation tree does not establish that capability.
+Windows computer-use mouse/save and actual Makira font rendering passed with an isolated config. Native Windows UI Automation now exposes text, controls, dialog/edit focus, and saved status through the bounded AccessKit bridge. Keyboard editing and an isolated save passed. GTK/AT-SPI and final native qualification remain open.
 
 ## Activity
 
@@ -45,3 +45,5 @@ Windows computer-use mouse/save and actual Makira font rendering passed with an 
 
 
 - 2026-09-07: Shared revision-aware save and bounded versioned stdio service cover all 53 editable fields; Rust protocol/validation/concurrency tests and strict clippy pass. Native settings build and real Windows automation load the five-page app with an isolated config. Layout, conflict, updater, lifecycle, and packaging qualification remain in progress.
+
+- 2026-09-07: Added the bounded native accessibility bridge and independently verified Windows DLL payload. Actual Windows text/control/editor/save checks, Rust bridge and dual-file-lease regressions, production GUI build, and Python packaging tests pass. Updated native CI toolchains; hosted rerun pending.

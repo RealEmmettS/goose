@@ -36,6 +36,7 @@ All notable changes to this project are documented here. Format based on
 - Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
 
 ### Fixed
+- Forward native settings semantics to Windows UI Automation and Linux AT-SPI through bounded AccessKit adapters (ADR 0042). Bind the Windows bridge DLL to archive/slot/receipt identities and retain both file leases until GUI initialization. Pin the Zig compiler bootstrap and repair native CI toolchain selection.
 - Keep forward steps planted ahead until the body passes over them, and give the rounded belly enough clearance for visible front/rear feet. Preserve the gait cadence and real ground contacts.
 - Do not acknowledge native Wayland presentation while all retained buffers are busy or a required output is unconfigured; retry the pending damage, including graceful final clears.
 - Retain and reap a bounded pool of audio voices/processes. Replace synthetic test-only limit checks with a real child-process exhaustion and recovery regression.

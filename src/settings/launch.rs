@@ -30,16 +30,34 @@ pub(crate) fn launch(config: Option<PathBuf>) -> io::Result<()> {
             .creation_flags(BASE | BREAKAWAY)
             .spawn()
         {
-            Ok(_) => Ok(()),
+            Ok(child) => await_settings_start(child),
             Err(error) if error.raw_os_error() == Some(5) => command(&settings, config.as_deref())
                 .creation_flags(BASE)
                 .spawn()
-                .map(|_| ()),
+                .and_then(await_settings_start),
             Err(error) => Err(error),
         }
     }
     #[cfg(not(windows))]
     command(&settings, config.as_deref()).spawn().map(|_| ())
+}
+
+#[cfg(windows)]
+fn await_settings_start(mut child: std::process::Child) -> io::Result<()> {
+    use std::os::windows::io::AsRawHandle;
+    use windows::Win32::{Foundation::HANDLE, System::Threading::WaitForInputIdle};
+    // Imported DLLs load after CreateProcess returns. Retain both verified file
+    // leases until the GUI has initialized its message loop and mapped them.
+    if unsafe { WaitForInputIdle(HANDLE(child.as_raw_handle()), 10_000) } == 0
+        && matches!(child.try_wait(), Ok(None))
+    {
+        return Ok(());
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    Err(io::Error::other(
+        "the settings application did not initialize within ten seconds",
+    ))
 }
 
 fn sibling(executable: &Path) -> io::Result<PathBuf> {

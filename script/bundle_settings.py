@@ -72,6 +72,8 @@ def bundle(archive: Path, directory: Path, target: str, manifest_path: Path) -> 
     assert len(runtimes) == 1, "archive must contain exactly one Rust executable"
     parent = runtimes[0].parent
     files = [binary.name, "settings-build.json", "NATIVE_SDK_LICENSE.txt", "NATIVE_SDK_FONT_LICENSE.txt"]
+    if "windows" in target:
+        files.append("honk_settings_accessibility.dll")
     additions = {str(parent / name): (directory / name).read_bytes() for name in files}
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["dist_version"] == "0.31.0", "cargo-dist schema version drift"

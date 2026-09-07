@@ -247,8 +247,19 @@ jobs:
           dist build --tag='${{ needs.plan.outputs.tag }}' --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
 
       - uses: actions/setup-python@v6
+        if: ${{ runner.os != 'Linux' }}
         with:
           python-version: '3.12'
+      - name: Install container-compatible Python
+        if: ${{ runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$(id -u)" = 0 ]; then
+            apt-get update && apt-get install --no-install-recommends -y python3 python3-tomli
+          else
+            sudo apt-get update && sudo apt-get install --no-install-recommends -y python3 python3-tomli
+          fi
       - name: Download native settings for the exact target
         uses: actions/download-artifact@v7
         with:

@@ -18,8 +18,9 @@
 - [ ] **Native SDK graphical settings** - ship a separate Zig settings app backed by Rust validation and retain the TUI (needs #rfnd) (ms #refine) (owner codex) #rgui
   - [x] Implement revision-aware shared settings persistence and bounded stdio service.
   - [ ] Build and exercise all five native settings pages.
-  - [ ] Add Check for updates and Update now through the verified existing updater.
+  - [x] Add Check for updates and Update now through the verified existing updater.
   - [ ] Integrate launch, package identity, signing, update, and uninstall paths.
+  - [ ] Qualify actual Windows UI Automation and Linux AT-SPI controls, modal focus, and native package payloads.
 - [ ] **Continuous goose rig and expressive behavior** - replace silhouette crossfades, refine motion, and verify actual render sequences (ms #refine) (owner codex) #rart
   - [ ] Implement continuous projected geometry and meaningful interaction anchors.
   - [ ] Add bounded task-driven expressions and reduced motion.

@@ -36,6 +36,7 @@ class SettingsPackagingTests(unittest.TestCase):
             struct.pack_into("<H", pe, 0x98, 0x20B)
             struct.pack_into("<H", pe, 0xDC, 2)
             (settings / "honk300-settings.exe").write_bytes(pe)
+            (settings / "honk_settings_accessibility.dll").write_bytes(pe)
             for name in ("NATIVE_SDK_LICENSE.txt", "NATIVE_SDK_FONT_LICENSE.txt"):
                 (settings / name).write_text("License fixture\n")
             version = tomllib.loads((ROOT / "Cargo.toml").read_text())["package"]["version"]
@@ -44,6 +45,7 @@ class SettingsPackagingTests(unittest.TestCase):
                         "target": target, "native_sdk": "0.5.4", "zig": "0.16.0",
                         "automation": False, "name": "honk300-settings.exe",
                         "size": len(pe), "sha256": hashlib.sha256(pe).hexdigest()}
+            metadata["accessibility"] = {"name": "honk_settings_accessibility.dll", "size": len(pe), "sha256": hashlib.sha256(pe).hexdigest()}
             metadata_path = settings / "settings-build.json"
             metadata_path.write_text(json.dumps(metadata))
             archive = root / "honk300.zip"
@@ -60,6 +62,7 @@ class SettingsPackagingTests(unittest.TestCase):
                 self.assertEqual(z.read("honk300.exe"), b"unchanged-runtime-fixture")
                 self.assertEqual(z.read("honk300-app.exe"), b"unchanged-launcher-fixture")
                 self.assertEqual(z.read("honk300-settings.exe"), pe)
+                self.assertEqual(z.read("honk_settings_accessibility.dll"), pe)
                 self.assertEqual(z.read("settings-build.json"), metadata_path.read_bytes())
             identity = json.loads(manifest.read_text())["artifacts"][archive.name]
             checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
@@ -70,6 +73,10 @@ class SettingsPackagingTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "already contains"):
                 bundle(archive, settings, target, manifest)
             self.assertEqual(archive.read_bytes(), before)
+            (settings / "honk_settings_accessibility.dll").write_bytes(pe + b"tampered")
+            with self.assertRaises(AssertionError):
+                verify(settings, target)
+            (settings / "honk_settings_accessibility.dll").write_bytes(pe)
             metadata["automation"] = True
             metadata_path.write_text(json.dumps(metadata))
             with self.assertRaises(AssertionError):

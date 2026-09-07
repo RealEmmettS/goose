@@ -9,7 +9,12 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Ubuntu 22.04's supported system Python.
+    import tomli as tomllib
+from settings_toolchain import ensure_zig
+from settings_licenses import accessibility_notices
 
 TARGETS = {
     "x86_64-pc-windows-msvc": "x86_64-windows",
@@ -33,6 +38,7 @@ def main() -> None:
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     project = root / "settings"
+    os.environ["NATIVE_SDK_ZIG"] = ensure_zig(root)
     version = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))["package"]["version"]
     manifest = (project / "app.zon").read_text(encoding="utf-8")
     source = (project / "src/main.zig").read_text(encoding="utf-8")
@@ -49,6 +55,9 @@ def main() -> None:
         run(npm, "ci", "--ignore-scripts", "--no-audit", "--no-fund")
     run(npm, "run", "prepare:sdk")
     if args.test:
+        if "windows" in args.target or "linux" in args.target:
+            run("cargo", "test", "--locked", "--manifest-path", "accessibility/Cargo.toml",
+                "--target", args.target)
         run(npm, "test")
         run(npm, "run", "check")
     run(npm, "run", "build", "--", "-Dtarget=" + TARGETS[args.target],
@@ -62,9 +71,20 @@ def main() -> None:
     if built.resolve() != installed:
         shutil.copyfile(built, installed)
     installed.chmod(0o755)
+    accessibility = None
+    if "windows" in args.target:
+        bridge_name = "honk_settings_accessibility.dll"
+        bridge = project / "zig-out/bin" / bridge_name
+        assert bridge.is_file() and not bridge.is_symlink(), "missing native accessibility DLL"
+        if bridge.resolve() != (output / bridge_name).resolve():
+            shutil.copyfile(bridge, output / bridge_name)
+        accessibility = {"name": bridge_name, "size": bridge.stat().st_size,
+                         "sha256": hashlib.sha256(bridge.read_bytes()).hexdigest()}
     # The SDK and bundled typefaces retain their third-party license notices.
     license_source = project / "node_modules/@native-sdk/cli/LICENSE"
-    shutil.copyfile(license_source, output / "NATIVE_SDK_LICENSE.txt")
+    (output / "NATIVE_SDK_LICENSE.txt").write_text(
+        license_source.read_text(encoding="utf-8") + accessibility_notices(project, args.target),
+        encoding="utf-8")
     (output / "NATIVE_SDK_FONT_LICENSE.txt").write_text(
         (project / "node_modules/@native-sdk/cli/src/runtime/testdata/fonts/OFL.txt").read_text(encoding="utf-8")
         + "\n\nAdditional application typefaces\n\n"
@@ -73,6 +93,7 @@ def main() -> None:
         "schema": "honk300.settings-build.v1", "version": version,
         "target": args.target, "native_sdk": "0.5.4", "zig": "0.16.0",
         "automation": args.automation, "name": name,
+        "accessibility": accessibility,
         "size": installed.stat().st_size,
         "sha256": hashlib.sha256(installed.read_bytes()).hexdigest()
     }, indent=2) + "\n", encoding="utf-8")
