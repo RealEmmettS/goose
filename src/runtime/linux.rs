@@ -8,11 +8,11 @@ use honk_control::{
     BundleStatus, CapabilityStatus, CommandServer, ControlCommand, ControlResponse, PlatformStatus,
     RuntimeStatus,
 };
+use honk_engine::render::DamageCanvas;
 use honk_engine::render::{
     render_autumn_leaves, render_footmarks_with_timing, render_hearts, render_pose_with_palette,
     render_sleepies, AutumnRenderLayer,
 };
-use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
     CollectWindowCommand, CollectWindowPayload, CursorCommand, DesktopLayout, PresenceSnapshot,
     Rect, Sound, World,
@@ -98,6 +98,7 @@ pub fn run(
     )?;
     let mut world = World::with_layout_and_options(layout, seed_from_clock(), effective.world);
     let mut core = RuntimeCore::new();
+    let mut damage_canvas = DamageCanvas::default();
     const AUDIO_RETRY_INTERVAL: f64 = 5.0;
     let mut next_audio_probe = 0.0;
     let mut warned_collect = false;
@@ -122,7 +123,7 @@ pub fn run(
             if let Err(error) = control_surface::handle_command(
                 command,
                 &mut world,
-                control_surface::open_configuration_tui,
+                || control_surface::open_configuration(&options.config_path),
                 control_surface::open_update_helper,
             ) {
                 eprintln!("honk300: {action} action could not start ({error})");
@@ -152,8 +153,11 @@ pub fn run(
                     request.respond(ControlResponse::Ok);
                     return Ok(());
                 }
-                ControlCommand::Reload => {
-                    let response = match Config::load_existing(&options.config_path) {
+                ControlCommand::Reload | ControlCommand::ReloadIf(_) => {
+                    let response = match RuntimeCore::load_reload_config(
+                        request.command(),
+                        &options.config_path,
+                    ) {
                         Ok(next_config)
                             if RuntimeCore::restart_required_reason(&config, &next_config)
                                 .is_some() =>
@@ -291,37 +295,38 @@ pub fn run(
             let width = dirty.width().ceil().max(1.0) as u32;
             let height = dirty.height().ceil().max(1.0) as u32;
             let origin = dirty.min;
-            let mut canvas =
-                Pixmap::new(width, height).ok_or("could not allocate dirty overlay canvas")?;
-            canvas.fill(Color::TRANSPARENT);
+            let canvas = damage_canvas.prepare(width, height)?;
             render_footmarks_with_timing(
-                &mut canvas,
+                canvas,
                 &world.goose.foot_marks,
                 world.now(),
                 origin,
                 world.footmark_timing(),
             );
             render_autumn_leaves(
-                &mut canvas,
+                canvas,
                 world.autumn(),
                 world.now(),
                 origin,
                 world.goose.position,
                 AutumnRenderLayer::BelowGoose,
             );
-            render_pose_with_palette(&mut canvas, world.pose(), origin, world.render_palette());
+            render_pose_with_palette(canvas, world.pose(), origin, world.render_palette());
             render_autumn_leaves(
-                &mut canvas,
+                canvas,
                 world.autumn(),
                 world.now(),
                 origin,
                 world.goose.position,
                 AutumnRenderLayer::AboveGoose,
             );
-            render_hearts(&mut canvas, world.hearts(), world.now(), origin);
-            render_sleepies(&mut canvas, world.sleepies(), world.now(), origin);
-            overlay.present(dirty, &canvas)?;
-            core.acknowledge_present();
+            render_hearts(canvas, world.hearts(), world.now(), origin);
+            render_sleepies(canvas, world.sleepies(), world.now(), origin);
+            if overlay.present(dirty, canvas)? {
+                core.acknowledge_present();
+            } else {
+                core.defer_present();
+            }
         }
 
         if core.graceful_stop_complete(&world) {
@@ -329,7 +334,7 @@ pub fn run(
             return Ok(());
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(2));
+        std::thread::sleep(core.next_tick_delay());
     }
 }
 

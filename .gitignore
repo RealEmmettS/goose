@@ -1,5 +1,6 @@
 # Rust build artifacts
 /target
+/.zig-cache/
 /inno/Output/
 
 # Cargo.lock IS committed (this is an application workspace, not a library) — it pins

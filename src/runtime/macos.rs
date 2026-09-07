@@ -11,19 +11,19 @@ use honk_control::{
     BundleStatus, CapabilityStatus, CommandServer, ControlCommand, ControlResponse, PlatformStatus,
     RuntimeStatus,
 };
+use honk_engine::render::DamageCanvas;
 use honk_engine::render::{
     render_autumn_leaves, render_footmarks_with_timing, render_hearts,
     render_pose_with_palette_at_scale, render_sleepies, AutumnRenderLayer,
 };
-use honk_engine::tiny_skia::{Color, Pixmap};
 use honk_engine::{
     CollectWindowCommand, CollectWindowPayload, CursorCommand, DesktopLayout, Pointer,
     PresenceSnapshot, Rect, Sound, Vec2, World,
 };
 use honk_platform_macos::{
     accessibility_state, local_time, main_bundle_release_metadata, open_accessibility_settings,
-    open_configuration_tui, open_update_helper, presence_state, request_accessibility_prompt,
-    warp_cursor, AccessibilityState, CollectWindowController, ForeignWindowWatcher, Overlay,
+    open_update_helper, presence_state, request_accessibility_prompt, warp_cursor,
+    AccessibilityState, CollectWindowController, ForeignWindowWatcher, Overlay,
 };
 
 pub fn run(
@@ -112,7 +112,7 @@ pub fn run(
     let mut collect_controller =
         CollectWindowController::new(primary_bounds, overlay.virtual_desktop_bounds());
     let mut core = RuntimeCore::new();
-    let mut canvas: Option<Pixmap> = None;
+    let mut damage_canvas = DamageCanvas::default();
     const AUDIO_RETRY_INTERVAL: f64 = 5.0;
     const ACCESSIBILITY_POLL_INTERVAL: f64 = 1.0;
     let mut next_audio_probe = 0.0;
@@ -134,7 +134,7 @@ pub fn run(
             if let Err(err) = control_surface::handle_command(
                 command,
                 &mut world,
-                open_configuration_tui,
+                || control_surface::open_configuration(&options.config_path),
                 open_update_helper,
             ) {
                 eprintln!("honk300: {action} action could not start ({err})");
@@ -173,8 +173,11 @@ pub fn run(
                     request.respond(ControlResponse::Ok);
                     return Ok(());
                 }
-                ControlCommand::Reload => {
-                    let response = match Config::load_existing(&options.config_path) {
+                ControlCommand::Reload | ControlCommand::ReloadIf(_) => {
+                    let response = match RuntimeCore::load_reload_config(
+                        request.command(),
+                        &options.config_path,
+                    ) {
                         Ok(next_config)
                             if RuntimeCore::restart_required_reason(&config, &next_config)
                                 .is_some() =>
@@ -466,8 +469,7 @@ pub fn run(
             let width = dirty.width().ceil().max(1.0) as u32;
             let height = dirty.height().ceil().max(1.0) as u32;
             let origin = dirty.min;
-            let canvas = prepare_dirty_canvas(&mut canvas, width, height)?;
-            canvas.fill(Color::TRANSPARENT);
+            let canvas = damage_canvas.prepare(width, height)?;
             render_footmarks_with_timing(
                 canvas,
                 &world.goose.foot_marks,
@@ -513,43 +515,6 @@ pub fn run(
     }
 
     Ok(())
-}
-
-fn prepare_dirty_canvas(
-    canvas: &mut Option<Pixmap>,
-    width: u32,
-    height: u32,
-) -> Result<&mut Pixmap, &'static str> {
-    let width = width.max(1);
-    let height = height.max(1);
-    let rounded = |extent: u32| extent.saturating_add(31) / 32 * 32;
-    let requested_width = rounded(width);
-    let requested_height = rounded(height);
-    let (next_width, next_height) =
-        canvas
-            .as_ref()
-            .map_or((requested_width, requested_height), |canvas| {
-                let resize_extent = |current: u32, required: u32, requested: u32| {
-                    if current < required || current > requested.saturating_mul(2) {
-                        requested
-                    } else {
-                        current
-                    }
-                };
-                (
-                    resize_extent(canvas.width(), width, requested_width),
-                    resize_extent(canvas.height(), height, requested_height),
-                )
-            });
-    let needs_resize = canvas
-        .as_ref()
-        .is_none_or(|canvas| canvas.width() != next_width || canvas.height() != next_height);
-    if needs_resize {
-        *canvas = Pixmap::new(next_width, next_height);
-    }
-    canvas
-        .as_mut()
-        .ok_or("could not allocate dirty overlay canvas")
 }
 
 fn effective_options(
@@ -999,34 +964,5 @@ mod tests {
         assert!(window_watcher_requested(supported));
         supported.enabled = false;
         assert!(!window_watcher_requested(supported));
-    }
-
-    #[test]
-    fn dirty_canvas_reuses_an_allocation_across_small_size_jitter() {
-        let mut canvas = None;
-        let first = prepare_dirty_canvas(&mut canvas, 257, 129)
-            .expect("allocate canvas")
-            .data()
-            .as_ptr() as usize;
-        assert_eq!(canvas.as_ref().map(Pixmap::width), Some(288));
-        assert_eq!(canvas.as_ref().map(Pixmap::height), Some(160));
-
-        let second = prepare_dirty_canvas(&mut canvas, 250, 120)
-            .expect("reuse canvas")
-            .data()
-            .as_ptr() as usize;
-        assert_eq!(first, second);
-    }
-
-    #[test]
-    fn dirty_canvas_shrinks_after_a_large_transient_frame() {
-        let mut canvas = None;
-        prepare_dirty_canvas(&mut canvas, 1440, 900).expect("allocate transient canvas");
-        assert_eq!(canvas.as_ref().map(Pixmap::width), Some(1440));
-        assert_eq!(canvas.as_ref().map(Pixmap::height), Some(928));
-
-        prepare_dirty_canvas(&mut canvas, 320, 300).expect("shrink canvas");
-        assert_eq!(canvas.as_ref().map(Pixmap::width), Some(320));
-        assert_eq!(canvas.as_ref().map(Pixmap::height), Some(320));
     }
 }

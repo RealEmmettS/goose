@@ -134,7 +134,7 @@ fn render_footer(frame: &mut Frame<'_>, area: ratatui::layout::Rect, app: &AppSt
         Style::default().fg(Color::Green)
     };
     let mut lines = vec![Line::raw(
-        "j/k move  Tab category  Enter toggle  Left/Right adjust  S save  R reload  U status  X stop  G start  q quit  PgUp/PgDn status",
+        "j/k move  Tab category  Enter toggle  Left/Right adjust  S save  R reload  U status  C check updates  I update  X stop  G start  q quit  PgUp/PgDn status",
     )];
     lines.extend(
         app.status

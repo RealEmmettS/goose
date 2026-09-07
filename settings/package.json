@@ -1,0 +1,17 @@
+{
+  "name": "honk300-settings-build",
+  "private": true,
+  "version": "1.3.7",
+  "description": "Pinned Native SDK build toolchain for the Honk300 settings binary.",
+  "devDependencies": {
+    "@native-sdk/cli": "0.5.4"
+  },
+  "scripts": {
+    "prepare:sdk": "node scripts/prepare-sdk.mjs",
+    "test": "native test --yes",
+    "build": "native build --yes",
+    "check": "native check --strict",
+    "pretest": "npm run prepare:sdk",
+    "prebuild": "npm run prepare:sdk"
+  }
+}

@@ -7,7 +7,7 @@ pub mod ui;
 use app::{Action, AppState, CommandResult, TuiCommand};
 use color_eyre::eyre::Result;
 use crossterm::event::{self, Event, KeyEvent, KeyEventKind};
-use honk_config::{Config, ConfigError, ConfigLoadState, LoadedConfig};
+use honk_config::{Config, ConfigError, ConfigSnapshot};
 use honk_control::{
     send_command, wait_for_shutdown, ControlCommand, ControlResponse, RuntimeStatus,
 };
@@ -26,18 +26,38 @@ pub fn run_with_save_hook<F>(config_path: PathBuf, save_hook: F) -> Result<()>
 where
     F: Fn(&Config) -> std::result::Result<(), String> + Send + Sync + 'static,
 {
+    run_with_hooks(config_path, save_hook, |_| {
+        Err("update actions require the honk300 host".into())
+    })
+}
+
+pub fn run_with_hooks<F, G>(config_path: PathBuf, save_hook: F, update_hook: G) -> Result<()>
+where
+    F: Fn(&Config) -> std::result::Result<(), String> + Send + Sync + 'static,
+    G: Fn(TuiCommand) -> std::result::Result<String, String> + Send + Sync + 'static,
+{
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_time()
         .build()?;
-    runtime.block_on(run_async(config_path, Arc::new(save_hook)))
+    runtime.block_on(run_async(
+        config_path,
+        Arc::new(save_hook),
+        Arc::new(update_hook),
+    ))
 }
 
 type ConfigSaveHook = Arc<dyn Fn(&Config) -> std::result::Result<(), String> + Send + Sync>;
+type UpdateHook = Arc<dyn Fn(TuiCommand) -> std::result::Result<String, String> + Send + Sync>;
 
-async fn run_async(config_path: PathBuf, save_hook: ConfigSaveHook) -> Result<()> {
+async fn run_async(
+    config_path: PathBuf,
+    save_hook: ConfigSaveHook,
+    update_hook: UpdateHook,
+) -> Result<()> {
     terminal::install_panic_hook()?;
-    let loaded = load_tui_config(config_path)?;
-    let mut app = AppState::new(loaded.config, loaded.path);
+    let loaded = load_tui_config(config_path.clone())?;
+    let mut app = AppState::new(loaded.config, config_path);
+    app.revision = loaded.revision;
     if let Some(warning) = loaded.warning {
         app.set_status(format!("config warning: {warning}"), false);
     }
@@ -81,8 +101,16 @@ async fn run_async(config_path: PathBuf, save_hook: ConfigSaveHook) -> Result<()
                 let tx = command_result_tx.clone();
                 let save_hook = Arc::clone(&save_hook);
                 app.set_status("working...".into(), false);
+                let update_hook = Arc::clone(&update_hook);
                 spawn_blocking_operation(tx, move || {
-                    handle_command(&snapshot, command, save_hook.as_ref())
+                    if matches!(command, TuiCommand::CheckUpdates | TuiCommand::Update) {
+                        match update_hook(command) {
+                            Ok(message) => result(message, false, false),
+                            Err(error) => result(error, true, false),
+                        }
+                    } else {
+                        handle_command(&snapshot, command, save_hook.as_ref())
+                    }
                 });
                 command_busy = true;
             }
@@ -104,18 +132,8 @@ where
     })
 }
 
-fn load_tui_config(path: PathBuf) -> Result<LoadedConfig, ConfigError> {
-    match Config::load(Some(path))? {
-        ConfigLoadState::Missing { path } => Ok(LoadedConfig {
-            path,
-            config: Config::default(),
-            warning: None,
-            migrated_from: None,
-        }),
-        ConfigLoadState::Loaded(loaded) => Ok(*loaded),
-        ConfigLoadState::Malformed { error, .. } => Err(ConfigError::MalformedDocument(error)),
-        ConfigLoadState::UnsupportedVersion { found, .. } => Err(ConfigError::WrongVersion(found)),
-    }
+fn load_tui_config(path: PathBuf) -> Result<ConfigSnapshot, ConfigError> {
+    ConfigSnapshot::load(&path)
 }
 
 fn spawn_key_reader() -> mpsc::UnboundedReceiver<KeyEvent> {
@@ -141,35 +159,67 @@ fn handle_command(
 ) -> CommandResult {
     match command {
         TuiCommand::Save => {
+            let mut saved_revision = None;
             let mut command_result = match app
                 .config
                 .validate()
-                .and_then(|_| app.config.save_atomic(&app.path))
+                .and_then(|_| app.config.save_if_revision(&app.path, &app.revision))
             {
-                Ok(()) => match save_hook(&app.config) {
-                    Err(error) => result(
-                        format!("saved; login autostart reconcile failed: {error}"),
-                        true,
-                        true,
-                    ),
-                    Ok(()) => match send_command(ControlCommand::Reload) {
-                        Ok(ControlResponse::Ok) => result("saved; reload sent", false, true),
-                        Ok(ControlResponse::Err(code)) => {
-                            result(format!("saved; reload rejected: {code}"), true, true)
-                        }
-                        Ok(ControlResponse::Status(_)) => {
-                            result("saved; unexpected status response", true, true)
-                        }
-                        Err(_) => result("saved; no running goose to reload", false, true),
-                    },
-                },
+                Ok(revision) => {
+                    saved_revision = Some(revision);
+                    match save_hook(&app.config) {
+                        Err(error) => result(
+                            format!("saved; login autostart reconcile failed: {error}"),
+                            true,
+                            true,
+                        ),
+                        Ok(()) => match saved_revision
+                            .as_ref()
+                            .expect("save returned a revision")
+                            .reload_token(&app.path)
+                            .map_err(std::io::Error::other)
+                            .and_then(|identity| send_command(ControlCommand::ReloadIf(identity)))
+                        {
+                            Ok(ControlResponse::Ok) => result("saved; reload sent", false, true),
+                            Ok(ControlResponse::Err(code)) => {
+                                result(format!("saved; reload rejected: {code}"), true, true)
+                            }
+                            Ok(ControlResponse::Status(_)) => {
+                                result("saved; unexpected status response", true, true)
+                            }
+                            Err(error)
+                                if matches!(
+                                    error.kind(),
+                                    std::io::ErrorKind::NotFound
+                                        | std::io::ErrorKind::ConnectionRefused
+                                ) =>
+                            {
+                                result("saved; no running goose to reload", false, true)
+                            }
+                            Err(error) => {
+                                result(format!("saved; reload not confirmed: {error}"), true, true)
+                            }
+                        },
+                    }
+                }
                 Err(err) => result(format!("save failed: {err}"), true, false),
             };
             if command_result.mark_saved {
                 command_result.saved_config = Some(app.config.clone());
             }
+            command_result.saved_revision = saved_revision;
             command_result
         }
+        TuiCommand::CheckUpdates | TuiCommand::Update => unreachable!("host hook handles updates"),
+        TuiCommand::ReloadFile => match load_tui_config(app.path.clone()) {
+            Ok(snapshot) => {
+                let mut response = result("saved file reloaded", false, false);
+                response.loaded_config = Some((app.config.clone(), snapshot.config));
+                response.saved_revision = Some(snapshot.revision);
+                response
+            }
+            Err(error) => result(format!("file reload failed: {error}"), true, false),
+        },
         TuiCommand::Reload => match send_command(ControlCommand::Reload) {
             Ok(ControlResponse::Ok) => result("reload sent", false, false),
             Ok(ControlResponse::Err(code)) => {
@@ -211,7 +261,7 @@ fn handle_command(
             Ok(ControlResponse::Status(_)) => result("poke got unexpected status", true, false),
             Err(err) => result(format!("poke failed: {err}"), true, false),
         },
-        TuiCommand::Start => handle_start_with_hook(app, launch_and_wait, save_hook),
+        TuiCommand::Start => handle_start_with_hook(app, start_from_config, save_hook),
     }
 }
 
@@ -232,13 +282,13 @@ where
     F: FnOnce(&Path) -> Result<String, String>,
 {
     let saved = app.dirty();
+    let mut saved_revision = None;
     if saved {
-        if let Err(err) = app
-            .config
-            .validate()
-            .and_then(|_| app.config.save_atomic(&app.path))
-        {
-            return result(format!("start blocked; save failed: {err}"), true, false);
+        match app.config.save_if_revision(&app.path, &app.revision) {
+            Ok(revision) => saved_revision = Some(revision),
+            Err(error) => {
+                return result(format!("start blocked; save failed: {error}"), true, false)
+            }
         }
         if let Err(error) = save_hook(&app.config) {
             let mut command_result = result(
@@ -247,6 +297,7 @@ where
                 true,
             );
             command_result.saved_config = Some(app.config.clone());
+            command_result.saved_revision = saved_revision;
             return command_result;
         }
     }
@@ -257,6 +308,7 @@ where
     if saved {
         command_result.saved_config = Some(app.config.clone());
     }
+    command_result.saved_revision = saved_revision;
     command_result
 }
 
@@ -301,7 +353,7 @@ where
     }
 }
 
-fn launch_and_wait(config_path: &Path) -> Result<String, String> {
+pub fn start_from_config(config_path: &Path) -> Result<String, String> {
     let (mut child, launcher_may_exit) = spawn_start(config_path).map_err(|err| err.to_string())?;
     let mut child_exited = false;
     wait_for_readiness(Duration::from_secs(10), Duration::from_millis(100), || {
@@ -332,6 +384,8 @@ fn result(status: impl Into<String>, is_error: bool, mark_saved: bool) -> Comman
         status: status.into(),
         is_error,
         mark_saved,
+        saved_revision: None,
+        loaded_config: None,
         saved_config: None,
         runtime_status: None,
     }
@@ -346,6 +400,8 @@ fn status_result(status: RuntimeStatus) -> CommandResult {
         },
         is_error: false,
         mark_saved: false,
+        saved_revision: None,
+        loaded_config: None,
         saved_config: None,
         runtime_status: Some(status),
     }
@@ -503,9 +559,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("config.toml");
         let loaded = load_tui_config(path.clone()).unwrap();
-        assert_eq!(loaded.path, path);
         assert_eq!(loaded.config, Config::default());
-        assert!(!loaded.path.exists());
+        assert!(!path.exists());
     }
 
     #[test]
@@ -514,6 +569,7 @@ mod tests {
         let path = dir.path().join("config.toml");
         Config::default().save_atomic(&path).unwrap();
         let mut app = AppState::new(Config::default(), path.clone());
+        app.revision = honk_config::ConfigRevision::read(&path).unwrap();
         app.config.audio.enabled = false;
         let launched = std::cell::Cell::new(false);
 
@@ -534,6 +590,7 @@ mod tests {
         let path = dir.path().join("config.toml");
         Config::default().save_atomic(&path).unwrap();
         let mut app = AppState::new(Config::default(), path.clone());
+        app.revision = honk_config::ConfigRevision::read(&path).unwrap();
         app.config.lifecycle.autostart_on_login = true;
 
         let command_result = handle_start_with_hook(

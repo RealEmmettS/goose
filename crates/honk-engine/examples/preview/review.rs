@@ -1,0 +1,161 @@
+//! Actual engine frames; HTML only displays the exported PNGs.
+use honk_engine::{
+    math::Vec2,
+    render::{render_rig_scaled, RenderPalette},
+    rig::{Rig, RigAnim, RigInput},
+    time::DT,
+    tiny_skia::{Pixmap, PixmapPaint, Transform},
+};
+use std::{fs, path::Path};
+const CELL: u32 = 128;
+const COLS: u32 = 12;
+const COUNT: u32 = 120;
+const ANCHOR: Vec2 = Vec2 { x: 60.0, y: 93.0 };
+const SEQUENCES: [&str; 10] = [
+    "walk",
+    "walk-front",
+    "walk-away",
+    "run-stop",
+    "turn",
+    "reversal",
+    "pet",
+    "honk",
+    "anticipation",
+    "reduced-motion",
+];
+
+pub fn export(out: &str) {
+    let out = Path::new(out);
+    fs::create_dir_all(out).unwrap();
+    let mut manifest = String::from("{\"developmentPreview\":true,\"fps\":30,\"cell\":128,\"scale\":2,\"columns\":12,\"count\":120,\"sequences\":{");
+    for (index, name) in SEQUENCES.iter().enumerate() {
+        let mut sheet = Pixmap::new(CELL * 2 * COLS, CELL * 2 * (COUNT / COLS)).unwrap();
+        let mut anim = RigAnim::new(Vec2::ZERO, 0.0);
+        let mut center = Vec2::ZERO;
+        let mut trace = String::new();
+        let mut heading = 0.0;
+        for frame in 0..COUNT {
+            let t = frame as f32 / 30.0;
+            let speed = match *name {
+                "walk" => 80.0,
+                "walk-front" => {
+                    heading = 90.0;
+                    120.0
+                }
+                "walk-away" => {
+                    heading = 270.0;
+                    120.0
+                }
+                "run-stop" => {
+                    if t < 0.5 {
+                        t * 400.0
+                    } else if t < 2.5 {
+                        200.0
+                    } else {
+                        (3.0 - t).max(0.0) * 400.0
+                    }
+                }
+                "turn" => {
+                    heading = t * 90.0;
+                    55.0
+                }
+                "reversal" => {
+                    heading = if (t as u32).is_multiple_of(2) {
+                        0.0
+                    } else {
+                        180.0
+                    };
+                    85.0
+                }
+                _ => 0.0,
+            };
+            if frame == 15 && *name == "pet" {
+                anim.pet();
+            }
+            if [15, 70].contains(&frame) && ["honk", "reduced-motion"].contains(name) {
+                anim.flick_tail();
+            }
+            if [40, 85].contains(&frame) {
+                anim.start_blink(f64::from(t));
+            }
+            anim.anticipate(*name == "anticipation" && (15..60).contains(&frame));
+            anim.set_expression_options(true, *name == "reduced-motion");
+            let velocity = Vec2::from_angle_degrees(heading) * speed;
+            let mut rig = Rig::default();
+            for tick in 0..4 {
+                center = center + velocity * DT;
+                rig = anim
+                    .update(&RigInput {
+                        center,
+                        direction_deg: heading,
+                        neck_target: 0.45,
+                        speed,
+                        velocity,
+                        step_time: 0.2,
+                        now: f64::from(t) + f64::from(tick) * f64::from(DT),
+                        dt: DT,
+                    })
+                    .primary;
+                anim.feet.drain_plants(|_| {});
+            }
+            let cell = render_rig_scaled(
+                &rig,
+                rig.ground - ANCHOR,
+                CELL as f32,
+                CELL as f32,
+                2.0,
+                RenderPalette::default(),
+            )
+            .unwrap();
+            sheet.draw_pixmap(
+                ((frame % COLS) * CELL * 2) as i32,
+                ((frame / COLS) * CELL * 2) as i32,
+                cell.as_ref(),
+                &PixmapPaint::default(),
+                Transform::identity(),
+                None,
+            );
+            if frame > 0 {
+                trace.push(',');
+            }
+            trace.push_str(&format!("[{:.2},{:.2}]", center.x, center.y));
+            if frame == 30 {
+                cell.save_png(out.join(format!("{name}-pose.png"))).unwrap();
+            }
+        }
+        sheet.save_png(out.join(format!("{name}.png"))).unwrap();
+        if index > 0 {
+            manifest.push(',');
+        }
+        manifest.push_str(&format!(
+            "\"{name}\":{{\"image\":\"{name}.png\",\"ground\":[{trace}]}}"
+        ));
+    }
+    manifest.push_str("}}");
+    fs::write(out.join("manifest.json"), &manifest).unwrap();
+    let mut headings = String::new();
+    for degrees in (0..360).step_by(30) {
+        let rig = Rig::update(Vec2::ZERO, degrees as f32, 0.45, 0.0);
+        render_rig_scaled(
+            &rig,
+            rig.ground - ANCHOR,
+            CELL as f32,
+            CELL as f32,
+            4.0,
+            RenderPalette::default(),
+        )
+        .unwrap()
+        .save_png(out.join(format!("heading-{degrees:03}.png")))
+        .unwrap();
+        headings.push_str(&format!("<figure><img src='heading-{degrees:03}.png' width='128' height='128'><figcaption>{degrees}&deg;</figcaption></figure>"));
+    }
+    fs::write(
+        out.join("index.html"),
+        include_str!("review.html")
+            .replace("MANIFEST_DATA", &manifest)
+            .replace("HEADING_IMAGES", &headings),
+    )
+    .unwrap();
+    fs::write(out.join("README.md"), "# Actual renderer development preview\n\nOpen index.html to play, pause, scrub, and inspect at 100/150/200 percent on light/dark backgrounds. PNG sheets: 120 frames, 30fps, 12 columns, 256px cells displayed at 128 CSS pixels. Heading PNGs: 512px cells displayed at 128 CSS pixels. Ground anchor: 60,93 world units in every cell. manifest.json records travel for the contact ruler. These are development exports, not released artwork or native desktop acceptance.\n").unwrap();
+    println!("wrote actual renderer motion review to {}", out.display());
+}

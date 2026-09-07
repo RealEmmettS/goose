@@ -75,7 +75,7 @@ pub use mood::{
     ZParticle, ZParticles,
 };
 pub use render::{AutumnRenderLayer, RenderPalette, GOOSE_SUPERSAMPLE};
-pub use rig::{GoosePose, Rig, RigAnim, RigInput, RigView};
+pub use rig::{GoosePose, Rig, RigAnim, RigInput};
 pub use rng::{Deck, RandomSource, SplitMix64};
 pub use schedule::{LocalMinute, PresenceSnapshot, PresenceState, ScheduleOptions};
 pub use sound::{HonkTone, Sound};

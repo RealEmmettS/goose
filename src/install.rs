@@ -1,3 +1,5 @@
+pub(crate) mod companions;
+pub(crate) use companions::verify_settings_companion;
 use std::fs;
 use std::io;
 #[cfg(target_os = "macos")]
@@ -757,6 +759,7 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
     migrate_legacy_user_media(&bin_dir.join("Assets"), &media, LegacyMigrationMode::Move)?;
     copy_current_exe_to_aliases(&bin_dir)?;
     copy_windows_app_launcher(&bin_dir)?;
+    companions::copy_settings_if_present(&bin_dir)?;
     write_install_marker(&root, InstallSource::ManualLocal)?;
     write_windows_install_source_marker(InstallSource::ManualLocal)?;
     add_windows_user_path(&bin_dir)?;
@@ -789,6 +792,7 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
     migrate_legacy_user_media(&bin_dir.join("Assets"), &media, LegacyMigrationMode::Move)?;
     let installed = bin_dir.join("honk300");
     copy_current_exe(&installed)?;
+    companions::copy_settings_if_present(&bin_dir)?;
     make_executable(&installed)?;
     write_install_marker(&root, InstallSource::ManualLocal)?;
 
@@ -1936,6 +1940,7 @@ pub fn run_windows_slot_protocol() -> Result<bool, DynError> {
                 // hash is compiled into the MSI and delivered in hidden CustomActionData; the
                 // activation transaction verifies that identity against the staged slot.
                 launcher_sha256: required_internal_short_arg(&values, "l")?.to_owned(),
+                settings_sha256: required_internal_short_arg(&values, "s")?.to_owned(),
                 autostart: required_internal_bool_short(&values, "u")?,
             })?;
             Ok(true)
@@ -1953,6 +1958,7 @@ pub fn run_windows_slot_protocol() -> Result<bool, DynError> {
                 artifact_path: required_internal_path(&values, "artifact-path")?,
                 payload_sha256: required_internal_arg(&values, "payload-sha256")?.to_owned(),
                 launcher_sha256: current_windows_app_launcher_hash()?,
+                settings_sha256: companions::current_settings_hash()?,
                 autostart: required_internal_bool(&values, "autostart")?,
             })?;
             Ok(true)
@@ -2173,6 +2179,7 @@ struct WindowsSlotActivation {
     artifact_path: PathBuf,
     payload_sha256: String,
     launcher_sha256: String,
+    settings_sha256: String,
     autostart: bool,
 }
 
@@ -2277,6 +2284,10 @@ fn windows_slot_activate(request: WindowsSlotActivation) -> Result<(), DynError>
     validate_regular_file_hash(
         &release_bin.join(WINDOWS_APP_LAUNCHER_NAME),
         &request.launcher_sha256,
+    )?;
+    validate_regular_file_hash(
+        &release_bin.join(companions::SETTINGS_NAME),
+        &request.settings_sha256,
     )?;
     let current = root.join("current");
     let bin = root.join("bin");
@@ -2387,6 +2398,11 @@ fn validate_windows_slot_activation(request: &WindowsSlotActivation) -> Result<(
         || request.payload_sha256.len() != 64
         || !request
             .payload_sha256
+            .chars()
+            .all(|c| c.is_ascii_hexdigit())
+        || request.settings_sha256.len() != 64
+        || !request
+            .settings_sha256
             .chars()
             .all(|c| c.is_ascii_hexdigit())
         || request.launcher_sha256.len() != 64
@@ -2504,6 +2520,11 @@ fn write_windows_slot_receipt(
             bin.join("honk.exe").to_string_lossy(),
             bin.join("goose.exe").to_string_lossy()
         ],
+        "settings_app": {
+            "name": companions::SETTINGS_NAME,
+            "sha256": request.settings_sha256,
+            "size": fs::metadata(bin.join(companions::SETTINGS_NAME))?.len()
+        },
         "app_launcher": {
             "path": bin.join(WINDOWS_APP_LAUNCHER_NAME).to_string_lossy(),
             "sha256": request.launcher_sha256
@@ -2547,6 +2568,10 @@ fn verify_windows_slot_activation(
     validate_regular_file_hash(
         &root.join("bin").join(WINDOWS_APP_LAUNCHER_NAME),
         &request.launcher_sha256,
+    )?;
+    validate_regular_file_hash(
+        &root.join("bin").join(companions::SETTINGS_NAME),
+        &request.settings_sha256,
     )?;
     let value: serde_json::Value =
         serde_json::from_slice(&fs::read(root.join("install-receipt.json"))?)?;
@@ -4590,6 +4615,7 @@ fn uninstall_windows_managed_under_lease(
         "honk.exe",
         "goose.exe",
         WINDOWS_APP_LAUNCHER_NAME,
+        companions::SETTINGS_NAME,
     ] {
         match fs::symlink_metadata(installed_bin.join(name)) {
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
@@ -5368,13 +5394,19 @@ fn write_macos_receipt(
     let payload = root.join("Contents").join("MacOS").join("honk300");
     let payload_size = fs::metadata(&payload)?.len();
     let payload_hash = sha256_file(&payload)?;
-    let bytes = serde_json::to_vec_pretty(&macos_install_receipt(
-        metadata,
-        root,
-        autostart,
-        &payload_hash,
-        payload_size,
-    ))?;
+    let mut receipt = macos_install_receipt(metadata, root, autostart, &payload_hash, payload_size);
+    let settings = payload.with_file_name(companions::SETTINGS_NAME);
+    let settings_metadata = fs::symlink_metadata(&settings)?;
+    if !settings_metadata.is_file() || settings_metadata.file_type().is_symlink() {
+        return Err(io::Error::other(
+            "macOS settings companion is not a regular executable",
+        ));
+    }
+    receipt["settings_app"] = serde_json::json!({
+        "name": companions::SETTINGS_NAME, "size": settings_metadata.len(),
+        "sha256": sha256_file(&settings)?
+    });
+    let bytes = serde_json::to_vec_pretty(&receipt)?;
     fs::write(&temp, bytes)?;
     fs::set_permissions(&temp, fs::Permissions::from_mode(0o600))?;
     if let Err(error) = fs::rename(&temp, path) {

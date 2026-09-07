@@ -4,6 +4,9 @@
 //! TOML, and user-facing validation, then converts validated settings into the
 //! platform-free option structs consumed by the engine.
 
+mod editing;
+pub use editing::{config_path_identity, ConfigRevision, ConfigSnapshot};
+
 use honk_engine::{
     AppearanceOptions, CollectWindowCapabilities, CollectWindowOptions, FootMarkTiming,
     ForeignWindowOptions, HourlyHonkOptions, InteractionOptions, LocalMinute, MoodIntensity,
@@ -146,14 +149,14 @@ pub struct ColorConfig {
 
 impl Default for ColorConfig {
     fn default() -> Self {
-        // Reference-art tones (docs/art-reference/, ADR 0014).
+        let palette = RenderPalette::default();
         Self {
-            goose_white: "#ededed".into(),
-            goose_orange: "#fc7927".into(),
-            goose_outline: "#c9c9c9".into(),
-            goose_shade: Some("#c6c6c6".into()),
-            goose_wing: Some("#515557".into()),
-            goose_orange_dark: Some("#d1551b".into()),
+            goose_white: hex_string(palette.goose_white),
+            goose_orange: hex_string(palette.goose_orange),
+            goose_outline: hex_string(palette.goose_outline),
+            goose_shade: Some(hex_string(palette.goose_shade)),
+            goose_wing: Some(hex_string(palette.goose_wing)),
+            goose_orange_dark: Some(hex_string(palette.goose_orange_dark)),
         }
     }
 }
@@ -308,10 +311,21 @@ impl Default for ScheduleConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AppearanceConfig {
     pub calm_goose: bool,
+    pub expressions: bool,
+    pub reduced_motion: bool,
+}
+impl Default for AppearanceConfig {
+    fn default() -> Self {
+        Self {
+            calm_goose: false,
+            expressions: true,
+            reduced_motion: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -438,11 +452,15 @@ pub enum ConfigError {
     WrongVersion(u32),
     Validation(Vec<String>),
     InvalidTarget(String),
+    Conflict,
 }
 
 impl fmt::Display for ConfigError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Conflict => {
+                f.write_str("settings changed in another editor; reload them before saving")
+            }
             Self::NoDefaultPath => f.write_str("could not determine a honk300 config path"),
             Self::Io(err) => write!(f, "config I/O error: {err}"),
             Self::Parse(err) => write!(f, "malformed config.toml: {err}"),
@@ -690,28 +708,15 @@ impl Config {
     }
 
     pub fn save_atomic(&self, path: &Path) -> Result<(), ConfigError> {
-        self.validate()?;
-        let target = save_target(path)?;
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let mut doc = match fs::read_to_string(&target) {
-            Ok(text) => text
-                .parse::<DocumentMut>()
-                .map_err(|err| ConfigError::MalformedDocument(err.to_string()))?,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => DocumentMut::new(),
-            Err(err) => return Err(ConfigError::Io(err)),
-        };
-        if let Some(found) = document_version(&doc).map_err(ConfigError::MalformedDocument)? {
-            if found != 1 && found != CONFIG_VERSION {
-                return Err(ConfigError::WrongVersion(found));
-            }
-            if found == 1 {
-                migrate_v1_document(&mut doc).map_err(ConfigError::MalformedDocument)?;
-            }
-        }
-        self.write_to_document(&mut doc);
-        persist_document(&target, &doc)
+        editing::save(self, path, None).map(|_| ())
+    }
+
+    pub fn save_if_revision(
+        &self,
+        path: &Path,
+        expected: &ConfigRevision,
+    ) -> Result<ConfigRevision, ConfigError> {
+        editing::save(self, path, Some(expected))
     }
 
     pub fn restart_required_changes(&self, next: &Self) -> Vec<&'static str> {
@@ -774,6 +779,8 @@ impl Config {
             },
             appearance: AppearanceOptions {
                 calm_goose: self.appearance.calm_goose,
+                expressions: self.appearance.expressions,
+                reduced_motion: self.appearance.reduced_motion,
             },
             timing: TimingOptions {
                 first_wander_time: self.behavior.first_wander_time_seconds,
@@ -969,6 +976,8 @@ impl Config {
 
         let appearance = table_mut(doc, "appearance");
         set_bool(appearance, "calm_goose", self.appearance.calm_goose);
+        set_bool(appearance, "expressions", self.appearance.expressions);
+        set_bool(appearance, "reduced_motion", self.appearance.reduced_motion);
 
         let audio = table_mut(doc, "audio");
         set_bool(audio, "enabled", self.audio.enabled);
@@ -1326,7 +1335,7 @@ fn known_section_keys(section: &str) -> &'static [&'static str] {
             "seasonal",
             "autumn",
         ],
-        "appearance" => &["calm_goose"],
+        "appearance" => &["calm_goose", "expressions", "reduced_motion"],
         "audio" => &["enabled", "honk", "bite", "mud", "pat"],
         "safety" => &["pause_on_fullscreen", "no_mouse_steal", "no_window_ride"],
         "platform" => &["wayland"],
@@ -1455,6 +1464,32 @@ mod tests {
                 .lifecycle
                 .autostart_on_login
         );
+    }
+
+    #[test]
+    fn existing_appearance_defaults_expressions_on_without_rewriting_saved_options() {
+        let config: Config = toml::from_str("[appearance]\ncalm_goose = true\n").unwrap();
+        assert!(config.appearance.calm_goose && config.appearance.expressions);
+        assert!(!config.appearance.reduced_motion);
+    }
+
+    #[test]
+    fn expression_options_persist_with_unknown_fields_and_comments() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(
+            &path,
+            "# personal settings\n[appearance]\nfuture = 3 # retained\n",
+        )
+        .unwrap();
+        let mut config = Config::load_existing(&path).unwrap();
+        config.appearance.expressions = false;
+        config.appearance.reduced_motion = true;
+        config.save_atomic(&path).unwrap();
+        let saved = fs::read_to_string(&path).unwrap();
+        assert!(saved.contains("# personal settings") && saved.contains("future = 3 # retained"));
+        let loaded = Config::load_existing(&path).unwrap();
+        assert!(!loaded.appearance.expressions && loaded.appearance.reduced_motion);
     }
 
     #[test]

@@ -15,6 +15,8 @@ if (-not $AppLauncher) {
     $AppLauncher = Join-Path (Split-Path -Parent $binaryPath) 'honk300-app.exe'
 }
 $launcherPath = (Resolve-Path -LiteralPath $AppLauncher).Path
+$settingsPath = (Resolve-Path -LiteralPath (Join-Path (Split-Path -Parent $binaryPath) 'honk300-settings.exe')).Path
+$settingsHash = (Get-FileHash -LiteralPath $settingsPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $launcherHash = (Get-FileHash -LiteralPath $launcherPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $versionOutput = (& $binaryPath --version | Select-Object -Last 1).Trim()
 $version = ($versionOutput.Split()[-1] -replace '[+-].*$', '')
@@ -43,6 +45,7 @@ function Stage-Channel([string] $Channel) {
         Copy-Item -LiteralPath $binaryPath -Destination (Join-Path $releaseBin $name)
     }
     Copy-Item -LiteralPath $launcherPath -Destination (Join-Path $releaseBin 'honk300-app.exe')
+    Copy-Item -LiteralPath $settingsPath -Destination (Join-Path $releaseBin 'honk300-settings.exe')
 }
 
 function Invoke-Activation([string] $Origin, [string] $Commit) {
@@ -61,7 +64,7 @@ function Invoke-Activation([string] $Origin, [string] $Commit) {
 }
 
 function Invoke-CompactActivation([string] $Origin, [string] $Commit) {
-    & $binaryPath __wsa -r $root -o $Origin -c $Commit -a $artifact -l $launcherHash -u false
+    & $binaryPath __wsa -r $root -o $Origin -c $Commit -a $artifact -l $launcherHash -s $settingsHash -u false
     return $LASTEXITCODE
 }
 
@@ -82,6 +85,11 @@ function Assert-Active([string] $Origin, [string] $Channel) {
         if ((Get-FileHash -LiteralPath $alias -Algorithm SHA256).Hash.ToLowerInvariant() -ne $hash) {
             throw "$name does not resolve to the staged release bytes"
         }
+    }
+    $settings = Join-Path $root 'bin\honk300-settings.exe'
+    if ((Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash.ToLowerInvariant() -ne $settingsHash -or
+        $receipt.settings_app.sha256 -ne $settingsHash -or (Read-PeSubsystem $settings) -ne 2) {
+        throw 'settings companion identity was not retained through activation'
     }
     $launcher = Join-Path $root 'bin\honk300-app.exe'
     if ((Get-FileHash -LiteralPath $launcher -Algorithm SHA256).Hash.ToLowerInvariant() -ne $launcherHash) {

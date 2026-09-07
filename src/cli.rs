@@ -63,6 +63,17 @@ pub enum Command {
         #[arg(long, value_name = "PATH")]
         config: Option<PathBuf>,
     },
+    /// Open the native graphical settings window.
+    Settings {
+        #[arg(long, value_name = "PATH")]
+        config: Option<PathBuf>,
+    },
+    /// Internal bounded settings protocol used by the native window.
+    #[command(name = "__settings-service", hide = true)]
+    SettingsService {
+        #[arg(long, value_name = "PATH")]
+        config: Option<PathBuf>,
+    },
     /// Poke the running goose into a specific action.
     Do {
         #[arg(value_enum)]
@@ -82,6 +93,9 @@ pub enum Command {
     },
     /// Download and run the matching release installer for this install source.
     Update {
+        /// Check the latest release without downloading or changing the installation.
+        #[arg(long)]
+        check: bool,
         /// Emit exactly one machine-readable result object on stdout.
         #[arg(long)]
         json: bool,
@@ -391,7 +405,13 @@ mod tests {
         for (word, expected) in [
             ("install", Command::Install { autostart: false }),
             ("uninstall", Command::Uninstall { purge: false }),
-            ("update", Command::Update { json: false }),
+            (
+                "update",
+                Command::Update {
+                    json: false,
+                    check: false,
+                },
+            ),
             (
                 "setup",
                 Command::Setup {
@@ -426,7 +446,13 @@ mod tests {
         assert_eq!(uninstall.command, Some(Command::Uninstall { purge: true }));
 
         let update = Cli::try_parse_normalized(["honk300", "update", "--json"]).unwrap();
-        assert_eq!(update.command, Some(Command::Update { json: true }));
+        assert_eq!(
+            update.command,
+            Some(Command::Update {
+                json: true,
+                check: false
+            })
+        );
     }
 
     #[test]

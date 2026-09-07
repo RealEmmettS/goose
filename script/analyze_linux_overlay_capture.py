@@ -16,10 +16,13 @@ DARK_BACKGROUND = (0x20, 0x30, 0x40)
 LIGHT_BACKGROUND = (0xD8, 0xE6, 0xF4)
 MIN_BODY_PIXELS = 100
 MIN_WING_PIXELS = 25
-# A distant top-down pose has a much smaller visible beak/feet footprint than the side view.
-# Candidate 29387569722 captured 13 warm pixels with 710 body and 1,615 wing pixels, so keep a
-# strict nonzero articulation signal without rejecting that valid renderer output.
+# The continuous rig retains warm feet at rear headings where the skull hides its bill.
 MIN_WARM_PIXELS = 10
+PALETTE = {
+    "body": (252, 252, 246), "shade": (231, 234, 227),
+    "wing": (238, 240, 233), "outline": (173, 184, 172),
+    "orange": (252, 121, 39), "orange_dark": (209, 85, 27),
+}
 
 
 @dataclass(frozen=True)
@@ -168,17 +171,18 @@ def analyze_pair(label: str, dark_path: Path, light_path: Path) -> CaptureMetric
         dark_background += dark_is_background
         light_background += light_is_background
         transitions += dark_is_background and light_is_background
-        if (
-            not light_is_background
-            and alpha >= 245
-            and min(red, green, blue) >= 205
-            and max(red, green, blue) - min(red, green, blue) <= 35
-        ):
-            body += 1
-        if alpha >= 245 and 45 <= red <= 145 and 45 <= green <= 145 and 45 <= blue <= 145 and max(red, green, blue) - min(red, green, blue) <= 30:
-            wing += 1
-        if alpha >= 245 and red >= 185 and 55 <= green <= 185 and blue <= 105 and red >= green + 35 and green >= blue + 15:
-            warm += 1
+        # Own each opaque pixel once. The pale wing and belly are close to the
+        # body, and a light desktop must not count as white feathers. Requiring
+        # both captures to match rejects background-dependent blends as well.
+        matches = []
+        if not light_is_background and not dark_is_background:
+            for name, color in PALETTE.items():
+                if near(red, green, blue, alpha, color, 8) and near(dark_red, dark_green, dark_blue, dark_alpha, color, 8):
+                    matches.append((sum((a - b) ** 2 for a, b in zip((red, green, blue), color)), name))
+        owner = min(matches)[1] if matches else None
+        body += owner == "body"
+        wing += owner == "wing"
+        warm += owner in {"orange", "orange_dark"}
         near_black_mask.append(
             (alpha >= 245 and red <= 28 and green <= 28 and blue <= 28)
             or (

@@ -93,6 +93,10 @@ pub struct TaskCtx<'a> {
 pub trait Task {
     /// Stable identifier (for `do <id>` pokes and debugging).
     fn id(&self) -> &'static str;
+    /// Current anticipation beat; visual only, never grants a capability or delays cancellation.
+    fn anticipating(&self) -> bool {
+        false
+    }
     /// Selected collect-window content, when this task controls one. Used to cancel one
     /// disabled media class without disabling the still-valid sibling class.
     fn collect_kind(&self) -> Option<CollectWindowKind> {
@@ -633,6 +637,9 @@ impl NabMouseTask {
 }
 
 impl Task for NabMouseTask {
+    fn anticipating(&self) -> bool {
+        matches!(self.state, NabState::SeekingMouse)
+    }
     fn id(&self) -> &'static str {
         "nab_mouse"
     }
@@ -648,7 +655,9 @@ impl Task for NabMouseTask {
 
         match self.state {
             NabState::SeekingMouse => {
-                goose.target_pos = ctx.layout.clamp_point(ctx.pointer.pos);
+                goose.target_pos = ctx
+                    .layout
+                    .clamp_point(beak_locomotion_target(goose, ctx.pointer.pos));
 
                 if Vec2::distance(goose.rig.beak_tip, ctx.pointer.pos)
                     <= ctx.mouse_steal.grab_distance
@@ -845,6 +854,12 @@ impl CollectWindowTask {
 }
 
 impl Task for CollectWindowTask {
+    fn anticipating(&self) -> bool {
+        matches!(
+            self.state,
+            CollectState::WaitForSpawn { .. } | CollectState::RunToPickup { .. }
+        )
+    }
     fn id(&self) -> &'static str {
         "collect_window"
     }
@@ -1024,6 +1039,9 @@ impl PerchRideTask {
 }
 
 impl Task for PerchRideTask {
+    fn anticipating(&self) -> bool {
+        self.state == PerchRideState::Seeking
+    }
     fn id(&self) -> &'static str {
         "perch_ride"
     }
@@ -1577,7 +1595,12 @@ mod tests {
         ctx.mouse_steal = MouseStealOptions::with_backend_support(true);
 
         assert!(!task.run(&mut goose, &mut ctx));
-        assert_eq!(goose.target_pos, pointer);
+        assert!(
+            Vec2::distance(
+                goose.target_pos + (goose.rig.beak_tip - goose.position),
+                pointer
+            ) < 0.01
+        );
         assert_eq!(goose.current_speed, goose.parameters.charge_speed);
         assert_eq!(
             goose.current_acceleration,

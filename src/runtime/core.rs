@@ -1,8 +1,6 @@
-use honk_config::Config;
-#[cfg(any(test, target_os = "macos"))]
-use honk_engine::DT;
+use honk_config::{Config, ConfigError, ConfigSnapshot};
+use honk_control::ControlCommand;
 use honk_engine::{Accumulator, Clock, Rect, World};
-#[cfg(any(test, target_os = "macos"))]
 use std::time::Duration;
 
 const PRESENT_INTERVAL: f64 = 1.0 / 60.0;
@@ -70,15 +68,13 @@ impl RuntimeCore {
         self.begin_at(self.clock.elapsed_secs())
     }
 
-    #[cfg(target_os = "macos")]
     pub(crate) fn next_tick_delay(&self) -> Duration {
         self.next_tick_delay_at(self.clock.elapsed_secs())
     }
 
-    #[cfg(any(test, target_os = "macos"))]
     fn next_tick_delay_at(&self, now: f64) -> Duration {
         let elapsed = (now - self.last_frame_time).max(0.0);
-        Duration::from_secs_f64((DT as f64 - elapsed).clamp(0.0, DT as f64))
+        Duration::from_secs_f64((self.accumulator.until_next_tick() - elapsed).max(0.0))
     }
 
     fn begin_at(&mut self, now: f64) -> RuntimeFrame {
@@ -157,6 +153,27 @@ impl RuntimeCore {
             .expect("pending overlay damage did not retain its presentation time");
     }
 
+    /// A backpressured presenter has not accepted these pixels. Retry against the last
+    /// acknowledged bounds, including any transparent final clear, on the next frame.
+    #[cfg(any(test, target_os = "linux"))]
+    pub(crate) fn defer_present(&mut self) {
+        assert!(self.pending_visual_bounds.take().is_some());
+        self.pending_present_time = None;
+    }
+
+    pub(crate) fn load_reload_config(
+        command: ControlCommand,
+        path: &std::path::Path,
+    ) -> Result<Config, ConfigError> {
+        let snapshot = ConfigSnapshot::load(path)?;
+        if let ControlCommand::ReloadIf(expected) = command {
+            if snapshot.revision.reload_token(path)? != expected {
+                return Err(ConfigError::Conflict);
+            }
+        }
+        Ok(snapshot.config)
+    }
+
     pub(crate) fn restart_required_reason(current: &Config, next: &Config) -> Option<String> {
         let changes = current.restart_required_changes(next);
         (!changes.is_empty()).then(|| changes.join(", "))
@@ -172,6 +189,26 @@ impl RuntimeCore {
 mod tests {
     use super::*;
     use honk_engine::{Vec2, World};
+
+    #[test]
+    fn conditional_reload_rejects_other_files_and_intervening_edits() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        let revision = Config::default()
+            .save_if_revision(&path, &Default::default())
+            .unwrap();
+        let command = ControlCommand::ReloadIf(revision.reload_token(&path).unwrap());
+        assert!(RuntimeCore::load_reload_config(command, &path).is_ok());
+        assert!(
+            RuntimeCore::load_reload_config(command, &directory.path().join("other.toml")).is_err()
+        );
+        std::fs::write(&path, "# a concurrent edit\n").unwrap();
+        assert!(matches!(
+            RuntimeCore::load_reload_config(command, &path),
+            Err(ConfigError::Conflict)
+        ));
+        assert!(RuntimeCore::load_reload_config(ControlCommand::Reload, &path).is_ok());
+    }
 
     #[test]
     fn platform_runtimes_share_clock_tick_and_damage_ordering() {
@@ -228,6 +265,48 @@ mod tests {
         let partial = core.next_tick_delay_at(start + tick * 0.25).as_secs_f64();
         assert!((partial - tick * 0.75).abs() < 1e-6);
         assert_eq!(core.next_tick_delay_at(start + tick * 2.0), Duration::ZERO);
+    }
+
+    #[test]
+    fn pacing_accounts_for_remainder_and_frame_work() {
+        let mut core = RuntimeCore::new();
+        let tick = honk_engine::DT as f64;
+        let start = core.last_frame_time;
+        core.accumulator.pump(tick * 0.7);
+        let remaining = core.next_tick_delay_at(start + tick * 0.1).as_secs_f64();
+        assert!((remaining - tick * 0.2).abs() < 1e-6);
+        assert_eq!(core.next_tick_delay_at(start + tick), Duration::ZERO);
+        core.accumulator.pump(3600.0);
+        assert!((core.next_tick_delay_at(start).as_secs_f64() - tick).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_deferred_transparent_clear_is_retried_before_stop_completes() {
+        let mut world = World::new(Rect::new(Vec2::ZERO, Vec2::new(1280.0, 720.0)), 8);
+        let mut core = RuntimeCore::new();
+        core.last_visual_bounds = Some(Rect::new(Vec2::ZERO, Vec2::new(100.0, 100.0)));
+        world.request_graceful_exit();
+        for _ in 0..120 * 30 {
+            world.tick();
+            if world.graceful_exit_complete() {
+                break;
+            }
+        }
+        assert!(world.graceful_exit_complete());
+        let mut now = core.last_frame_time + 1.0;
+        for _ in 0..4 {
+            let frame = core.begin_at(now);
+            core.tick(&mut world, frame);
+            assert!(core.damage(&world, frame).is_some());
+            core.defer_present();
+            assert!(!core.graceful_stop_complete(&world));
+            now += 1.0 / 60.0;
+        }
+        let frame = core.begin_at(now);
+        core.tick(&mut world, frame);
+        assert!(core.damage(&world, frame).is_some());
+        core.acknowledge_present();
+        assert!(core.graceful_stop_complete(&world));
     }
 
     #[test]

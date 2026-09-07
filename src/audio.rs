@@ -21,8 +21,7 @@ use std::io::Cursor;
 #[cfg(all(target_os = "linux", target_env = "musl"))]
 use std::path::PathBuf;
 
-#[cfg(any(test, all(target_os = "linux", target_env = "musl")))]
-const MAX_AUDIO_CHILDREN: usize = 4;
+const MAX_AUDIO_VOICES: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlayOutcome {
@@ -30,11 +29,6 @@ pub enum PlayOutcome {
     #[allow(dead_code)]
     Busy,
     Failed,
-}
-
-#[cfg(test)]
-fn bounded_child_count(requested: usize) -> usize {
-    requested.min(MAX_AUDIO_CHILDREN)
 }
 
 #[cfg(any(test, all(target_os = "linux", target_env = "musl")))]
@@ -70,6 +64,7 @@ pub struct Audio {
     _stream: OutputStream,
     handle: OutputStreamHandle,
     counter: usize,
+    voices: Vec<Sink>,
 }
 
 #[cfg(any(
@@ -86,6 +81,7 @@ impl Audio {
             _stream: stream,
             handle,
             counter: 0,
+            voices: Vec::new(),
         })
     }
 
@@ -94,10 +90,16 @@ impl Audio {
         self.counter
     }
 
-    pub fn poll(&mut self) {}
+    pub fn poll(&mut self) {
+        self.voices.retain(|voice| !voice.empty());
+    }
 
     /// Play `sound` fire-and-forget (honks/pats rotate through their variants).
     pub fn play(&mut self, sound: Sound) -> PlayOutcome {
+        self.poll();
+        if self.voices.len() >= MAX_AUDIO_VOICES {
+            return PlayOutcome::Busy;
+        }
         let bytes: &'static [u8] = match sound {
             Sound::Honk(tone) => match tone {
                 HonkTone::Normal => HONKS[self.next() % HONKS.len()],
@@ -115,7 +117,7 @@ impl Audio {
             return PlayOutcome::Failed;
         };
         sink.append(decoder);
-        sink.detach(); // play to completion in the background
+        self.voices.push(sink);
         PlayOutcome::Played
     }
 }
@@ -217,13 +219,13 @@ fn is_executable_file(path: &std::path::Path) -> bool {
         .unwrap_or(false)
 }
 
-#[cfg(all(target_os = "linux", target_env = "musl"))]
+#[cfg(any(test, all(target_os = "linux", target_env = "musl")))]
 fn spawn_audio_child(
     children: &mut Vec<std::process::Child>,
     command: &mut std::process::Command,
 ) -> PlayOutcome {
     reap_audio_children(children);
-    if children.len() >= MAX_AUDIO_CHILDREN {
+    if children.len() >= MAX_AUDIO_VOICES {
         return PlayOutcome::Busy;
     }
     match command
@@ -240,7 +242,7 @@ fn spawn_audio_child(
     }
 }
 
-#[cfg(all(target_os = "linux", target_env = "musl"))]
+#[cfg(any(test, all(target_os = "linux", target_env = "musl")))]
 fn reap_audio_children(children: &mut Vec<std::process::Child>) {
     let mut index = 0;
     while index < children.len() {
@@ -297,21 +299,69 @@ fn sound_file_name(sound: Sound, mut next: impl FnMut() -> usize) -> String {
 }
 
 #[cfg(test)]
-fn linux_audio_backend_for(target_env: &str) -> &'static str {
-    if target_env == "musl" {
-        "command-fallback"
-    } else {
-        "in-process"
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
 
+    struct Children(Vec<std::process::Child>);
+
+    impl Drop for Children {
+        fn drop(&mut self) {
+            for child in &mut self.0 {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    }
+
     #[test]
-    fn fallback_audio_child_pool_is_bounded() {
-        assert_eq!(bounded_child_count(5), MAX_AUDIO_CHILDREN);
+    #[ignore = "subprocess fixture; invoked only by the bounded-pool test"]
+    fn audio_child_fixture() {
+        if std::env::var_os("HONK300_AUDIO_TEST_CHILD").is_some() {
+            std::thread::sleep(std::time::Duration::from_secs(30));
+        }
+    }
+
+    #[test]
+    fn real_audio_child_pool_limits_processes_and_recovers_after_exit() {
+        let mut children = Children(Vec::new());
+        let command = || {
+            let mut cmd = std::process::Command::new(std::env::current_exe().unwrap());
+            cmd.args(["--exact", "audio::tests::audio_child_fixture", "--ignored"])
+                .env("HONK300_AUDIO_TEST_CHILD", "1");
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.creation_flags(0x0800_0000);
+            }
+            cmd
+        };
+        for _ in 0..MAX_AUDIO_VOICES {
+            assert_eq!(
+                spawn_audio_child(&mut children.0, &mut command()),
+                PlayOutcome::Played
+            );
+        }
+        assert_eq!(
+            spawn_audio_child(&mut children.0, &mut command()),
+            PlayOutcome::Busy
+        );
+        assert_eq!(children.0.len(), MAX_AUDIO_VOICES);
+        let last = children.0.last_mut().unwrap();
+        last.kill().unwrap();
+        last.wait().unwrap();
+        assert_eq!(
+            spawn_audio_child(
+                &mut children.0,
+                &mut std::process::Command::new("honk300-missing-audio-test-player")
+            ),
+            PlayOutcome::Failed
+        );
+        assert_eq!(children.0.len(), MAX_AUDIO_VOICES - 1);
+        assert_eq!(
+            spawn_audio_child(&mut children.0, &mut command()),
+            PlayOutcome::Played
+        );
+        assert_eq!(children.0.len(), MAX_AUDIO_VOICES);
     }
 
     #[test]
@@ -324,11 +374,5 @@ mod tests {
         assert!(path_candidates("ffplay", &joined)
             .iter()
             .any(|path| path.ends_with("custom/tools/ffplay")));
-    }
-
-    #[test]
-    fn linux_backend_selection_keeps_command_fallback_musl_only() {
-        assert_eq!(linux_audio_backend_for("gnu"), "in-process");
-        assert_eq!(linux_audio_backend_for("musl"), "command-fallback");
     }
 }

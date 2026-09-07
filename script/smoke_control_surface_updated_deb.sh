@@ -41,6 +41,7 @@ printf 'source_commit=%s\n' "$(git -C "$PROJECT_ROOT" rev-parse HEAD)" \
 git -C "$PROJECT_ROOT" archive --format=tar HEAD | tar -xf - -C "$SOURCE"
 
 python3 - "$SOURCE/Cargo.toml" "$SOURCE/Cargo.lock" "$FIXTURE_VERSION" <<'PY'
+import json
 import pathlib
 import re
 import sys
@@ -65,10 +66,23 @@ if count != 1:
     raise SystemExit("could not stamp the fixture Cargo lock")
 manifest.write_text(manifest_text)
 lock.write_text(lock_text)
+settings = manifest.parent / "settings"
+for name in ("package.json", "package-lock.json"):
+    path = settings / name
+    data = json.loads(path.read_text())
+    data["version"] = version
+    if "packages" in data:
+        data["packages"][""]["version"] = version
+    path.write_text(json.dumps(data, indent=2) + "\n")
+path = settings / "app.zon"
+path.write_text(re.sub(r'(\.version = ")[^"]+("[ ,])', lambda m: m[1] + version + m[2], path.read_text()))
+path = settings / "src/main.zig"
+path.write_text(re.sub(r'(pub const version = ")[^"]+(";)', lambda m: m[1] + version + m[2], path.read_text()))
 PY
 
 CARGO_TARGET_DIR="$TARGET_DIR" cargo build \
   --manifest-path "$SOURCE/Cargo.toml" --locked --bin honk300
+python3 "$SOURCE/script/build_settings.py" --target x86_64-unknown-linux-gnu --output "$TARGET_DIR/debug"
 FIXTURE_BINARY="$TARGET_DIR/debug/honk300"
 test -x "$FIXTURE_BINARY"
 test "$("$FIXTURE_BINARY" --version | awk '{ print $NF }')" = "$FIXTURE_VERSION"

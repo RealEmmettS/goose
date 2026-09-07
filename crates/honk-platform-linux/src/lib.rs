@@ -125,11 +125,6 @@ pub fn display_collect_window_supported(_session: DisplayServer) -> bool {
     false
 }
 
-#[cfg(test)]
-fn x11_overlay_count(monitor_count: usize) -> usize {
-    monitor_count
-}
-
 #[cfg(any(test, target_os = "linux"))]
 fn x11_mapping_allowed(argb: bool, compositor: bool, empty_input_shape: bool) -> bool {
     argb && compositor && empty_input_shape
@@ -173,18 +168,27 @@ fn x11_accepts_hard_coded_bgra(layout: X11Argb8888Layout) -> bool {
         && layout.scanline_pad == 32
 }
 
-#[cfg(test)]
-fn x11_setup_steps() -> [&'static str; 2] {
-    ["shape", "map"]
-}
+#[cfg(any(test, target_os = "linux"))]
+const WAYLAND_MAX_BUFFERS_PER_OUTPUT: usize = 3;
 
-#[cfg(test)]
-fn x11_event_requires_reconcile(randr_event: bool) -> bool {
-    randr_event
+#[cfg(any(test, target_os = "linux"))]
+#[derive(Debug, PartialEq, Eq)]
+enum BufferSlot {
+    Reuse(usize),
+    Allocate,
+    Deferred,
 }
 
 #[cfg(any(test, target_os = "linux"))]
-const WAYLAND_MAX_BUFFERS_PER_OUTPUT: usize = 3;
+fn select_buffer_slot(retained: usize, released: Option<usize>) -> BufferSlot {
+    if let Some(index) = released.filter(|&index| index < retained) {
+        BufferSlot::Reuse(index)
+    } else if retained < WAYLAND_MAX_BUFFERS_PER_OUTPUT {
+        BufferSlot::Allocate
+    } else {
+        BufferSlot::Deferred
+    }
+}
 
 #[cfg(any(test, target_os = "linux"))]
 fn wayland_scaled_dimension(logical: u32, scale_120: u32) -> u32 {
@@ -199,21 +203,6 @@ fn wayland_scale_floor(logical: u32, scale_120: u32) -> u32 {
 #[cfg(any(test, target_os = "linux"))]
 fn wayland_scale_ceil(logical: u32, scale_120: u32) -> u32 {
     ((logical as u64 * scale_120 as u64).div_ceil(120)) as u32
-}
-
-#[cfg(test)]
-fn wayland_retained_buffer_count(frame_count: usize) -> usize {
-    frame_count.min(WAYLAND_MAX_BUFFERS_PER_OUTPUT)
-}
-
-#[cfg(test)]
-fn wayland_surface_count(output_count: usize) -> usize {
-    output_count
-}
-
-#[cfg(test)]
-fn wayland_pump_steps() -> [&'static str; 4] {
-    ["prepare_read", "poll", "read", "dispatch_pending"]
 }
 
 #[cfg(target_os = "linux")]
@@ -343,12 +332,12 @@ mod platform {
             }
         }
 
-        pub fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<()> {
+        pub fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<bool> {
             maybe_write_smoke_frame(pixmap);
             match &mut self.inner {
-                OverlayInner::X11(overlay) => overlay.present(dirty, pixmap),
+                OverlayInner::X11(overlay) => overlay.present(dirty, pixmap).map(|()| true),
                 OverlayInner::Wayland(overlay) => overlay.present(dirty, pixmap),
-                OverlayInner::Headless(_) => Ok(()),
+                OverlayInner::Headless(_) => Ok(true),
             }
         }
 
@@ -1222,8 +1211,8 @@ mod platform {
 
     mod wayland {
         use super::super::{
-            wayland_scale_ceil, wayland_scale_floor, wayland_scaled_dimension,
-            WAYLAND_MAX_BUFFERS_PER_OUTPUT,
+            select_buffer_slot, wayland_scale_ceil, wayland_scale_floor, wayland_scaled_dimension,
+            BufferSlot,
         };
         use super::x11_bgra_from_rgba;
         use honk_engine::tiny_skia::Pixmap;
@@ -1342,9 +1331,10 @@ mod platform {
                 Ok(())
             }
 
-            pub fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<()> {
-                self.state.present(dirty, pixmap)?;
-                self.conn.flush().map_err(to_io)
+            pub fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<bool> {
+                let accepted = self.state.present(dirty, pixmap)?;
+                self.conn.flush().map_err(to_io)?;
+                Ok(accepted)
             }
 
             pub fn pump(&mut self) -> io::Result<bool> {
@@ -1478,13 +1468,14 @@ mod platform {
                     })
             }
 
-            fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<()> {
+            fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<bool> {
+                let mut accepted = true;
                 for surface in &mut self.surfaces {
-                    if !surface.closed && surface.configured {
-                        surface.present(dirty, pixmap)?;
+                    if !surface.closed && dirty.intersection(surface.bounds()).is_some() {
+                        accepted &= surface.configured && surface.present(dirty, pixmap)?;
                     }
                 }
-                Ok(())
+                Ok(accepted)
             }
         }
 
@@ -1596,9 +1587,9 @@ mod platform {
                 )
             }
 
-            fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<()> {
+            fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> io::Result<bool> {
                 let Some(clip) = dirty.intersection(self.bounds()).map(Rect::pixel_aligned) else {
-                    return Ok(());
+                    return Ok(true);
                 };
                 let scale_120 = self.effective_scale_120();
                 let surface_bounds = self.bounds();
@@ -1627,24 +1618,26 @@ mod platform {
                         && self.buffers[index].stride() == stride
                         && self.buffers[index].canvas(&mut self.pool).is_some()
                 });
-                let buffer_index = if let Some(index) = released {
-                    index
-                } else if self.buffers.len() < WAYLAND_MAX_BUFFERS_PER_OUTPUT {
-                    let (buffer, _canvas) = self
-                        .pool
-                        .create_buffer(
-                            buffer_width as i32,
-                            buffer_height as i32,
-                            stride,
-                            wl_shm::Format::Argb8888,
-                        )
-                        .map_err(to_io)?;
-                    self.buffers.push_back(buffer);
-                    self.buffers.len() - 1
-                } else {
-                    // All three buffers are still owned by the compositor. Dropping this frame
-                    // is preferable to allocating without a bound or blocking the event pump.
-                    return Ok(());
+                let buffer_index = match select_buffer_slot(self.buffers.len(), released) {
+                    BufferSlot::Reuse(index) => index,
+                    BufferSlot::Allocate => {
+                        let (buffer, _canvas) = self
+                            .pool
+                            .create_buffer(
+                                buffer_width as i32,
+                                buffer_height as i32,
+                                stride,
+                                wl_shm::Format::Argb8888,
+                            )
+                            .map_err(to_io)?;
+                        self.buffers.push_back(buffer);
+                        self.buffers.len() - 1
+                    }
+                    BufferSlot::Deferred => {
+                        // All three buffers are still owned by the compositor. Dropping this frame
+                        // is preferable to allocating without a bound or blocking the event pump.
+                        return Ok(false);
+                    }
                 };
 
                 if let Some(canvas) = self.buffers[buffer_index].canvas(&mut self.pool) {
@@ -1670,7 +1663,7 @@ mod platform {
                     .attach_to(&surface)
                     .map_err(to_io)?;
                 self.layer.commit();
-                Ok(())
+                Ok(true)
             }
         }
 
@@ -2020,6 +2013,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn full_wayland_pool_defers_until_an_owned_buffer_is_released() {
+        for retained in 0..3 {
+            assert_eq!(select_buffer_slot(retained, None), BufferSlot::Allocate);
+        }
+        for _ in 0..100 {
+            assert_eq!(select_buffer_slot(3, None), BufferSlot::Deferred);
+        }
+        assert_eq!(select_buffer_slot(3, Some(1)), BufferSlot::Reuse(1));
+        assert_eq!(select_buffer_slot(3, Some(3)), BufferSlot::Deferred);
+        assert_eq!(select_buffer_slot(2, Some(0)), BufferSlot::Reuse(0));
+    }
+
+    #[test]
     fn x11_and_wayland_preserve_asymmetric_channels_and_alpha_when_swizzling_to_bgra() {
         let rgba = [17_u8, 83, 149, 211, 7, 61, 203, 0];
 
@@ -2027,12 +2033,6 @@ mod tests {
             premultiplied_bgra_from_rgba(&rgba),
             [149, 83, 17, 211, 203, 61, 7, 0]
         );
-    }
-
-    #[test]
-    fn x11_requires_one_overlay_per_monitor() {
-        let monitor_count = 3;
-        assert_eq!(x11_overlay_count(monitor_count), monitor_count);
     }
 
     #[test]
@@ -2099,41 +2099,11 @@ mod tests {
     }
 
     #[test]
-    fn wayland_buffer_budget_is_capped_per_output() {
-        assert_eq!(wayland_retained_buffer_count(4), 3);
-    }
-
-    #[test]
     fn wayland_fractional_scaling_rounds_outward_without_zero_sized_buffers() {
         assert_eq!(wayland_scaled_dimension(100, 180), 150);
         assert_eq!(wayland_scale_floor(1, 180), 1);
         assert_eq!(wayland_scale_ceil(1, 180), 2);
         assert_eq!(wayland_scaled_dimension(0, 180), 1);
-    }
-
-    #[test]
-    fn x11_empty_input_shape_is_verified_before_map() {
-        assert_eq!(x11_setup_steps(), ["shape", "map"]);
-    }
-
-    #[test]
-    fn x11_randr_change_triggers_topology_reconciliation() {
-        assert!(x11_event_requires_reconcile(true));
-        assert!(!x11_event_requires_reconcile(false));
-    }
-
-    #[test]
-    fn wayland_owns_one_surface_per_output() {
-        let active_outputs = 3;
-        assert_eq!(wayland_surface_count(active_outputs), active_outputs);
-    }
-
-    #[test]
-    fn wayland_pump_reads_socket_before_dispatching() {
-        assert_eq!(
-            wayland_pump_steps(),
-            ["prepare_read", "poll", "read", "dispatch_pending"]
-        );
     }
 
     #[test]

@@ -54,15 +54,16 @@ def write_png(path: Path, width: int, height: int, pixels: list[tuple[int, int, 
 def valid_pair(width: int = 200, height: int = 160) -> tuple[list[tuple[int, int, int]], list[tuple[int, int, int]]]:
     dark = [ANALYZER.DARK_BACKGROUND] * (width * height)
     light = [ANALYZER.LIGHT_BACKGROUND] * (width * height)
-    for y in range(45, 85):
-        for x in range(65, 130):
-            dark[y * width + x] = light[y * width + x] = (235, 235, 232)
-    for y in range(60, 78):
-        for x in range(78, 105):
-            dark[y * width + x] = light[y * width + x] = (82, 85, 88)
-    for y in range(67, 75):
-        for x in range(130, 146):
-            dark[y * width + x] = light[y * width + x] = (230, 125, 48)
+    fixture = ROOT / "crates/honk-engine/tests/golden/side_mid_stride.png"
+    fw, fh, source = ANALYZER.read_png(fixture)
+    for y in range(fh):
+        for x in range(fw):
+            dx, dy = x + (width - fw) // 2, y + (height - fh) // 2
+            if 0 <= dx < width and 0 <= dy < height:
+                i = (y * fw + x) * 4
+                rgb, alpha = source[i:i + 3], source[i + 3]
+                for target, background in [(dark, ANALYZER.DARK_BACKGROUND), (light, ANALYZER.LIGHT_BACKGROUND)]:
+                    target[dy * width + dx] = tuple((c * alpha + b * (255 - alpha) + 127) // 255 for c, b in zip(rgb, background))
     return dark, light
 
 
@@ -77,22 +78,6 @@ class LinuxOverlayAnalyzerTests(unittest.TestCase):
             write_png(root / "not-ready.png", 10, 10, mostly_wrong)
             self.assertGreaterEqual(READY.sampled_fraction(root / "ready.png", expected), 0.90)
             self.assertLess(READY.sampled_fraction(root / "not-ready.png", expected), 0.90)
-
-    def test_accepts_proven_small_top_down_pose_but_still_requires_warm_articulation(self) -> None:
-        common = {
-            "label": "candidate-top-down",
-            "width": 1280,
-            "height": 720,
-            "dark_background_pixels": 918_768,
-            "light_background_pixels": 918_704,
-            "background_transition_pixels": 918_689,
-            "body_pixels": 710,
-            "wing_pixels": 1_615,
-            "largest_near_black_component": 0,
-            "largest_unchanged_component": 991,
-        }
-        self.assertTrue(ANALYZER.CaptureMetrics(warm_pixels=13, **common).has_goose)
-        self.assertFalse(ANALYZER.CaptureMetrics(warm_pixels=9, **common).has_goose)
 
     def test_committed_goose_golden_passes_paired_compositor_analysis(self) -> None:
         golden = ROOT / "crates" / "honk-engine" / "tests" / "golden" / "side_mid_stride.png"

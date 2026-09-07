@@ -3,6 +3,9 @@
 //!
 //! Usage: `cargo run -p honk-engine --example preview -- [out.png]`
 
+#[path = "preview/review.rs"]
+mod review;
+
 use honk_engine::math::Vec2;
 use honk_engine::render::{render_pose_with_palette, RenderPalette};
 use honk_engine::rig::{GoosePose, RigAnim, RigInput};
@@ -60,6 +63,7 @@ fn main() {
     // `-- <out.png> walk` renders 8 sequential walk frames with a ground ruler;
     // `-- <out-dir> frames` exports crisp site/marketing assets (walk spritesheet + poses).
     match std::env::args().nth(2).as_deref() {
+        Some("review") => return review::export(&out),
         Some("big") => return big_strip(&out),
         Some("walk") => return walk_strip(&out),
         Some("frames") => return export_frames(&out),

@@ -1,0 +1,145 @@
+name: Native settings
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      commit:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Settings (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+          - target: aarch64-pc-windows-msvc
+            runner: windows-11-arm
+          - target: x86_64-apple-darwin
+            runner: macos-15-intel
+          - target: aarch64-apple-darwin
+            runner: macos-15
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            container: ubuntu:22.04
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            container: ubuntu:22.04
+    steps:
+      - name: Install GNU native dependencies
+        if: ${{ contains(matrix.target, '-linux-gnu') }}
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+            ca-certificates curl git build-essential pkg-config libgtk-4-dev libasound2-dev \
+            xvfb xauth dbus-x11 xz-utils unzip
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: settings/package-lock.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.95.0
+          targets: ${{ matrix.target }}
+      - name: Build exact Rust settings service
+        run: cargo build --locked --release --target ${{ matrix.target }} --bin honk300
+      - name: Compile and test native UI
+        run: >-
+          python script/build_settings.py --target ${{ matrix.target }}
+          --output target/${{ matrix.target }}/release --automation --test
+      - name: Exercise real native settings window (Windows and macOS)
+        if: ${{ !contains(matrix.target, '-linux-') }}
+        run: >-
+          python script/smoke_settings.py
+          --binary target/${{ matrix.target }}/release/honk300-settings${{ runner.os == 'Windows' && '.exe' || '' }}
+          --evidence target/settings-ui-evidence
+      - name: Exercise real GTK settings window
+        if: ${{ contains(matrix.target, '-linux-gnu') }}
+        run: >-
+          xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session --
+          python script/smoke_settings.py
+          --binary target/${{ matrix.target }}/release/honk300-settings
+          --evidence target/settings-ui-evidence
+      - name: Build production companion with automation disabled
+        run: >-
+          python script/build_settings.py --target ${{ matrix.target }}
+          --output target/settings-release/${{ matrix.target }} --skip-install
+      - name: Verify production executable identity
+        run: >-
+          python script/verify_settings.py --target ${{ matrix.target }}
+          --directory target/settings-release/${{ matrix.target }} --execute
+      - uses: actions/upload-artifact@v6
+        with:
+          name: settings-${{ matrix.target }}
+          path: target/settings-release/${{ matrix.target }}
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: settings-ui-${{ matrix.target }}
+          path: target/settings-ui-evidence
+          if-no-files-found: warn
+
+  musl:
+    name: Settings (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.95.0
+          targets: ${{ matrix.target }}
+      - name: Build matching musl Rust service
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          cargo build --locked --release --target ${{ matrix.target }} --bin honk300
+      - name: Build and exercise settings on native musl GTK
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work alpine:3.21.3 sh -eu -c '
+            apk add --no-cache nodejs npm python3 build-base pkgconf gtk4.0-dev curl xz git xvfb xauth dbus
+            python3 script/build_settings.py --target "${{ matrix.target }}" --output "target/${{ matrix.target }}/release" --automation --test
+            xvfb-run -a -s "-screen 0 1280x900x24" dbus-run-session -- python3 script/smoke_settings.py --binary "target/${{ matrix.target }}/release/honk300-settings" --evidence target/settings-ui-evidence
+            python3 script/build_settings.py --target "${{ matrix.target }}" --output "target/settings-release/${{ matrix.target }}" --skip-install
+            python3 script/verify_settings.py --target "${{ matrix.target }}" --directory "target/settings-release/${{ matrix.target }}" --execute
+          '
+      - uses: actions/upload-artifact@v6
+        with:
+          name: settings-${{ matrix.target }}
+          path: target/settings-release/${{ matrix.target }}
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: settings-ui-${{ matrix.target }}
+          path: target/settings-ui-evidence
+          if-no-files-found: warn

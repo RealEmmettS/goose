@@ -1,0 +1,31 @@
+TT;DR: KDE and portal integration.
+
+## Why
+Deliver the user-approved refinement while preserving healthy installations and explicit platform claims.
+
+## Scope
+Guided opt-in KWin and portal/libei capability adapters; deny terminal targets and cancel on stale identity, revoked access, or disconnect.
+
+Authoritative sources: approved September 7 implementation plan, docs/adr/0041-refinement-native-settings-and-continuous-goose.md, current source/tests, docs/refinement-audit.md.
+
+Preserve saved user settings/media, verified installer ownership, immutable releases, terminal protection, and graceful stop. Native hardware beyond this Windows PC is unavailable; hosted proof is identified separately.
+
+## Plan
+Implement the linked board subtasks; retain later release stages as separate tasks. At each failed check record the exact failure and fix or leave the gate open.
+
+## Impact
+Guided opt-in KWin and portal/libei capability adapters; deny terminal targets and cancel on stale identity, revoked access, or disconnect.
+
+## Acceptance
+The requested behavior runs through its production path and the supporting evidence matches the claimed platform and installation.
+
+## Verification
+- [ ] Relevant production-path regression tests pass.
+- [ ] Actual behavior or rendered output is inspected in its supported environment.
+- [ ] Integration and required package/release checks pass before publication.
+
+## Status
+Queued; not implemented or qualified.
+
+## Activity
+- 2026-09-07 — created from the user-approved implementation plan (agent: codex).

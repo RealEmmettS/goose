@@ -115,7 +115,7 @@ pub struct GooseEntity {
     pub foot_marks: FootMarks,
     /// Computed body geometry for rendering (the active view of `pose`).
     pub rig: Rig,
-    /// The full drawable pose: active view + optional crossfading view (V2).
+    /// The full drawable projected pose.
     pub pose: GoosePose,
     /// Persistent animation state: plant-and-swing feet, view/facing, eased neck,
     /// blink/breath/tail channels (V2).

@@ -1,0 +1,40 @@
+# Honk300 refinement audit
+
+Source baseline: `599d6fc`. Started 2026-09-07. Entries distinguish source findings from platform or physical acceptance. The existing Windows-host workspace tests passed before changes. This is a working register, not a claim that every platform has been exercised.
+
+| ID | Severity | Evidence and impact | Correction and verification | State |
+|---|---|---|---|---|
+| R01 | Medium | Windows/Linux allocate a dirty Pixmap on every presentation; macOS alone reuses and shrinks it. Allocation churn grows with large trails and display bounds. | Shared bounded canvas owner; test reuse, growth, shrink, clearing, and repeated workloads. | In progress |
+| R02 | Medium | Windows/Linux sleep 2 ms per loop; macOS's delay ignores accumulator remainder. Extra polling and drifting tick deadlines waste work. | Calculate deadline from unconsumed simulation time and elapsed frame work; preserve five-tick catchup bound and prompt event handling. | In progress |
+| R03 | Medium | Linux tests assert test-only arrays, identity functions, and a buffer-count formula. Audio tests assert a test-only backend selector and child-count formula. They do not exercise the behavior named by the tests. | Remove false assurances; test actual child spawning/reaping and production buffer selection. Native event-order proof belongs to desktop integration checks. | Open |
+| R04 | Medium | Renderer switches between side and overhead drawings via opacity crossfade. Source-generated contact sheet exposes overlapping silhouettes and inconsistent proportions. | Continuous projected rig; inspect full heading/motion sequences and preserve geometry/alpha oracles. | Open |
+| R05 | Medium | macOS presence_state returns unsupported; Linux presence_supported is false. Fullscreen/DND manners cannot be assumed from a saved toggle. | Show separate effective capabilities; add supported observations with explicit fallback and loss handling. | Open |
+| R06 | Medium | Linux collect support is disabled, so note/meme commands cannot provide the Windows/macOS experience. | Owned Linux prop windows; positioning capability kept separate from ordinary compositor placement. | Open |
+| R07 | Medium | Config editors load a whole model and save later without detecting intervening edits. Adding a GUI makes concurrent edits more likely. | Shared revision-aware save with a cooperating-writer lock; reject stale snapshots and preserve document comments/unknown compatible fields. | Open |
+| R08 | Low | install.rs combines provenance, user-media migration, autostart, platform mutation, and tests in roughly 245 KB. Current guidance duplicates years of release history. | Extract cohesive modules preserving behavior; keep active guidance short and retain historical evidence by reference. | Open |
+| R09 | Medium | Existing ARM64 builds are not Pi desktop acceptance. Native SDK's Linux native-only host requires GTK4. | Package/runtime dependency checks and native ARM64 labwc smoke; Pi claims remain experimental without hardware. | Open |
+| R10 | Medium | Rodio playback detaches sinks with no common voice bound, unlike the musl child pool. Repeated control requests can accumulate concurrent playback. | Retain and cap active sinks, reap completed voices, test saturation and recovery through the shared admission path. | Open |
+
+## Preservation contracts
+
+No existing release tag or asset changes. Preserve saved configuration, personal media, installer provenance, protected receipts, exact-byte verification, rollback, terminal protection, and graceful shutdown. Native SDK owns only the new settings window; the Rust runtime, tray, updater, and installation remain authoritative. New platform support is advertised only at its demonstrated capability level.
+
+## Evidence
+
+- Baseline renderer: `target/goose-audit-current.png`, produced from the unchanged Rust preview example.
+- Baseline: `cargo test --locked --workspace --quiet`, passed on Windows. Non-host OS code behind cfg gates was not executed.
+- Physical macOS/Pi acceptance is unavailable by the user's 2026-09-07 hardware statement; it is not inferred from cross-compilation or hosted tests.
+
+## Additional demonstrated interaction defect
+
+Cursor seeking aimed the body at the pointer while acquisition tested beak distance. A fixed-tick world regression failed for a left/down approach after the rig redraw. Use the existing beak-offset locomotion target, as collected props already do. The real approach and permission-revocation regression now passes for three directions.
+
+## Additional settings findings
+
+- The TUI had no updater action. Added independent Check/Update actions through the existing update lifecycle, and a read-only CLI/service check that never enters cleanup or installation.
+- Generic editor reloads could address a runtime using another configuration file. Added the bounded additive `RELOAD_IF` token for exact selected-path and saved-revision matching; ordinary CLI `RELOAD` remains compatible.
+- Native SDK 0.5.4's subprocess effect used Zig's visible Windows console default. The pinned project-local SDK patch enables `create_no_window`; exact source hash checks prevent an accidental framework-wide edit or silently drifting patch.
+- Native windows were inspected through the SDK's retained-scene screenshots and widget input, with a real Windows HWND confirmed for the public `settings` launcher. Screenshots establish layout and input behavior, not an OS compositor screenshot or physical-device acceptance on other platforms.
+- Subsequent Windows computer use captured the actual settings HWND with Makira Bold/Light, toggled reduced motion, saved, and verified the isolated config. UI Automation exposed only a canvas pane: the pinned SDK has no Windows/GTK widget accessibility callback. Current published SDK 0.10.1 was inspected separately and still lacks the Windows callback. Native screen-reader acceptance remains open.
+- Tray Configure originally discarded an explicitly selected runtime config path; its exact-sibling GUI launch now passes that path on all three platforms.
+- Archive bundling tests preserve Rust payload bytes/modes and refresh the cargo-dist checksums. Raw ZIP member spelling is validated before Windows filename normalization, so backslashes and traversal cannot evade the same cross-platform guard.

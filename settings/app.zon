@@ -1,0 +1,34 @@
+.{
+    .id = "dev.emmetts.honk300.settings",
+    .name = "honk300-settings",
+    .display_name = "Honk300 Settings",
+    .description = "Native settings for Honk300.",
+    .version = "1.3.7",
+    .icons = .{"assets/icon.png"},
+    .platforms = .{ "macos", "windows", "linux" },
+    .permissions = .{ "view", "command" },
+    .capabilities = .{ "native_views", "gpu_surfaces" },
+    .shell = .{
+        .windows = .{
+            .{
+                .label = "main",
+                .title = "Honk300 Settings",
+                .width = 860,
+                .height = 700,
+                .restore_state = false,
+                .restore_policy = "center_on_primary",
+                .views = .{
+                    .{ .label = "main-canvas", .kind = "gpu_surface", .fill = true, .role = "Settings", .accessibility_label = "Honk300 settings", .gpu_backend = "metal", .gpu_pixel_format = "bgra8_unorm", .gpu_present_mode = "timer", .gpu_alpha_mode = "opaque", .gpu_color_space = "srgb", .gpu_vsync = true },
+                },
+            },
+        },
+    },
+    .security = .{
+        .navigation = .{
+            .allowed_origins = .{ "zero://app", "zero://inline" },
+            .external_links = .{ .action = "deny" },
+        },
+    },
+    .web_engine = "system",
+    .cef = .{ .dir = "third_party/cef/macos", .auto_install = false },
+}

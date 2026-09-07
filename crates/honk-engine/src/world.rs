@@ -683,7 +683,7 @@ impl World {
             }
         };
 
-        // The full pose: during a view crossfade both views stay inside the current bounds.
+        // Keep the complete projected anatomy inside the current bounds.
         add(self.goose.pose.bounding_box().grow(3.0));
         for (mark, scale) in self
             .goose
@@ -806,6 +806,7 @@ impl World {
         // Pat = hovering hover-sweeps. Each registered pat spawns a heart above the goose.
         let pats = self.pat.update(hovering, pointer.pos, self.elapsed);
         if pats > 0 {
+            self.goose.anim.pet();
             let head = self.goose.rig.neck_head;
             for _ in 0..pats.min(3) {
                 let jitter = Vec2::new(self.rng.range(-7.0, 7.0), self.rng.range(-3.0, 3.0));
@@ -1241,6 +1242,11 @@ impl World {
             self.goose.parameters.step_time_normal
         };
 
+        self.goose.anim.set_expression_options(
+            self.options.appearance.expressions,
+            self.options.appearance.reduced_motion,
+        );
+        self.goose.anim.anticipate(self.current.anticipating());
         let pose = self.goose.anim.update(&RigInput {
             center: self.goose.position,
             direction_deg: self.goose.direction,
@@ -1293,7 +1299,7 @@ impl World {
         &self.goose.rig
     }
 
-    /// The full drawable pose (active view + optional crossfading view).
+    /// The full drawable projected pose.
     pub fn pose(&self) -> &GoosePose {
         &self.goose.pose
     }
@@ -2679,6 +2685,51 @@ mod tests {
     }
 
     #[test]
+    fn nab_reaches_a_stationary_pointer_through_real_locomotion_and_cancels_on_revoke() {
+        for target in [
+            Vec2::new(700.0, 350.0),
+            Vec2::new(400.0, 150.0),
+            Vec2::new(180.0, 420.0),
+        ] {
+            let mut world = World::with_options(
+                bounds(),
+                91,
+                WorldOptions {
+                    mouse_steal: MouseStealOptions::with_backend_support(true),
+                    ..WorldOptions::default()
+                },
+            );
+            place_static_goose(&mut world, Vec2::new(400.0, 350.0));
+            world.current = Box::new(NabMouseTask::new());
+            let mut grabbed = false;
+            for _ in 0..1200 {
+                world.set_pointer(Pointer {
+                    pos: target,
+                    present: true,
+                    left_down: false,
+                });
+                world.tick();
+                if !world.take_cursor_commands().is_empty() {
+                    grabbed = true;
+                    break;
+                }
+                world.take_sounds();
+            }
+            assert!(
+                grabbed,
+                "never reached pointer {target:?}; beak={:?}",
+                world.goose.rig.beak_tip
+            );
+            let mut options = world.options;
+            options.mouse_steal.warp_supported = false;
+            world.apply_options(options);
+            world.tick();
+            assert!(world.take_cursor_commands().is_empty());
+            assert_ne!(world.current_task(), "nab_mouse");
+        }
+    }
+
+    #[test]
     fn cursor_commands_are_queued_and_drained_once() {
         let mut w = World::with_options(
             bounds(),
@@ -3479,7 +3530,10 @@ mod tests {
             bounds(),
             265,
             WorldOptions {
-                appearance: AppearanceOptions { calm_goose: true },
+                appearance: AppearanceOptions {
+                    calm_goose: true,
+                    ..AppearanceOptions::default()
+                },
                 mood: MoodOptions {
                     dynamic_moods: false,
                     intensity: MoodIntensity::Normal,

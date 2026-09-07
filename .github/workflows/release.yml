@@ -136,9 +136,15 @@ jobs:
           path: plan-dist-manifest.json
           retention-days: 7
 
+  native-settings:
+    needs: plan
+    uses: ./.github/workflows/settings.yml
+    with:
+      commit: ${{ needs.plan.outputs.commit }}
+
   build-portable-artifacts:
     name: portable (${{ join(matrix.targets, ', ') }})
-    needs: plan
+    needs: [plan, native-settings]
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.plan.outputs.manifest).ci.github.artifacts_matrix }}
@@ -218,7 +224,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            dbus grim imagemagick libasound2-dev openbox python3 sway swaybg x11-utils \
+            dbus grim imagemagick libasound2-dev libgtk-4-1 openbox python3 sway swaybg x11-utils \
             x11-xserver-utils xcompmgr xvfb
 
       - name: Install native packages
@@ -239,6 +245,27 @@ jobs:
         run: |
           set -euo pipefail
           dist build --tag='${{ needs.plan.outputs.tag }}' --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Download native settings for the exact target
+        uses: actions/download-artifact@v7
+        with:
+          name: settings-${{ join(matrix.targets, '') }}
+          path: target/settings-companion
+      - name: Complete portable archive before qualification and upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='${{ join(matrix.targets, '') }}'
+          case "$target" in
+            *-windows-*) extension=zip ;;
+            *) extension=tar.xz ;;
+          esac
+          python3 script/bundle_settings.py --target "$target" \
+            --archive "target/distrib/honk300-$target.$extension" \
+            --directory target/settings-companion --manifest dist-manifest.json
 
       - name: Qualify exact Linux archive payload before upload
         if: ${{ runner.os == 'Linux' && contains(join(matrix.targets, ','), '-unknown-linux-') }}
@@ -598,6 +625,7 @@ jobs:
     name: Verify, upload once, and publish latest
     needs:
       - plan
+      - native-settings
       - build-portable-artifacts
       - build-debian-packages
       - qualify-debian-packages
@@ -761,6 +789,11 @@ jobs:
           path: target/install-scope-collision-evidence
           if-no-files-found: error
           retention-days: 7
+
+      - name: Install GTK for managed settings acceptance
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-1
 
       - name: Smoke shell installer twice without sudo
         shell: bash

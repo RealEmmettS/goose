@@ -12,6 +12,7 @@ pub enum ControlCommand {
     Stop,
     ForceStop,
     Reload,
+    ReloadIf([u8; 32]),
     Status,
     Do(PokeAction),
 }
@@ -98,6 +99,13 @@ impl ControlCommand {
         match self {
             Self::Stop => format!("{VERSION} STOP\n"),
             Self::ForceStop => format!("{VERSION} FORCE_STOP\n"),
+            Self::ReloadIf(identity) => {
+                let hex = identity
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>();
+                format!("{VERSION} RELOAD_IF {hex}\n")
+            }
             Self::Reload => format!("{VERSION} RELOAD\n"),
             Self::Status => format!("{VERSION} STATUS\n"),
             Self::Do(action) => format!("{VERSION} DO {}\n", encode_action(action)),
@@ -131,6 +139,19 @@ impl ControlCommand {
             "RELOAD" => {
                 ensure_end(parts)?;
                 Ok(Self::Reload)
+            }
+            "RELOAD_IF" => {
+                let hex = parts.next().ok_or(ProtocolError::MissingAction)?;
+                ensure_end(parts)?;
+                if hex.len() != 64 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                    return Err(ProtocolError::UnknownCommand);
+                }
+                let mut identity = [0; 32];
+                for (index, byte) in identity.iter_mut().enumerate() {
+                    *byte = u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16)
+                        .map_err(|_| ProtocolError::UnknownCommand)?;
+                }
+                Ok(Self::ReloadIf(identity))
             }
             "STATUS" => {
                 ensure_end(parts)?;
@@ -454,6 +475,7 @@ mod tests {
             ControlCommand::Stop,
             ControlCommand::ForceStop,
             ControlCommand::Reload,
+            ControlCommand::ReloadIf([0xa5; 32]),
             ControlCommand::Status,
             ControlCommand::Do(PokeAction::Honk),
             ControlCommand::Do(PokeAction::Wander),

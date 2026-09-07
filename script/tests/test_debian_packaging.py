@@ -37,6 +37,9 @@ class DebianPackagingTests(unittest.TestCase):
             binary = temp / "input-honk300"
             binary.write_bytes(b"qualified-elf")
             binary.chmod(0o755)
+            binary.with_name("honk300-settings").write_bytes(b"native-settings")
+            for notice in ("NATIVE_SDK_LICENSE.txt", "NATIVE_SDK_FONT_LICENSE.txt"):
+                binary.with_name(notice).write_text("SDK license fixture\n", encoding="utf-8")
             staging = temp / "staging"
             installed = PACKAGE_DEB.build_package_tree(
                 staging,
@@ -47,12 +50,15 @@ class DebianPackagingTests(unittest.TestCase):
                 "amd64",
             )
 
+            self.assertEqual(installed.with_name("honk300-settings").read_bytes(), b"native-settings")
             self.assertEqual(installed.read_bytes(), binary.read_bytes())
             self.assertTrue(installed.stat().st_mode & stat.S_IXUSR)
             self.assertEqual((installed.parent / "install-source.txt").read_text(), "deb\n")
             receipt = json.loads((installed.parent / "install-receipt.json").read_text())
             self.assertEqual(receipt["schema"], "honk300.install.v2")
             self.assertEqual(receipt["origin"], "deb")
+            self.assertEqual(receipt["settings_app"]["size"], len(b"native-settings"))
+            self.assertEqual(receipt["settings_app"]["sha256"], __import__("hashlib").sha256(b"native-settings").hexdigest())
             self.assertEqual(receipt["installer_family"], "deb")
             self.assertEqual(receipt["target"], "x86_64-unknown-linux-gnu")
             self.assertEqual(receipt["artifact"]["size"], len(b"qualified-elf"))

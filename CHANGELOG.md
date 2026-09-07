@@ -26,6 +26,24 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- Add the Native SDK/Zig settings application, exact-sibling `settings` launcher and tray Configure routing, and a bounded versioned Rust service covering all 53 editable fields. Keep the terminal editor and add GUI/TUI update controls plus read-only `update --check`.
+- Protect GUI and TUI saves with shared revision-aware atomic persistence and conditional runtime reload tokens tied to the selected file and saved revision. Preserve comments, compatible unknown fields, and drafts after validation or conflict failures.
+
+### Changed
+- Use embedded Makira Bold headings and Makira Light body text in native settings while retaining system appearance preferences. Tray Configure opens the runtime's selected configuration file.
+- Replace the dual-view crossfade with one continuously projected goose (ADR 0041): rounder white body, restrained wings, solid orange bill and webbed feet, continuous heading, foot-contact weight shifts, acceleration/braking lean, bounded honk/pet/anticipation reactions, and default-on expressions with optional reduced motion. Existing saved color and behavior choices remain authoritative.
+- Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
+
+### Fixed
+- Keep forward steps planted ahead until the body passes over them, and give the rounded belly enough clearance for visible front/rear feet. Preserve the gait cadence and real ground contacts.
+- Do not acknowledge native Wayland presentation while all retained buffers are busy or a required output is unconfigured; retry the pending damage, including graceful final clears.
+- Retain and reap a bounded pool of audio voices/processes. Replace synthetic test-only limit checks with a real child-process exhaustion and recovery regression.
+- Aim cursor-seeking locomotion at the body position that brings the beak to the pointer, avoiding a stationary-pointer chase that could never reach the grab distance.
+
+### Development
+- Add actual Rust motion exports, heading/alpha/bounds regressions, renderer timing workloads, and a tracked refinement audit. Native desktop, distribution, GUI, and complete release qualification remain in progress.
+
 ## [1.3.7] - 2026-07-23
 
 ### Fixed

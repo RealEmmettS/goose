@@ -10,6 +10,7 @@
 <?ifndef Commit ?><?define Commit = "0000000000000000000000000000000000000000" ?><?endif ?>
 <?ifndef TargetTriple ?><?define TargetTriple = "x86_64-pc-windows-msvc" ?><?endif ?>
 <?ifndef PayloadSha256 ?><?define PayloadSha256 = "0000000000000000000000000000000000000000000000000000000000000000" ?><?endif ?>
+<?ifndef SettingsSha256 ?><?define SettingsSha256 = "0000000000000000000000000000000000000000000000000000000000000000" ?><?endif ?>
 <?ifndef LauncherSha256 ?><?define LauncherSha256 = "0000000000000000000000000000000000000000000000000000000000000000" ?><?endif ?>
 
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
@@ -79,6 +80,13 @@
                                         <Component Id='Honk300AppExe' Guid='*' Permanent='yes'>
                                             <File Id='Honk300AppExeFile' Name='honk300-app.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300-app.exe' KeyPath='yes'/>
                                         </Component>
+                                        <Component Id='Honk300SettingsExe' Guid='*' Permanent='yes'>
+                                            <File Id='Honk300SettingsExeFile' Name='honk300-settings.exe' DiskId='1' Source='$(var.CargoTargetBinDir)\honk300-settings.exe' KeyPath='yes'/>
+                                        </Component>
+                                        <Component Id='NativeSdkNotices' Guid='*' Permanent='yes'>
+                                            <File Id='NativeSdkLicense' Name='NATIVE_SDK_LICENSE.txt' DiskId='1' Source='$(var.CargoTargetBinDir)\NATIVE_SDK_LICENSE.txt' KeyPath='yes'/>
+                                            <File Id='NativeSdkFontLicense' Name='NATIVE_SDK_FONT_LICENSE.txt' DiskId='1' Source='$(var.CargoTargetBinDir)\NATIVE_SDK_FONT_LICENSE.txt'/>
+                                        </Component>
                                     </Directory>
                                 </Directory>
                             </Directory>
@@ -140,6 +148,8 @@
             <ComponentRef Id='HonkAliasExe'/>
             <ComponentRef Id='GooseAliasExe'/>
             <ComponentRef Id='Honk300AppExe'/>
+            <ComponentRef Id='Honk300SettingsExe'/>
+            <ComponentRef Id='NativeSdkNotices'/>
             <ComponentRef Id='LegalNotices'/>
             <ComponentRef Id='InstallSourceMarker'/>
             <ComponentRef Id='StartMenuShortcut'/>
@@ -166,7 +176,7 @@
         <CustomAction
             Id='ActivateWindowsSlot'
             BinaryKey='Honk300SlotHelper'
-            ExeCommand='__wsa -r &quot;[APPLICATIONFOLDER]\&quot; -o &quot;[HONK300ORIGIN]&quot; -c &quot;$(var.Commit)&quot; -a &quot;[OriginalDatabase]&quot; -l &quot;$(var.LauncherSha256)&quot; -u &quot;[HONK300AUTOSTART]&quot;'
+            ExeCommand='__wsa -r &quot;[APPLICATIONFOLDER]\&quot; -o &quot;[HONK300ORIGIN]&quot; -c &quot;$(var.Commit)&quot; -a &quot;[OriginalDatabase]&quot; -l &quot;$(var.LauncherSha256)&quot; -s &quot;$(var.SettingsSha256)&quot; -u &quot;[HONK300AUTOSTART]&quot;'
             Execute='deferred'
             Impersonate='no'
             Return='check'

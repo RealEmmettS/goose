@@ -64,6 +64,9 @@ Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\channels\exe-corporat
 Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\channels\exe-corporate\releases\{#MyAppVersion}-{#TargetTriple}\bin"; DestName: "honk.exe"; Flags: ignoreversion uninsneveruninstall
 Source: "{#SourceBinDir}\{#MyAppExeName}"; DestDir: "{app}\channels\exe-corporate\releases\{#MyAppVersion}-{#TargetTriple}\bin"; DestName: "goose.exe"; Flags: ignoreversion uninsneveruninstall
 Source: "{#SourceBinDir}\honk300-app.exe"; DestDir: "{app}\channels\exe-corporate\releases\{#MyAppVersion}-{#TargetTriple}\bin"; DestName: "honk300-app.exe"; Flags: ignoreversion uninsneveruninstall
+Source: "{#SourceBinDir}\honk300-settings.exe"; DestDir: "{app}\channels\exe-corporate\releases\{#MyAppVersion}-{#TargetTriple}\bin"; DestName: "honk300-settings.exe"; Flags: ignoreversion uninsneveruninstall
+Source: "{#SourceBinDir}\NATIVE_SDK_LICENSE.txt"; DestDir: "{app}\channels\exe-corporate\releases\{#MyAppVersion}-{#TargetTriple}\bin"; DestName: "NATIVE_SDK_LICENSE.txt"; Flags: ignoreversion uninsneveruninstall
+Source: "{#SourceBinDir}\NATIVE_SDK_FONT_LICENSE.txt"; DestDir: "{app}\channels\exe-corporate\releases\{#MyAppVersion}-{#TargetTriple}\bin"; DestName: "NATIVE_SDK_FONT_LICENSE.txt"; Flags: ignoreversion uninsneveruninstall
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY_ASSETS.md"; DestDir: "{app}"; Flags: ignoreversion
 

@@ -91,6 +91,7 @@ honk-config = { path = "crates/honk-config" }
 honk-config-tui = { path = "crates/honk-config-tui" }
 honk-control = { path = "crates/honk-control" }
 honk-engine = { path = "crates/honk-engine" }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 

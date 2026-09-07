@@ -1,0 +1,76 @@
+<stack>
+  <column gap="16" padding="24">
+    <row gap="16" cross="center">
+      <text size="heading" grow="1"><span weight="bold">Honk300 settings</span></text>
+      <text>v{versionText}</text>
+      <if test="{dirty}"><badge>Unsaved changes</badge></if>
+    </row>
+    <row gap="6">
+      <button variant="ghost" selected="{page == 'general'}" on-press="general">General</button>
+      <button variant="ghost" selected="{page == 'appearance'}" on-press="appearance">Appearance</button>
+      <button variant="ghost" selected="{page == 'behavior'}" on-press="behavior">Behavior</button>
+      <button variant="ghost" selected="{page == 'sound'}" on-press="sound">Sound & manners</button>
+      <button variant="ghost" selected="{page == 'platform'}" on-press="platform">Platform & status</button>
+    </row>
+    <text size="lg"><span weight="bold">{heading}</span></text>
+    <scroll grow="1" key="settings-scroll">
+      <column gap="12">
+        <if test="{isGeneral}">
+          <row gap="8"><button disabled="{not canEdit}" on-press="start">Start goose</button><button disabled="{not canEdit}" on-press="stop">Stop goose</button></row>
+        </if>
+        <if test="{isPlatform}">
+          <text wrap="true">{runtime}</text>
+          <button disabled="{busy}" on-press="refresh">Refresh status</button>
+          <separator/>
+          <text wrap="true">{updateStatus}</text>
+          <row gap="8">
+            <button disabled="{busy}" on-press="check_updates">Check for updates</button>
+            <button disabled="{not canUpdate}" on-press="update_now">Update now</button>
+          </row>
+          <text wrap="true">Updates open a separate window that keeps the result visible.</text>
+          <separator/>
+        </if>
+        <for each="visible" key="key" as="f">
+          <column gap="4">
+            <row gap="12" cross="center">
+              <if test="{f.isToggle}">
+                <switch checked="{f.checked}" disabled="{not canEdit}" on-toggle="toggle:{f.index}">{f.label}</switch>
+              </if>
+              <else>
+                <text grow="1">{f.label}</text>
+                <button label="{f.label}" width="170" disabled="{not canEdit}" on-press="edit:{f.index}">{f.value}</button>
+              </else>
+              <if test="{f.changed}"><badge>Changed</badge></if>
+            </row>
+            <if test="{f.hasHelp}"><text wrap="true">{f.help}</text></if>
+          </column>
+        </for>
+      </column>
+    </scroll>
+    <separator/>
+    <text wrap="true">{status}</text>
+    <row gap="12">
+      <button variant="secondary" disabled="{busy}" on-press="reload">Reload saved settings</button>
+      <spacer grow="1"/>
+      <button variant="primary" disabled="{not canSave}" on-press="save">Save & apply</button>
+    </row>
+  </column>
+  <if test="{hasEditor}">
+    <column main="center" cross="center">
+    <dialog on-dismiss="edit_cancel" label="Edit setting" width="460" height="240">
+      <column gap="16" padding="24">
+        <text size="lg"><span weight="bold">{editLabel}</span></text><text wrap="true">{editHelp}</text>
+        <text-field label="{editLabel}" text="{editText}" on-input="edit_input" on-submit="edit_done" autofocus="true"/>
+        <row gap="8"><button on-press="edit_cancel">Cancel</button><button variant="primary" on-press="edit_done">Apply to draft</button></row>
+      </column>
+    </dialog>
+    </column>
+  </if>
+  <if test="{discard_prompt}">
+    <column main="center" cross="center">
+    <dialog on-dismiss="keep_draft" label="Unsaved changes" width="460" height="170">
+      <column gap="16" padding="24"><text wrap="true">Reloading will discard your unsaved changes.</text><row gap="8"><button on-press="keep_draft">Keep editing</button><button variant="destructive" on-press="discard">Discard and reload</button></row></column>
+    </dialog>
+    </column>
+  </if>
+</stack>

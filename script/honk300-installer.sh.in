@@ -110,6 +110,13 @@ validate_zip() {
   fi
 }
 
+verify_settings() {
+  settings="$1"
+  [ -f "$settings" ] && [ ! -L "$settings" ] && [ -x "$settings" ] || die "missing regular settings companion: $settings"
+  settings_version="$("$settings" --version 2>&1)" || die "settings cannot run; Linux graphical settings require GTK 4: $settings_version"
+  [ "$settings_version" = "honk300-settings $VERSION" ] || die "settings companion version does not match $VERSION"
+}
+
 reported_version() {
   "$1" --version 2>/dev/null | awk '{print $NF}' | sed 's/[+-].*$//'
 }
@@ -400,6 +407,7 @@ write_receipt() {
   "layout": "$(json_escape "$layout")",
   "target": "$(json_escape "$target")",
   "artifact": { "name": "$(json_escape "$artifact")", "sha256": "$(json_escape "$hash")", "size": $artifact_size },
+  "settings_app": { "name": "honk300-settings", "sha256": "$SETTINGS_SHA", "size": $SETTINGS_SIZE },
   "install_root": "$(json_escape "$install_root")",
   "owned_root": "$(json_escape "$install_root")",
   "active_release": "$(json_escape "$active_release")",
@@ -612,6 +620,11 @@ if [ "$OS" = Darwin ]; then
   [ -z "$(find "$CANDIDATE" -type l -print -quit)" ] || die "app archive contains an unexpected symlink"
   STAGED_BINARY="$CANDIDATE/Contents/MacOS/honk300"
   verify_binary "$STAGED_BINARY"
+  STAGED_SETTINGS="$CANDIDATE/Contents/MacOS/honk300-settings"
+  verify_settings "$STAGED_SETTINGS"
+  SETTINGS_SHA="$(file_sha256 "$STAGED_SETTINGS")"
+  SETTINGS_SIZE="$(wc -c < "$STAGED_SETTINGS" | tr -d ' ')"
+  lipo "$STAGED_SETTINGS" -verify_arch x86_64 arm64
   codesign --verify --deep --strict "$CANDIDATE"
   lipo "$STAGED_BINARY" -verify_arch x86_64 arm64
   bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$CANDIDATE/Contents/Info.plist")"
@@ -626,6 +639,7 @@ if [ "$OS" = Darwin ]; then
   swap_install "$CANDIDATE" "$DEST"
   INSTALLED_BINARY="$DEST/Contents/MacOS/honk300"
   verify_binary "$INSTALLED_BINARY"
+  verify_file "$DEST/Contents/MacOS/honk300-settings" "$SETTINGS_SHA"
   codesign --verify --deep --strict "$DEST"
   layout=mac-app
   ACTIVE_RELEASE="$DEST"
@@ -643,12 +657,25 @@ else
   [ "$(printf '%s\n' "$binaries" | sed '/^$/d' | wc -l | tr -d ' ')" = 1 ] || die "archive must contain exactly one honk300 binary"
   staged_source="$(printf '%s\n' "$binaries" | sed -n '1p')"
   cp "$staged_source" "$STAGE_ROOT/install/bin/honk300"
+  settings_source="$(dirname "$staged_source")/honk300-settings"
+  [ -f "$settings_source" ] && [ ! -L "$settings_source" ] || die "archive has no settings companion beside honk300"
+  cp "$settings_source" "$STAGE_ROOT/install/bin/honk300-settings"
+  for notice in NATIVE_SDK_LICENSE.txt NATIVE_SDK_FONT_LICENSE.txt; do
+    notice_source="$(dirname "$staged_source")/$notice"
+    [ -f "$notice_source" ] && [ ! -L "$notice_source" ] || die "archive has no SDK license notice: $notice"
+    cp "$notice_source" "$STAGE_ROOT/install/$notice"
+  done
+  chmod 755 "$STAGE_ROOT/install/bin/honk300-settings"
+  verify_settings "$STAGE_ROOT/install/bin/honk300-settings"
+  SETTINGS_SHA="$(file_sha256 "$STAGE_ROOT/install/bin/honk300-settings")"
+  SETTINGS_SIZE="$(wc -c < "$STAGE_ROOT/install/bin/honk300-settings" | tr -d ' ')"
   chmod 755 "$STAGE_ROOT/install/bin/honk300"
   verify_binary "$STAGE_ROOT/install/bin/honk300"
   hold_lifecycle_lease "$STAGE_ROOT/install/bin/honk300"
   activate_linux_slot "$STAGE_ROOT/install"
   INSTALLED_BINARY="$DEST/current/bin/honk300"
   verify_binary "$INSTALLED_BINARY"
+  verify_file "$DEST/current/bin/honk300-settings" "$SETTINGS_SHA"
   layout=linux-slots-v1
   ACTIVE_RELEASE="$NEW_RELEASE"
   autostart=false

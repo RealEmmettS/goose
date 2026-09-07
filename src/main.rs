@@ -10,6 +10,7 @@ mod control_surface_update;
 mod debian;
 mod install;
 mod runtime;
+mod settings;
 mod update;
 
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
@@ -91,9 +92,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         Some(Command::Config { config }) => run_config(config),
+        Some(Command::Settings { config }) => settings::launch(config).map_err(Into::into),
+        Some(Command::SettingsService { config }) => settings::run(config),
         Some(Command::Install { autostart }) => install::install(autostart),
         Some(Command::Uninstall { purge }) => install::uninstall(purge),
-        Some(Command::Update { json }) => update::run(json),
+        Some(Command::Update { json, check }) => {
+            if check {
+                update::run_check(json)
+            } else {
+                update::run(json)
+            }
+        }
         Some(Command::ControlSurfaceUpdate) => control_surface_update::run(),
         Some(Command::Setup { config, reset }) => run_setup(config, reset),
         Some(Command::Start { options }) => run_start(options),
@@ -125,6 +134,8 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::Do { action }) => ControlCommand::Do(action.into_engine()),
         Some(
             Command::Start { .. }
+            | Command::Settings { .. }
+            | Command::SettingsService { .. }
             | Command::Config { .. }
             | Command::Install { .. }
             | Command::Uninstall { .. }
@@ -221,10 +232,27 @@ fn run_config(config: Option<std::path::PathBuf>) -> Result<(), Box<dyn std::err
     let path = honk_config::resolve_path(config)?;
     let mut loaded = Config::load_or_default(Some(path.clone()))?;
     install::prepare_config_autostart(&path, &mut loaded.config)?;
-    honk_config_tui::run_with_save_hook(path, |config| {
-        install::reconcile_config_autostart(config.lifecycle.autostart_on_login)
-            .map_err(|error| error.to_string())
-    })?;
+    honk_config_tui::run_with_hooks(
+        path,
+        |config| {
+            install::reconcile_config_autostart(config.lifecycle.autostart_on_login)
+                .map_err(|error| error.to_string())
+        },
+        |action| {
+            use honk_config_tui::app::TuiCommand;
+            match action {
+                TuiCommand::CheckUpdates => update::check()
+                    .map(|check| check.message)
+                    .map_err(|error| error.to_string()),
+                TuiCommand::Update => {
+                    runtime::control_surface::open_update_helper()
+                        .map_err(|error| error.to_string())?;
+                    Ok("Updater opened; its result will remain in the update window.".into())
+                }
+                _ => Err("unsupported settings action".into()),
+            }
+        },
+    )?;
     Ok(())
 }
 

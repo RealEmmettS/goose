@@ -1,0 +1,349 @@
+//! Bounded, versioned stdio bridge. Rust owns settings and lifecycle decisions;
+//! the native window owns only the draft and its presentation (ADR 0041).
+mod launch;
+mod schema;
+use honk_config::{Config, ConfigError, ConfigRevision, ConfigSnapshot};
+use honk_control::{send_command, ControlCommand, ControlResponse, RuntimeStatus};
+pub(crate) use launch::launch;
+use serde::Deserialize;
+use serde_json::{json, Value};
+use std::{
+    collections::BTreeMap,
+    io::{self, Read, Write},
+    path::{Path, PathBuf},
+};
+
+const PROTOCOL: u32 = 1;
+const MAX_REQUEST: u64 = 64 * 1024;
+const MAX_RESPONSE: usize = 128 * 1024;
+type Error = Box<dyn std::error::Error>;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Request {
+    protocol: u32,
+    request_id: u64,
+    command: Operation,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
+enum Operation {
+    Read {},
+    Validate {
+        revision: ConfigRevision,
+        patch: BTreeMap<String, Value>,
+    },
+    Save {
+        revision: ConfigRevision,
+        patch: BTreeMap<String, Value>,
+    },
+    Status {},
+    Start {},
+    Stop {},
+    CheckUpdates {},
+    Update {},
+}
+
+pub(crate) fn run(path: Option<PathBuf>) -> Result<(), Error> {
+    let path = honk_config::resolve_path(path)?;
+    serve(io::stdin().lock(), io::stdout().lock(), &path)
+}
+
+fn serve(reader: impl Read, mut writer: impl Write, path: &Path) -> Result<(), Error> {
+    let mut input = Vec::new();
+    reader.take(MAX_REQUEST + 1).read_to_end(&mut input)?;
+    let parsed = if input.len() as u64 > MAX_REQUEST {
+        Err("settings request exceeds 64 KiB".to_owned())
+    } else {
+        serde_json::from_slice::<Request>(&input).map_err(|error| error.to_string())
+    };
+    let (id, result) = match parsed {
+        Ok(request) if request.protocol == PROTOCOL => {
+            (request.request_id, execute(request.command, path))
+        }
+        Ok(request) => (
+            request.request_id,
+            Err("unsupported settings protocol version".into()),
+        ),
+        Err(error) => (0, Err(error.into())),
+    };
+    let response = match result {
+        Ok(data) => json!({"protocol": PROTOCOL, "request_id": id, "ok": true, "data": data}),
+        Err(error) => {
+            let code = match error.downcast_ref::<ConfigError>() {
+                Some(ConfigError::Conflict) => "conflict",
+                Some(ConfigError::Validation(_)) => "validation",
+                _ => "failed",
+            };
+            json!({"protocol": PROTOCOL, "request_id": id, "ok": false, "error": {"code": code, "message": friendly_error(error.as_ref())}})
+        }
+    };
+    let bytes = serde_json::to_vec(&response)?;
+    if bytes.len() > MAX_RESPONSE {
+        return Err("settings response exceeds 128 KiB".into());
+    }
+    writer.write_all(&bytes)?;
+    writer.write_all(b"\n")?;
+    writer.flush()?;
+    Ok(())
+}
+
+fn friendly_error(error: &(dyn std::error::Error + 'static)) -> String {
+    if let Some(ConfigError::Validation(errors)) = error.downcast_ref::<ConfigError>() {
+        let mut message = errors.join("; ");
+        for field in schema::FIELDS {
+            message = message.replace(field.key, field.label);
+        }
+        format!("Invalid settings: {message}")
+    } else {
+        error.to_string()
+    }
+}
+
+fn execute(operation: Operation, path: &Path) -> Result<Value, Error> {
+    match operation {
+        Operation::Read {} => {
+            let snapshot = ConfigSnapshot::load(path)?;
+            let mut value = snapshot_json(&snapshot, path);
+            value["runtime"] = runtime_json()?;
+            Ok(value)
+        }
+        Operation::Validate { revision, patch } => {
+            let (before, config) = edited(path, &revision, patch)?;
+            Ok(
+                json!({"message": "Settings are valid.", "restart_required": restart_fields(&before.config, &config)}),
+            )
+        }
+        Operation::Save { revision, patch } => save(path, revision, patch, &|config| {
+            crate::install::reconcile_config_autostart(config.lifecycle.autostart_on_login)
+                .map_err(|error| error.to_string())
+        }),
+        Operation::Status {} => Ok(json!({"runtime": runtime_json()?})),
+        Operation::Start {} => {
+            let message = honk_config_tui::start_from_config(path)?;
+            Ok(json!({"message": message, "runtime": runtime_json()?}))
+        }
+        Operation::Stop {} => {
+            match send_command(ControlCommand::Stop)? {
+                ControlResponse::Ok => honk_control::wait_for_shutdown()?,
+                response => return Err(format!("stop rejected: {response:?}").into()),
+            }
+            Ok(json!({"message": "Goose stopped.", "runtime": runtime_json()?}))
+        }
+        Operation::CheckUpdates {} => Ok(json!({"updates": crate::update::check()?})),
+        Operation::Update {} => {
+            // The visible, independent helper owns the retained completion screen, lifecycle
+            // lease, recovery and relaunch. Closing settings cannot kill its transaction.
+            crate::runtime::control_surface::open_update_helper()?;
+            Ok(json!({"message": "Updater opened. Its result will remain in the update window."}))
+        }
+    }
+}
+
+fn snapshot_json(snapshot: &ConfigSnapshot, path: &Path) -> Value {
+    json!({"version": env!("CARGO_PKG_VERSION"), "revision": snapshot.revision,
+        "path": path, "fields": schema::fields(&snapshot.config), "warning": snapshot.warning})
+}
+
+fn edited(
+    path: &Path,
+    revision: &ConfigRevision,
+    patch: BTreeMap<String, Value>,
+) -> Result<(ConfigSnapshot, Config), Error> {
+    let before = ConfigSnapshot::load(path)?;
+    if before.revision != *revision {
+        return Err(ConfigError::Conflict.into());
+    }
+    let config = apply_patch(&before.config, patch)?;
+    Ok((before, config))
+}
+
+fn apply_patch(config: &Config, patch: BTreeMap<String, Value>) -> Result<Config, Error> {
+    if patch.len() > schema::FIELDS.len() {
+        return Err("too many settings in patch".into());
+    }
+    let mut document = serde_json::to_value(config)?;
+    for (key, value) in patch {
+        if !schema::FIELDS.iter().any(|field| field.key == key) {
+            return Err(format!("unknown setting: {key}").into());
+        }
+        let (section, name) = key.split_once('.').ok_or("invalid setting key")?;
+        document[section][name] = value;
+    }
+    let config: Config = serde_json::from_value(document)?;
+    config.validate()?;
+    Ok(config)
+}
+
+fn restart_fields(before: &Config, after: &Config) -> Vec<&'static str> {
+    if before.platform.wayland != after.platform.wayland {
+        vec!["Use native Wayland"]
+    } else {
+        vec![]
+    }
+}
+
+fn save(
+    path: &Path,
+    revision: ConfigRevision,
+    patch: BTreeMap<String, Value>,
+    reconcile: &dyn Fn(&Config) -> Result<(), String>,
+) -> Result<Value, Error> {
+    let (before, config) = edited(path, &revision, patch)?;
+    let restart = restart_fields(&before.config, &config);
+    let revision = config.save_if_revision(path, &revision)?;
+    let mut warning = None;
+    if config.lifecycle != before.config.lifecycle {
+        warning = reconcile(&config).err();
+    }
+    let identity = revision.reload_token(path)?;
+    let (apply_state, message) = match send_command(ControlCommand::ReloadIf(identity)) {
+        Ok(ControlResponse::Ok) => ("applied", "Saved and applied to the running goose.".into()),
+        Err(error)
+            if matches!(
+                error.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused
+            ) =>
+        {
+            (
+                "saved",
+                "Saved. The goose will use these settings when it starts.".into(),
+            )
+        }
+        result => (
+            "saved",
+            format!("Saved; runtime reload was not confirmed: {result:?}"),
+        ),
+    };
+    let snapshot = ConfigSnapshot {
+        config,
+        revision,
+        warning,
+    };
+    let mut data = snapshot_json(&snapshot, path);
+    data["apply_state"] = json!(apply_state);
+    data["message"] = json!(message);
+    data["restart_required"] = json!(restart);
+    Ok(data)
+}
+
+fn runtime_json() -> Result<Value, Error> {
+    let status = match send_command(ControlCommand::Status) {
+        Ok(ControlResponse::Status(status)) => status,
+        Err(error)
+            if matches!(
+                error.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused
+            ) =>
+        {
+            RuntimeStatus::not_running()
+        }
+        result => return Err(format!("runtime status was not confirmed: {result:?}").into()),
+    };
+    Ok(
+        json!({"running": status.running, "platform": status.platform.label(),
+        "overlay": status.overlay.label(), "accessibility": status.accessibility.label(),
+        "cursor": status.cursor.label(), "windows": status.window.label(),
+        "notes_and_memes": status.collect.label(), "manners": status.presence.label(),
+        "audio": status.audio.label(), "notes": status.notes, "memes": status.memes}),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request(path: &Path, bytes: &[u8]) -> Value {
+        let mut response = Vec::new();
+        serve(bytes, &mut response, path).unwrap();
+        serde_json::from_slice(&response).unwrap()
+    }
+
+    #[test]
+    fn protocol_rejects_wrong_versions_extra_fields_and_oversize_frames_without_writes() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        for bytes in [
+            br#"{"protocol":2,"request_id":1,"command":{"op":"read"}}"#.to_vec(),
+            br#"{"protocol":1,"request_id":1,"command":{"op":"read","shell":"whoami"}}"#.to_vec(),
+            vec![b' '; MAX_REQUEST as usize + 1],
+            br#"{"protocol":1,"request_id":1,"command":{"op":"read"}} {}"#.to_vec(),
+        ] {
+            assert_eq!(request(&path, &bytes)["ok"], false);
+        }
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn catalogue_covers_every_editable_config_leaf_once_and_patch_is_typed() {
+        let config = Config::default();
+        let serialized = serde_json::to_value(&config).unwrap();
+        let mut keys = std::collections::BTreeSet::new();
+        for (section, value) in serialized.as_object().unwrap() {
+            if section == "goose_config_version" {
+                continue;
+            }
+            for name in value.as_object().unwrap().keys() {
+                keys.insert(format!("{section}.{name}"));
+            }
+        }
+        assert_eq!(keys.len(), schema::FIELDS.len());
+        assert_eq!(
+            keys,
+            schema::FIELDS
+                .iter()
+                .map(|field| field.key.to_owned())
+                .collect()
+        );
+        assert!(apply_patch(
+            &config,
+            BTreeMap::from([("audio.enabled".into(), json!("yes"))])
+        )
+        .is_err());
+        assert!(apply_patch(
+            &config,
+            BTreeMap::from([("goose_config_version".into(), json!(99))])
+        )
+        .is_err());
+        assert!(apply_patch(
+            &config,
+            BTreeMap::from([("speeds.walk_speed".into(), json!(-1))])
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn stale_gui_save_and_validation_cannot_mutate_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        let snapshot = ConfigSnapshot::load(&path).unwrap();
+        Config::default().save_atomic(&path).unwrap();
+        let contents = std::fs::read(&path).unwrap();
+        let patch = BTreeMap::from([("audio.enabled".to_owned(), json!(false))]);
+        let bytes = serde_json::to_vec(&json!({"protocol":1,"request_id":9,"command":{"op":"save","revision":snapshot.revision,"patch":patch}})).unwrap();
+        let result = request(&path, &bytes);
+        assert_eq!(result["request_id"], 9);
+        assert_eq!(result["error"]["code"], "conflict");
+        assert_eq!(std::fs::read(&path).unwrap(), contents);
+    }
+
+    #[test]
+    fn validated_patch_preserves_unedited_fields_and_comments() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        std::fs::write(&path, "# mine\n[audio]\nfuture = 3 # preserve\n").unwrap();
+        let before = ConfigSnapshot::load(&path).unwrap();
+        let (_, edited) = edited(
+            &path,
+            &before.revision,
+            BTreeMap::from([("appearance.expressions".into(), json!(false))]),
+        )
+        .unwrap();
+        assert!(!edited.appearance.expressions);
+        assert_eq!(edited.audio, before.config.audio);
+        edited.save_if_revision(&path, &before.revision).unwrap();
+        let contents = std::fs::read_to_string(path).unwrap();
+        assert!(contents.contains("# mine") && contents.contains("future = 3 # preserve"));
+    }
+}

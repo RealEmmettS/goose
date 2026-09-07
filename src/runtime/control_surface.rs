@@ -3,9 +3,11 @@ use honk_control::ControlSurfaceCommand;
 use honk_engine::World;
 use std::io;
 
-#[cfg(windows)]
-pub(crate) fn open_configuration_tui() -> io::Result<()> {
-    open_windows_console("config")
+#[cfg(target_os = "macos")]
+pub(crate) use honk_platform_macos::open_update_helper;
+
+pub(crate) fn open_configuration(config_path: &std::path::Path) -> io::Result<()> {
+    crate::settings::launch(Some(config_path.to_owned()))
 }
 
 #[cfg(windows)]
@@ -82,11 +84,6 @@ fn quote_windows_argument(argument: &[u16]) -> Vec<u16> {
     quoted.extend(std::iter::repeat_n(b'\\' as u16, backslashes * 2));
     quoted.push(b'"' as u16);
     quoted
-}
-
-#[cfg(target_os = "linux")]
-pub(crate) fn open_configuration_tui() -> io::Result<()> {
-    open_linux_terminal("config")
 }
 
 #[cfg(target_os = "linux")]

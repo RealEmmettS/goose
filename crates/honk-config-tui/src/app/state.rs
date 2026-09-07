@@ -1,6 +1,6 @@
 use super::Action;
 use crossterm::event::{KeyCode, KeyEvent};
-use honk_config::Config;
+use honk_config::{Config, ConfigRevision};
 use honk_control::RuntimeStatus;
 use honk_engine::PokeAction;
 use std::collections::VecDeque;
@@ -61,6 +61,9 @@ impl Category {
 pub enum TuiCommand {
     Save,
     Reload,
+    ReloadFile,
+    CheckUpdates,
+    Update,
     Status,
     Stop,
     Start,
@@ -73,6 +76,8 @@ pub struct CommandResult {
     pub is_error: bool,
     pub mark_saved: bool,
     pub saved_config: Option<Config>,
+    pub saved_revision: Option<ConfigRevision>,
+    pub loaded_config: Option<(Config, Config)>,
     pub runtime_status: Option<RuntimeStatus>,
 }
 
@@ -114,6 +119,8 @@ pub enum ToggleField {
     Seasonal,
     Autumn,
     CalmGoose,
+    Expressions,
+    ReducedMotion,
     CustomColors,
     AudioEnabled,
     HonkSound,
@@ -167,6 +174,7 @@ pub struct AppState {
     pub config: Config,
     original: Config,
     pub path: PathBuf,
+    pub revision: ConfigRevision,
     pub active_category: Category,
     pub selected_row: usize,
     pub should_quit: bool,
@@ -184,6 +192,7 @@ impl AppState {
             original: config.clone(),
             config,
             path,
+            revision: ConfigRevision::default(),
             active_category: Category::General,
             selected_row: 0,
             should_quit: false,
@@ -235,6 +244,9 @@ impl AppState {
             KeyCode::Right | KeyCode::Char('+') | KeyCode::Char('=') => Action::Adjust(1),
             KeyCode::Left | KeyCode::Char('-') => Action::Adjust(-1),
             KeyCode::Char('s') | KeyCode::Char('S') => Action::Save,
+            KeyCode::Char('l') | KeyCode::Char('L') => Action::ReloadFile,
+            KeyCode::Char('c') | KeyCode::Char('C') => Action::CheckUpdates,
+            KeyCode::Char('i') | KeyCode::Char('I') => Action::Update,
             KeyCode::Char('r') | KeyCode::Char('R') => Action::Reload,
             KeyCode::Char('u') | KeyCode::Char('U') => Action::Status,
             KeyCode::Char('x') | KeyCode::Char('X') => Action::Stop,
@@ -282,6 +294,18 @@ impl AppState {
             Action::Toggle => self.toggle_selected(),
             Action::Adjust(delta) => self.adjust_selected(delta),
             Action::Save => self.pending_commands.push_back(TuiCommand::Save),
+            Action::ReloadFile => {
+                if self.dirty() {
+                    self.set_status(
+                        "unsaved changes; save or reopen the editor to discard them".into(),
+                        true,
+                    );
+                } else {
+                    self.pending_commands.push_back(TuiCommand::ReloadFile);
+                }
+            }
+            Action::CheckUpdates => self.pending_commands.push_back(TuiCommand::CheckUpdates),
+            Action::Update => self.pending_commands.push_back(TuiCommand::Update),
             Action::Reload => self.pending_commands.push_back(TuiCommand::Reload),
             Action::Status => self.pending_commands.push_back(TuiCommand::Status),
             Action::Stop => self.pending_commands.push_back(TuiCommand::Stop),
@@ -289,6 +313,20 @@ impl AppState {
             Action::Poke(action) => self.pending_commands.push_back(TuiCommand::Poke(action)),
             Action::CommandResult(result) => {
                 let result = *result;
+                if let Some((expected, loaded)) = result.loaded_config {
+                    if self.config != expected {
+                        self.set_status(
+                            "file reload skipped; draft changed while loading".into(),
+                            true,
+                        );
+                        return;
+                    }
+                    self.config = loaded.clone();
+                    self.original = loaded;
+                }
+                if let Some(revision) = result.saved_revision {
+                    self.revision = revision;
+                }
                 if let Some(saved_config) = result.saved_config {
                     self.original = saved_config;
                 } else if result.mark_saved {
@@ -390,6 +428,12 @@ impl AppState {
             ToggleField::Autumn => self.config.schedule.autumn = !self.config.schedule.autumn,
             ToggleField::CalmGoose => {
                 self.config.appearance.calm_goose = !self.config.appearance.calm_goose
+            }
+            ToggleField::Expressions => {
+                self.config.appearance.expressions = !self.config.appearance.expressions
+            }
+            ToggleField::ReducedMotion => {
+                self.config.appearance.reduced_motion = !self.config.appearance.reduced_motion
             }
             ToggleField::CustomColors => {
                 self.config.behavior.use_custom_colors = !self.config.behavior.use_custom_colors
@@ -781,6 +825,16 @@ impl AppState {
             ],
             Category::Appearance => vec![
                 row(
+                    "Expressions",
+                    on_off(self.config.appearance.expressions),
+                    RowKind::Toggle(ToggleField::Expressions),
+                ),
+                row(
+                    "Reduced motion",
+                    on_off(self.config.appearance.reduced_motion),
+                    RowKind::Toggle(ToggleField::ReducedMotion),
+                ),
+                row(
                     "Calm goose",
                     on_off(self.config.appearance.calm_goose),
                     RowKind::Toggle(ToggleField::CalmGoose),
@@ -1004,6 +1058,17 @@ impl AppState {
                 ),
                 row("config", "open this TUI".into(), RowKind::Static),
                 row(
+                    "C / update --check",
+                    "check for updates".into(),
+                    RowKind::Static,
+                ),
+                row("I / update", "open updater window".into(), RowKind::Static),
+                row(
+                    "L",
+                    "reload saved file (clean draft)".into(),
+                    RowKind::Static,
+                ),
+                row(
                     "install/update/uninstall/setup",
                     "M19".into(),
                     RowKind::Static,
@@ -1012,11 +1077,7 @@ impl AppState {
             Category::About => vec![
                 row("honk300", "Desktop Goose in Rust".into(), RowKind::Static),
                 row("Config", self.path.display().to_string(), RowKind::Static),
-                row(
-                    "Control",
-                    "CLI/TUI only over local IPC".into(),
-                    RowKind::Static,
-                ),
+                row("Control", "Settings, CLI and TUI".into(), RowKind::Static),
                 row(
                     "Terminal protection",
                     "not configurable".into(),
@@ -1349,6 +1410,8 @@ mod tests {
             status: "saved".into(),
             is_error: false,
             mark_saved: true,
+            saved_revision: None,
+            loaded_config: None,
             saved_config: None,
             runtime_status: None,
         })));
@@ -1368,6 +1431,8 @@ mod tests {
             status: "saved".into(),
             is_error: false,
             mark_saved: true,
+            saved_revision: None,
+            loaded_config: None,
             saved_config: Some(saved_config),
             runtime_status: None,
         })));

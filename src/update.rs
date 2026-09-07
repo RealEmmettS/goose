@@ -139,7 +139,7 @@ fn windows_fetch_text_invocation(url: &str) -> WindowsWebRequestInvocation {
             "-ExecutionPolicy".into(),
             "Bypass".into(),
             "-Command".into(),
-            "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; $response=Invoke-WebRequest -UseBasicParsing -Uri $env:HONK300_INTERNAL_WEB_REQUEST_URI -Headers @{ 'User-Agent' = 'honk300' }; $content=$response.Content; if ($content -is [byte[]]) { $content=[Text.Encoding]::UTF8.GetString($content) }; [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); [Console]::Out.Write([string]$content)".into(),
+            "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; $response=Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 -Uri $env:HONK300_INTERNAL_WEB_REQUEST_URI -Headers @{ 'User-Agent' = 'honk300' }; $content=$response.Content; if ($content -is [byte[]]) { $content=[Text.Encoding]::UTF8.GetString($content) }; [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); [Console]::Out.Write([string]$content)".into(),
         ],
         environment: vec![("HONK300_INTERNAL_WEB_REQUEST_URI", url.into())],
     }
@@ -629,6 +629,103 @@ impl UpdateReport {
             "cleanup_state": self.cleanup_state,
             "message": self.message,
         })
+    }
+}
+
+/// Read-only release discovery shared by CLI, terminal settings, and native settings.
+/// This deliberately does not enter `run_inner`: even an up-to-date transaction may
+/// repair an installation's pending cleanup journal.
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct UpdateCheck {
+    pub current_version: String,
+    pub latest_version: String,
+    pub available: bool,
+    pub managed: bool,
+    pub origin: String,
+    pub target: String,
+    pub message: String,
+}
+
+pub(crate) fn check() -> Result<UpdateCheck, DynError> {
+    let manifest = fetch_latest_release_manifest()?;
+    let target = current_release_target().ok_or("this platform is outside the release matrix")?;
+    let source = detect_install_source();
+    let mut check = check_manifest(env!("CARGO_PKG_VERSION"), source, target, &manifest)?;
+    if check.managed {
+        let plan = select_update_plan(source, target)?;
+        if let Err(error) = strategy_owned_executable(plan.strategy, source, target) {
+            check.managed = false;
+            check.message = format!(
+                "Latest release: {}. Update unavailable: {error}",
+                check.latest_version
+            );
+        }
+    }
+    Ok(check)
+}
+
+fn check_manifest(
+    current: &str,
+    source: InstallSource,
+    target: ReleaseTarget,
+    manifest: &ReleaseManifest,
+) -> Result<UpdateCheck, String> {
+    let available = is_newer(current, &manifest.version);
+    let (managed, message) = match select_update_plan(source, target) {
+        Ok(plan) => {
+            // Never enable Update from a manifest with a missing or mismatched payload.
+            manifest_artifact(manifest, &plan, target)?;
+            let message = if available {
+                format!("Update available: {current} -> {}.", manifest.version)
+            } else {
+                format!(
+                    "No newer stable release. Current: {current}; latest: {}.",
+                    manifest.version
+                )
+            };
+            (true, message)
+        }
+        Err(reason) => (
+            false,
+            format!(
+                "Latest release: {}. Update unavailable: {reason}",
+                manifest.version
+            ),
+        ),
+    };
+    Ok(UpdateCheck {
+        current_version: current.into(),
+        latest_version: manifest.version.clone(),
+        available,
+        managed,
+        origin: source.marker_value().into(),
+        target: target.triple().into(),
+        message,
+    })
+}
+
+pub fn run_check(json: bool) -> Result<(), DynError> {
+    match check() {
+        Ok(check) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"action": "check_updates", "success": true, "check": check})
+                );
+            } else {
+                println!("{}", check.message);
+            }
+            Ok(())
+        }
+        Err(error) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"action": "check_updates", "success": false, "message": error.to_string()})
+                );
+            }
+            Err(error)
+        }
     }
 }
 
@@ -1150,6 +1247,10 @@ fn verify_windows_coordinator_result(
         }
         alias_hash = Some(hash);
     }
+    crate::install::companions::verify_receipted_settings(
+        &receipt,
+        &root.join("bin").join("honk300-settings.exe"),
+    )?;
     let launcher_identity = receipt
         .get("app_launcher")
         .and_then(serde_json::Value::as_object)
@@ -1481,7 +1582,16 @@ fn fetch_text_with_system_tool(url: &str) -> Result<String, DynError> {
 #[cfg(not(windows))]
 fn fetch_text_with_system_tool(url: &str) -> Result<String, DynError> {
     if let Ok(output) = Command::new("curl")
-        .args(["-fsSL", "--retry", "3", "-H", "User-Agent: honk300", url])
+        .args([
+            "-fsSL",
+            "--connect-timeout",
+            "10",
+            "--max-time",
+            "30",
+            "-H",
+            "User-Agent: honk300",
+            url,
+        ])
         .output()
     {
         if output.status.success() {
@@ -1489,7 +1599,13 @@ fn fetch_text_with_system_tool(url: &str) -> Result<String, DynError> {
         }
     }
     let output = Command::new("wget")
-        .args(["-qO-", "--header=User-Agent: honk300", url])
+        .args([
+            "-qO-",
+            "--timeout=30",
+            "--tries=1",
+            "--header=User-Agent: honk300",
+            url,
+        ])
         .output()?;
     if output.status.success() {
         Ok(String::from_utf8(output.stdout)?)
@@ -2017,6 +2133,49 @@ mod tests {
         assert!(checksum_verdict(empty, &empty.to_uppercase()).is_ok());
         let err = checksum_verdict(empty, "deadbeef").unwrap_err();
         assert!(err.contains("SHA256 mismatch"));
+    }
+
+    #[test]
+    fn update_check_rejects_missing_or_wrong_payload_and_distinguishes_unmanaged() {
+        let mut manifest = ReleaseManifest {
+            version: "9.0.0".into(),
+            tag: "v9.0.0".into(),
+            commit: "a".repeat(40),
+            artifacts: vec![],
+        };
+        let unmanaged = check_manifest(
+            "1.3.7",
+            InstallSource::Unknown,
+            ReleaseTarget::WindowsX64,
+            &manifest,
+        )
+        .unwrap();
+        assert!(unmanaged.available && !unmanaged.managed);
+        let source = InstallSource::MsiGlobal;
+        let target = ReleaseTarget::WindowsX64;
+        assert!(check_manifest("1.3.7", source, target, &manifest).is_err());
+        let plan = select_update_plan(source, target).unwrap();
+        manifest.artifacts.push(ReleaseArtifact {
+            name: plan.artifact,
+            target: target.triple().into(),
+            kind: "msi-global".into(),
+            sha256: "a".repeat(64),
+            size: 100,
+        });
+        let update = check_manifest("1.3.7", source, target, &manifest).unwrap();
+        assert!(update.available && update.managed);
+        assert!(
+            !check_manifest("9.0.0", source, target, &manifest)
+                .unwrap()
+                .available
+        );
+        assert!(
+            !check_manifest("10.0.0", source, target, &manifest)
+                .unwrap()
+                .available
+        );
+        manifest.artifacts[0].target = ReleaseTarget::WindowsArm64.triple().into();
+        assert!(check_manifest("1.3.7", source, target, &manifest).is_err());
     }
 
     #[test]

@@ -165,6 +165,20 @@ jobs:
           cmd.exe /c $cmd
           if ($LASTEXITCODE -ne 0) { throw "cargo build failed with exit $LASTEXITCODE" }
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build and verify exact native settings companion
+        shell: pwsh
+        run: |
+          python script/build_settings.py --target ${{ matrix.triple }} --output target/${{ matrix.triple }}/release
+          if ($LASTEXITCODE -ne 0) { throw 'settings companion build failed' }
+          python script/verify_settings.py --target ${{ matrix.triple }} --directory target/${{ matrix.triple }}/release
+          if ($LASTEXITCODE -ne 0) { throw 'settings companion identity failed' }
+
       - name: Prove exact build PE machine identity
         shell: pwsh
         run: |
@@ -228,6 +242,7 @@ jobs:
           $sourceRoot = (Get-Location).Path
           $payloadSha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk300.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
           $launcherSha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk300-app.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+          $settingsSha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk300-settings.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
           New-Item -ItemType Directory -Force -Path target\wix | Out-Null
           & $candle -arch ${{ matrix.wix_arch }} `
             "-dVersion=${{ steps.tag.outputs.version }}" `
@@ -236,6 +251,7 @@ jobs:
             "-dTargetTriple=${{ matrix.triple }}" `
             "-dPayloadSha256=$payloadSha256" `
             "-dLauncherSha256=$launcherSha256" `
+            "-dSettingsSha256=$settingsSha256" `
             "-dCargoTargetBinDir=$binDir" `
             "-dSourceRoot=$sourceRoot" `
             -out target\wix\corporate.wixobj `
@@ -248,6 +264,7 @@ jobs:
             "-dTargetTriple=${{ matrix.triple }}" `
             "-dPayloadSha256=$payloadSha256" `
             "-dLauncherSha256=$launcherSha256" `
+            "-dSettingsSha256=$settingsSha256" `
             "-dCargoTargetBinDir=$binDir" `
             "-dSourceRoot=$sourceRoot" `
             -out target\wix\global.wixobj `

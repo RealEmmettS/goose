@@ -78,6 +78,12 @@ impl Accumulator {
         }
         ticks
     }
+
+    /// Time left until the next simulation tick after the last pump. Runtimes subtract
+    /// work performed since that pump rather than starting a new full tick after it.
+    pub fn until_next_tick(&self) -> f64 {
+        (DT as f64 - self.acc).clamp(0.0, DT as f64)
+    }
 }
 
 #[cfg(test)]

@@ -25,7 +25,7 @@ DEPENDENCIES = (
     "libc6 (>= 2.35), "
     "libasound2 | libasound2t64, "
     "libwayland-client0, "
-    "libxkbcommon0"
+    "libxkbcommon0, libgtk-4-1"
 )
 
 
@@ -57,6 +57,7 @@ def build_package_tree(
     if not COMMIT.fullmatch(commit):
         raise ValueError("commit must be a full 40-character hexadecimal SHA")
     binary = _regular_file(binary, "binary")
+    settings = _regular_file(binary.with_name("honk300-settings"), "settings companion")
     if root.exists():
         raise ValueError(f"package staging root already exists: {root}")
 
@@ -64,6 +65,9 @@ def build_package_tree(
     installed.parent.mkdir(parents=True)
     shutil.copyfile(binary, installed)
     installed.chmod(0o755)
+    installed_settings = installed.with_name("honk300-settings")
+    shutil.copyfile(settings, installed_settings)
+    installed_settings.chmod(0o755)
     _write(installed.parent / "install-source.txt", "deb\n")
 
     aliases = root / "usr" / "bin"
@@ -90,6 +94,11 @@ def build_package_tree(
             "name": "usr/lib/honk300/honk300",
             "sha256": payload_hash,
             "size": installed.stat().st_size,
+        },
+        "settings_app": {
+            "name": "honk300-settings",
+            "sha256": hashlib.sha256(installed_settings.read_bytes()).hexdigest(),
+            "size": installed_settings.stat().st_size,
         },
         "install_root": "/usr/lib/honk300",
         "owned_root": "/usr/lib/honk300",
@@ -139,6 +148,8 @@ def build_package_tree(
     license_source = Path(__file__).resolve().parents[1] / "LICENSE"
     documentation = root / "usr" / "share" / "doc" / "honk300"
     documentation.mkdir(parents=True)
+    for notice in ("NATIVE_SDK_LICENSE.txt", "NATIVE_SDK_FONT_LICENSE.txt"):
+        shutil.copyfile(_regular_file(binary.with_name(notice), "SDK notice"), documentation / notice)
     shutil.copyfile(_regular_file(license_source, "license"), documentation / "LICENSE")
     _write(
         root / "usr" / "share" / "doc" / "honk300" / "copyright",

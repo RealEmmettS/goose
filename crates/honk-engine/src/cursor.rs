@@ -70,10 +70,21 @@ impl MouseStealOptions {
 }
 
 /// Runtime appearance/personality options that stay platform-free.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AppearanceOptions {
     /// Master calm valve: suppress autonomous disruption while leaving direct commands live.
     pub calm_goose: bool,
+    pub expressions: bool,
+    pub reduced_motion: bool,
+}
+impl Default for AppearanceOptions {
+    fn default() -> Self {
+        Self {
+            calm_goose: false,
+            expressions: true,
+            reduced_motion: false,
+        }
+    }
 }
 
 /// Runtime options for the platform-free world.

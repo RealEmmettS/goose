@@ -85,6 +85,13 @@ jobs:
             test "$(git rev-parse '${{ inputs.tag }}^{commit}')" = "$(git rev-parse HEAD)"
           fi
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:

@@ -175,18 +175,32 @@ impl FeetState {
         // Trigger the next step: one foot in the air at a time, farthest-lagging first.
         let airborne = self.left.swing.is_some() || self.right.swing.is_some();
         if !airborne {
-            let lag_l = Vec2::distance(self.left.pos, home_l);
-            let lag_r = Vec2::distance(self.right.pos, home_r);
+            // A foot planted ahead is waiting for the body to pass over it. Only
+            // trailing or lateral error requests recovery while moving; absolute
+            // distance would immediately pick up the newly landed leading foot.
+            let recovery_error = |pos, home| {
+                let delta: Vec2 = home - pos;
+                if speed > 1.0 {
+                    let travel = velocity / speed;
+                    Vec2::dot(delta, travel).max(Vec2::dot(delta, travel.perpendicular()).abs())
+                } else {
+                    delta.magnitude()
+                }
+            };
+            let lag_l = recovery_error(self.left.pos, home_l);
+            let lag_r = recovery_error(self.right.pos, home_r);
             let (foot, home, lag) = if lag_l >= lag_r {
                 (&mut self.left, home_l, lag_l)
             } else {
                 (&mut self.right, home_r, lag_r)
             };
             if lag > GAIT_STEP_TRIGGER_DISTANCE {
-                // Aim past home (overshoot) and lead a moving body so the foot lands
-                // where the home will roughly be, not where it was.
+                // Lead through the whole airborne recovery and half the following
+                // stance. Landing ahead of the body lets it roll over the planted
+                // foot; predicting only half the swing made both feet trail behind
+                // the belly during forward walking.
                 let dir = (home - foot.pos).normalize();
-                let target = home + dir * (lag * OVERSHOOT_FRACTION) + velocity * (duration * 0.5);
+                let target = home + dir * (lag * OVERSHOOT_FRACTION) + velocity * (duration * 1.5);
                 foot.swing = Some(Swing {
                     from: foot.pos,
                     to: target,
@@ -318,26 +332,28 @@ mod tests {
     /// foot's world position must not change.
     #[test]
     fn planted_feet_never_slide() {
-        let forward = Vec2::new(1.0, 0.0);
-        let mut center = Vec2::new(100.0, 100.0);
-        let velocity = forward * 80.0;
-        let mut state = FeetState::new(center, forward);
-        let mut prev = state.poses();
-        for _ in 0..240 {
-            center = center + velocity * DT;
-            state.tick(DT, center, forward, velocity, 0.2);
-            let now = state.poses();
-            for (before, after) in prev.iter().zip(now.iter()) {
-                if !before.swinging && !after.swinging {
-                    assert!(
-                        Vec2::distance(before.pos, after.pos) < 1e-4,
-                        "planted foot slid from {:?} to {:?}",
-                        before.pos,
-                        after.pos
-                    );
+        for heading in (0..360).step_by(30) {
+            let forward = Vec2::from_angle_degrees(heading as f32);
+            let mut center = Vec2::new(100.0, 100.0);
+            let velocity = forward * 80.0;
+            let mut state = FeetState::new(center, forward);
+            let mut prev = state.poses();
+            for _ in 0..240 {
+                center = center + velocity * DT;
+                state.tick(DT, center, forward, velocity, 0.2);
+                let now = state.poses();
+                for (before, after) in prev.iter().zip(now.iter()) {
+                    if !before.swinging && !after.swinging {
+                        assert!(
+                            Vec2::distance(before.pos, after.pos) < 1e-4,
+                            "planted foot slid from {:?} to {:?}",
+                            before.pos,
+                            after.pos
+                        );
+                    }
                 }
+                prev = now;
             }
-            prev = now;
         }
     }
 

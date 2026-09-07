@@ -85,6 +85,14 @@ jobs:
         run: cargo clippy --all-targets --workspace -- -D warnings
       - name: Release build
         run: cargo build --release
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build native settings companion
+        run: python script/build_settings.py --target x86_64-pc-windows-msvc --output target/release
       - name: Prove x64 PE identity
         shell: pwsh
         run: |
@@ -133,6 +141,14 @@ jobs:
         run: |
           cargo test --workspace --locked --target aarch64-pc-windows-msvc
           cargo build --release --locked --target aarch64-pc-windows-msvc --bin honk300 --bin honk300-app
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build native settings companion
+        run: python script/build_settings.py --target aarch64-pc-windows-msvc --output target/aarch64-pc-windows-msvc/release
       - name: ARM64 layered-overlay compositor and lifecycle smoke
         shell: pwsh
         run: |
@@ -173,6 +189,12 @@ jobs:
         run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
       - name: Test
         run: cargo test --workspace
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - name: macOS bundle smoke
         run: bash script/smoke_m16_macos.sh
       - name: Archive universal2 app
@@ -211,7 +233,7 @@ jobs:
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y dbus libasound2-dev xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway swaybg grim
+          sudo apt-get install -y dbus libasound2-dev libgtk-4-dev xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway swaybg grim
       - name: Install Rust targets
         run: rustup target add ${{ matrix.gnu_target }} ${{ matrix.musl_target }}
       - name: Test
@@ -221,6 +243,14 @@ jobs:
           dbus-run-session --
           cargo test --locked -p honk-platform-linux --test linux_status_notifier --
           --ignored --test-threads=1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build native settings for Debian lifecycle acceptance
+        run: python3 script/build_settings.py --target ${{ matrix.gnu_target }} --output target/release
       - name: Staged tray-helper Debian update and restart
         if: ${{ matrix.gnu_target == 'x86_64-unknown-linux-gnu' }}
         run: >-

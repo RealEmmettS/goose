@@ -24,27 +24,25 @@ from typing import Iterable, Sequence
 
 
 PALETTE = {
-    "body": (0xED, 0xED, 0xED),
-    "shade": (0xC6, 0xC6, 0xC6),
-    "wing": (0x51, 0x55, 0x57),
+    "body": (252, 252, 246),
+    "shade": (231, 234, 227),
+    "wing": (238, 240, 233),
     "orange": (0xFC, 0x79, 0x27),
     "orange_dark": (0xD1, 0x55, 0x1B),
-    "outline": (0xC9, 0xC9, 0xC9),
+    "outline": (173, 184, 172),
 }
 
-# Conservative floors beneath every committed side-view golden.  They are high
+# Conservative floors beneath the reviewed continuous-rig poses. They are high
 # enough that a few antialiased pixels or an unrelated desktop icon cannot pass.
 PALETTE_MINIMUMS = {
-    "body": 100,
+    "body": 900,
     "shade": 5,
     "wing": 50,
     "orange": 10,
-    "orange_dark": 3,
     "outline": 10,
 }
 
-TOP_DOWN_ORANGE_MINIMUM = 5
-TOP_DOWN_ORANGE_MAXIMUM = 20
+ORANGE_MINIMUM = 5
 
 PRESENTER_MAGIC = b"HONK300_LAYERED_BGRA_V1"
 
@@ -209,76 +207,43 @@ def _classify_pose(
     palette_counts: dict[str, int],
     orange_components: Sequence[dict],
     shadow_pixels: int,
+    gray_pixels: Sequence[int],
+    eye_pixels: Sequence[int],
+    width: int,
 ) -> tuple[str, dict[str, dict[str, bool]]]:
-    """Prove either renderer view without treating a valid top-down pose as damaged.
+    """One anatomy at every yaw, with visible feet and a complete head/neck/body.
 
-    Side view intentionally exposes a separated beak/two-tone leg assembly and a
-    stippled ground shadow. Top-down view intentionally has a single compact beak,
-    no visible legs or ground shadow, a larger wing-to-body ratio, and much less
-    shade. Requiring the full view-specific signature prevents a damaged side view
-    from falling through to the top-down acceptance path.
+    Use spatial structure as well as palette counts. In particular, removing the
+    feet or cropping half the front-facing goose cannot masquerade as an older
+    top-down renderer. Rear headings may occlude the bill; a visible eye requires
+    a separated bill above the body. The shadow is independently reconstructed.
     """
-
-    orange_y_span = (
-        max(component["centroid"][1] for component in orange_components)
-        - min(component["centroid"][1] for component in orange_components)
-        if orange_components
-        else 0.0
-    )
-    side_checks = {
-        "two_tone_orange": (
-            palette_counts["orange"] >= PALETTE_MINIMUMS["orange"]
-            and palette_counts["orange_dark"] >= PALETTE_MINIMUMS["orange_dark"]
+    rows: dict[int, list[int]] = {}
+    for index in gray_pixels:
+        rows.setdefault(index // width, []).append(index % width)
+    if not rows:
+        return "unknown", {"continuous": {"complete_anatomy": False}}
+    top, bottom = min(rows), max(rows)
+    span = bottom - top + 1
+    widths = {y: max(xs) - min(xs) + 1 for y, xs in rows.items()}
+    head_width = max((w for y, w in widths.items() if y < top + span * 0.27), default=0)
+    belly_width = max((w for y, w in widths.items() if y >= top + span * 0.5), default=0)
+    neck_width = min((w for y, w in widths.items() if top + span * 0.29 <= y <= top + span * 0.48), default=0)
+    visible_eyes = any(top + 3 <= i // width <= top + span * 0.30 for i in eye_pixels)
+    has_bill = any(c["pixels"] >= 10 and top <= c["centroid"][1] < top + span * 0.55 for c in orange_components)
+    has_feet = any(bottom - span * 0.15 < c["centroid"][1] < bottom + span * 0.65 for c in orange_components)
+    checks = {
+        "complete_anatomy": (
+            span >= 50 and head_width >= 22 and belly_width >= 30
+            and head_width < span * 0.60 and belly_width >= head_width * 1.15
+            and neck_width >= 8 and neck_width < belly_width * 0.8
+            and palette_counts["body"] >= PALETTE_MINIMUMS["body"]
         ),
-        "visible_beak_and_two_legs": (
-            len(orange_components) >= 2 and orange_y_span >= 15.0
-        ),
-        "semi_transparent_shadow": shadow_pixels >= 5,
+        "visible_feet": has_feet,
+        "bill_when_eyes_visible": not visible_eyes or has_bill,
+        "semi_transparent_shadow": shadow_pixels >= 30,
     }
-    top_down_checks = {
-        "single_compact_beak": (
-            len(orange_components) == 1
-            and TOP_DOWN_ORANGE_MINIMUM
-            <= palette_counts["orange"]
-            <= TOP_DOWN_ORANGE_MAXIMUM
-        ),
-        "no_dark_orange_legs": (
-            palette_counts["orange_dark"] < PALETTE_MINIMUMS["orange_dark"]
-        ),
-        "complete_top_down_palette": (
-            palette_counts["body"] >= 400
-            and palette_counts["wing"] >= 280
-            and palette_counts["outline"] >= 25
-        ),
-        # The committed top-down view dedicates at least 60% as many opaque
-        # palette pixels to its wing as its body. Every committed side view is
-        # below that ratio, even mid-stride.
-        "top_down_wing_body_ratio": (
-            palette_counts["wing"] * 5 >= palette_counts["body"] * 3
-        ),
-        # Top-down uses only a small neck/body shade. Side view has materially
-        # more shade, so this is a second independent view discriminator.
-        "top_down_shade_ratio": (
-            palette_counts["shade"] * 20 <= palette_counts["body"]
-        ),
-        # Removing the lower leg/shadow area from a side frame can otherwise
-        # leave one orange component. Top-down keeps a much smaller beak and
-        # outline share than that damaged side silhouette.
-        "top_down_beak_body_ratio": (
-            palette_counts["orange"] * 40 <= palette_counts["body"]
-        ),
-        "top_down_outline_body_ratio": (
-            palette_counts["outline"] * 8 <= palette_counts["body"]
-        ),
-        "no_ground_shadow": shadow_pixels < 5,
-    }
-    if all(side_checks.values()):
-        pose_kind = "side"
-    elif all(top_down_checks.values()):
-        pose_kind = "top-down"
-    else:
-        pose_kind = "unknown"
-    return pose_kind, {"side": side_checks, "top_down": top_down_checks}
+    return ("continuous" if all(checks.values()) else "unknown"), {"continuous": checks}
 
 
 def analyze_captures(
@@ -300,6 +265,7 @@ def analyze_captures(
     semantic_edge_pixels = 0
     shadow_candidates: list[int] = []
     goose_palette_pixels: list[int] = []
+    eye_pixels: list[int] = []
     orange_mask = [False] * (width * height)
     unchanged_near_black_mask = [False] * (width * height)
     content_mask = [False] * (width * height)
@@ -316,10 +282,12 @@ def analyze_captures(
         if max((*dark, *light)) <= 12 and _close(dark, light, 3):
             unchanged_near_black_mask[index] = True
 
+        if _close(dark, (31, 36, 34), 10) and _close(light, (31, 36, 34), 10):
+            eye_pixels.append(index)
         matches: list[tuple[float, str]] = []
         for name, expected in PALETTE.items():
             if _close(dark, expected, tolerance) and _close(light, expected, tolerance):
-                # Shade (#c6c6c6) and outline (#c9c9c9) are intentionally close.
+                # The restrained shade and wing colors are intentionally close.
                 # Assign one nearest palette owner instead of letting a pixel satisfy
                 # both semantic checks through the shared tolerance.
                 distance = sum(
@@ -359,14 +327,14 @@ def analyze_captures(
                 light[channel] - (1.0 - alpha) * light_background[channel]
             ) / alpha
             reconstructed.append((from_dark + from_light) / 2.0)
-        if 0.15 <= alpha <= 0.85:
+        if 0.15 <= alpha <= 0.85 and max(reconstructed) > 80:
             semantic_edge_candidates += 1
             if any(_close(reconstructed, expected, 20) for expected in PALETTE.values()):
                 semantic_edge_pixels += 1
         if alpha > 0.35:
             continue
         if (
-            # The stipple source is straight #202020 at alpha 42/255. A second
+            # The soft contact shadow uses straight (40, 44, 42). A second
             # accidental premultiplication reconstructs near #050505 and must fail;
             # the wider bounds only accommodate 8-bit compositor rounding at edges.
             all(12.0 <= channel <= 55.0 for channel in reconstructed)
@@ -381,7 +349,7 @@ def analyze_captures(
         height,
         minimum_size=4,
     )
-    # The real stippled ground shadow is below the opaque body/wing/outline palette.
+    # The real soft ground shadow is below the opaque body/wing/outline palette.
     # Restrict reconstruction to that spatial band so a damaged dark antialiased
     # wing edge cannot masquerade as proof that the shadow survived premultiplication.
     opaque_goose_bottom = max(
@@ -396,6 +364,9 @@ def analyze_captures(
         palette_counts,
         orange_components,
         shadow_pixels,
+        goose_palette_pixels,
+        eye_pixels,
+        width,
     )
     total = width * height
     largest_near_black_component = max(
@@ -418,11 +389,10 @@ def analyze_captures(
         "visible_shade": palette_counts["shade"] >= PALETTE_MINIMUMS["shade"],
         "visible_wing": palette_counts["wing"] >= PALETTE_MINIMUMS["wing"],
         "visible_outline": palette_counts["outline"] >= PALETTE_MINIMUMS["outline"],
-        # Both views contain deliberately asymmetric true-orange pixels, so an
-        # R/B bridge swap still fails even though top-down intentionally omits the
-        # dark-orange legs used by the side-view proof.
+        # Every heading retains asymmetric orange feet; visible eyes also
+        # require a bill. An R/B bridge swap fails in every direction.
         "asymmetric_orange_channels": (
-            palette_counts["orange"] >= TOP_DOWN_ORANGE_MINIMUM
+            palette_counts["orange"] >= ORANGE_MINIMUM
         ),
         "semi_transparent_edges": semi_transparent_pixels >= 20,
         "semantic_edge_colors": (
@@ -505,6 +475,7 @@ def analyze_surface(
     semantic_edge_pixels = 0
     invalid_premultiplied_pixels = 0
     opaque_goose_pixels: list[int] = []
+    eye_pixels: list[int] = []
     shadow_candidates: list[int] = []
     orange_mask = [False] * (width * height)
     opaque_near_black_mask = [False] * (width * height)
@@ -527,11 +498,13 @@ def analyze_surface(
             if alpha
             else (0, 0, 0)
         )
-        if 38 <= alpha <= 217:
+        if 38 <= alpha <= 217 and max(straight) > 80:
             semantic_edge_candidates += 1
             if any(_close(straight, expected, 20) for expected in PALETTE.values()):
                 semantic_edge_pixels += 1
 
+        if alpha >= 245 and _close(straight, (31, 36, 34), 10):
+            eye_pixels.append(index)
         matches: list[tuple[float, str]] = []
         if alpha >= 245:
             for name, expected in PALETTE.items():
@@ -575,6 +548,9 @@ def analyze_surface(
         palette_counts,
         orange_components,
         shadow_pixels,
+        opaque_goose_pixels,
+        eye_pixels,
+        width,
     )
     total = width * height
     largest_opaque_near_black_component = max(
@@ -593,7 +569,7 @@ def analyze_surface(
         "visible_wing": palette_counts["wing"] >= PALETTE_MINIMUMS["wing"],
         "visible_outline": palette_counts["outline"] >= PALETTE_MINIMUMS["outline"],
         "asymmetric_orange_channels": (
-            palette_counts["orange"] >= TOP_DOWN_ORANGE_MINIMUM
+            palette_counts["orange"] >= ORANGE_MINIMUM
         ),
         "semi_transparent_edges": semi_transparent_pixels >= 20,
         "semantic_edge_colors": (

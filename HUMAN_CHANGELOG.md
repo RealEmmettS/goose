@@ -31,6 +31,18 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ---
 
+## In development — September 2026
+
+The goose is being fully redrawn with a rounder white body, lighter wings, clearer orange feet and bill, and one continuous turn. Its body follows planted steps, settles after running, opens its bill to honk, and looks pleased when petted. Expressions can be disabled, and a reduced-motion option removes decorative movement.
+
+Drawing now reuses bounded memory and wakes on the next needed tick. A busy Wayland desktop retries the last picture instead of treating an undisplayed frame as complete, including the last clear when quitting. Audio playback now keeps a bounded, recoverable pool of voices. A pointer chase also aims the beak correctly so the goose can finish catching a stationary pointer.
+
+A graphical settings window now groups appearance, behavior, sound, manners and desktop status in one place. The terminal editor remains available. Both editors protect against overwriting changes from another editor, retain unsaved drafts after errors, and only apply saved settings to the goose using that same file. The window and terminal editor can check for updates and open the existing update window.
+
+The new artwork and settings window have development previews and focused checks. Complete desktop, packaging and release qualification is still in progress.
+
+Settings use bold Makira headings and light Makira body text, matching the website direction. Opening settings from the goose's menu edits the file that goose is using. Forward steps now stay planted until the body passes over them, with clearer feet when the goose walks toward or away from you.
+
 ## Latest — July 2026
 
 ### Fixed

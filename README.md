@@ -5,6 +5,14 @@ across real monitor layouts, honks, leaves muddy footprints, reacts to the point
 bounded desktop pranks. Configuration and control stay local through a command-line interface
 and terminal settings screen.
 
+**Refinement in development:** this branch adds a fully redesigned, continuously projected
+goose with new expressions and motion, shared runtime reliability improvements, and a native
+graphical settings companion. `honk300 settings` and tray Configure open that window;
+`honk300 config` retains the TUI. Both edit the same Rust-owned configuration. Native accessibility,
+cross-platform packaging, and release qualification are still in progress; these changes are
+not part of the public stable release below. See [the refinement audit](docs/refinement-audit.md)
+and [ADR 0041](docs/adr/0041-refinement-native-settings-and-continuous-goose.md).
+
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 

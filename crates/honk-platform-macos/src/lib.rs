@@ -307,9 +307,7 @@ mod platform {
                     &NSString::from_str(""),
                 )
             };
-            configure.setToolTip(Some(&NSString::from_str(
-                "Open the Honk300 terminal settings interface",
-            )));
+            configure.setToolTip(Some(&NSString::from_str("Open Honk300 settings")));
             // SAFETY: NSMenuItem does not retain its target, so StatusMenu retains `target` for
             // strictly longer than the item remains installed in the status bar.
             unsafe { configure.setTarget(Some(&target)) };

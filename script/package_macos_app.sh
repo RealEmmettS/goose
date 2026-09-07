@@ -35,11 +35,15 @@ CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 BIN="$MACOS_DIR/honk300"
+SETTINGS_BIN="$MACOS_DIR/honk300-settings"
 
 cd "$ROOT"
 
 cargo build --release --target x86_64-apple-darwin
 cargo build --release --target aarch64-apple-darwin
+
+python3 "$ROOT/script/build_settings.py" --target x86_64-apple-darwin --output "$ROOT/target/settings-macos/x86_64"
+python3 "$ROOT/script/build_settings.py" --target aarch64-apple-darwin --output "$ROOT/target/settings-macos/arm64" --skip-install
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
@@ -49,6 +53,12 @@ lipo -create \
   "$ROOT/target/aarch64-apple-darwin/release/honk300" \
   -output "$BIN"
 chmod 755 "$BIN"
+lipo -create "$ROOT/target/settings-macos/x86_64/honk300-settings" \
+  "$ROOT/target/settings-macos/arm64/honk300-settings" -output "$SETTINGS_BIN"
+chmod 755 "$SETTINGS_BIN"
+lipo "$SETTINGS_BIN" -verify_arch x86_64 arm64
+ditto "$ROOT/target/settings-macos/arm64/NATIVE_SDK_LICENSE.txt" "$RESOURCES_DIR/NATIVE_SDK_LICENSE.txt"
+ditto "$ROOT/target/settings-macos/arm64/NATIVE_SDK_FONT_LICENSE.txt" "$RESOURCES_DIR/NATIVE_SDK_FONT_LICENSE.txt"
 
 ditto "$ROOT/LICENSE" "$RESOURCES_DIR/LICENSE"
 ditto "$ROOT/THIRD_PARTY_ASSETS.md" "$RESOURCES_DIR/THIRD_PARTY_ASSETS.md"
@@ -104,17 +114,21 @@ PLIST
 plutil -lint "$CONTENTS_DIR/Info.plist"
 lipo "$BIN" -verify_arch x86_64 arm64
 if [[ "$IDENTITY" == "-" ]]; then
+  codesign --force --options runtime --sign - "$SETTINGS_BIN"
   codesign --force --options runtime --sign - "$BIN"
   codesign --force --options runtime --sign - "$APP_DIR"
 else
   if [[ -n "$KEYCHAIN" ]]; then
+    codesign --keychain "$KEYCHAIN" --force --options runtime --timestamp --sign "$IDENTITY" "$SETTINGS_BIN"
     codesign --keychain "$KEYCHAIN" --force --options runtime --timestamp --sign "$IDENTITY" "$BIN"
     codesign --keychain "$KEYCHAIN" --force --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
   else
+    codesign --force --options runtime --timestamp --sign "$IDENTITY" "$SETTINGS_BIN"
     codesign --force --options runtime --timestamp --sign "$IDENTITY" "$BIN"
     codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP_DIR"
   fi
 fi
+codesign --verify --strict "$SETTINGS_BIN"
 codesign --verify --strict "$BIN"
 codesign --verify --strict "$APP_DIR"
 

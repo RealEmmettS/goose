@@ -8,7 +8,28 @@
 
 ## To-Do
 
+- [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
+  - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
+- [ ] **Linux props and experimental Raspberry Pi support** - own note/image windows, improve session reporting, and qualify ARM64 labwc packages (needs #rr1) (ms #refine) (owner codex) #rlpi
+- [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi) (ms #refine) (owner codex) #rkde
+- [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
+
 ## Active
+- [ ] **Native SDK graphical settings** - ship a separate Zig settings app backed by Rust validation and retain the TUI (needs #rfnd) (ms #refine) (owner codex) #rgui
+  - [x] Implement revision-aware shared settings persistence and bounded stdio service.
+  - [ ] Build and exercise all five native settings pages.
+  - [ ] Add Check for updates and Update now through the verified existing updater.
+  - [ ] Integrate launch, package identity, signing, update, and uninstall paths.
+- [ ] **Continuous goose rig and expressive behavior** - replace silhouette crossfades, refine motion, and verify actual render sequences (ms #refine) (owner codex) #rart
+  - [ ] Implement continuous projected geometry and meaningful interaction anchors.
+  - [ ] Add bounded task-driven expressions and reduced motion.
+  - [ ] Review motion exports and update independently checked visual fixtures.
+- [ ] **Refinement audit and reliability foundation** - evidence-backed corrections, production-path tests, shared bounded rendering resources, and maintainable lifecycle modules (ms #refine) (owner codex) #rfnd
+  - [ ] Record the audit register and baseline measurements.
+  - [ ] Share bounded canvas reuse and accumulator-aware runtime pacing.
+  - [ ] Replace tests disconnected from production behavior.
+  - [ ] Separate lifecycle responsibilities and shorten current guidance.
+  - [ ] Pass focused regressions and complete local checks.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
