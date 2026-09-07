@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -60,7 +61,18 @@ def main() -> None:
                 "--target", args.target)
         run(npm, "test")
         run(npm, "run", "check")
-    run(npm, "run", "build", "--", "-Dtarget=" + TARGETS[args.target],
+    if "linux" in args.target:
+        expected_arch = args.target.split("-", 1)[0]
+        assert platform.system() == "Linux" and platform.machine().lower() in {
+            "x86_64": {"x86_64", "amd64"}, "aarch64": {"aarch64", "arm64"}
+        }[expected_arch], "GTK settings must build on the matching native Linux architecture"
+        # Keep Zig's native libc/header discovery while avoiding runner-specific
+        # CPU instructions. An explicit Linux target mixes its bundled libc
+        # headers with GTK's system headers and is not a native distro build.
+        target_flags = ["-Dcpu=baseline"]
+    else:
+        target_flags = ["-Dtarget=" + TARGETS[args.target]]
+    run(npm, "run", "build", "--", *target_flags,
         "-Dautomation=" + str(args.automation).lower())
     name = "honk300-settings" + (".exe" if "windows" in args.target else "")
     built = project / "zig-out/bin" / name

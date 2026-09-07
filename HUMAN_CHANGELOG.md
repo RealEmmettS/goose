@@ -39,6 +39,8 @@ Settings now expose their text and controls to Windows accessibility tools, with
 
 ### Behind the scenes
 
+Automated Windows checks now operate settings through the same controls used by accessibility tools, including switches, text fields, and dialogs. Linux builds use the matching system libraries while retaining support for ordinary processors.
+
 Native builds use a consistent compiler and retain the notices for their supporting libraries, making installation checks more dependable across machines.
 
 The goose is being fully redrawn with a rounder white body, lighter wings, clearer orange feet and bill, and one continuous turn. Its body follows planted steps, settles after running, opens its bill to honk, and looks pleased when petted. Expressions can be disabled, and a reduced-motion option removes decorative movement.

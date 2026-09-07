@@ -50,6 +50,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          # The pinned SDK's Windows ARM CLI crashes before spawning Zig.
+          # Use its proven x64 CLI on Windows; target binaries remain native ARM64.
+          architecture: ${{ runner.os == 'Windows' && 'x64' || (startsWith(matrix.target, 'aarch64') && 'arm64' || 'x64') }}
           cache: npm
           cache-dependency-path: settings/package-lock.json
       - uses: actions/setup-python@v6
@@ -79,6 +82,13 @@ jobs:
           python script/smoke_settings.py
           --binary target/${{ matrix.target }}/release/honk300-settings
           --evidence target/settings-ui-evidence
+      - name: Exercise Windows UI Automation provider
+        if: ${{ runner.os == 'Windows' }}
+        shell: powershell
+        run: >-
+          .\script\smoke_settings_accessibility_windows.ps1
+          -Binary target/${{ matrix.target }}/release/honk300-settings.exe
+          -EvidenceDirectory target/settings-ui-evidence/native-uia
       - name: Build production companion with automation disabled
         run: >-
           python script/build_settings.py --target ${{ matrix.target }}
