@@ -5,10 +5,7 @@
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## To-Do
-- [ ] **Fullscreen and do-not-disturb observations** - resolve audit R05 with separately proven platform observations and honest fallback (needs #rfnd) (ms #refine) (owner codex) #prs
-  - [ ] Qualify macOS fullscreen and supported system do-not-disturb observation paths.
-  - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
-  - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
+
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
   - [ ] Complete the separately qualified Sway implementation (needs #rsw).
   - [ ] Complete the separately qualified Hyprland implementation (needs #rhy).
@@ -19,6 +16,10 @@
   - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
 
 ## Active
+- [ ] **Fullscreen and do-not-disturb observations** - resolve audit R05 with separately proven platform observations and honest fallback (needs #rfnd) (ms #refine) (owner codex) #prs
+  - [ ] Qualify macOS fullscreen and supported system do-not-disturb observation paths.
+  - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
+  - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
 - [ ] **Hyprland desktop integration** - separately probe supported native IPC operations and preserve per-operation capability claims (needs #rkde) (ms #refine) (owner codex) #rhy
   - [x] Prove native socket ownership, exact window identity and supported bounded placement.
   - [x] Integrate explicit setup/removal and exercise disconnect, stale identity and terminal refusals.

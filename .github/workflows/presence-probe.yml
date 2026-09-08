@@ -1,0 +1,35 @@
+name: Native presence premise
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/goose-presence-observation]
+    paths: ['script/probe_macos_presence.swift', '.github/workflows/presence-probe.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    name: macOS presence (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Build the native observer and isolated fullscreen fixture
+        run: |
+          mkdir -p target/presence-evidence
+          swiftc script/probe_macos_presence.swift -o target/presence-probe
+      - name: Observe actual fullscreen transitions without requesting permission
+        run: target/presence-probe observe "$PWD/target/presence-evidence"
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: presence-${{ matrix.runner }}
+          path: target/presence-evidence
+          if-no-files-found: warn

@@ -26,6 +26,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Behind the scenes
+- Probe native macOS fullscreen and Focus observations independently from a real app's normal/fullscreen/restored transitions, without requesting permission or inferring fullscreen from geometry.
+
 ## [1.8.0] - 2026-09-08
 
 ### Added

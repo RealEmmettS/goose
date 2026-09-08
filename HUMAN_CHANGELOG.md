@@ -31,6 +31,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ---
 
+## Remaining manners observations — In development
+
+### Behind the scenes
+- Check what macOS can actually tell the goose about fullscreen apps and interrupted notifications before adding support or asking for more access.
+
 ## Hyprland desktop observations — September 2026
 
 ### Added

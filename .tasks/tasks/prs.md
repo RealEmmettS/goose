@@ -20,7 +20,11 @@ The functional bar is honest independent fullscreen/DND status and correct manne
 - [ ] Settings and runtime status agree after permission loss, reload and unsupported-session selection.
 
 ## Status
-Queued. The first stage truthfully reports unsupported Mac/Linux observations. KDE fullscreen is under separate native qualification, while macOS and DND evidence remain open. This task preserves that original audit obligation within the refinement milestone.
+Active. Linux compositor fullscreen now has separate native evidence. Probe actual
+macOS system presentation, window accessibility and Focus authorization from an
+independent accessory process during a private native app's fullscreen transitions.
+Do not request permissions or infer availability from window size.
 
 ## Activity
+- 2026-09-08 — Start a bounded native x64/Apple Silicon API premise using documented system presentation and Focus APIs. Observe actual normal/fullscreen/restored phases from an independent process, record existing authorization without prompting, and retain unavailable APIs honestly before production wiring.
 - 2026-09-08: Made unresolved R05 independently visible while reconciling the completed first-stage audit corrections. No observation or acceptance requirement was waived.
