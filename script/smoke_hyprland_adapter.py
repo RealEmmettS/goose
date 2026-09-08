@@ -277,11 +277,13 @@ def main():
                 native=fullscreen, gtk_size=[windows[0].get_width(), windows[0].get_height()]),
                 indent=2) + '\n')
             if watcher:
-                wait(lambda: (state if (state := watch_current()) and state['observed']
-                    and state['fullscreen'] else None), 'fresh fullscreen after native configure')
-            rust = rust_snapshot('fullscreen')
-            if rust:
-                assert rust['fullscreen']
+                observed = wait(lambda: (state if (state := watch_current()) and state['observed']
+                    and state['fullscreen'] and state['fullscreen_window'] is not None else None),
+                    'fresh fullscreen from the retained production observer')
+                actual = observed['fullscreen_window']
+                assert actual['id'] == ordinary['address'] and actual['pid'] == os.getpid(), actual
+                assert actual['geometry'] == fullscreen['at'] + fullscreen['size'], actual
+                (evidence / 'rust-fullscreen.json').write_text(json.dumps(observed, indent=2) + '\n')
             windows[0].unfullscreen()
             wait(lambda: find(ordinary['title'])['fullscreen'] == 0, 'fullscreen removal')
             if watcher:

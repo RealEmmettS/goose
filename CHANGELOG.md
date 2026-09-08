@@ -26,6 +26,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Behind the scenes
+- Qualify Hyprland fullscreen transitions through the same retained production observer, requiring fresh native window identity, PID and geometry. Preserve direct startup transport and impostor checks; avoid a test-only second version handshake during fullscreen that the runtime never performs.
+
 ### Fixed
 - Preserve an already running authenticated Hyprland worker when repeated setup overlaps transient fullscreen recovery. Keep expired observations unavailable independently from worker ownership, and retain exact native thread diagnostics for revocation qualification.
 
