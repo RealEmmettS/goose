@@ -23,11 +23,19 @@ The functional bar is honest independent fullscreen/DND status and correct manne
 Active. The retained Mac fullscreen worker and separate CLI/TUI/native settings
 status are implemented. Native Intel and Apple Silicon pass actual fullscreen,
 frozen-target expiry/recovery, live settings, unavailable windows, graceful stop
-and the private denied app. Mac/Linux DND stays explicitly unsupported. Integrate
-the shared stopping correction from #rst after the final integrated art finding,
-then repeat native, candidate, main, publication, fresh-public and website gates.
+and the private denied app. Mac/Linux DND stays explicitly unsupported. The complete
+shared stopping/reversal correction from #rst is integrated and passes the local
+workspace and separate settings checks. Native, candidate, main, publication,
+fresh-public and website qualification remain required on this source.
 
 ## Activity
+- 2026-09-08 — Integrate f25e700's corrected airborne prediction, acceleration
+  travel bound, four actual World witnesses and reviewed turn fixtures. Native
+  diagnostic 34280092759 confirms the old failure in actual foot state. Production
+  Mac observation remains unchanged. Formatting, strict workspace lint, complete
+  Rust tests, release build, 138 Python tests (three platform skips), and separate
+  Native SDK test/check/build pass. Repeat native and distribution gates,
+  retaining the GNOME-first public and website order.
 - 2026-09-08 — All four 420dc31 GNOME suites and both native Mac presence suites pass in 34271715326 and 34271715256. Actual newer-ARM delivered-note review exposes a shared stopping-art defect. Cancel candidate 34271817809 and integrate ADR 0050's reproducing engine correction from 2b050ac. Repeat native visual review and complete final-source gates; Mac capability behavior is unchanged.
 - 2026-09-08 — All four e1cfaa7 desktops receive the corrected native drag input; three complete suites pass. The older ARM64 trace cancels its held ride correctly but exposes a production status race: extension disable can be misclassified as durable consent revocation. Integrate c2827ff, whose production regression reproduces and corrects that race, and repeat complete final-source qualification. Mac observation code remains unchanged.
 - 2026-09-08 — Both ARM64 suites pass 34268128789. Both x64 failures occur before the held gesture: no preparatory motion on the older desktop, and no final motion on the newer one, with GTK reporting no pointer over its surface. Keep the private input point off the goose's centered return route, ensure the first point differs from the current pointer and capture Mutter's actual picked surface. Every GTK/Mutter/engine oracle stays required; no product behavior changes.

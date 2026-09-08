@@ -66,15 +66,21 @@ pub struct FootPose {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+struct LandingPrediction {
+    overshoot: Vec2,
+    velocity: Vec2,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 struct Swing {
     from: Vec2,
     to: Vec2,
     /// Progress 0..1.
     t: f32,
     duration: f32,
-    /// A moving landing prediction is withdrawn when locomotion stops.
-    motion_lead: bool,
-    /// Preserve the current position and lift phase when retargeting a stopped swing.
+    /// Fixed overshoot bias and the velocity used for the latest landing prediction.
+    motion_lead: Option<LandingPrediction>,
+    /// Preserve current position and lift phase when withdrawing a stale prediction.
     easing_start: f32,
 }
 
@@ -161,13 +167,29 @@ impl FeetState {
         // Advance any active swing.
         for (foot, home) in [(&mut self.left, home_l), (&mut self.right, home_r)] {
             if let Some(swing) = &mut foot.swing {
-                if speed <= 1.0 && swing.motion_lead {
-                    swing.from = foot.pos;
-                    swing.to = home;
-                    swing.easing_start = smoothstep(swing.t);
-                    swing.motion_lead = false;
+                // A step begun while braking must keep the existing travel cap
+                // when the body accelerates again. Preserve lift progress; only
+                // shorten future progress intervals as actual speed increases.
+                swing.duration = swing.duration.min(duration);
+                let next_t = (swing.t + dt / swing.duration).min(1.0);
+                if let Some(prediction) = &mut swing.motion_lead {
+                    if speed <= 1.0 {
+                        swing.from = foot.pos;
+                        swing.to = home;
+                        swing.easing_start = smoothstep(swing.t);
+                        swing.motion_lead = None;
+                    } else if velocity != prediction.velocity {
+                        // Use actual motion through the remaining swing and half
+                        // the following stance. At steady velocity this is the
+                        // original fixed landing; braking/reversal updates the
+                        // airborne prediction before it can starve the other foot.
+                        swing.to = home
+                            + prediction.overshoot
+                            + velocity * (swing.duration * (1.5 - next_t));
+                        prediction.velocity = velocity;
+                    }
                 }
-                swing.t = (swing.t + dt / swing.duration).min(1.0);
+                swing.t = next_t;
                 let eased = if swing.t >= 1.0 || swing.easing_start >= 1.0 {
                     1.0
                 } else {
@@ -213,13 +235,17 @@ impl FeetState {
                 // foot; predicting only half the swing made both feet trail behind
                 // the belly during forward walking.
                 let dir = (home - foot.pos).normalize();
-                let target = home + dir * (lag * OVERSHOOT_FRACTION) + velocity * (duration * 1.5);
+                let overshoot = dir * (lag * OVERSHOOT_FRACTION);
+                let target = home + overshoot + velocity * (duration * 1.5);
                 foot.swing = Some(Swing {
                     from: foot.pos,
                     to: target,
                     t: 0.0,
                     duration,
-                    motion_lead: speed > 1.0,
+                    motion_lead: (speed > 1.0).then_some(LandingPrediction {
+                        overshoot,
+                        velocity,
+                    }),
                     easing_start: 0.0,
                 });
             }

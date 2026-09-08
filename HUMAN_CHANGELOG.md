@@ -37,7 +37,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Let the Mac goose notice fullscreen apps through its existing desktop permission, while keeping commands responsive if an app stops answering. Show fullscreen and do-not-disturb support separately in every settings interface.
 
 ### Fixed
-- Include the improved stopping motion so the goose settles its feet naturally after delivering a note.
+- Include the improved turning and stopping motion so a quick return with a note does not leave a leg stretched behind the goose.
 - Refresh Windows manners availability after a temporary failure recovers, and show Linux fullscreen support according to the desktop integration that is actually connected.
 - Show a clear temporary failure when a Mac app stops answering, and restore its fullscreen status when it responds again.
 
@@ -55,6 +55,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Bring Linux setup and accessibility guidance up to date, explain the separate status labels, and verify complete public downloads before announcing the update.
 
 ## GNOME desktop observations — September 2026
+
+### Fixed
+- Keep quick turns near a delivered note from leaving one leg stretched behind the goose.
+- Make private desktop checks show how the goose was moving when a picture was captured, so movement problems are easier to reproduce.
 
 ### Added
 - Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.

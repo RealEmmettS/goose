@@ -49,6 +49,12 @@ candidate/main/publication, fresh-public and website qualification repeat on the
 corrected source before any tag is created.
 
 ## Activity
+- 2026-09-08 — Complete local qualification of the shared stopping/reversal
+  correction under ADR 0050: full workspace checks, release, Python, production
+  JavaScript and separate Native SDK checks pass. Actual World witnesses reproduce
+  the remaining native long leg and corrected motion is reviewed. The expanded
+  native diagnostic confirms actual foot-state displacement; repeat all native,
+  candidate, main and public gates on this corrected source before publication.
 - 2026-09-08 — Corrected c2827ff passes all 31 standalone gates, including all four complete GNOME desktops. Integrated run 34271715326 then exposes a shared delivery stopping art defect. Cancel both incomplete candidates; track the reproducing engine correction and native requalification in #rst and ADR 0050 before any tag.
 - 2026-09-08 — Candidate 34265477487 passes all 43 jobs and exact 6ff7611 reaches main. Main 34269778219 passes three desktops but repeats a pre-drag input failure on newer x64. Integrated final-stage run 34269817286 exposes a real disable/query race: the ride cancels, but unchanged consent is misclassified as revoked. A production regression reproduces the wrong status; separate inactive-generation failure from actual consent revocation, adopt strict per-step native input acknowledgments clear of the goose's return route, and repeat complete qualification before creating any tag.
 - 2026-09-08 — Run 34262984345 captures actual new motion inside the native handle while its newly attached controller still reports contains_pointer false because no enter event was replayed. Require the captured motion/enter event within the current handle bounds and current native surface ownership; retain the real grab and all behavior assertions.
