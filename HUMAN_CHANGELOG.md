@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Test the real KDE connection through Rust, including rejected impostor connections, recovery and stopping when access disappears.
 - Connect optional KDE support to checks that reject stale desktop information and cancel pending movement when the connection is disabled; native runtime qualification remains in progress.
 - Account for the older KDE window-list interface after the first real KDE desktop test passed movement and protected-window checks.
 - Let the isolated KDE test wait for the desktop connection to finish starting, and retain clear diagnostics if that connection never becomes ready.

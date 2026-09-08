@@ -32,6 +32,7 @@ All notable changes to this project are documented here. Format based on
 - Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.
 
 ### Development
+- Exercise real authenticated Rust/KWin exchange, actual bounded moves, rejected untrusted D-Bus callers, expiry, explicit reconnect and disable. Pin the script's unique bridge owner and stop on replacement, timeout or malformed responses.
 - Define ADR 0044 and the Rust KWin boundary with pinned same-user D-Bus ownership, strict bounded snapshots, one pending move, terminal/identity/geometry checks, expiry and explicit revocation. Native script feasibility is proven; the runtime connection remains gated on actual transport tests.
 - Use Plasma 5's documented managed-client list when Plasma 6's stacking-order property is unavailable; retain live identity checks without inferring occlusion order from the older API. The first native KDE 6 probe passes real bounded movement and refusals.
 - Wait for KWin's actual D-Bus registration after its earlier Wayland socket creation; capture bus ownership and compositor diagnostics on a bounded timeout before testing the script API.

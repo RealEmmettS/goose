@@ -49,7 +49,7 @@ jobs:
             # Drop that request for this private software-rendered container;
             # do not grant extra container/host privileges just to launch it.
             if test -n "$capabilities"; then setcap -r "$compositor"; fi
-            dbus-run-session -- python3 script/smoke_kwin_companion.py --evidence target/kwin-evidence
+            dbus-run-session -- python3 script/smoke_kwin_companion.py --evidence target/kwin-evidence --bridge target/debug/examples/kwin_bridge_probe
           '
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}

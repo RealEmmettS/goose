@@ -9,6 +9,8 @@
     timer.interval = 50;
     var sequence = 0;
     var pending = false;
+    var pendingSince = 0;
+    var bridgeOwner = null;
     var stopped = false;
     var lastResult = "none";
     var protectedTokens = /^(terminal|console|xterm|uxterm|rxvt|urxvt|alacritty|kitty|foot|ghostty|wezterm|konsole|kgx|tilix|terminator|lxterminal|qterminal|blackbox|ptyxis|rio|code|codex|chatgpt|contour|tabby|warp|zellij|st|terminology|guake|yakuake|tilda|extraterm)$/;
@@ -96,7 +98,13 @@
         return "gone";
     }
     function exchange() {
-        if (stopped || pending) return;
+        if (stopped) return;
+        if (pending) {
+            if (Date.now() - pendingSince >= 250 || Date.now() < pendingSince) {
+                stopped = true; timer.stop();
+            }
+            return;
+        }
         var windows = windowList();
         if (!windows || windows.length > 64) { stopped = true; timer.stop(); return; }
         var frame = {protocol: 1, sequence: ++sequence, windows: [],
@@ -106,9 +114,22 @@
         if (bytes.length > 65536) { stopped = true; timer.stop(); return; }
         pending = true;
         var started = Date.now();
-        callDBus(service, path, iface, "Exchange", bytes, function (reply) {
+        pendingSince = started;
+        callDBus("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "GetNameOwner", service, function (owner) {
+            if (stopped) return;
+            if (typeof owner !== "string" || owner.charAt(0) !== ":" ||
+                (bridgeOwner !== null && bridgeOwner !== owner) ||
+                Date.now() - started >= 250 || Date.now() < started) {
+                stopped = true; timer.stop(); return;
+            }
+            bridgeOwner = owner;
+            // Address the pinned unique owner, never a replacement claiming its name.
+            callDBus(bridgeOwner, path, iface, "Exchange", bytes, function (reply) {
             pending = false;
-            if (stopped || Date.now() - started > 250 || typeof reply !== "string" || reply.length > 4096) return;
+            if (stopped) return;
+            if (Date.now() - started >= 250 || Date.now() < started || typeof reply !== "string" || reply.length > 4096) {
+                stopped = true; timer.stop(); return;
+            }
             try {
                 var message = JSON.parse(reply);
                 if (message.protocol !== 1 || message.sequence !== frame.sequence ||
@@ -116,6 +137,7 @@
                 if (message.stop === true) { stopped = true; timer.stop(); return; }
                 lastResult = message.commands.length ? apply(message.commands[0], frame) : "none";
             } catch (error) { stopped = true; timer.stop(); }
+            });
         });
     }
     timer.timeout.connect(exchange);

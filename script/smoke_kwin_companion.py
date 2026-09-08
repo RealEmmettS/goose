@@ -5,8 +5,51 @@ import argparse
 import json
 import os
 from pathlib import Path
+import selectors
 import subprocess
 import time
+
+
+class RustBridge:
+    def __init__(self, binary, evidence):
+        self.log = (evidence / 'rust-bridge.log').open('a')
+        self.process = subprocess.Popen([str(binary)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log)
+        self.selector = selectors.DefaultSelector()
+        self.selector.register(self.process.stdout, selectors.EVENT_READ)
+        self.buffer = b''
+        assert self.receive() == {'ready': True}
+
+    def receive(self):
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if b'\n' in self.buffer:
+                line, self.buffer = self.buffer.split(b'\n', 1)
+                return json.loads(line)
+            if self.selector.select(0.1):
+                chunk = os.read(self.process.stdout.fileno(), 65536)
+                if not chunk:
+                    raise RuntimeError(f'Rust bridge exited: {self.process.poll()}')
+                self.buffer += chunk
+        raise RuntimeError('Rust bridge response deadline exceeded')
+
+    def request(self, op, **fields):
+        self.process.stdin.write((json.dumps({'op': op, **fields}) + '\n').encode())
+        self.process.stdin.flush()
+        return self.receive()
+
+    def close(self):
+        self.process.stdin.close()
+        try:
+            self.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait()
+            raise
+        finally:
+            self.selector.close()
+            self.process.stdout.close()
+            self.log.close()
+        assert self.process.returncode == 0
 
 
 def main():
@@ -14,6 +57,7 @@ def main():
         raise RuntimeError('Use only a disposable GitHub runner')
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence', type=Path, required=True)
+    parser.add_argument('--bridge', type=Path)
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -156,9 +200,75 @@ def main():
             assert after <= before + 1, (before, after)
             call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'unloadScript',
                  GLib.Variant('(s)', ('honk300-native-probe',)))
+            bus.unregister_object(registration)
+            call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+                 'ReleaseName', GLib.Variant('(s)', ('org.emmetts.Honk300.Wayland',)))
+            if args.bridge:
+                def load_rust_script():
+                    identity = call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'loadScript',
+                        GLib.Variant('(ss)', (script_path, 'honk300-rust-probe'))).unpack()[0]
+                    assert identity >= 0
+                    address = f'/Scripting/Script{identity}' if major >= 6 else f'/{identity}'
+                    call('org.kde.KWin', address, 'org.kde.kwin.Script', 'run')
+
+                def unload_rust_script():
+                    call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'unloadScript',
+                         GLib.Variant('(s)', ('honk300-rust-probe',)))
+
+                bridge = RustBridge(args.bridge.resolve(), evidence)
+                try:
+                    load_rust_script()
+
+                    def rust_window(title):
+                        current = bridge.request('snapshot')['snapshot']
+                        return next((item for item in (current or {}).get('windows', []) if item['title'] == title), None)
+
+                    ordinary = wait(lambda: rust_window('Honk300 ordinary probe'), 'authenticated Rust snapshot')
+                    denied = wait(lambda: rust_window('ChatGPT Codex terminal probe'), 'Rust protected snapshot')
+                    response = bridge.request('move', window=ordinary,
+                                              to=[ordinary['geometry'][0] + 10, ordinary['geometry'][1]])
+                    assert response['ok'], response
+                    moved = wait(lambda: (item if (item := rust_window('Honk300 ordinary probe')) and
+                        item['geometry'][0] == ordinary['geometry'][0] + 10 else None), 'Rust-authorized native move')
+                    assert not bridge.request('move', window=denied,
+                        to=[denied['geometry'][0] + 10, denied['geometry'][1]])['ok']
+                    assert not bridge.request('move', window=moved,
+                        to=[moved['geometry'][0] + 200, moved['geometry'][1]])['ok']
+                    assert not bridge.request('move', window=ordinary,
+                        to=[ordinary['geometry'][0] + 5, ordinary['geometry'][1]])['ok']
+                    try:
+                        call('org.emmetts.Honk300.Wayland', '/org/emmetts/Honk300/KWin',
+                             'org.emmetts.Honk300.KWin1', 'Exchange', GLib.Variant('(s)', (json.dumps(latest),)))
+                    except GLib.Error as error:
+                        assert 'AccessDenied' in str(error), error
+                    else:
+                        raise AssertionError('Untrusted D-Bus peer injected a compositor frame')
+                    assert rust_window('Honk300 ordinary probe'), 'Untrusted peer revoked the valid observer'
+                    (evidence / 'rust-native-snapshot.json').write_text(json.dumps(bridge.request('snapshot'), indent=2) + '\n')
+                    unload_rust_script()
+                    wait(lambda: bridge.request('snapshot')['snapshot'] is None, 'Rust expiry after companion loss')
+                    assert not bridge.request('move', window=moved,
+                        to=[moved['geometry'][0] + 5, moved['geometry'][1]])['ok']
+                finally:
+                    bridge.close()
+                # A new explicitly established connection can recover; old queues do not.
+                bridge = RustBridge(args.bridge.resolve(), evidence)
+                try:
+                    load_rust_script()
+                    recovered = wait(lambda: rust_window('Honk300 ordinary probe'), 'new Rust connection')
+                    assert bridge.request('stop')['ok']
+                    assert bridge.request('snapshot')['snapshot'] is None
+                    assert not bridge.request('move', window=recovered,
+                        to=[recovered['geometry'][0] + 5, recovered['geometry'][1]])['ok']
+                    unload_rust_script()
+                finally:
+                    bridge.close()
+                (evidence / 'rust-result.json').write_text(json.dumps(dict(ok=True,
+                    native_identity=True, bounded_move=True, untrusted_peer_refused=True,
+                    protected_stale_excessive_refused=True, connection_loss_expires=True,
+                    explicit_reconnect=True, stop=True, goose_runtime_connected=False), indent=2) + '\n')
             normal.destroy()
             protected.destroy()
-            bus.unregister_object(registration)
             (evidence / 'result.json').write_text(json.dumps(dict(ok=True, kwin=version,
                 architecture=os.uname().machine, native_identity=True, bounded_move=True,
                 terminal_refused=True, excessive_move_refused=True, stale_refused=True,

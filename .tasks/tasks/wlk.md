@@ -42,6 +42,10 @@ without claiming occlusion order. The repeat native probe remains open, followed
 Rust bridge and setup. No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: The new Rust endpoint compiles and passes strict native Linux checks.
+  Extend the actual compositor probe through that endpoint: real movement, untrusted
+  peer refusal, expired observation, explicit reconnect and stop. Pin the script to
+  one unique bridge owner with a bounded watchdog; native transport results are pending.
 - 2026-09-08: Both native KWin generations pass in run 34189071395. Record ADR 0044;
   implement the bounded Rust state and authenticated session-bus endpoint. Six new
   production-state tests pass locally, with actual native transport qualification next.
