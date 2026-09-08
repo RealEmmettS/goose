@@ -44,6 +44,11 @@ Active. Production correction and reproducing regressions are implemented.
 Native review and both affected releases remain held.
 
 ## Activity
+- 2026-09-08 — Diagnostic run 34278778497 passes all four native suites. All
+  eight first-arrival images and aligned foot traces are normal, so this run
+  does not reproduce or explain the earlier intermittent failure. Extend the
+  private diagnostic branch to twelve deliveries per desktop with a bounded
+  post-arrival capture sequence; keep product behavior and publication held.
 - 2026-09-08 — All four native GNOME suites pass in 34276905894, but newer-ARM
   cycle-zero delivery still shows an overextended leg. Keep publication held;
   capture bounded actual foot/velocity state and screenshot timing in a separate

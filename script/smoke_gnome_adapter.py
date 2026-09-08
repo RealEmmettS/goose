@@ -269,7 +269,7 @@ def main():
                     subprocess.run(['python3', str(Path(__file__).with_name(script)),
                         '--binary', str(binary), '--evidence', str(evidence / label),
                         *capture_arguments, *extra], env=props_environment, stdout=log,
-                        stderr=log, check=True, timeout=300)
+                        stderr=log, check=True, timeout=1200)
             result = dict(ok=True, version=initial['version'], architecture=os.uname().machine,
                 shell_pid=shell.pid, peer_credentials=True, layer_shell=layer_shell,
                 production_runtime=True, xwayland_overlay_ready=True, normal_desktop=True, actual_fixture_move=True, stale_geometry_refused=True,

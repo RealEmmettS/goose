@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## GNOME desktop observations — September 2026
 
+### Behind the scenes
+- Repeat note deliveries on private test desktops to investigate an intermittent stretched leg and inspect how the goose settles after arrival.
+
 ### Added
 - Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
 

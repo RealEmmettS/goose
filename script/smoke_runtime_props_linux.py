@@ -171,6 +171,16 @@ def main():
                 return sum(min(pixel) > 220 for pixel in picture.getdata()) > 25_000 and rendered_note_text(picture)
 
         wait(visible, 'visible native note in the composited desktop', 15)
+        # Diagnostic branch only: retain the first accepted capture, then observe
+        # the same actual desktop as the stopped foot settles. This does not
+        # control the runtime's seed, motion, native placement or timing.
+        for frame in range(8):
+            time.sleep(0.1)
+            capture_started = time.time_ns()
+            subprocess.run([*prefix, str(directory / f'settling-{frame}.png')],
+                           env=capture_environment, check=True, timeout=10)
+            (directory / f'settling-{frame}-time.json').write_text(json.dumps({
+                'started_ns': capture_started, 'finished_ns': time.time_ns()}, indent=2) + '\n')
 
     config = evidence / 'config.toml'
     config.write_text('''goose_config_version = 2
@@ -190,7 +200,7 @@ autumn = false
 ''')
     results = []
     try:
-        for cycle in range(2):
+        for cycle in range(12):
             directory = evidence / f'cycle-{cycle}'
             directory.mkdir()
             with (directory / 'runtime.log').open('w') as log:
