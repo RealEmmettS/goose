@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Exercise the real Rust engine/GTK child connection on a disposable Linux desktop."""
+from __future__ import annotations
+import argparse
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import time
+
+
+def main():
+    if os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('GDK_BACKEND') != 'x11':
+        raise RuntimeError('This probe requires the disposable GitHub X11 desktop')
+    import gi
+    gi.require_version('Atspi', '2.0')
+    from gi.repository import Atspi, GLib
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--binary', type=Path, required=True)
+    parser.add_argument('--evidence', type=Path, required=True)
+    args = parser.parse_args()
+    binary, evidence = args.binary.resolve(), args.evidence.resolve()
+    evidence.mkdir(parents=True, exist_ok=True)
+
+    def control(*arguments, check=True):
+        return subprocess.run([str(binary), *arguments], capture_output=True, text=True, timeout=10, check=check)
+
+    assert control('status', check=False).returncode != 0, 'Another runtime is already active'
+    subprocess.run(['gdbus', 'call', '--session', '--dest', 'org.a11y.Bus', '--object-path', '/org/a11y/bus',
+                    '--method', 'org.freedesktop.DBus.Properties.Set', 'org.a11y.Status', 'IsEnabled', '<true>'], check=True)
+    Atspi.init()
+
+    def wait(check, description, timeout=60):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if result := check():
+                return result
+            time.sleep(0.1)
+        raise RuntimeError(f'Timed out waiting for {description}')
+
+    def nodes(pid):
+        context = GLib.MainContext.default()
+        for _ in range(100):
+            if not context.pending():
+                break
+            context.iteration(False)
+        desktop = Atspi.get_desktop(0)
+        desktop.clear_cache()
+        stack = [desktop.get_child_at_index(i) for i in range(desktop.get_child_count())]
+        stack = [node for node in stack if node and node.get_process_id() == pid]
+        result = []
+        while stack and len(result) < 512:
+            node = stack.pop()
+            node.clear_cache()
+            result.append(node)
+            stack.extend(child for i in range(node.get_child_count()) if (child := node.get_child_at_index(i)))
+        return result
+
+    def delivered_text(pid):
+        for node in nodes(pid):
+            if node.get_name() == 'Note' and (interface := node.get_text_iface()):
+                value = Atspi.Text.get_text(interface, 0, -1)
+                if value.strip():
+                    return value
+        return None
+
+    def owned_windows(pid):
+        result = subprocess.run(['xdotool', 'search', '--onlyvisible', '--pid', str(pid), '--name', '^Honk300 (note|picture)$'], capture_output=True, text=True)
+        return result.stdout.splitlines() if result.returncode == 0 else []
+
+    config = evidence / 'config.toml'
+    config.write_text('''goose_config_version = 2
+[behavior]
+first_wander_time_seconds = 0.0
+[audio]
+enabled = false
+[safety]
+no_mouse_steal = true
+no_window_ride = true
+pause_on_fullscreen = false
+[schedule]
+quiet_hours_enabled = false
+dnd_respect = false
+seasonal = false
+autumn = false
+''')
+    results = []
+    try:
+        for cycle in range(2):
+            directory = evidence / f'cycle-{cycle}'
+            directory.mkdir()
+            with (directory / 'runtime.log').open('w') as log:
+                runtime = subprocess.Popen([str(binary), 'start', '--config', str(config)], stdout=log, stderr=log)
+                host_pid = None
+                try:
+                    wait(lambda: 'collect: supported' in control('status', check=False).stdout, 'real prop readiness')
+                    children = Path(f'/proc/{runtime.pid}/task/{runtime.pid}/children').read_text().split()
+                    candidates = [int(pid) for pid in children if Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')[:2] ==
+                                  [os.fsencode(binary.with_name('honk300-settings')), b'--owned-props']]
+                    assert len(candidates) == 1, candidates
+                    host_pid = candidates[0]
+                    control('do', 'note')
+                    value = wait(lambda: delivered_text(host_pid), 'engine delivery and native note text', 100)
+                    (directory / 'note.txt').write_text(value)
+                    subprocess.run(['import', '-window', 'root', str(directory / 'delivered-note.png')], check=True)
+                    assert owned_windows(host_pid), 'Delivered note has no native window'
+                    assert 'collect: supported' in control('status').stdout
+                    if cycle == 0:
+                        # Simulate the actual owned child disappearing, using a
+                        # descriptor and fresh command identity to avoid PID reuse.
+                        descriptor = os.pidfd_open(host_pid)
+                        try:
+                            assert Path(f'/proc/{host_pid}/cmdline').read_bytes().split(b'\0')[:2] == candidates_argv(binary)
+                            signal.pidfd_send_signal(descriptor, signal.SIGTERM)
+                        finally:
+                            os.close(descriptor)
+                        status = wait(lambda: (value if 'collect: failed' in (value := control('status').stdout) else None), 'failed child capability')
+                        (directory / 'failed-child-status.txt').write_text(status)
+                        assert 'running' in status
+                        refused = control('do', 'note', check=False)
+                        assert 'UNSUPPORTED' in (refused.stdout + refused.stderr).upper()
+                        control('reload')
+                        assert 'collect: failed' in control('status').stdout, 'Reload resurrected the failed child'
+                    control('stop')
+                    assert runtime.wait(timeout=60) == 0
+                    if host_pid:
+                        assert not owned_windows(host_pid)
+                    results.append({'cycle': cycle, 'native_note_text': True, 'owned_child': True,
+                                    'graceful_cleanup': True, 'failed_child_stays_failed': cycle == 0})
+                finally:
+                    if runtime.poll() is None:
+                        control('stop', '--force', check=False)
+                        try:
+                            runtime.wait(timeout=10)
+                        except subprocess.TimeoutExpired:
+                            runtime.kill()
+                            runtime.wait()
+        (evidence / 'result.json').write_text(json.dumps({'ok': True, 'cycles': results}, indent=2) + '\n')
+    finally:
+        Atspi.exit()
+
+
+def candidates_argv(binary):
+    return [os.fsencode(binary.with_name('honk300-settings')), b'--owned-props']
+
+
+if __name__ == '__main__':
+    main()

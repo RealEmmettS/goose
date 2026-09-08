@@ -120,9 +120,9 @@ static void update_geometry(Prop *prop) {
     GdkSurface *surface = surface_for(prop);
     if (!surface || gdk_surface_is_destroyed(surface) || !gdk_surface_get_mapped(surface)) return;
     int x = 0, y = 0;
-    int scale = gdk_surface_get_scale_factor(surface);
-    int width = gdk_surface_get_width(surface) * scale;
-    int height = gdk_surface_get_height(surface) * scale;
+    // Native Wayland engine coordinates are logical; X11 uses physical pixels.
+    int width = gdk_surface_get_width(surface);
+    int height = gdk_surface_get_height(surface);
     if (positioning) {
         Display *display = NULL;
         Window window = owned_xid(prop, &display), child = None;
@@ -220,7 +220,7 @@ static int spawn_prop(Prop *prop, const HonkPropCommand *command) {
     }
     gtk_window_set_child(prop->window, box);
     gtk_widget_realize(GTK_WIDGET(prop->window));
-    int scale = gtk_widget_get_scale_factor(GTK_WIDGET(prop->window));
+    int scale = positioning ? gtk_widget_get_scale_factor(GTK_WIDGET(prop->window)) : 1;
     gtk_window_set_default_size(prop->window, MAX(1, (int)command->width / scale),
                                MAX(1, (int)command->height / scale));
     if (positioning) {

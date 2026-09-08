@@ -2,6 +2,7 @@ use crate::assets;
 use crate::audio;
 use crate::runtime::control_surface;
 use crate::runtime::core::RuntimeCore;
+use crate::runtime::owned_props::Controller as PropController;
 use crate::runtime::{audio_probe_capability, RuntimeOptions};
 use honk_config::{BackendCapability, BackendState, Config, EffectiveOptions};
 use honk_control::{
@@ -13,14 +14,10 @@ use honk_engine::render::{
     render_autumn_leaves, render_footmarks_with_timing, render_hearts, render_pose_with_palette,
     render_sleepies, AutumnRenderLayer,
 };
-use honk_engine::{
-    CollectWindowCommand, CollectWindowPayload, CursorCommand, DesktopLayout, PresenceSnapshot,
-    Rect, Sound, World,
-};
+use honk_engine::{CursorCommand, DesktopLayout, PresenceSnapshot, Rect, Sound, World};
 use honk_platform_linux::{
-    display_collect_window_supported, display_cursor_mischief_supported,
-    display_foreign_window_watch_supported, local_time, presence_supported, DisplayServer, Overlay,
-    OverlayMode, SessionInfo, StatusTray,
+    display_cursor_mischief_supported, display_foreign_window_watch_supported, local_time,
+    presence_supported, DisplayServer, Overlay, OverlayMode, SessionInfo, StatusTray,
 };
 
 pub fn run(
@@ -52,7 +49,24 @@ pub fn run(
 
     let mut cursor_warp = cursor_capability(overlay_mode, display_server);
     let mut window_watch = window_capability(overlay_mode, display_server);
-    let mut collect_window = collect_capability(overlay_mode, display_server);
+    let mut collect_window = BackendCapability::Unsupported;
+    let mut props = if overlay_mode == OverlayMode::Headless {
+        None
+    } else {
+        match PropController::start(overlay_mode == OverlayMode::X11) {
+            Ok(controller) => Some(controller),
+            Err(error) => {
+                if error
+                    .downcast_ref::<std::io::Error>()
+                    .is_none_or(|error| error.kind() != std::io::ErrorKind::NotFound)
+                {
+                    collect_window = BackendCapability::Failed;
+                }
+                eprintln!("honk300: native Linux notes and pictures unavailable ({error})");
+                None
+            }
+        }
+    };
     let presence = presence_capability(display_server);
     let mut audio_capability = BackendCapability::Supported;
 
@@ -101,7 +115,6 @@ pub fn run(
     let mut damage_canvas = DamageCanvas::default();
     const AUDIO_RETRY_INTERVAL: f64 = 5.0;
     let mut next_audio_probe = 0.0;
-    let mut warned_collect = false;
     let mut warned_cursor = false;
 
     println!("honk300: Linux goose control is live. Use `honk300 stop` to send it home.");
@@ -141,6 +154,28 @@ pub fn run(
 
         let frame = core.begin_frame();
 
+        if let Some(controller) = props.as_mut() {
+            match controller.poll() {
+                Ok(()) if controller.ready() && collect_window != BackendCapability::Supported => {
+                    collect_window = BackendCapability::Supported;
+                    world.set_collect_window_supported(true);
+                    world.set_collect_window_positioning(overlay_mode == OverlayMode::X11);
+                    eprintln!(
+                        "honk300: native Linux notes and pictures ready; animated placement: {}",
+                        overlay_mode == OverlayMode::X11
+                    );
+                }
+                Ok(()) => {}
+                Err(error) => {
+                    eprintln!("honk300: native Linux prop connection failed; disabling delivery ({error})");
+                    props = None;
+                    collect_window = BackendCapability::Failed;
+                    world.set_collect_window_supported(false);
+                }
+            }
+        }
+        world.set_collect_window_capacity(props.as_ref().is_some_and(PropController::has_capacity));
+
         while let Some(request) = server.try_recv() {
             match request.command() {
                 ControlCommand::Stop => {
@@ -172,7 +207,6 @@ pub fn run(
                             config = next_config;
                             cursor_warp = cursor_capability(overlay_mode, display_server);
                             window_watch = window_capability(overlay_mode, display_server);
-                            collect_window = collect_capability(overlay_mode, display_server);
                             effective = effective_options(
                                 &config,
                                 &options,
@@ -193,6 +227,13 @@ pub fn run(
                                 audio_capability = audio_probe_capability(audio.is_some());
                             }
                             world.apply_options(effective.world);
+                            world.set_collect_window_positioning(
+                                collect_window == BackendCapability::Supported
+                                    && overlay_mode == OverlayMode::X11,
+                            );
+                            world.set_collect_window_capacity(
+                                props.as_ref().is_some_and(PropController::has_capacity),
+                            );
                             println!("honk300: reload command applied.");
                             ControlResponse::Ok
                         }
@@ -230,21 +271,27 @@ pub fn run(
         let pointer = overlay.pointer_state();
         world.set_pointer(pointer);
         world.set_foreign_window_drag(overlay.foreign_window_drag());
-        world.set_collect_window_snapshot(None);
+        world.set_collect_window_snapshot(props.as_mut().and_then(PropController::snapshot));
         let _ = overlay.set_input_region(Some(world.rig().bounding_box()));
 
         let now = frame.now();
         core.tick(&mut world, frame);
 
-        let collect_commands = world.take_collect_window_commands();
-        if !collect_commands.is_empty() {
-            observe_collect_assets(&assets, collect_commands);
-            world.set_collect_window_supported(false);
-            if !warned_collect {
-                warned_collect = true;
-                eprintln!(
-                    "honk300: Linux collect-window commands are unsupported in this runtime mode."
-                );
+        let collect_display = world
+            .layout()
+            .region_at(world.goose.position)
+            .and_then(|index| world.layout().regions().get(index).copied())
+            .unwrap_or_else(|| overlay.bounds());
+        for command in world.take_collect_window_commands() {
+            if let Some(controller) = props.as_mut() {
+                if let Err(error) = controller.apply(command, &assets, collect_display) {
+                    eprintln!(
+                        "honk300: native Linux prop command failed; disabling delivery ({error})"
+                    );
+                    props = None;
+                    collect_window = BackendCapability::Failed;
+                    world.set_collect_window_supported(false);
+                }
             }
         }
 
@@ -338,23 +385,6 @@ pub fn run(
     }
 }
 
-fn observe_collect_assets(assets: &assets::AssetCatalog, commands: Vec<CollectWindowCommand>) {
-    for command in commands {
-        if let CollectWindowCommand::Spawn { payload, .. } = command {
-            match payload {
-                CollectWindowPayload::Note { index } => {
-                    let _ = assets.note_text(index);
-                }
-                CollectWindowPayload::Meme { index } => {
-                    if let Some(meme) = assets.meme(index) {
-                        let _ = (&meme.title, meme.pixmap.width(), meme.pixmap.height());
-                    }
-                }
-            }
-        }
-    }
-}
-
 fn effective_options(
     config: &Config,
     options: &RuntimeOptions,
@@ -415,14 +445,6 @@ fn window_capability(mode: OverlayMode, session: DisplayServer) -> BackendCapabi
         };
     }
     capability_for(session, display_foreign_window_watch_supported)
-}
-
-fn collect_capability(mode: OverlayMode, session: DisplayServer) -> BackendCapability {
-    if mode == OverlayMode::X11 && display_collect_window_supported(session) {
-        BackendCapability::Supported
-    } else {
-        capability_for(session, display_collect_window_supported)
-    }
 }
 
 fn presence_capability(session: DisplayServer) -> BackendCapability {
@@ -547,7 +569,7 @@ mod tests {
     }
 
     #[test]
-    fn x11_reports_supported_cursor_and_window_but_not_collect() {
+    fn x11_reports_supported_cursor_and_window() {
         assert_eq!(
             cursor_capability(OverlayMode::X11, DisplayServer::X11),
             BackendCapability::Supported
@@ -555,10 +577,6 @@ mod tests {
         assert_eq!(
             window_capability(OverlayMode::X11, DisplayServer::X11),
             BackendCapability::Supported
-        );
-        assert_eq!(
-            collect_capability(OverlayMode::X11, DisplayServer::X11),
-            BackendCapability::Unsupported
         );
     }
 

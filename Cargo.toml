@@ -118,6 +118,7 @@ rodio = "0.20"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 honk-platform-linux = { path = "crates/honk-platform-linux" }
+base64 = "0.22"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

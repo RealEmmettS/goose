@@ -1304,6 +1304,7 @@ dependencies = [
 name = "honk300"
 version = "1.4.0"
 dependencies = [
+ "base64",
  "clap",
  "crossterm",
  "embed-resource",

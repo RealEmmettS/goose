@@ -27,9 +27,10 @@ Evidence: locked Rust tests and native GTK builds plus at least two real deliver
 - [ ] GNU/musl architecture builds preserve CLI/TUI availability and reject broken companion/protocol inputs.
 
 ## Status
-Active in the isolated `codex/goose-linux-expansion` checkout. Architecture and admission implementation are starting; no Linux prop capability is yet implemented or advertised.
+Active in the isolated `codex/goose-linux-expansion` checkout. Native GNU x64/ARM64 note, capacity, move, close and EOF checks pass. Rust runtime integration is implemented and awaits its first native build/delivery/failure test; image pixels and native Wayland qualification remain open. Nothing is published.
 
 ## Activity
+- 2026-09-07: Both native GNU host cycles passed at 35829c9, including Unicode text, capacity, owned movement, Close, recovery and EOF cleanup. Screenshot review found capture before the image's first paint; add a complete four-quadrant pixel oracle. Implemented Rust retained-child/nonblocking protocol, runtime readiness/failure/admission and logical Wayland sizing, with real engine-delivery/child-loss CI next.
 - 2026-09-07: Native tree and screenshot evidence isolated the unavailable Close action to GTK announcing the button's multiplication symbol despite its separate label. Make Close the visible button text as well, retaining the exact native action oracle before another run.
 - 2026-09-07: Embedded-font GNU builds and text/capacity/movement checks pass, but native Close activation was unavailable on both architectures. Added bounded action-tree and screenshot diagnostics before another attempt, plus a real header drag handle and Cairo-owned pixel lifetime. Rust transport work is local only and does not advertise support before the native gate passes.
 - 2026-09-07: Both GNU probes now pass native Unicode text, capacity refusal with retained contents and actual owned movement. The close fixture used XDestroyWindow through xdotool, bypassing GTK close handling and causing a GDK assertion. Replaced it with the real owned GTK Close accessibility action and retain malformed protocol diagnostics. Added embedded approved fonts and bounded dispatch before the next native repeat.

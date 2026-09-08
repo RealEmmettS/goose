@@ -152,6 +152,36 @@ def main():
         subprocess.run(['import', '-window', 'root', str(host.directory / 'failed-close.png')], check=True)
         raise RuntimeError('Native owned Close action is unavailable')
 
+    def capture_complete_picture(host):
+        from PIL import Image
+        colors = [(255, 255, 0), (0, 255, 0), (255, 0, 0), (0, 0, 255)]
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            path = host.directory / 'desktop.png'
+            subprocess.run(['import', '-window', 'root', str(path)], check=True)
+            with Image.open(path).convert('RGB') as image:
+                points = {color: [] for color in colors}
+                for y in range(image.height):
+                    for x in range(image.width):
+                        color = image.getpixel((x, y))
+                        if color in points:
+                            points[color].append((x, y))
+            if all(len(points[color]) > 100 for color in colors):
+                boxes = [(min(x for x, y in points[color]), min(y for x, y in points[color]),
+                          max(x for x, y in points[color]), max(y for x, y in points[color])) for color in colors]
+                yellow, green, red, blue = boxes
+                assert abs(yellow[0] - red[0]) <= 1 and abs(green[0] - blue[0]) <= 1, boxes
+                assert abs(yellow[1] - green[1]) <= 1 and abs(red[1] - blue[1]) <= 1, boxes
+                widths = [box[2] - box[0] + 1 for box in boxes]
+                heights = [box[3] - box[1] + 1 for box in boxes]
+                assert max(widths) - min(widths) <= 2 and max(heights) - min(heights) <= 2, boxes
+                width, height = blue[2] - yellow[0] + 1, blue[3] - yellow[1] + 1
+                assert abs(width / height - 1.5) < 0.04 and width <= 180 and height <= 120, boxes
+                (host.directory / 'picture-pixels.json').write_text(json.dumps({'quadrants': boxes, 'width': width, 'height': height}) + '\n')
+                return
+            time.sleep(0.1)
+        raise RuntimeError('The complete picture never appeared in the native capture')
+
     results = []
     try:
         for cycle in range(2):
@@ -191,7 +221,7 @@ def main():
                           pixel_width=180, pixel_height=120, title='All four corners', pixels=base64.b64encode(pixels).decode())
                 picture = host.window(11)
                 assert picture['width'] <= 180 and picture['height'] <= 154
-                subprocess.run(['import', '-window', 'root', str(host.directory / 'desktop.png')], check=True)
+                capture_complete_picture(host)
                 host.send('shutdown')
                 assert host.process.wait(timeout=10) == 0
                 assert not native_windows(host.process.pid)
