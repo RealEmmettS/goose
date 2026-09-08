@@ -43,6 +43,7 @@ preserve = "untouched"
     runtime = ui = None
     logs = []
     states = []
+    thread_states = []
 
     def launch(executable, label, *arguments):
         path = directory / f'{label}-{len(logs)}.log'
@@ -73,8 +74,17 @@ preserve = "untouched"
         return result
 
     def workers():
-        return sorted(p.parent.name for p in Path(f'/proc/{runtime.pid}/task').glob('*/comm')
-                      if p.read_text().strip() == 'hyprland-observer'[:15])
+        threads = []
+        for path in Path(f'/proc/{runtime.pid}/task').glob('*/comm'):
+            try:
+                name = path.read_text().strip()
+                if name == 'hyprland-observer'[:15]:
+                    threads.append(dict(id=path.parent.name, name=name,
+                        stat=(path.parent / 'stat').read_text()))
+            except FileNotFoundError:
+                continue
+        thread_states.append(dict(at=time.monotonic(), threads=threads))
+        return sorted(thread['id'] for thread in threads)
 
     def nodes():
         assert ui.poll() is None, f'Settings exited with {ui.returncode}'
@@ -122,7 +132,7 @@ preserve = "untouched"
         assert not record.exists() and not status()['installed']
         runtime, runtime_log = launch(binary, 'runtime', 'start', '--config', str(config), '--wayland')
         expect('unsupported', 'default-off observations')
-        assert not workers()
+        assert not workers(), thread_states[-1]
         ui, _ = launch(settings, 'settings', '--config', str(config))
         wait(lambda: find('First wander (seconds)'), 'actual loaded settings')
         invoke('Appearance')
@@ -173,12 +183,12 @@ preserve = "untouched"
         invoke('Platform & status')
         invoke('Remove Hyprland observations')
         expect('unsupported', 'native settings revokes live observations')
-        assert not workers() and not record.exists()
+        assert not workers() and not record.exists(), thread_states[-1]
         control('integrations', 'hyprland', 'setup')
         expect('supported', 'explicit CLI setup')
         record.unlink()
         expect('unsupported', 'external consent removal')
-        assert not workers()
+        assert not workers(), thread_states[-1]
         control('integrations', 'hyprland', 'setup')
         expect('supported', 'new consent after external removal')
         # Replace only this disposable compositor's IPC pathname. The overlay
@@ -231,6 +241,7 @@ preserve = "untouched"
             no_automatic_reconnect=True, graceful_restart=True, crash_restart=True,
             stopped_removal=True, unrelated_state_preserved=True), indent=2) + '\n')
     finally:
+        (directory / 'worker-identities.json').write_text(json.dumps(thread_states, indent=2) + '\n')
         (directory / 'observed-states.json').write_text(json.dumps(states, indent=2) + '\n')
         if ui is not None and ui.poll() is None:
             (directory / 'native-settings-tree.json').write_text(json.dumps([

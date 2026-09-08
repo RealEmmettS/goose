@@ -26,6 +26,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Fixed
+- Preserve an already running authenticated Hyprland worker when repeated setup overlaps transient fullscreen recovery. Keep expired observations unavailable independently from worker ownership, and retain exact native thread diagnostics for revocation qualification.
+
 ### Added
 - Connect explicit Hyprland setup/removal across Rust CLI, versioned IPC, the native Wayland runtime and Native SDK consent dialogs. Keep independent private consent, immediate revocation, unsaved drafts, unsupported action boundaries and engine fullscreen manners; qualify the actual binaries in both native compositor generations.
 

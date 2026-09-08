@@ -110,6 +110,13 @@ impl<S: Source> Observer<S> {
     pub fn failed(&self) -> bool {
         self.state.lock().map_or(true, |state| state.failed)
     }
+    /// A recovering or connecting worker still owns its authenticated source.
+    /// Snapshot freshness determines capability, not permission to replace it.
+    pub fn running(&self) -> bool {
+        self.worker
+            .as_ref()
+            .is_some_and(|worker| !worker.is_finished())
+    }
 }
 
 impl<S: Source> Drop for Observer<S> {
