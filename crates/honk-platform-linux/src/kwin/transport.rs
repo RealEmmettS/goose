@@ -67,6 +67,55 @@ pub struct Bridge {
 }
 
 impl Bridge {
+    /// Reclaim only the caller's persisted random registration after its runtime
+    /// has gone away. Owning SERVICE proves a previous bridge cannot still act.
+    pub fn retire_inactive_owned_script(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let connection = connection::Builder::session()?
+            .method_timeout(MAX_AGE)
+            .build()?;
+        let bus = Proxy::new(
+            &connection,
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
+            "org.freedesktop.DBus",
+        )?;
+        let present: bool = bus.call("NameHasOwner", &(KWIN,))?;
+        if !present {
+            return Ok(());
+        }
+        Self::connect()?.retire_owned_script(name)
+    }
+
+    /// The caller must obtain this exact name from its validated private consent
+    /// record. Never enumerate registrations or remove a name inferred from a prefix.
+    pub fn retire_owned_script(&self, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if self.script.is_some()
+            || name.len() != 40
+            || !name.starts_with("honk300-")
+            || !name[8..].bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err("Invalid persisted companion identity".into());
+        }
+        let owner = self
+            .state
+            .lock()
+            .map_err(|_| "KWin state unavailable")?
+            .owner
+            .clone();
+        let connection = self.connection.as_ref().ok_or("KWin connection closed")?;
+        let scripting = Proxy::new(
+            connection,
+            owner.as_str(),
+            "/Scripting",
+            "org.kde.kwin.Scripting",
+        )?;
+        let loaded: bool = scripting.call("isScriptLoaded", &(name,))?;
+        if loaded && !scripting.call::<_, _, bool>("unloadScript", &(name,))? {
+            return Err("KWin could not retire the previous owned companion".into());
+        }
+        Ok(())
+    }
+
     pub fn connect() -> Result<Self, Box<dyn std::error::Error>> {
         let discovery = connection::Builder::session()?
             .method_timeout(MAX_AGE)

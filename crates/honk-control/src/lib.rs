@@ -7,8 +7,10 @@
 mod platform;
 mod protocol;
 mod session;
+mod wayland;
 
 pub use session::{DesktopBackend, DesktopEnvironment, SessionStatus};
+pub use wayland::WaylandStatus;
 
 pub use platform::CommandServer;
 pub use platform::{

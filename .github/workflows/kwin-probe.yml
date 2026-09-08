@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [codex/goose-wayland-integrations]
-    paths: ['integrations/kwin/**', 'crates/honk-platform-linux/**', 'Cargo.lock', 'script/smoke_kwin*', '.github/workflows/kwin-probe.yml']
+    paths: ['integrations/kwin/**', 'crates/**', 'src/**', 'Cargo.lock', 'script/smoke_kwin*', '.github/workflows/kwin-probe.yml']
 
 permissions:
   contents: read
@@ -27,9 +27,13 @@ jobs:
           toolchain: '1.95'
       - name: Build and check the actual Rust KWin boundary
         run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libasound2-dev
           cargo test --locked -p honk-platform-linux --lib
-          cargo clippy --locked -p honk-platform-linux --all-targets -- -D warnings
+          cargo test --locked --bin honk300 integrations
+          cargo clippy --locked --workspace --all-targets -- -D warnings
           cargo build --locked -p honk-platform-linux --example kwin_bridge_probe
+          cargo build --locked --bin honk300
       - name: Exercise the real isolated compositor and script
         env:
           HONK_DISTRIBUTION: ${{ matrix.distribution }}
@@ -41,7 +45,7 @@ jobs:
             apt-get update
             DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
               kwin-wayland dbus-x11 python3 python3-gi gir1.2-gtk-4.0 libgtk-4-1 \
-              libgl1-mesa-dri mesa-utils wayland-utils libcap2-bin
+              libgl1-mesa-dri mesa-utils wayland-utils libcap2-bin libasound2t64
             dpkg-query -W > target/kwin-evidence/packages.txt
             compositor="$(command -v kwin_wayland)"
             capabilities="$(getcap "$compositor")"
@@ -50,7 +54,7 @@ jobs:
             # Drop that request for this private software-rendered container;
             # do not grant extra container/host privileges just to launch it.
             if test -n "$capabilities"; then setcap -r "$compositor"; fi
-            dbus-run-session -- python3 script/smoke_kwin_companion.py --evidence target/kwin-evidence --bridge target/debug/examples/kwin_bridge_probe
+            dbus-run-session -- python3 script/smoke_kwin_companion.py --evidence target/kwin-evidence --bridge target/debug/examples/kwin_bridge_probe --goose target/debug/honk300
           '
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}

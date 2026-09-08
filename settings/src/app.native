@@ -21,6 +21,15 @@
         <if test="{isPlatform}">
           <text wrap="true">{runtime}</text>
           <button disabled="{busy}" on-press="refresh">Refresh status</button>
+          <if test="{integration_supported}">
+            <separator/>
+            <text size="lg"><span weight="bold">Optional KDE integration</span></text>
+            <text wrap="true">{integrationStatus}</text>
+            <row gap="8">
+              <button disabled="{not canSetupKde}" on-press="kde_setup">Set up KDE</button>
+              <if test="{kde_installed}"><button disabled="{busy}" on-press="kde_remove">Remove KDE integration</button></if>
+            </row>
+          </if>
           <separator/>
           <text wrap="true">{updateStatus}</text>
           <row gap="8">
@@ -71,6 +80,18 @@
     <dialog on-dismiss="keep_draft" label="Unsaved changes" width="460" height="170">
       <column gap="16" padding="24"><text wrap="true">Reloading will discard your unsaved changes.</text><row gap="8"><button on-press="keep_draft">Keep editing</button><button variant="destructive" on-press="discard">Discard and reload</button></row></column>
     </dialog>
+    </column>
+  </if>
+  <if test="{kde_prompt}">
+    <column main="center" cross="center">
+      <dialog on-dismiss="kde_cancel" label="Enable KDE integration" width="520" height="320">
+        <column gap="16" padding="24">
+          <text size="lg"><span weight="bold">Connect the goose to KDE</span></text>
+          <text wrap="true">Enable window observation, window rides, fullscreen awareness and bounded window movement for this user. Terminal windows remain protected. Pointer control needs a separate portal permission.</text>
+          <text wrap="true">Use native Wayland on KDE to connect. You can remove this integration here at any time. Other desktop integrations and startup settings stay separate.</text>
+          <row gap="8"><button on-press="kde_cancel">Cancel</button><button variant="primary" on-press="kde_confirm">Enable KDE integration</button></row>
+        </column>
+      </dialog>
     </column>
   </if>
 </stack>

@@ -42,6 +42,11 @@ pub struct StartOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
 pub enum Command {
+    /// Set up or remove an explicitly enabled desktop integration.
+    Integrations {
+        #[command(subcommand)]
+        integration: Integration,
+    },
     /// Start the goose. This is also the default when no command is provided.
     Start {
         #[command(flatten)]
@@ -119,6 +124,22 @@ pub enum Command {
         #[command(flatten)]
         options: StartOptions,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
+pub enum Integration {
+    /// Optional KDE window support. Pointer permission is separate.
+    Kde {
+        #[arg(value_enum, default_value = "status")]
+        action: IntegrationAction,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum IntegrationAction {
+    Setup,
+    Remove,
+    Status,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

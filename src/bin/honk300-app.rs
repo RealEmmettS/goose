@@ -176,7 +176,12 @@ fn probe_runtime() -> RuntimeProbe {
         {
             RuntimeProbe::Transient
         }
-        Ok(ControlResponse::Ok | ControlResponse::Err(_) | ControlResponse::Session(_))
+        Ok(
+            ControlResponse::Ok
+            | ControlResponse::Err(_)
+            | ControlResponse::Session(_)
+            | ControlResponse::Wayland(_),
+        )
         | Err(_) => RuntimeProbe::Fatal,
     }
 }

@@ -1,6 +1,6 @@
 #![cfg_attr(not(windows), allow(dead_code))]
 
-use crate::SessionStatus;
+use crate::{SessionStatus, WaylandStatus};
 use honk_engine::{PokeAction, PokeOutcome};
 use std::error::Error;
 use std::fmt;
@@ -16,6 +16,9 @@ pub enum ControlCommand {
     ReloadIf([u8; 32]),
     Status,
     Session,
+    WaylandStatus,
+    KwinEnable,
+    KwinDisable,
     Do(PokeAction),
 }
 
@@ -25,6 +28,7 @@ pub enum ControlResponse {
     Err(String),
     Status(RuntimeStatus),
     Session(SessionStatus),
+    Wayland(WaylandStatus),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,6 +116,9 @@ impl ControlCommand {
             Self::Reload => format!("{VERSION} RELOAD\n"),
             Self::Status => format!("{VERSION} STATUS\n"),
             Self::Session => format!("{VERSION} SESSION\n"),
+            Self::WaylandStatus => format!("{VERSION} WAYLAND\n"),
+            Self::KwinEnable => format!("{VERSION} KWIN_ENABLE\n"),
+            Self::KwinDisable => format!("{VERSION} KWIN_DISABLE\n"),
             Self::Do(action) => format!("{VERSION} DO {}\n", encode_action(action)),
         }
     }
@@ -132,6 +139,14 @@ impl ControlCommand {
             return Err(ProtocolError::UnknownCommand);
         };
         match command {
+            "WAYLAND" | "KWIN_ENABLE" | "KWIN_DISABLE" => {
+                ensure_end(parts)?;
+                Ok(match command {
+                    "WAYLAND" => Self::WaylandStatus,
+                    "KWIN_ENABLE" => Self::KwinEnable,
+                    _ => Self::KwinDisable,
+                })
+            }
             "STOP" => {
                 ensure_end(parts)?;
                 Ok(Self::Stop)
@@ -196,6 +211,7 @@ impl ControlResponse {
             Self::Err(code) => format!("ERR {code}\n"),
             Self::Status(status) => status.encode(),
             Self::Session(session) => session.encode(),
+            Self::Wayland(status) => status.encode(),
         }
     }
 
@@ -222,6 +238,7 @@ impl ControlResponse {
             }
             Some("STATUS") => RuntimeStatus::decode(parts).map(Self::Status),
             Some("SESSION") => SessionStatus::decode(parts).map(Self::Session),
+            Some("WAYLAND") => WaylandStatus::decode(parts).map(Self::Wayland),
             _ => Err(ProtocolError::MalformedResponse),
         }
     }

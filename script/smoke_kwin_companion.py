@@ -59,6 +59,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--bridge', type=Path)
+    parser.add_argument('--goose', type=Path)
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -67,6 +68,7 @@ def main():
     config = evidence / 'config'
     config.mkdir()
     environment = dict(os.environ, XDG_RUNTIME_DIR=str(runtime), XDG_CONFIG_HOME=str(config),
+        XDG_DATA_HOME=str(evidence / 'data'),
         XDG_CURRENT_DESKTOP='KDE', XDG_SESSION_TYPE='wayland', QT_QPA_PLATFORM='offscreen',
         KWIN_COMPOSE='Q', LIBGL_ALWAYS_SOFTWARE='true', GDK_BACKEND='wayland')
     environment.pop('DISPLAY', None)
@@ -369,6 +371,9 @@ def main():
                     other_desktop_refused=True, actual_user_drag_observed=True,
                     sealed_rust_activation=True, owned_script_cleanup=True,
                     goose_runtime_connected=False), indent=2) + '\n')
+            if args.goose:
+                from smoke_kwin_runtime import qualify
+                qualify(args.goose.resolve(), evidence, wait, call, GLib)
             normal.destroy()
             protected.destroy()
             (evidence / 'result.json').write_text(json.dumps(dict(ok=True, kwin=version,

@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Added
+- Add optional KDE setup and removal in graphical settings and the command line. The goose remembers your choice separately from unsaved settings, stops using access when it is removed, and cleans up its own companion after stopping.
+
+### Added
 - The goose can bring notes and pictures on Linux. Compatible desktops animate deliveries, while Wayland chooses where to place them. Settings explain the active desktop capabilities, and new guidance covers experimental Raspberry Pi desktop use.
 
 ### Behind the scenes

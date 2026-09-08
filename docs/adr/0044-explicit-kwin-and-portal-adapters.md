@@ -1,7 +1,7 @@
 # ADR 0044: explicit and revocable native Wayland adapters
 
 Date: 2026-09-08
-Status: accepted design; native KWin script premise qualified, runtime/setup work in progress
+Status: accepted design; native KWin bridge qualified, runtime/setup qualification in progress
 
 ## Context
 
@@ -40,6 +40,15 @@ implementation of the Rust boundary, not a public capability claim.
   result promotes another adapter. Pi hardware performance remains unverified.
 
 ## Qualification
+
+Explicit setup stores the exact companion bytes and a random registration identity in a
+bounded private user record beside the existing configuration. Permission state is separate
+from an unsaved settings draft. Updated script bytes require explicit setup again; the
+record retains its registration identity so crash recovery can retire that exact stopped
+script. The runtime loads sealed bytes, removes its registration on graceful exit, and
+rechecks the saved grant while running. Removal deletes only that record and registration.
+Normal uninstall retains user data as before; purge follows the existing user-data policy.
+No global KWin package, autostart entry or foreign script is installed or removed.
 
 Run the same script and Rust bridge against actual native KDE 5/6 fixture windows. Cover
 untrusted D-Bus peers, changed titles/processes/geometry, vanished windows, window overload,

@@ -26,6 +26,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- Add explicit KDE setup/removal through CLI and Native SDK settings, with private consent, sealed companion loading, live Rust runtime capabilities, owned-only crash recovery and immediate IPC revocation. Keep portal control, DND and native prop positioning unsupported pending separate implementation and qualification.
+
 ### Development
 - Release the temporary KWin introspection proxy before selecting its owned script path; native Linux compilation caught the borrowed path lifetime before activation could run.
 - Load the explicitly authorized KWin companion from a retained sealed memfd, reject duplicate registrations, and unload only the runtime-owned script on drop. All four native KDE architecture/version lanes now pass fullscreen, other-desktop, user-drag and reconnect boundaries; qualify sealed activation next.

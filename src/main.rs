@@ -9,6 +9,7 @@ mod control_surface_update;
 #[cfg(not(windows))]
 mod debian;
 mod install;
+mod integrations;
 mod runtime;
 mod settings;
 mod update;
@@ -99,6 +100,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::Config { config }) => run_config(config),
         Some(Command::Settings { config }) => settings::launch(config).map_err(Into::into),
         Some(Command::SettingsService { config }) => settings::run(config),
+        Some(Command::Integrations { integration }) => {
+            let result = match integration {
+                cli::Integration::Kde {
+                    action: cli::IntegrationAction::Setup,
+                } => integrations::setup()?,
+                cli::Integration::Kde {
+                    action: cli::IntegrationAction::Remove,
+                } => integrations::remove()?,
+                cli::Integration::Kde {
+                    action: cli::IntegrationAction::Status,
+                } => integrations::status(),
+            };
+            println!("{}", serde_json::to_string_pretty(&result)?);
+            Ok(())
+        }
         Some(Command::Install { autostart }) => install::install(autostart),
         Some(Command::Uninstall { purge }) => install::uninstall(purge),
         Some(Command::Update { json, check }) => {
@@ -139,6 +155,7 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::Do { action }) => ControlCommand::Do(action.into_engine()),
         Some(
             Command::Start { .. }
+            | Command::Integrations { .. }
             | Command::Settings { .. }
             | Command::SettingsService { .. }
             | Command::Config { .. }
@@ -200,7 +217,9 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(())
         }
-        ControlResponse::Session(_) => Err("honk300: unexpected session response.".into()),
+        ControlResponse::Session(_) | ControlResponse::Wayland(_) => {
+            Err("honk300: unexpected session response.".into())
+        }
     }
 }
 

@@ -43,6 +43,8 @@ enum Operation {
     Stop {},
     CheckUpdates {},
     Update {},
+    KdeSetup {},
+    KdeRemove {},
 }
 
 pub(crate) fn run(path: Option<PathBuf>) -> Result<(), Error> {
@@ -118,7 +120,11 @@ fn execute(operation: Operation, path: &Path) -> Result<Value, Error> {
             crate::install::reconcile_config_autostart(config.lifecycle.autostart_on_login)
                 .map_err(|error| error.to_string())
         }),
-        Operation::Status {} => Ok(json!({"runtime": runtime_json()})),
+        Operation::Status {} => {
+            Ok(json!({"runtime": runtime_json(), "integrations": crate::integrations::status()}))
+        }
+        Operation::KdeSetup {} => crate::integrations::setup(),
+        Operation::KdeRemove {} => crate::integrations::remove(),
         Operation::Start {} => {
             let message = honk_config_tui::start_from_config(path)?;
             Ok(json!({"message": message, "runtime": runtime_json()}))
@@ -152,6 +158,7 @@ fn read_settings(
     let snapshot = ConfigSnapshot::load(path)?;
     let mut value = snapshot_json(&snapshot);
     value["runtime"] = runtime();
+    value["integrations"] = crate::integrations::status();
     Ok(value)
 }
 

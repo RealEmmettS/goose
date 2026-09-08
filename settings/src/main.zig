@@ -45,7 +45,7 @@ const fonts = [_]SettingsApp.FontRegistration{
 };
 const Buffer = canvas.TextBuffer;
 const Page = enum { general, appearance, behavior, sound, platform };
-const Action = enum { read, save, validate, status, start, stop, check_updates, update };
+const Action = enum { read, save, validate, status, start, stop, check_updates, update, kde_setup, kde_remove };
 
 pub const Field = struct {
     index: usize = 0,
@@ -103,6 +103,10 @@ pub const Msg = union(enum) {
     refresh,
     start,
     stop,
+    kde_setup,
+    kde_confirm,
+    kde_cancel,
+    kde_remove,
     completed: native_sdk.EffectExit,
     system_appearance: native_sdk.Appearance,
     pub const view_unbound = .{ "completed", "system_appearance" };
@@ -110,7 +114,7 @@ pub const Msg = union(enum) {
 
 pub const Model = struct {
     // Used by derived view methods or the stdio lifecycle, never bound directly.
-    pub const view_unbound = .{ "fields", "field_count", "page", "service", "config_path", "revision", "version", "status_buffer", "runtime_buffer", "update_buffer", "loaded", "request_id", "editing", "edit_buffer", "update_available", "update_managed", "system_appearance" };
+    pub const view_unbound = .{ "fields", "field_count", "page", "service", "config_path", "revision", "version", "status_buffer", "runtime_buffer", "update_buffer", "integration_buffer", "loaded", "request_id", "editing", "edit_buffer", "update_available", "update_managed", "system_appearance" };
     system_appearance: native_sdk.Appearance = .{},
     fields: [64]Field = @splat(.{}),
     field_count: usize = 0,
@@ -130,6 +134,17 @@ pub const Model = struct {
     discard_prompt: bool = false,
     update_available: bool = false,
     update_managed: bool = false,
+    integration_buffer: Buffer(2048) = .{},
+    integration_supported: bool = false,
+    kde_installed: bool = false,
+    kde_prompt: bool = false,
+
+    pub fn integrationStatus(m: *const Model) []const u8 {
+        return m.integration_buffer.text();
+    }
+    pub fn canSetupKde(m: *const Model) bool {
+        return m.integration_supported and !m.busy;
+    }
 
     pub fn status(m: *const Model) []const u8 {
         return m.status_buffer.text();
@@ -239,6 +254,13 @@ pub fn update(model: *Model, msg: Msg, fx: *Effects) void {
             submit(model, .save, fx);
         },
         .refresh => submit(model, .status, fx),
+        .kde_setup => if (model.canSetupKde()) { model.kde_prompt = true; },
+        .kde_cancel => model.kde_prompt = false,
+        .kde_confirm => if (model.canSetupKde()) {
+            model.kde_prompt = false;
+            submit(model, .kde_setup, fx);
+        },
+        .kde_remove => if (model.canSetupKde()) { submit(model, .kde_remove, fx); },
         .check_updates => submit(model, .check_updates, fx),
         .update_now => if (model.canUpdate()) {
             submit(model, .update, fx);
@@ -386,6 +408,22 @@ pub fn acceptResponse(model: *Model, bytes: []const u8) !void {
         model.update_available = flag(updates, "available");
         model.update_managed = flag(updates, "managed");
         model.update_buffer.set(string(updates, "message"));
+    }
+    if (data.object.get("integrations")) |integrations| {
+        model.integration_supported = flag(integrations, "supported");
+        model.kde_installed = flag(integrations, "installed");
+        const detail = string(integrations, "description");
+        if (integrations == .object) {
+            if (integrations.object.get("capabilities")) |caps| {
+                if (caps == .object) {
+                    model.integration_buffer.set(try std.fmt.allocPrint(allocator,
+                        "{s}\nWindow observation: {s} | Movement: {s}\nPointer observation: {s} | Control: {s}\nFullscreen: {s} | Do not disturb: {s}\nAnimated prop placement: {s}", .{
+                        detail, string(caps, "windows"), string(caps, "movement"), string(caps, "pointer_observation"),
+                        string(caps, "pointer_control"), string(caps, "fullscreen"), string(caps, "dnd"), string(caps, "prop_positioning"),
+                    }));
+                } else model.integration_buffer.set(detail);
+            } else model.integration_buffer.set(detail);
+        }
     }
     const message = string(data, "message");
     const warning = string(data, "warning");

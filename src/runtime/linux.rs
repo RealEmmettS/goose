@@ -44,6 +44,11 @@ pub fn run(
     };
     let overlay_mode = overlay.mode();
     let display_server = overlay.display_server();
+    let mut kwin = if overlay_mode == OverlayMode::Wayland {
+        crate::integrations::KwinRuntime::start()
+    } else {
+        crate::integrations::KwinRuntime::default()
+    };
     eprintln!(
         "honk300: Linux {} runtime active; overlay mode is {:?}.",
         display_server.label(),
@@ -181,6 +186,29 @@ pub fn run(
 
         while let Some(request) = server.try_recv() {
             match request.command() {
+                ControlCommand::WaylandStatus => {
+                    request.respond(ControlResponse::Wayland(kwin.status()));
+                }
+                ControlCommand::KwinEnable => {
+                    let response = if overlay_mode != OverlayMode::Wayland {
+                        ControlResponse::Err("UNSUPPORTED".into())
+                    } else {
+                        match kwin.enable() {
+                            Ok(()) => ControlResponse::Ok,
+                            Err(error) => {
+                                eprintln!("honk300: KDE activation failed ({error})");
+                                ControlResponse::Err("ADAPTER_FAILED".into())
+                            }
+                        }
+                    };
+                    request.respond(response);
+                }
+                ControlCommand::KwinDisable => {
+                    kwin.disable();
+                    world.set_foreign_window_watch_supported(false);
+                    world.set_foreign_window_drag(None);
+                    request.respond(ControlResponse::Ok);
+                }
                 ControlCommand::Stop => {
                     println!("honk300: stop command received.");
                     request.respond(ControlResponse::Ok);
@@ -297,10 +325,35 @@ pub fn run(
         }
 
         world.set_local_time(local_time());
-        world.set_presence(PresenceSnapshot::unsupported());
-        let pointer = overlay.pointer_state();
+        let kwin_frame = kwin.poll();
+        window_watch = if kwin_frame.is_some() {
+            BackendCapability::Supported
+        } else {
+            window_capability(overlay_mode, display_server)
+        };
+        world.set_foreign_window_watch_supported(window_watch.active());
+        world.set_presence(match kwin_frame.as_ref() {
+            Some(frame) if frame.fullscreen() => PresenceSnapshot::fullscreen(),
+            Some(_) => PresenceSnapshot::available(),
+            None => PresenceSnapshot::unsupported(),
+        });
+        let mut pointer = overlay.pointer_state();
+        if let Some(frame) = &kwin_frame {
+            let pos = honk_engine::Vec2::new(frame.pointer[0] as f32, frame.pointer[1] as f32);
+            // KWin supplies position only. Retain a native button observation only
+            // when the overlay itself observed that same point.
+            pointer.left_down =
+                pointer.left_down && pointer.present && (pointer.pos - pos).length() < 1.0;
+            pointer.pos = pos;
+            pointer.present = world.layout().region_at(pos).is_some();
+        }
         world.set_pointer(pointer);
-        world.set_foreign_window_drag(overlay.foreign_window_drag());
+        world.set_foreign_window_drag(
+            kwin_frame
+                .as_ref()
+                .and_then(|frame| kwin.dragged(frame))
+                .or_else(|| overlay.foreign_window_drag()),
+        );
         world.set_collect_window_snapshot(props.as_mut().and_then(PropController::snapshot));
         let _ = overlay.set_input_region(Some(world.rig().bounding_box()));
 

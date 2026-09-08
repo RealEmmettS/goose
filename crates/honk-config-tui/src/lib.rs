@@ -188,9 +188,11 @@ fn handle_command(
                             Ok(ControlResponse::Err(code)) => {
                                 result(format!("saved; reload rejected: {code}"), true, true)
                             }
-                            Ok(ControlResponse::Status(_) | ControlResponse::Session(_)) => {
-                                result("saved; unexpected status response", true, true)
-                            }
+                            Ok(
+                                ControlResponse::Status(_)
+                                | ControlResponse::Session(_)
+                                | ControlResponse::Wayland(_),
+                            ) => result("saved; unexpected status response", true, true),
                             Err(error)
                                 if matches!(
                                     error.kind(),
@@ -229,9 +231,11 @@ fn handle_command(
             Ok(ControlResponse::Err(code)) => {
                 result(format!("reload rejected: {code}"), true, false)
             }
-            Ok(ControlResponse::Status(_) | ControlResponse::Session(_)) => {
-                result("reload got unexpected status", true, false)
-            }
+            Ok(
+                ControlResponse::Status(_)
+                | ControlResponse::Session(_)
+                | ControlResponse::Wayland(_),
+            ) => result("reload got unexpected status", true, false),
             Err(err) => result(format!("reload failed: {err}"), true, false),
         },
         TuiCommand::Status => match send_command(ControlCommand::Status) {
@@ -251,7 +255,7 @@ fn handle_command(
                 }
                 result
             }
-            Ok(ControlResponse::Session(_)) => {
+            Ok(ControlResponse::Session(_) | ControlResponse::Wayland(_)) => {
                 result("status got unexpected session detail", true, false)
             }
             Ok(ControlResponse::Ok) => result("status got unexpected ok", true, false),
@@ -276,17 +280,21 @@ fn handle_command(
                 Err(err) => result(format!("stop stalled: {err}"), true, false),
             },
             Ok(ControlResponse::Err(code)) => result(format!("stop rejected: {code}"), true, false),
-            Ok(ControlResponse::Status(_) | ControlResponse::Session(_)) => {
-                result("stop got unexpected status", true, false)
-            }
+            Ok(
+                ControlResponse::Status(_)
+                | ControlResponse::Session(_)
+                | ControlResponse::Wayland(_),
+            ) => result("stop got unexpected status", true, false),
             Err(err) => result(format!("stop failed: {err}"), true, false),
         },
         TuiCommand::Poke(action) => match send_command(ControlCommand::Do(action)) {
             Ok(ControlResponse::Ok) => result(format!("poke sent: {action:?}"), false, false),
             Ok(ControlResponse::Err(code)) => result(format!("poke rejected: {code}"), true, false),
-            Ok(ControlResponse::Status(_) | ControlResponse::Session(_)) => {
-                result("poke got unexpected status", true, false)
-            }
+            Ok(
+                ControlResponse::Status(_)
+                | ControlResponse::Session(_)
+                | ControlResponse::Wayland(_),
+            ) => result("poke got unexpected status", true, false),
             Err(err) => result(format!("poke failed: {err}"), true, false),
         },
         TuiCommand::Start => handle_start_with_hook(app, start_from_config, save_hook),
@@ -371,7 +379,9 @@ where
             Ok(ControlResponse::Status(_)) => "runtime reported not running".into(),
             Ok(ControlResponse::Err(code)) => format!("status rejected: {code}"),
             Ok(ControlResponse::Ok) => "status returned an unexpected OK".into(),
-            Ok(ControlResponse::Session(_)) => "status returned unexpected session detail".into(),
+            Ok(ControlResponse::Session(_) | ControlResponse::Wayland(_)) => {
+                "status returned unexpected session detail".into()
+            }
             Err(err) => {
                 let message = err.to_string();
                 if !matches!(
