@@ -24,7 +24,8 @@
 
 ## Active
 - [ ] **Sway desktop integration** - explicit native window support with bounded owned-prop placement and exact-version evidence (needs #rkde) (ms #refine) (owner codex) #rsw
-  - [ ] Prove the authenticated native socket, window identity and actual bounded placement premise.
+  - [x] Prove the authenticated native socket, window identity and actual bounded placement premise.
+  - [ ] Resolve authoritative user-drag exclusion before advertising animated delivery.
   - [ ] Integrate explicit Rust and native settings setup/removal with cancellation and terminal protection.
   - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
 - [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) #rkde

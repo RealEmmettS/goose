@@ -25,7 +25,19 @@ its website guidance follow all project-required candidate/main and public-byte 
 ## Evidence
 Authoritative protocol: https://github.com/swaywm/sway/blob/master/sway/sway-ipc.7.scd
 It specifies the native socket framing, tree identities, application PIDs, visible geometry
-and command responses. Exact installed compositor versions and native behavior remain unverified.
+and command responses.
+
+Native run https://github.com/RealEmmettS/goose/actions/runs/34212710026 passes on
+Sway 1.9 (Ubuntu 24.04) and 1.10.1 (Debian trixie), each on x64 and ARM64. Actual
+socket peer credentials match the privately launched compositor and Unix user. Native
+fixture windows expose their real PID, application identity and floating geometry;
+the exact owned target moves six pixels while the protected fixture stays unchanged.
+Fullscreen enters/exits and the closed fixture disappears from the live tree.
+
+The native tree/seat results and upstream IPC documentation expose no authoritative
+active user-drag state. Window movement is therefore only a native operation premise;
+it does not yet qualify animated deliveries. Resolve that safety boundary explicitly
+before production movement. Pointer authority remains separately unsupported.
 
 ## Verification
 - [ ] Actual supported Sway versions on x64/ARM64 pass native movement and refusal scenarios.
@@ -33,13 +45,13 @@ and command responses. Exact installed compositor versions and native behavior r
 - [ ] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Active native premise. A disposable unprivileged Sway process on both Linux architectures
-and two distributions must expose its actual socket credentials, own-window PID and
-application identity, bounded six-pixel movement, fullscreen state and disappearance.
+Active. The initial socket/window/fullscreen premise passed all four native lanes.
 The production adapter, live user-drag evidence and pointer authority remain unimplemented.
 Publication remains ordered after the qualified KDE release.
 
 ## Activity
+- 2026-09-08 — Record all four native premise results, including the unresolved user-drag
+  observation boundary. Do not promote raw movement support into a production capability.
 - 2026-09-08 — Begin the isolated native socket/window premise with fixed reply bounds,
   native peer credentials and no modification of the user's compositor configuration.
 - 2026-09-08 — Split the approved follow-on scope into a separately verifiable adapter task.
