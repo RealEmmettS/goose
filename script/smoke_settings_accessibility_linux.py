@@ -134,6 +134,10 @@ def main() -> None:
         invoke("Save & apply")
         wait(lambda: "no_mouse_steal = true" in config.read_text() and "can_attack_mouse = false" in config.read_text(), "saved full-page changes")
         invoke("Platform & status")
+        wait(lambda: any("Goose: stopped" in node.get_name()
+                         and "Fullscreen observation: unprobed" in node.get_name()
+                         and "Do not disturb: unprobed" in node.get_name() for node in tree()),
+             "independent native fullscreen and do-not-disturb status")
         disabled = wait(lambda: find("Update now", Atspi.Role.PUSH_BUTTON), "disabled update button")
         if disabled.get_state_set().contains(Atspi.StateType.ENABLED) or disabled.get_state_set().contains(Atspi.StateType.SENSITIVE):
             raise RuntimeError("Disabled Update now was reported as enabled or sensitive")
@@ -142,7 +146,7 @@ def main() -> None:
             raise RuntimeError("Disabled Update now exposed an action")
         (evidence / "result.json").write_text(json.dumps({
             "schema": "honk300.settings-atspi-smoke.v1", "ok": True,
-            "checks": ["native-names", "action", "toggle-state", "text-interface", "focus", "keyboard-edit", "modal-isolation", "save-readback", "largest-dirty-page", "disabled-button-state"],
+            "checks": ["native-names", "action", "toggle-state", "text-interface", "focus", "keyboard-edit", "modal-isolation", "save-readback", "largest-dirty-page", "disabled-button-state", "independent-presence-status"],
         }, indent=2) + "\n", encoding="utf-8")
     except Exception:
         (evidence / "failed-tree.json").write_text(json.dumps([

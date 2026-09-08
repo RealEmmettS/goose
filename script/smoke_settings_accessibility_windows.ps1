@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory = $true)][string] $EvidenceDirectory
 )
 
-# Run on disposable hosted Windows desktops. This uses the OS UIA provider,
+# Use an isolated configuration on a Windows desktop. This uses the OS UIA provider,
 # independently of Native SDK's internal automation tree and input protocol.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -111,11 +111,20 @@ try {
     Invoke-Named 'Save & apply'
     Wait-Saved
     Wait-For { $text = Get-Content -LiteralPath $config -Raw; $text -match 'no_mouse_steal = true' -and $text -match 'can_attack_mouse = false' } 'the saved full-page changes'
+    Invoke-Named 'Platform & status'
+    Wait-For {
+        $window.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition) | Where-Object {
+            $_.Current.Name -match 'Goose: stopped' -and $_.Current.Name -match 'Fullscreen observation: unprobed' -and $_.Current.Name -match 'Do not disturb: unprobed'
+        } | Select-Object -First 1
+    } 'independent native fullscreen and do-not-disturb status'
+    $window.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition) | ForEach-Object {
+        [ordered]@{ name = $_.Current.Name; type = $_.Current.ControlType.ProgrammaticName; enabled = $_.Current.IsEnabled }
+    } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'platform-status-tree.json') -Encoding utf8
     [ordered]@{
         schema = 'honk300.settings-uia-smoke.v1'
         binary = $binaryPath
         ok = $true
-        checks = @('native-names', 'invoke-pattern', 'toggle-pattern', 'value-pattern', 'modal-isolation', 'save-readback', 'largest-dirty-page')
+        checks = @('native-names', 'invoke-pattern', 'toggle-pattern', 'value-pattern', 'modal-isolation', 'save-readback', 'largest-dirty-page', 'independent-presence-status')
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'result.json') -Encoding utf8
 } finally {
     if ($null -ne $process) {

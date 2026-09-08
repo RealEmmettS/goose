@@ -51,6 +51,8 @@ jobs:
         run: target/presence-probe observe "$PWD/target/presence-evidence"
       - name: Exercise actual fullscreen, live settings, interrupted target and graceful shutdown
         run: python3 script/smoke_macos_presence.py --binary target/release/honk300 --fixture target/presence-probe --evidence target/presence-evidence/runtime
+      - name: Prove denied observations from a private uninstalled app identity
+        run: python3 script/smoke_macos_presence_denied.py --binary target/release/honk300 --evidence target/presence-evidence/denied
       - name: Probe documented Focus authorization in a private bundle
         if: ${{ inputs.focus_premise == true }}
         run: |
