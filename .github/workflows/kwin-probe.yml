@@ -1,0 +1,42 @@
+name: Native KWin companion
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/goose-wayland-integrations]
+    paths: ['integrations/kwin/**', 'script/smoke_kwin*', '.github/workflows/kwin-probe.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: KWin (${{ matrix.distribution }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: ['ubuntu:24.04', 'debian:trixie-slim']
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Exercise the real isolated compositor and script
+        env:
+          HONK_DISTRIBUTION: ${{ matrix.distribution }}
+        run: |
+          docker run --rm -e GITHUB_ACTIONS -v "$PWD:/work" -w /work "$HONK_DISTRIBUTION" bash -euc '
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+              kwin-wayland dbus-x11 python3 python3-gi gir1.2-gtk-4.0 libgtk-4-1 \
+              libgl1-mesa-dri mesa-utils wayland-utils
+            mkdir -p target/kwin-evidence
+            dpkg-query -W > target/kwin-evidence/packages.txt
+            dbus-run-session -- python3 script/smoke_kwin_companion.py --evidence target/kwin-evidence
+          '
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: kwin-${{ strategy.job-index }}
+          path: target/kwin-evidence
+          if-no-files-found: warn

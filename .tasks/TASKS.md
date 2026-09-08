@@ -3,7 +3,6 @@
 ## Backlog
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
 - [ ] **Portable Wayland observation and portal spike** - probe staging toplevel identity plus explicit XDG Remote Desktop/libei cursor capability without claiming geometry/move parity; terminal protection and revocation are hard gates (needs #a6e) #wlp
-- [ ] **KDE native Wayland companion** - prototype a user-enabled KWin script and authenticated same-user bridge for exact window geometry, move-state, bounded movement, topology, and terminal-negative enforcement (needs #a6e) #wlk
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## To-Do
@@ -11,10 +10,14 @@
   - [x] Qualify native ARM64 labwc placement, scaling and dependency/standalone behavior.
   - [x] Document experimental Pi 4/5 setup and the physical acceptance boundary.
   - [ ] Integrate the first release and complete every platform/package/public-byte gate.
-- [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi) (ms #refine) (owner codex) #rkde
+- [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) #rkde
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
 
 ## Active
+- [ ] **KDE native Wayland companion** - implement the explicitly enabled KWin bridge and prove exact identities, bounded movement, terminal exclusions and revocation (needs #a6e) (ms #refine) (owner codex) #wlk
+  - [ ] Prove the real KWin script API and owned test-window movement on KDE 5/6.
+  - [ ] Connect the authenticated bounded Rust bridge and live runtime capabilities.
+  - [ ] Add explicit setup/removal and failure/revocation tests.
 - [ ] **Linux owned prop implementation** - bounded native note/image windows and honest compositor placement in an isolated follow-on checkout (ms #refine) (owner codex) #lpr
   - [x] Bound owned prop admission and preserve existing notes when the capacity is full.
   - [x] Implement the companion protocol and native GTK note/image host.
