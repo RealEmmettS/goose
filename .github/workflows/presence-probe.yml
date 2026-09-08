@@ -13,6 +13,7 @@ jobs:
   macos:
     name: macOS presence (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 3
     strategy:
       fail-fast: false
       matrix:

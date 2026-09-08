@@ -63,10 +63,12 @@ if mode == "fixture" {
     child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
     child.arguments = ["fixture", evidence.path]
     try child.run()
+    DispatchQueue.global().asyncAfter(deadline: .now() + 32) { exit(3) }
     var samples: [[String: Any]] = []
     var ended = false
     let started = Date()
     let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
+        write(["stage": "timer"], "observer-stage.json")
         if let data = try? Data(contentsOf: evidence.appendingPathComponent("fixture.json")),
            let fixture = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             let presentation = app.currentSystemPresentationOptions
@@ -89,11 +91,13 @@ if mode == "fixture" {
                 "ax_fullscreen_error": fullscreenError.rawValue,
                 "ax_fullscreen": (fullscreenValue as? NSNumber) ?? NSNull()]
             if #available(macOS 12, *) {
+                write(["stage": "focus", "phase": fixture["phase"] ?? NSNull()], "observer-stage.json")
                 let center = INFocusStatusCenter.default
                 sample["focus_authorization"] = center.authorizationStatus.rawValue
                 sample["focus_is_focused"] = center.focusStatus.isFocused ?? NSNull()
             }
             samples.append(sample)
+            write(["stage": "sampled", "sample": sample], "observer-stage.json")
             if fixture["phase"] as? String == "done" { ended = true }
         }
         if ended || !child.isRunning || Date().timeIntervalSince(started) > 28 {
@@ -103,7 +107,7 @@ if mode == "fixture" {
             write(["completed": ended, "architecture": ProcessInfo.processInfo.machineArchitecture,
                    "os": ProcessInfo.processInfo.operatingSystemVersionString,
                    "samples": samples], "observation.json")
-            NSApplication.shared.stop(nil)
+            exit(ended ? 0 : 1)
         }
     }
     withExtendedLifetime(timer) { app.run() }
