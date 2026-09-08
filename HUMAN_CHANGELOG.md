@@ -40,6 +40,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Refresh Windows manners availability after a temporary failure recovers, and show Linux fullscreen support according to the desktop integration that is actually connected.
 
 ### Behind the scenes
+- Check every fullscreen transition and the private test window's final completion so a window closing during an observation cannot produce a misleading test result.
 - Check that assistive software can read fullscreen and do-not-disturb availability separately, and test the Mac goose when desktop permission is denied.
 - Keep Linux-only uninstall checks out of the Mac build so the full Mac code can pass stricter validation.
 - Check the Mac-specific implementation on a native Mac build and distinguish lost desktop permission from an app that stops answering.

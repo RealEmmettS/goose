@@ -169,12 +169,34 @@ if mode == "focus" {
         }
         if ended || !child.isRunning || Date().timeIntervalSince(started) > 28 {
             timer.invalidate()
+            // The child writes completion before terminating. It can finish
+            // during the AX query after the earlier phase read, so read that
+            // atomic record once more before evaluating the final observation.
+            if let data = try? Data(contentsOf: evidence.appendingPathComponent("fixture.json")),
+               let final = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                ended = final["phase"] as? String == "done" &&
+                    final["pid"] as? Int32 == child.processIdentifier
+            }
             if child.isRunning { child.terminate() }
             child.waitUntilExit()
-            write(["completed": ended, "architecture": ProcessInfo.processInfo.machineArchitecture,
+            let states = [("normal", false), ("fullscreen", true), ("restored", false)]
+            let verified = states.allSatisfy { phase, fullscreen in
+                samples.contains { sample in
+                    guard let fixture = sample["fixture"] as? [String: Any] else { return false }
+                    return fixture["phase"] as? String == phase &&
+                        fixture["native_fullscreen"] as? Bool == fullscreen &&
+                        sample["fixture_is_frontmost"] as? Bool == true &&
+                        sample["accessibility_trusted"] as? Bool == true &&
+                        sample["ax_fullscreen"] as? Bool == fullscreen &&
+                        sample["ax_fullscreen_error"] as? Int32 == 0
+                }
+            }
+            let completed = ended && verified
+            write(["completed": completed, "fixture_completed": ended, "transitions_verified": verified,
+                   "architecture": ProcessInfo.processInfo.machineArchitecture,
                    "os": ProcessInfo.processInfo.operatingSystemVersionString,
                    "samples": samples], "observation.json")
-            exit(ended ? 0 : 1)
+            exit(completed ? 0 : 1)
         }
     }
     withExtendedLifetime(timer) { app.run() }

@@ -33,6 +33,7 @@ All notable changes to this project are documented here. Format based on
 - Recover Windows notification-observation status after a successful poll follows an error, and expose the current Linux compositor fullscreen capability independently of unsupported DND observation.
 
 ### Behind the scenes
+- Re-read the private Mac fixture's atomic completion record after a final AX query and require matching native/observed normal, fullscreen and restored states before accepting the API premise.
 - Check separate presence labels through real Windows UI Automation and Linux AT-SPI, and qualify denied Mac runtime observations in a private uninstalled LaunchServices bundle without granting permission.
 - Limit Debian uninstall identity helpers to Linux so the native Mac strict lint gate covers the complete workspace without unused platform code.
 - Correct native Mac binding signatures at the real target build and retain permission withdrawal separately from an observation timeout.
