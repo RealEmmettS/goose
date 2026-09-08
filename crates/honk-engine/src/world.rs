@@ -652,6 +652,14 @@ impl World {
     /// Owned toplevels may be supported without global positioning (Wayland).
     /// This does not grant any foreign-window or pointer capability.
     pub fn set_collect_window_positioning(&mut self, animated: bool) {
+        if !animated
+            && self.options.collect_window.capabilities.move_window
+            && self.is_collect_window_active()
+        {
+            self.pending_collect_window_commands
+                .retain(|command| !matches!(command, CollectWindowCommand::Move { .. }));
+            self.abandon_collect_window();
+        }
         self.options.collect_window.capabilities.move_window = animated;
         self.options.collect_window.capabilities.set_passthrough = animated;
     }
@@ -3722,6 +3730,45 @@ mod tests {
                 CollectWindowCommand::Close { id }
             ]
         );
+    }
+
+    #[test]
+    fn lost_prop_positioning_cancels_pending_motion_and_preserves_the_note() {
+        let mut world = world_with_collect(28);
+        assert_eq!(world.poke(PokeAction::Note), PokeOutcome::Applied);
+        world.tick();
+        let request = match world.take_collect_window_commands().as_slice() {
+            [CollectWindowCommand::Spawn { request, .. }] => *request,
+            other => panic!("unexpected commands: {other:?}"),
+        };
+        let id = CollectWindowId(7);
+        world.set_collect_window_snapshot(Some(CollectWindowSnapshot {
+            id,
+            request,
+            kind: CollectWindowKind::Note,
+            rect: Rect::new(Vec2::new(300.0, 200.0), Vec2::new(500.0, 320.0)),
+            alive: true,
+            close_origin: None,
+        }));
+        world
+            .pending_collect_window_commands
+            .push(CollectWindowCommand::Move {
+                id,
+                top_left: Vec2::new(310.0, 200.0),
+            });
+        world.set_collect_window_positioning(false);
+        assert!(!world.is_collect_window_active());
+        assert_eq!(
+            world.take_collect_window_commands(),
+            vec![CollectWindowCommand::SetPassthrough {
+                id,
+                passthrough: false
+            }]
+        );
+        assert!(world
+            .options
+            .collect_window
+            .kind_active(CollectWindowKind::Note));
     }
 
     fn stage_closed_note(world: &mut World, origin: CollectWindowCloseOrigin) {

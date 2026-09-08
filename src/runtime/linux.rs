@@ -14,7 +14,9 @@ use honk_engine::render::{
     render_autumn_leaves, render_footmarks_with_timing, render_hearts, render_pose_with_palette,
     render_sleepies, AutumnRenderLayer,
 };
-use honk_engine::{CursorCommand, DesktopLayout, PresenceSnapshot, Rect, Sound, World};
+use honk_engine::{
+    CollectWindowCommand, CursorCommand, DesktopLayout, PresenceSnapshot, Rect, Sound, World,
+};
 use honk_platform_linux::{
     display_cursor_mischief_supported, display_foreign_window_watch_supported, local_time,
     presence_supported, DisplayServer, Overlay, OverlayMode, SessionInfo, StatusTray,
@@ -187,7 +189,11 @@ pub fn run(
         while let Some(request) = server.try_recv() {
             match request.command() {
                 ControlCommand::WaylandStatus => {
-                    request.respond(ControlResponse::Wayland(kwin.status()));
+                    let mut status = kwin.status();
+                    if collect_window == BackendCapability::Supported {
+                        status.prop_positioning = status.movement;
+                    }
+                    request.respond(ControlResponse::Wayland(status));
                 }
                 ControlCommand::KwinEnable => {
                     let response = if overlay_mode != OverlayMode::Wayland {
@@ -260,7 +266,8 @@ pub fn run(
                             world.apply_options(effective.world);
                             world.set_collect_window_positioning(
                                 collect_window == BackendCapability::Supported
-                                    && overlay_mode == OverlayMode::X11,
+                                    && (overlay_mode == OverlayMode::X11
+                                        || kwin.status().movement == CapabilityStatus::Supported),
                             );
                             world.set_collect_window_capacity(
                                 props.as_ref().is_some_and(PropController::has_capacity),
@@ -311,7 +318,7 @@ pub fn run(
                     let prop_positioning = if collect_window == BackendCapability::Supported
                         && overlay_mode != OverlayMode::X11
                     {
-                        CapabilityStatus::Unsupported
+                        kwin.status().movement
                     } else {
                         capability_status(collect_window)
                     };
@@ -326,6 +333,10 @@ pub fn run(
 
         world.set_local_time(local_time());
         let kwin_frame = kwin.poll();
+        world.set_collect_window_positioning(
+            collect_window == BackendCapability::Supported
+                && (overlay_mode == OverlayMode::X11 || kwin_frame.is_some()),
+        );
         window_watch = if kwin_frame.is_some() {
             BackendCapability::Supported
         } else {
@@ -354,7 +365,11 @@ pub fn run(
                 .and_then(|frame| kwin.dragged(frame))
                 .or_else(|| overlay.foreign_window_drag()),
         );
-        world.set_collect_window_snapshot(props.as_mut().and_then(PropController::snapshot));
+        world.set_collect_window_snapshot(
+            props
+                .as_mut()
+                .and_then(|controller| controller.snapshot(kwin_frame.as_ref())),
+        );
         let _ = overlay.set_input_region(Some(world.rig().bounding_box()));
 
         let now = frame.now();
@@ -367,6 +382,12 @@ pub fn run(
             .unwrap_or_else(|| overlay.bounds());
         for command in world.take_collect_window_commands() {
             if let Some(controller) = props.as_mut() {
+                if overlay_mode == OverlayMode::Wayland {
+                    if let CollectWindowCommand::Move { id, top_left } = command {
+                        controller.move_with_kwin(id, top_left, &kwin);
+                        continue;
+                    }
+                }
                 if let Err(error) = controller.apply(command, &assets, collect_display) {
                     eprintln!(
                         "honk300: native Linux prop command failed; disabling delivery ({error})"

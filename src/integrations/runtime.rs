@@ -19,6 +19,38 @@ pub(crate) struct KwinRuntime {
 }
 
 impl KwinRuntime {
+    pub(crate) fn move_owned_prop(&self, pid: u32, id: u64, size: [f64; 2], target: Vec2) {
+        let Some(bridge) = self.bridge.as_ref() else {
+            return;
+        };
+        let Some(frame) = bridge.snapshot() else {
+            return;
+        };
+        let Some(window) = frame.owned_prop(pid, id, size) else {
+            return;
+        };
+        let [left, top, area_width, area_height] = window.area;
+        let [x, y, width, height] = window.geometry;
+        if width > area_width
+            || height > area_height
+            || !target.x.is_finite()
+            || !target.y.is_finite()
+        {
+            return;
+        }
+        let dx = (target.x as f64).clamp(left, left + area_width - width) - x;
+        let dy = (target.y as f64).clamp(top, top + area_height - height) - y;
+        let distance = dx.hypot(dy);
+        let scale = if distance > 23.0 {
+            23.0 / distance
+        } else {
+            1.0
+        };
+        // The same live identity/geometry and script-side bounds checks apply.
+        // A rejected or superseded move is never retried with stale authority.
+        let _ = bridge.queue_move(window, [x + dx * scale, y + dy * scale]);
+    }
+
     pub(crate) fn start() -> Self {
         let mut runtime = Self::default();
         match directory().and_then(|path| installed::read(&path).map_err(Into::into)) {

@@ -5,6 +5,7 @@
 #include "host.h"
 #include <gtk/gtk.h>
 #include <gdk/x11/gdkx.h>
+#include <gdk/wayland/gdkwayland.h>
 #include <glib-unix.h>
 #include <X11/Xutil.h>
 #include <fontconfig/fontconfig.h>
@@ -220,6 +221,14 @@ static int spawn_prop(Prop *prop, const HonkPropCommand *command) {
     }
     gtk_window_set_child(prop->window, box);
     gtk_widget_realize(GTK_WIDGET(prop->window));
+    if (!positioning) {
+        GdkSurface *surface = surface_for(prop);
+        if (!surface || !GDK_IS_WAYLAND_TOPLEVEL(surface)) return 0;
+        char application_id[80];
+        g_snprintf(application_id, sizeof(application_id), "honk300.prop.%" G_GUINT64_FORMAT,
+                   (guint64)prop->id);
+        gdk_wayland_toplevel_set_application_id(GDK_TOPLEVEL(surface), application_id);
+    }
     int scale = positioning ? gtk_widget_get_scale_factor(GTK_WIDGET(prop->window)) : 1;
     gtk_window_set_default_size(prop->window, MAX(1, (int)command->width / scale),
                                MAX(1, (int)command->height / scale));
@@ -269,7 +278,6 @@ int honk_props_apply(const HonkPropCommand *command) {
         move_prop(prop, command->x, command->y);
         break;
     case HONK_PROP_PASSTHROUGH: {
-        if (!positioning) return 0;
         GdkSurface *surface = surface_for(prop);
         if (!surface) return 0;
         cairo_region_t *empty = command->passthrough ? cairo_region_create() : NULL;

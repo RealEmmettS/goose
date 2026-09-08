@@ -92,6 +92,22 @@ pub struct Frame {
 }
 
 impl Frame {
+    /// Bind a live window to an unreaped, caller-owned prop process and opaque id.
+    /// Matching an application name alone never establishes ownership.
+    pub fn owned_prop(&self, pid: u32, id: u64, size: [f64; 2]) -> Option<&Window> {
+        let app = format!("honk300.prop.{id}");
+        let mut matches = self.windows.iter().filter(|window| {
+            window.pid == pid
+                && window.app == app
+                && window.eligible()
+                && window.drag_known
+                && !window.dragging
+                && window.geometry[2..] == size
+        });
+        let window = matches.next()?;
+        matches.next().is_none().then_some(window)
+    }
+
     /// Conservative pointer exclusion requires a complete compositor ordering.
     /// Even an occluded protected window rejects an intersecting movement path.
     pub fn permits_pointer_motion(&self, target: [f64; 2]) -> bool {
@@ -310,6 +326,27 @@ mod tests {
     }
     fn raw(frame: &Frame) -> String {
         serde_json::to_string(frame).unwrap()
+    }
+    #[test]
+    fn owned_props_require_unique_process_token_geometry_and_live_eligibility() {
+        let mut frame = fixture();
+        frame.windows[0].app = "honk300.prop.7".into();
+        assert!(frame.owned_prop(4307, 7, [300.0, 200.0]).is_some());
+        assert!(frame.owned_prop(4308, 7, [300.0, 200.0]).is_none());
+        assert!(frame.owned_prop(4307, 8, [300.0, 200.0]).is_none());
+        assert!(frame.owned_prop(4307, 7, [301.0, 200.0]).is_none());
+        for title in ["ChatGPT", "Konsole", ""] {
+            frame.windows[0].title = title.into();
+            assert!(frame.owned_prop(4307, 7, [300.0, 200.0]).is_none());
+        }
+        frame.windows[0].title = "Honk300 note".into();
+        frame.windows[0].dragging = true;
+        assert!(frame.owned_prop(4307, 7, [300.0, 200.0]).is_none());
+        frame.windows[0].dragging = false;
+        frame.windows.push(frame.windows[0].clone());
+        assert!(frame.owned_prop(4307, 7, [300.0, 200.0]).is_none());
+        frame.windows.clear();
+        assert!(frame.owned_prop(4307, 7, [300.0, 200.0]).is_none());
     }
     #[test]
     fn pointer_motion_requires_bounded_complete_safe_observations() {

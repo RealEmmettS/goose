@@ -32,6 +32,7 @@ preserve = "untouched"
     record = Path(os.environ['XDG_DATA_HOME']) / 'honk300/wayland/kwin.json'
     process = None
     logs = []
+    observer = None
 
     def control(*args):
         result = subprocess.run([str(binary), *args], capture_output=True, text=True, timeout=10)
@@ -83,17 +84,44 @@ preserve = "untouched"
         active = wait(supported, 'explicitly enabled runtime KWin capabilities')
         for capability in ('windows', 'movement', 'pointer_observation', 'fullscreen'):
             assert active['capabilities'][capability] == 'supported', active
-        for capability in ('pointer_control', 'dnd', 'prop_positioning'):
+        for capability in ('pointer_control', 'dnd'):
             assert active['capabilities'][capability] == 'unsupported', active
+        wait(lambda: status()['capabilities']['prop_positioning'] == 'supported', 'native prop placement readiness')
+        active = status()
         service = subprocess.run([str(binary), '__settings-service', '--config', str(config)],
             input=json.dumps({'protocol': 1, 'request_id': 91, 'command': {'op': 'status'}}),
             capture_output=True, text=True, timeout=10, check=True)
         native_status = json.loads(service.stdout)['data']['integrations']
         assert native_status['capabilities'] == active['capabilities'], native_status
         (directory / 'settings-status.json').write_text(json.dumps(native_status, indent=2) + '\n')
+        from smoke_kwin_observer import NativeObserver
+        observer = NativeObserver(directory, call, GLib)
+        wait(lambda: observer.frames, 'native runtime observer')
+        control('do', 'note')
+        def note():
+            return next((item for item in observer.latest if item['app'] == 'honk300.prop.1'), None)
+        initial = wait(note, 'actual runtime-owned note', timeout=20)
+        parent = next(line.split()[1] for line in Path(f"/proc/{initial['pid']}/status").read_text().splitlines()
+                      if line.startswith('PPid:'))
+        assert int(parent) == process.pid, initial
+        assert initial['geometry'][2] <= 1280 * 0.48 and initial['geometry'][3] <= 900 * 0.48
+        moved = wait(lambda: (item if (item := note()) and
+            sum((item['geometry'][i] - initial['geometry'][i]) ** 2 for i in (0, 1)) > 16 else None),
+            'engine-driven native KDE note movement', timeout=30)
         control('integrations', 'kde', 'remove')
         wait(unsupported, 'live explicit revocation')
         assert not loaded(name) and not record.exists()
+        count = len(observer.frames)
+        wait(lambda: len(observer.frames) >= count + 2, 'revocation settles in compositor')
+        stopped = note()
+        assert stopped is not None, 'Revocation destroyed the retained note'
+        count = len(observer.frames)
+        wait(lambda: len(observer.frames) >= count + 10, 'movement remains stopped after revocation')
+        assert note()['geometry'] == stopped['geometry'], (stopped, note())
+        (directory / 'owned-movement.json').write_text(json.dumps(dict(initial=initial,
+            moved=moved, stopped=stopped, after=note()), indent=2) + '\n')
+        observer.close()
+        observer = None
         setup()
         wait(supported, 'live explicit setup after removal')
         name = 'honk300-' + json.loads(record.read_text())['nonce']
@@ -123,8 +151,11 @@ preserve = "untouched"
         (directory / 'result.json').write_text(json.dumps(dict(ok=True, goose_runtime_connected=True,
             explicit_setup=True, distinct_capabilities=True, settings_service=True, default_off=True,
             live_remove=True, external_revocation=True, crash_recovery=True,
-            graceful_cleanup=True, stopped_removal=True, unrelated_state_preserved=True), indent=2) + '\n')
+            graceful_cleanup=True, stopped_removal=True, unrelated_state_preserved=True,
+            actual_owned_prop_movement=True, revocation_preserves_note_and_stops_motion=True), indent=2) + '\n')
     finally:
+        if observer:
+            observer.close()
         if process is not None and process.poll() is None:
             process.kill()
             process.wait(timeout=5)

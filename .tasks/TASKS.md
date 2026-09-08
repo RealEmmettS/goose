@@ -21,6 +21,7 @@
   - [x] Prove the real KWin script API and owned test-window movement on KDE 5/6.
   - [x] Connect the authenticated bounded Rust bridge and live runtime capabilities.
   - [x] Add explicit setup/removal and failure/revocation tests.
+  - [ ] Qualify actual KDE-owned prop movement and immediate placement revocation.
   - [ ] Exercise the guided native settings controls and qualifying package integrations.
 - [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
   - [ ] Resolve final PR review findings and repeat qualification before tagging.

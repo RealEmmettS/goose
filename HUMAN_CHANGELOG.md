@@ -34,6 +34,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Fixed
+- Stop moving a delivered window as soon as desktop integration is removed, keeping notes available to use.
+- Give the isolated permission test a fresh desktop service before opening consent.
 - Wait for desktop permission services to finish starting before testing a request.
 
 ### Behind the scenes

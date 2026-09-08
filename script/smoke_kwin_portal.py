@@ -60,12 +60,22 @@ def qualify(binary, evidence, wait, call, GLib, Gtk, RustBridge):
     try:
         launch('pipewire', 'pipewire')
         backend = launch(program('xdg-desktop-portal-kde', 'xdg-desktop-portal-kde'), 'kde')
-        launch(program('xdg-desktop-portal', 'xdg-desktop-portal'), 'desktop', '--verbose')
+        desktop = launch(program('xdg-desktop-portal', 'xdg-desktop-portal'), 'desktop', '--verbose', '--replace')
         wait(lambda: call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
             'NameHasOwner', GLib.Variant('(s)', ('org.freedesktop.portal.Desktop',))).unpack()[0], 'native portal service')
         wait(lambda: call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
             'NameHasOwner', GLib.Variant('(s)', ('org.freedesktop.impl.portal.desktop.kde',))).unpack()[0],
             'native KDE portal backend')
+
+        def owns_desktop_service():
+            assert desktop.poll() is None, 'Private portal frontend exited'
+            try:
+                return call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+                    'GetConnectionUnixProcessID', GLib.Variant('(s)', ('org.freedesktop.portal.Desktop',))).unpack()[0] == desktop.pid
+            except GLib.Error:
+                return False
+
+        wait(owns_desktop_service, 'fresh private frontend owns the portal service')
 
         def remote_desktop_ready():
             try:

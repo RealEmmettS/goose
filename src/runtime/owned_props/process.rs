@@ -22,6 +22,8 @@ pub(crate) struct Controller {
     diagnostics: VecDeque<u8>,
     started: Instant,
     last_progress: Instant,
+    positioned_id: Option<CollectWindowId>,
+    pending_failure: Option<io::Error>,
 }
 
 impl Controller {
@@ -55,6 +57,8 @@ impl Controller {
             diagnostics: VecDeque::with_capacity(4096),
             started: Instant::now(),
             last_progress: Instant::now(),
+            positioned_id: None,
+            pending_failure: None,
         };
         nonblocking(this.input.as_ref().expect("retained input"))?;
         nonblocking(&this.output)?;
@@ -68,11 +72,72 @@ impl Controller {
     pub(crate) fn has_capacity(&self) -> bool {
         self.registry.has_capacity()
     }
-    pub(crate) fn snapshot(&mut self) -> Option<CollectWindowSnapshot> {
-        self.registry.snapshot()
+    pub(crate) fn snapshot(
+        &mut self,
+        frame: Option<&honk_platform_linux::kwin::Frame>,
+    ) -> Option<CollectWindowSnapshot> {
+        let mut snapshot = self.registry.snapshot()?;
+        if self.registry.expected_positioning || !snapshot.alive {
+            return Some(snapshot);
+        }
+        if let Some(frame) = frame {
+            let Some(window) = frame.owned_prop(
+                self.child.id(),
+                snapshot.id.0,
+                [snapshot.rect.width() as f64, snapshot.rect.height() as f64],
+            ) else {
+                if let Some(id) = self.positioned_id.take() {
+                    if let Err(error) = self.outbox.enqueue(Command::Passthrough {
+                        id: id.0,
+                        passthrough: false,
+                    }) {
+                        self.pending_failure = Some(error);
+                    }
+                }
+                return None;
+            };
+            let [x, y, width, height] = window.geometry;
+            snapshot.rect = Rect::new(
+                Vec2::new(x as f32, y as f32),
+                Vec2::new((x + width) as f32, (y + height) as f32),
+            );
+            self.positioned_id = Some(snapshot.id);
+        } else {
+            self.positioned_id = None;
+        }
+        Some(snapshot)
+    }
+
+    pub(crate) fn move_with_kwin(
+        &self,
+        id: CollectWindowId,
+        target: Vec2,
+        kwin: &crate::integrations::KwinRuntime,
+    ) {
+        if self.registry.expected_positioning {
+            return;
+        }
+        let Some(snapshot) = self
+            .registry
+            .entries
+            .get(&id.0)
+            .and_then(|entry| entry.snapshot)
+            .filter(|snapshot| snapshot.alive)
+        else {
+            return;
+        };
+        kwin.move_owned_prop(
+            self.child.id(),
+            id.0,
+            [snapshot.rect.width() as f64, snapshot.rect.height() as f64],
+            target,
+        );
     }
 
     pub(crate) fn poll(&mut self) -> io::Result<()> {
+        if let Some(error) = self.pending_failure.take() {
+            return Err(error);
+        }
         self.drain_diagnostics()?;
         if let Some(status) = self.child.try_wait()? {
             return Err(io::Error::other(format!(

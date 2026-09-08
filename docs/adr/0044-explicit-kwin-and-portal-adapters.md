@@ -61,6 +61,12 @@ rechecks the saved grant while running. Removal deletes only that record and reg
 Normal uninstall retains user data as before; purge follows the existing user-data policy.
 No global KWin package, autostart entry or foreign script is installed or removed.
 
+Owned native Wayland props set a per-window application token and retain the existing
+private process transport. KWin placement requires that token, the unreaped child PID,
+matching native dimensions and a fresh eligible window. The same script-side movement
+bounds apply. The prop retains its own input region and text ownership; permission loss
+restores input and cancels pending motion while preserving retained notes.
+
 Run the same script and Rust bridge against actual native KDE 5/6 fixture windows. Cover
 untrusted D-Bus peers, changed titles/processes/geometry, vanished windows, window overload,
 display and desktop changes, delayed replies, owner loss/replacement and explicit disable.
