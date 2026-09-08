@@ -34,6 +34,7 @@ All notable changes to this project are documented here. Format based on
 - Report an expired Mac fullscreen sample as failed while its replacement is blocked; reserve unprobed for a new target, preserve the original freshness limit and recover on a fresh result.
 
 ### Behind the scenes
+- Use GTK's typed click signals for native input acknowledgment on the supported Python bindings, preserving unclaimed event propagation and actual window-handle movement.
 - Acknowledge each real GTK motion and primary-button event before issuing the next private GNOME drag step; retain actual Mutter grabs, engine rides, terminal refusal and every held-action cancellation check.
 - Integrate the native GNOME drag-handle correction and repeat final-source qualification after cancelling the incomplete candidates; preserve production presence behavior and ordered publication gates.
 - Record all four corrected GNOME desktop passes and reviewed native output before freezing the combined final-stage candidate; preserve the qualified Mac implementation and every publication gate.

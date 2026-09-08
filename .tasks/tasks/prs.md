@@ -28,6 +28,7 @@ the GNOME review fixes, then complete final-source candidate, main, publication,
 fresh-public and website gates.
 
 ## Activity
+- 2026-09-08 — Run 34267024884 delivers both separately acknowledged native motions on all four desktops, then exposes a null raw GdkEvent in the installed Python bindings. Use the typed GTK pressed signal with the gesture left unclaimed; retain the strict button acknowledgment and every actual Mutter/runtime assertion. Preserve all four binding failures and repeat native qualification.
 - 2026-09-08 — Both native Mac lanes pass again in 34264286000. The integrated GNOME run passes three desktops; the newer x64 failure records only preparatory motion, with no final GTK motion or button event. Sequence both motions and the real button press using passive native acknowledgments before the existing Mutter/engine oracles. Preserve failed captures and repeat the full final-source qualification.
 - 2026-09-08 — Cancel incomplete candidate 34261907400 after the GNOME stage's native input failure repeats in the integrated PR. Incorporate actual client-area GTK drag handles while preserving real Mutter grabs and every ride interruption assertion; production Mac and Linux observations remain unchanged. Repeat native and complete release gates before publication.
 - 2026-09-08 — Integrate the final GNOME source after all four corrected native suites pass in 34260153471. Preserve the independently qualified Mac implementation and freeze the combined source for complete candidate, main, public distribution and website qualification.

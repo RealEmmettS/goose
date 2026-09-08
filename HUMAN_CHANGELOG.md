@@ -41,6 +41,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Show a clear temporary failure when a Mac app stops answering, and restore its fullscreen status when it responds again.
 
 ### Behind the scenes
+- Use the desktop toolkit's supported click signal to observe private test input without taking over the window's normal drag behavior.
 - Wait for private test windows to receive each mouse action before continuing a drag, so delayed input cannot hide or falsely report a desktop behavior failure.
 - Repeat the final desktop checks after correcting how private test windows receive a drag, keeping the same required behavior and publication checks.
 - Complete the corrected GNOME desktop checks and review its native output before the final combined release checks.

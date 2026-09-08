@@ -13,7 +13,7 @@ def qualify(binary, settings, evidence, wait, window, protected_window, find_win
     os.environ.update(environment)
     import gi
     gi.require_version('Atspi', '2.0')
-    from gi.repository import Atspi, Gdk, Gio, Gtk
+    from gi.repository import Atspi, Gio, Gtk
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     bus.call_sync('org.a11y.Bus', '/org/a11y/bus', 'org.freedesktop.DBus.Properties', 'Set',
         GLib.Variant('(ssv)', ('org.a11y.Status', 'IsEnabled', GLib.Variant('b', True))),
@@ -189,15 +189,18 @@ preserve = "untouched"
         controller.connect('motion', lambda _controller, x, y: record_event('motion', x, y))
         controller.connect('leave', lambda _controller: record_event('leave'))
         handle.add_controller(controller)
-        buttons = Gtk.EventControllerLegacy.new()
+        # GTK's typed click signal is available through PyGObject on both
+        # supported desktops; raw GdkEvent arguments are not marshalled there.
+        # Leave sequence state NONE so the actual WindowHandle keeps receiving
+        # the gesture and remains the only controller that begins the move.
+        buttons = Gtk.GestureClick.new()
+        buttons.set_button(1)
+        buttons.set_exclusive(False)
         buttons.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-        def record_button(_controller, native_event):
-            kind = native_event.get_event_type()
-            if kind in (Gdk.EventType.BUTTON_PRESS, Gdk.EventType.BUTTON_RELEASE):
-                record_event('press' if kind == Gdk.EventType.BUTTON_PRESS else 'release',
-                             native_event.get_button())
-            return False
-        buttons.connect('event', record_button)
+        buttons.connect('pressed', lambda gesture, _count, _x, _y:
+                        record_event('press', gesture.get_current_button()))
+        buttons.connect('released', lambda gesture, _count, _x, _y:
+                        record_event('release', gesture.get_current_button()))
         handle.add_controller(buttons)
         surface = target.get_surface()
         device = surface.get_display().get_default_seat().get_pointer()
