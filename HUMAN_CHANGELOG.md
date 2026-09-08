@@ -56,6 +56,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost, keep setup responsive when a connection stops answering, and preserve unrelated desktop settings.
 
 ### Behind the scenes
+- Test GNOME window rides with a normal title-bar drag and require the desktop to acknowledge the real movement before checking the goose.
 - Check the real GNOME desktop, goose and settings together before publishing, including readable notes, complete pictures, lost access, restarts and unexpected failures. Keep private test permissions out of the evidence files.
 - Keep each desktop's support claims tied to its own checks, and keep website instructions and downloads aligned with the verified release while preserving the artwork you chose.
 

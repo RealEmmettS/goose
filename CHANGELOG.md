@@ -49,6 +49,7 @@ All notable changes to this project are documented here. Format based on
 - Authenticate the pinned system Shell and approved runtime executable, bound complete connection and snapshot operations, preserve exact owned files and recoverable consent, and withdraw stale or revoked observations until explicit reconnection.
 
 ### Behind the scenes
+- Use an actual native title-bar drag in GNOME qualification after final desktop evidence shows a held Alt/button mask can exist without a compositor grab. Keep the native grab and production response mandatory.
 - Require the real GNOME runtime, native settings and owned-prop scenarios as same-source release gates, including unapproved callers, actual held input, terminal protection, saved drafts, native note text, uncropped images, helper failures and restart. Preserve private display authentication and omit private consent from evidence.
 - Record separately qualified desktop and publication evidence, including the verified Sway website handoff with the user's selected artwork.
 
