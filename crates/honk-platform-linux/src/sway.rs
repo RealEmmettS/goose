@@ -64,7 +64,7 @@ impl Geometry {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Window {
     pub id: u64,
-    pub pid: u32,
+    pub pid: Option<u32>,
     pub title: String,
     pub app: Option<String>,
     pub geometry: Geometry,
@@ -174,22 +174,29 @@ impl Frame {
                         .map(|child| (child, depth + 1, fullscreen, live_output)),
                 );
             }
-            if node.get("pid").is_none_or(|value| value.is_null()) {
+            // Structural containers omit pid. Real views can explicitly report
+            // null (notably XWayland clients without _NET_WM_PID); their visible
+            // fullscreen state is still authoritative compositor information.
+            let Some(raw_pid) = node.get("pid") else {
                 continue;
-            }
-            let pid = node
-                .get("pid")
-                .and_then(|value| value.as_u64())
-                .filter(|pid| *pid > 0 && *pid <= u32::MAX as u64)
-                .ok_or("Invalid Sway window process")? as u32;
+            };
+            let pid = match raw_pid {
+                serde_json::Value::Null => None,
+                value => Some(
+                    value
+                        .as_u64()
+                        .filter(|pid| *pid > 0 && *pid <= u32::MAX as u64)
+                        .ok_or("Invalid Sway window process")? as u32,
+                ),
+            };
             if !matches!(kind, "con" | "floating_con") || windows.len() >= 64 {
                 return Err("Invalid or excessive Sway window inventory");
             }
-            let title = node
-                .get("name")
-                .and_then(|value| value.as_str())
-                .filter(|title| title.len() <= 1024)
-                .ok_or("Invalid Sway window title")?;
+            let title = match node.get("name") {
+                Some(serde_json::Value::Null) => "",
+                Some(serde_json::Value::String(title)) if title.len() <= 1024 => title,
+                _ => return Err("Invalid Sway window title"),
+            };
             let app = match node.get("app_id") {
                 Some(serde_json::Value::String(app)) if app.len() <= 1024 => Some(app.clone()),
                 Some(serde_json::Value::Null) => None,
@@ -255,10 +262,35 @@ mod tests {
     fn native_window_visibility_and_fullscreen_remain_separate() {
         let mut input = tree();
         let frame = decode(&input).unwrap();
-        assert_eq!(frame.windows[0].pid, 2489);
+        assert_eq!(frame.windows[0].pid, Some(2489));
         assert!(!frame.fullscreen());
         window_mut(&mut input)["fullscreen_mode"] = json!(2);
         assert!(decode(&input).unwrap().fullscreen());
+        window_mut(&mut input)["visible"] = json!(false);
+        assert!(!decode(&input).unwrap().fullscreen());
+    }
+
+    #[test]
+    fn untitled_native_window_keeps_observation_alive() {
+        let mut input = tree();
+        window_mut(&mut input)["name"] = serde_json::Value::Null;
+        let frame = decode(&input).unwrap();
+        assert_eq!(frame.windows.len(), 1);
+        assert!(frame.windows[0].title.is_empty());
+        window_mut(&mut input)["name"] = json!(72);
+        assert!(decode(&input).is_err());
+    }
+
+    #[test]
+    fn fullscreen_without_a_client_pid_still_pauses_manners() {
+        let mut input = tree();
+        window_mut(&mut input)["pid"] = serde_json::Value::Null;
+        window_mut(&mut input)["app_id"] = serde_json::Value::Null;
+        window_mut(&mut input)["fullscreen_mode"] = json!(1);
+        let frame = decode(&input).unwrap();
+        assert!(frame.fullscreen());
+        assert_eq!(frame.windows.len(), 1);
+        assert_eq!(frame.windows[0].pid, None);
         window_mut(&mut input)["visible"] = json!(false);
         assert!(!decode(&input).unwrap().fullscreen());
     }

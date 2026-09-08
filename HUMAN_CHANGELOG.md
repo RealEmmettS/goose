@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Fixed
+- Keep fullscreen quiet behavior working when an application has no title or does not report its process identity, and avoid briefly losing desktop observations while a fresh view is being recorded.
+
 ### Behind the scenes
 - Check the goose against its actual on-screen outline, including every transparent edge, so a complete bird in a compact drawing area can pass while damaged colors, dark boxes and mismatched frames still fail.
 

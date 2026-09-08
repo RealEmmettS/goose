@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import shlex
 import struct
 import subprocess
 import time
@@ -160,6 +161,29 @@ def main():
                     with client:
                         assert client.recv(32) == b'', 'Untrusted peer received a query before rejection'
                 fake.unlink()
+            # Exercise real compositor null fields, not a handcrafted transport
+            # response. Sway starts this private X11 fixture with its own DISPLAY.
+            helper = Path(__file__).parent / 'fixtures' / 'sway_identity_window.py'
+            command('exec ' + shlex.join(['python3', str(helper.resolve()), str(evidence)]))
+            wait(lambda: (evidence / 'identity.json').exists(), 'untitled XWayland fixture')
+            identity = json.loads((evidence / 'identity.json').read_text())
+            def identity_node():
+                return next((node for node in nodes(ipc(4)) if node.get('window') == identity['window']), None)
+            anonymous = wait(identity_node, 'actual anonymous native identity')
+            assert anonymous['shell'] == 'xwayland'
+            assert anonymous['window_properties']['class'] == 'honk300-sway-identity-probe'
+            assert anonymous['name'] in (None, '') and anonymous['pid'] is None, anonymous
+            command(f'[con_id={anonymous["id"]}] fullscreen enable')
+            wait(lambda: identity_node()['fullscreen_mode'] > 0, 'anonymous native fullscreen')
+            rust = rust_snapshot('anonymous-fullscreen')
+            if rust:
+                assert rust['fullscreen'], 'A real fullscreen client without a PID was ignored'
+                observed = next(node for node in rust['windows'] if node['id'] == anonymous['id'])
+                assert observed['title'] == '' and observed['pid'] is None
+            (evidence / 'anonymous-window.json').write_text(json.dumps(anonymous, indent=2) + '\n')
+            (evidence / 'identity.stop').write_text('stop\n')
+            wait(lambda: (evidence / 'identity.done').exists() and identity_node() is None,
+                 'anonymous fixture cleanup')
             # Only this fixture-owned node receives commands. Native criteria bind
             # its numeric id, process id and exact application identity together.
             criteria = f'[con_id={ordinary["id"]} pid={os.getpid()} app_id="^honk300-sway-probe$"]'
@@ -230,6 +254,7 @@ def main():
                 no_output_is_unknown=args.bridge is not None,
                 untrusted_peer_refused=args.bridge is not None), indent=2) + '\n')
         finally:
+            (evidence / 'identity.stop').write_text('stop\n')
             for window in windows:
                 window.destroy()
             compositor.terminate()
