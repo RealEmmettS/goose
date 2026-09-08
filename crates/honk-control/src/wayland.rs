@@ -75,6 +75,9 @@ mod tests {
             ControlCommand::WaylandStatus,
             ControlCommand::KwinEnable,
             ControlCommand::KwinDisable,
+            ControlCommand::SwayStatus,
+            ControlCommand::SwayEnable,
+            ControlCommand::SwayDisable,
             ControlCommand::PointerRequest,
             ControlCommand::PointerCancel,
         ] {

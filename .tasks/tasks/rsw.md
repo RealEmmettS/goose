@@ -48,12 +48,17 @@ before production movement. Pointer authority remains separately unsupported.
 
 ## Status
 Active. The initial socket/window/fullscreen premise passed all four native lanes.
-The bounded production decoder and read-only socket transport are implemented; local
-platform tests pass. Actual Linux transport, untrusted-peer refusal and subsequent
-runtime/GUI qualification remain required. User drag and pointer authority are unsupported.
+The actual bounded Rust decoder/transport and untrusted-peer refusal pass all four native
+lanes in run 34215421415. CLI, settings service, native GUI and owned observation worker
+are implemented; integrated desktop lifecycle qualification is now required. User drag
+and pointer authority remain unsupported.
 Publication remains ordered after the qualified KDE release.
 
 ## Activity
+- 2026-09-08 — Verify all four production Rust transport lanes, then connect explicit
+  Sway consent to its independent bounded worker and native settings controls. Add actual
+  engine fullscreen/configuration, native draft, revocation, socket replacement and
+  retained-worker/restart qualification before making a public support claim.
 - 2026-09-08 — Record ADR 0046 and implement a read-only Rust boundary restricted to
   qualified versions, private socket peer identity, stable ownership and bounded I/O.
   Extend the native fixture to exercise that exact decoder/transport and reject a

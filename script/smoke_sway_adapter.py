@@ -15,6 +15,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--bridge', type=Path)
+    parser.add_argument('--goose', type=Path)
+    parser.add_argument('--settings', type=Path)
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -25,6 +27,7 @@ def main():
                       'default_border none\nfocus_follows_mouse no\n'
                       'for_window [app_id="honk300-sway-probe"] floating enable\n')
     environment = dict(os.environ, XDG_RUNTIME_DIR=str(runtime),
+        XDG_DATA_HOME=str(evidence / 'user-data'), XDG_CONFIG_HOME=str(evidence / 'user-config'),
         XDG_CURRENT_DESKTOP='sway', XDG_SESSION_TYPE='wayland',
         WLR_BACKENDS='headless', WLR_HEADLESS_OUTPUTS='1',
         WLR_LIBINPUT_NO_DEVICES='1', WLR_RENDERER='pixman', GDK_BACKEND='wayland')
@@ -173,6 +176,11 @@ def main():
                 assert rust['fullscreen']
             windows[0].unfullscreen()
             wait(lambda: find(ordinary['name'])['fullscreen_mode'] == 0, 'fullscreen revocation')
+            if args.goose is not None:
+                assert args.settings is not None, 'Native settings are required with the real goose'
+                from smoke_sway_runtime import qualify
+                qualify(args.goose.resolve(), args.settings.resolve(), evidence, wait,
+                        windows[0], find, ipc_path, GLib)
             windows[0].destroy()
             windows.pop(0)
             wait(lambda: find(ordinary['name']) is None, 'native disappearance')
@@ -183,6 +191,7 @@ def main():
                 vanished=True, pointer_control_qualified=False,
                 user_drag_observation_qualified=False,
                 production_rust_observation=args.bridge is not None,
+                production_runtime=args.goose is not None,
                 untrusted_peer_refused=args.bridge is not None), indent=2) + '\n')
         finally:
             for window in windows:

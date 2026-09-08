@@ -128,6 +128,11 @@ pub enum Command {
 
 #[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
 pub enum Integration {
+    /// Optional read-only Sway window and fullscreen observations.
+    Sway {
+        #[arg(value_enum, default_value = "status")]
+        action: IntegrationAction,
+    },
     /// Optional KDE window support. Pointer permission is separate.
     Kde {
         #[arg(value_enum, default_value = "status")]

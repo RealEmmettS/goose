@@ -258,6 +258,9 @@ impl Connection {
         }
         let mut bytes = vec![0; size];
         self.read(&mut bytes, deadline)?;
+        if socket_identity(&self.socket, self.peer.uid)? != self.inode {
+            return Err(invalid("Sway socket changed during observation"));
+        }
         Ok(bytes)
     }
 

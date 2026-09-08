@@ -138,3 +138,30 @@ test "KDE permission responses and native consent dialog preserve unsaved settin
     try std.testing.expect(model.dirty());
     try std.testing.expectEqualStrings("true", model.fields[0].value());
 }
+
+test "Sway setup and removal retain the settings draft and separate capability limits" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const model = try arena.allocator().create(main.Model);
+    model.* = .{};
+    model.request_id = 1;
+    try main.acceptResponse(model, @embedFile("fixtures/read.json"));
+    model.fields[0].value_buffer.set("true");
+    try main.acceptResponse(model,
+        \\{"protocol":1,"request_id":1,"ok":true,"data":{"sway":{"supported":true,"installed":true,"description":"Sway enabled","capabilities":{"windows":"supported","fullscreen":"supported","movement":"unsupported","pointer_control":"unsupported"}}}}
+    );
+    try std.testing.expect(model.sway_installed);
+    try std.testing.expect(model.dirty());
+    try std.testing.expect(std.mem.indexOf(u8, model.swayStatus(), "Movement: unsupported") != null);
+    model.page = .platform;
+    model.sway_prompt = true;
+    const View = sdk.canvas.CompiledMarkupView(main.Model, main.Msg, main.app_markup);
+    var ui = main.AppUi.init(arena.allocator());
+    _ = try ui.finalize(View.build(&ui, model));
+    try main.acceptResponse(model,
+        \\{"protocol":1,"request_id":1,"ok":true,"data":{"sway":{"supported":true,"installed":false,"description":"Sway observations removed"}}}
+    );
+    try std.testing.expect(!model.sway_installed);
+    try std.testing.expect(model.dirty());
+    try std.testing.expectEqualStrings("true", model.fields[0].value());
+}

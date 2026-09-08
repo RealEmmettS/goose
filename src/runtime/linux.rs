@@ -46,6 +46,11 @@ pub fn run(
     };
     let overlay_mode = overlay.mode();
     let display_server = overlay.display_server();
+    let mut sway = if overlay_mode == OverlayMode::Wayland {
+        crate::integrations::SwayRuntime::start()
+    } else {
+        crate::integrations::SwayRuntime::default()
+    };
     let mut kwin = if overlay_mode == OverlayMode::Wayland {
         crate::integrations::KwinRuntime::start()
     } else {
@@ -132,6 +137,10 @@ pub fn run(
         && std::env::var("HONK300_TRACE_COLLECTION").as_deref() == Ok("1");
     let mut next_collection_trace = 0.0;
     let mut collection_trace_count = 0;
+    let trace_presence = std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true")
+        && std::env::var("HONK300_TRACE_PRESENCE").as_deref() == Ok("1");
+    let mut last_presence_trace = None;
+    let mut presence_trace_count = 0;
 
     println!("honk300: Linux goose control is live. Use `honk300 stop` to send it home.");
 
@@ -199,6 +208,29 @@ pub fn run(
 
         while let Some(request) = server.try_recv() {
             match request.command() {
+                ControlCommand::SwayStatus => {
+                    request.respond(ControlResponse::Wayland(sway.status()));
+                }
+                ControlCommand::SwayEnable => {
+                    let response = if overlay_mode != OverlayMode::Wayland
+                        || world.graceful_exit_requested()
+                    {
+                        ControlResponse::Err("UNSUPPORTED".into())
+                    } else {
+                        match sway.enable() {
+                            Ok(()) => ControlResponse::Ok,
+                            Err(error) => {
+                                eprintln!("honk300: Sway observation activation failed ({error})");
+                                ControlResponse::Err("ADAPTER_FAILED".into())
+                            }
+                        }
+                    };
+                    request.respond(response);
+                }
+                ControlCommand::SwayDisable => {
+                    sway.disable();
+                    request.respond(ControlResponse::Ok);
+                }
                 ControlCommand::WaylandStatus => {
                     let mut status = kwin.status();
                     if collect_window == BackendCapability::Supported {
@@ -371,6 +403,7 @@ pub fn run(
 
         world.set_local_time(local_time());
         let kwin_frame = kwin.poll();
+        let sway_frame = sway.poll();
         if world.graceful_exit_requested() {
             kwin.cancel_pointer();
         }
@@ -404,8 +437,28 @@ pub fn run(
         world.set_presence(match kwin_frame.as_ref() {
             Some(frame) if frame.fullscreen() => PresenceSnapshot::fullscreen(),
             Some(_) => PresenceSnapshot::available(),
-            None => PresenceSnapshot::unsupported(),
+            None => match sway_frame.as_ref() {
+                Some(frame) if frame.fullscreen() => PresenceSnapshot::fullscreen(),
+                Some(_) => PresenceSnapshot::available(),
+                None => PresenceSnapshot::unsupported(),
+            },
         });
+        if trace_presence && presence_trace_count < 64 {
+            let state = (
+                kwin_frame.is_some() || sway_frame.is_some(),
+                kwin_frame.as_ref().is_some_and(|frame| frame.fullscreen())
+                    || sway_frame.as_ref().is_some_and(|frame| frame.fullscreen()),
+                world.manners_active(),
+            );
+            if last_presence_trace != Some(state) {
+                last_presence_trace = Some(state);
+                presence_trace_count += 1;
+                eprintln!(
+                    "honk300 presence trace: observed={} fullscreen={} manners={}",
+                    state.0, state.1, state.2
+                );
+            }
+        }
         let mut pointer = overlay.pointer_state();
         if let Some(frame) = &kwin_frame {
             let pos = honk_engine::Vec2::new(frame.pointer[0] as f32, frame.pointer[1] as f32);

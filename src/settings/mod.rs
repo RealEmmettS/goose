@@ -45,6 +45,8 @@ enum Operation {
     Update {},
     KdeSetup {},
     KdeRemove {},
+    SwaySetup {},
+    SwayRemove {},
     PointerRequest {},
     PointerCancel {},
 }
@@ -122,11 +124,13 @@ fn execute(operation: Operation, path: &Path) -> Result<Value, Error> {
             crate::install::reconcile_config_autostart(config.lifecycle.autostart_on_login)
                 .map_err(|error| error.to_string())
         }),
-        Operation::Status {} => {
-            Ok(json!({"runtime": runtime_json(), "integrations": crate::integrations::status()}))
-        }
+        Operation::Status {} => Ok(
+            json!({"runtime": runtime_json(), "integrations": crate::integrations::status(), "sway": crate::integrations::sway_status()}),
+        ),
         Operation::KdeSetup {} => crate::integrations::setup(),
         Operation::KdeRemove {} => crate::integrations::remove(),
+        Operation::SwaySetup {} => crate::integrations::sway_setup(),
+        Operation::SwayRemove {} => crate::integrations::sway_remove(),
         Operation::PointerRequest {} => crate::integrations::pointer(true),
         Operation::PointerCancel {} => crate::integrations::pointer(false),
         Operation::Start {} => {
@@ -163,6 +167,7 @@ fn read_settings(
     let mut value = snapshot_json(&snapshot);
     value["runtime"] = runtime();
     value["integrations"] = crate::integrations::status();
+    value["sway"] = crate::integrations::sway_status();
     Ok(value)
 }
 

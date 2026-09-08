@@ -259,6 +259,9 @@ pub fn run(
                 | ControlCommand::WaylandStatus
                 | ControlCommand::KwinEnable
                 | ControlCommand::KwinDisable
+                | ControlCommand::SwayStatus
+                | ControlCommand::SwayEnable
+                | ControlCommand::SwayDisable
                 | ControlCommand::PointerRequest
                 | ControlCommand::PointerCancel => {
                     request.respond(ControlResponse::Err("UNSUPPORTED".into()))

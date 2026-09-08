@@ -27,6 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- Connect explicit Sway CLI and Native SDK setup/removal to a private consent record and the Rust observation worker. Keep request polling off the presentation loop, expire stale frames, retain the exact worker through removal, and require explicit reconnection after socket replacement. Qualify actual fullscreen manners, live configuration changes, native accessibility actions, drafts and restart in disposable Sway desktops.
 - Implement the read-only Sway window/fullscreen decoder and bounded native transport for independently qualified 1.9/1.10.1 desktops, requiring private socket ownership and a system-owned compositor peer. ADR 0046 leaves movement and pointer actions unsupported without authoritative user-drag/input evidence.
 
 ### Behind the scenes

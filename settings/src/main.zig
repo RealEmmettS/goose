@@ -45,7 +45,7 @@ const fonts = [_]SettingsApp.FontRegistration{
 };
 const Buffer = canvas.TextBuffer;
 const Page = enum { general, appearance, behavior, sound, platform };
-const Action = enum { read, save, validate, status, start, stop, check_updates, update, kde_setup, kde_remove, pointer_request, pointer_cancel };
+const Action = enum { read, save, validate, status, start, stop, check_updates, update, kde_setup, kde_remove, sway_setup, sway_remove, pointer_request, pointer_cancel };
 
 pub const Field = struct {
     index: usize = 0,
@@ -107,6 +107,10 @@ pub const Msg = union(enum) {
     kde_confirm,
     kde_cancel,
     kde_remove,
+    sway_setup,
+    sway_confirm,
+    sway_cancel,
+    sway_remove,
     pointer_request,
     pointer_cancel,
     completed: native_sdk.EffectExit,
@@ -116,7 +120,7 @@ pub const Msg = union(enum) {
 
 pub const Model = struct {
     // Used by derived view methods or the stdio lifecycle, never bound directly.
-    pub const view_unbound = .{ "fields", "field_count", "page", "service", "config_path", "revision", "version", "status_buffer", "runtime_buffer", "update_buffer", "integration_buffer", "pointer_buffer", "pointer_request_available", "pointer_cancel_available", "loaded", "request_id", "editing", "edit_buffer", "update_available", "update_managed", "system_appearance" };
+    pub const view_unbound = .{ "fields", "field_count", "page", "service", "config_path", "revision", "version", "status_buffer", "runtime_buffer", "update_buffer", "integration_buffer", "sway_buffer", "pointer_buffer", "pointer_request_available", "pointer_cancel_available", "loaded", "request_id", "editing", "edit_buffer", "update_available", "update_managed", "system_appearance" };
     system_appearance: native_sdk.Appearance = .{},
     fields: [64]Field = @splat(.{}),
     field_count: usize = 0,
@@ -140,6 +144,10 @@ pub const Model = struct {
     integration_supported: bool = false,
     kde_installed: bool = false,
     kde_prompt: bool = false,
+    sway_buffer: Buffer(2048) = .{},
+    sway_supported: bool = false,
+    sway_installed: bool = false,
+    sway_prompt: bool = false,
     pointer_buffer: Buffer(1024) = .{},
     pointer_request_available: bool = false,
     pointer_cancel_available: bool = false,
@@ -156,6 +164,12 @@ pub const Model = struct {
 
     pub fn integrationStatus(m: *const Model) []const u8 {
         return m.integration_buffer.text();
+    }
+    pub fn swayStatus(m: *const Model) []const u8 {
+        return m.sway_buffer.text();
+    }
+    pub fn canSetupSway(m: *const Model) bool {
+        return m.sway_supported and !m.busy;
     }
     pub fn canSetupKde(m: *const Model) bool {
         return m.integration_supported and !m.busy;
@@ -279,6 +293,17 @@ pub fn update(model: *Model, msg: Msg, fx: *Effects) void {
         },
         .kde_remove => if (model.canSetupKde()) {
             submit(model, .kde_remove, fx);
+        },
+        .sway_setup => if (model.canSetupSway()) {
+            model.sway_prompt = true;
+        },
+        .sway_cancel => model.sway_prompt = false,
+        .sway_confirm => if (model.canSetupSway()) {
+            model.sway_prompt = false;
+            submit(model, .sway_setup, fx);
+        },
+        .sway_remove => if (model.canSetupSway()) {
+            submit(model, .sway_remove, fx);
         },
         .pointer_request => if (model.canRequestPointer()) {
             submit(model, .pointer_request, fx);
@@ -455,6 +480,21 @@ pub fn acceptResponse(model: *Model, bytes: []const u8) !void {
                     }));
                 } else model.integration_buffer.set(detail);
             } else model.integration_buffer.set(detail);
+        }
+    }
+    if (data.object.get("sway")) |sway| {
+        model.sway_supported = flag(sway, "supported");
+        model.sway_installed = flag(sway, "installed");
+        const detail = string(sway, "description");
+        model.sway_buffer.set(detail);
+        if (sway == .object) {
+            if (sway.object.get("capabilities")) |caps| {
+                if (caps == .object) {
+                    model.sway_buffer.set(try std.fmt.allocPrint(allocator, "{s}\nWindow observation: {s} | Fullscreen: {s}\nMovement: {s} | Pointer control: {s}\nOwned notes use normal desktop placement.", .{
+                        detail, string(caps, "windows"), string(caps, "fullscreen"), string(caps, "movement"), string(caps, "pointer_control"),
+                    }));
+                }
+            }
         }
     }
     const message = string(data, "message");

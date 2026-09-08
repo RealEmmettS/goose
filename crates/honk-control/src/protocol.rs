@@ -19,6 +19,9 @@ pub enum ControlCommand {
     WaylandStatus,
     KwinEnable,
     KwinDisable,
+    SwayStatus,
+    SwayEnable,
+    SwayDisable,
     PointerRequest,
     PointerCancel,
     Do(PokeAction),
@@ -121,6 +124,9 @@ impl ControlCommand {
             Self::WaylandStatus => format!("{VERSION} WAYLAND\n"),
             Self::KwinEnable => format!("{VERSION} KWIN_ENABLE\n"),
             Self::KwinDisable => format!("{VERSION} KWIN_DISABLE\n"),
+            Self::SwayStatus => format!("{VERSION} SWAY\n"),
+            Self::SwayEnable => format!("{VERSION} SWAY_ENABLE\n"),
+            Self::SwayDisable => format!("{VERSION} SWAY_DISABLE\n"),
             Self::PointerRequest => format!("{VERSION} POINTER_REQUEST\n"),
             Self::PointerCancel => format!("{VERSION} POINTER_CANCEL\n"),
             Self::Do(action) => format!("{VERSION} DO {}\n", encode_action(action)),
@@ -143,12 +149,16 @@ impl ControlCommand {
             return Err(ProtocolError::UnknownCommand);
         };
         match command {
-            "WAYLAND" | "KWIN_ENABLE" | "KWIN_DISABLE" | "POINTER_REQUEST" | "POINTER_CANCEL" => {
+            "WAYLAND" | "KWIN_ENABLE" | "KWIN_DISABLE" | "SWAY" | "SWAY_ENABLE"
+            | "SWAY_DISABLE" | "POINTER_REQUEST" | "POINTER_CANCEL" => {
                 ensure_end(parts)?;
                 Ok(match command {
                     "WAYLAND" => Self::WaylandStatus,
                     "KWIN_ENABLE" => Self::KwinEnable,
                     "KWIN_DISABLE" => Self::KwinDisable,
+                    "SWAY" => Self::SwayStatus,
+                    "SWAY_ENABLE" => Self::SwayEnable,
+                    "SWAY_DISABLE" => Self::SwayDisable,
                     "POINTER_REQUEST" => Self::PointerRequest,
                     _ => Self::PointerCancel,
                 })

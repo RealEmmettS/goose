@@ -1,6 +1,14 @@
 //! Explicit per-user Wayland setup. This is permission state, separate from drafts.
 #[cfg(any(target_os = "linux", test))]
 mod installed;
+mod sway;
+#[cfg(any(target_os = "linux", test))]
+mod sway_consent;
+pub(crate) use sway::{sway_remove, sway_setup, sway_status};
+#[cfg(target_os = "linux")]
+mod sway_runtime;
+#[cfg(target_os = "linux")]
+pub(crate) use sway_runtime::SwayRuntime;
 #[cfg(target_os = "linux")]
 mod runtime;
 #[cfg(target_os = "linux")]

@@ -102,6 +102,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::SettingsService { config }) => settings::run(config),
         Some(Command::Integrations { integration }) => {
             let result = match integration {
+                cli::Integration::Sway {
+                    action: cli::IntegrationAction::Setup,
+                } => integrations::sway_setup()?,
+                cli::Integration::Sway {
+                    action: cli::IntegrationAction::Remove,
+                } => integrations::sway_remove()?,
+                cli::Integration::Sway {
+                    action: cli::IntegrationAction::Status,
+                } => integrations::sway_status(),
                 cli::Integration::Kde {
                     action: cli::IntegrationAction::Setup,
                 } => integrations::setup()?,

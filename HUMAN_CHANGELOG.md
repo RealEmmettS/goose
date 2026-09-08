@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Added
+- Add optional Sway window and fullscreen awareness with setup and removal in settings and the command line. Keep desktop checks responsive, stop using observations when the connection changes, and preserve unsaved settings through permission changes and goose restarts.
 - Add optional KDE support with clear setup, status and removal in graphical settings and the command line. Window support and pointer permission remain separate choices.
 - Let you request temporary pointer permission through your desktop's own dialog and cancel it from settings. Closing settings leaves the goose running; a later goose session needs fresh permission.
 - Export editable artwork and animation frames directly from the desktop drawing code, keeping the website's goose consistent with the app.

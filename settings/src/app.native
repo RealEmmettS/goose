@@ -36,6 +36,15 @@
             </row>
           </if>
           <separator/>
+          <if test="{sway_supported}">
+            <text size="lg"><span weight="bold">Optional Sway observations</span></text>
+            <text wrap="true">{swayStatus}</text>
+            <row gap="8">
+              <button disabled="{not canSetupSway}" on-press="sway_setup">Set up Sway</button>
+              <if test="{sway_installed}"><button disabled="{busy}" on-press="sway_remove">Remove Sway observations</button></if>
+            </row>
+            <separator/>
+          </if>
           <text wrap="true">{updateStatus}</text>
           <row gap="8">
             <button disabled="{busy}" on-press="check_updates">Check for updates</button>
@@ -95,6 +104,18 @@
           <text wrap="true">Enable window observation, window rides, fullscreen awareness and bounded window movement for this user. Terminal windows remain protected. Pointer control needs a separate portal permission.</text>
           <text wrap="true">Use native Wayland on KDE to connect. You can remove this integration here at any time. Other desktop integrations and startup settings stay separate.</text>
           <row gap="8"><button on-press="kde_cancel">Cancel</button><button variant="primary" on-press="kde_confirm">Enable KDE integration</button></row>
+        </column>
+      </dialog>
+    </column>
+  </if>
+  <if test="{sway_prompt}">
+    <column main="center" cross="center">
+      <dialog on-dismiss="sway_cancel" label="Enable Sway observations" width="520" height="300">
+        <column gap="16" padding="24">
+          <text size="lg"><span weight="bold">Connect the goose to Sway</span></text>
+          <text wrap="true">Allow window observation and fullscreen awareness on qualified Sway desktops. Movement, window rides and pointer control remain unavailable. Notes use normal desktop placement.</text>
+          <text wrap="true">Use native Wayland to connect. Remove these observations here at any time.</text>
+          <row gap="8"><button on-press="sway_cancel">Cancel</button><button variant="primary" on-press="sway_confirm">Enable Sway observations</button></row>
         </column>
       </dialog>
     </column>

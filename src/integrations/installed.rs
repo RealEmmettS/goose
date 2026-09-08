@@ -30,21 +30,23 @@ fn invalid(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message)
 }
 
-fn check(path: &Path, directory: bool) -> io::Result<()> {
+pub(super) fn check(path: &Path, directory: bool) -> io::Result<()> {
     let metadata = fs::symlink_metadata(path)?;
     if metadata.file_type().is_symlink()
         || metadata.is_dir() != directory
         || (!directory && !metadata.is_file())
     {
         return Err(invalid(
-            "KDE setup path is not an owned regular file or directory",
+            "Integration setup path is not an owned regular file or directory",
         ));
     }
     #[cfg(target_os = "linux")]
     {
         use std::os::unix::fs::MetadataExt;
         if metadata.uid() != unsafe { libc::geteuid() } || metadata.mode() & 0o077 != 0 {
-            return Err(invalid("KDE setup must be private to the current user"));
+            return Err(invalid(
+                "Integration setup must be private to the current user",
+            ));
         }
     }
     Ok(())
@@ -78,7 +80,7 @@ pub(super) fn read(directory: &Path) -> io::Result<Option<Consent>> {
     Ok(Some(consent))
 }
 
-fn private_file(path: &Path, exclusive: bool) -> io::Result<File> {
+pub(super) fn private_file(path: &Path, exclusive: bool) -> io::Result<File> {
     let mut options = OpenOptions::new();
     options.read(true).write(true);
     if exclusive {
@@ -99,6 +101,10 @@ fn private_file(path: &Path, exclusive: bool) -> io::Result<File> {
 }
 
 fn lock(directory: &Path) -> io::Result<File> {
+    lock_record(directory, ".kwin-lock")
+}
+
+pub(super) fn lock_record(directory: &Path, name: &str) -> io::Result<File> {
     let mut builder = fs::DirBuilder::new();
     builder.recursive(true);
     #[cfg(target_os = "linux")]
@@ -108,11 +114,11 @@ fn lock(directory: &Path) -> io::Result<File> {
     }
     builder.create(directory)?;
     check(directory, true)?;
-    let file = private_file(&directory.join(".kwin-lock"), false)?;
+    let file = private_file(&directory.join(name), false)?;
     file.try_lock().map_err(|_| {
         io::Error::new(
             io::ErrorKind::WouldBlock,
-            "KDE setup is being changed elsewhere",
+            "Integration setup is being changed elsewhere",
         )
     })?;
     Ok(file)
