@@ -145,6 +145,15 @@ preserve = "untouched"
         window.fullscreen()
         wait(lambda: find_window('Honk300 ordinary Sway probe')['fullscreen_mode'] > 0, 'fixture fullscreen')
         trace(True, True)
+        original_workers = workers()
+        original_consent = record.read_bytes()
+        control('integrations', 'sway', 'setup')
+        expect('supported', 'repeated CLI setup retains fullscreen observations')
+        assert workers() == original_workers and record.read_bytes() == original_consent
+        invoke('Set up Sway')
+        invoke('Enable Sway observations')
+        expect('supported', 'repeated native setup retains fullscreen observations')
+        assert workers() == original_workers and record.read_bytes() == original_consent
         # The actual engine honors the user's switch while the native fullscreen
         # observation stays true. No test-only schedule substitute is involved.
         config.write_text(original.replace('pause_on_fullscreen = true', 'pause_on_fullscreen = false'))
@@ -216,6 +225,7 @@ preserve = "untouched"
         assert config.read_text() == original
         (directory / 'result.json').write_text(json.dumps(dict(ok=True, default_off=True,
             native_settings_consent=True, engine_fullscreen_manners=True, live_config_toggle=True,
+            idempotent_setup_preserves_worker=True,
             draft_preserved=True, unsupported_actions=True, exact_worker_removed=True,
             live_remove=True, external_revocation=True, socket_replacement=True,
             no_automatic_reconnect=True, graceful_restart=True, crash_restart=True,

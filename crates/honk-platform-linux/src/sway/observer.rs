@@ -66,7 +66,9 @@ impl Observer {
 
     pub fn snapshot(&self) -> Option<Frame> {
         self.state
-            .try_lock()
+            // The producer only assigns an already decoded frame under this
+            // lock. Brief publication contention is not a capability failure.
+            .lock()
             .ok()?
             .frame
             .as_ref()
@@ -75,7 +77,7 @@ impl Observer {
     }
 
     pub fn failed(&self) -> bool {
-        self.state.try_lock().map_or(true, |state| state.failed)
+        self.state.lock().map_or(true, |state| state.failed)
     }
 }
 
@@ -88,5 +90,42 @@ impl Drop for Observer {
             // retained until it exits; no detached thread survives removal.
             let _ = worker.join();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc;
+
+    #[test]
+    fn publication_contention_preserves_the_healthy_snapshot() {
+        let observer = Arc::new(Observer {
+            state: Arc::new(Mutex::new(State {
+                frame: Some((Instant::now(), Frame { windows: vec![] })),
+                failed: false,
+            })),
+            stop: Arc::new(AtomicBool::new(false)),
+            worker: None,
+        });
+        let mut publishing = observer.state.lock().unwrap();
+        let reader = Arc::clone(&observer);
+        let (started, start) = mpsc::channel();
+        let (result, received) = mpsc::channel();
+        let thread = thread::spawn(move || {
+            started.send(()).unwrap();
+            result.send((reader.snapshot(), reader.failed())).unwrap();
+        });
+        start.recv().unwrap();
+        assert!(matches!(
+            received.recv_timeout(Duration::from_millis(25)),
+            Err(mpsc::RecvTimeoutError::Timeout)
+        ));
+        publishing.frame.as_mut().unwrap().0 = Instant::now();
+        drop(publishing);
+        let (frame, failed) = received.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert!(frame.is_some());
+        assert!(!failed);
+        thread.join().unwrap();
     }
 }

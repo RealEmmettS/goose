@@ -50,6 +50,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ### Behind the scenes
 - Test optional Hyprland support in isolated desktops before offering it, checking that desktop observations are trustworthy and unrelated windows remain untouched.
+### Fixed
+- Keep fullscreen quiet behavior working when an application has no title or does not report its process identity, and avoid briefly losing desktop observations while a fresh view is being recorded.
+
+### Behind the scenes
+- Check the goose against its actual on-screen outline, including every transparent edge, so a complete bird in a compact drawing area can pass while damaged colors, dark boxes and mismatched frames still fail.
 
 ### Added
 - Add optional Sway window and fullscreen awareness with setup and removal in settings and the command line. Keep desktop checks responsive, stop using observations when the connection changes, and preserve unsaved settings through permission changes and goose restarts.
@@ -59,7 +64,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Explain optional desktop setup and dependencies without claiming support for desktops that have not been tested.
 
 ### Fixed
+- Keep Sway desktop awareness steady when you repeat setup, preserving the existing connection and permission.
 - Recognize fullscreen groups of windows on Sway and report unavailable observations when its screens are off. Check that incomplete desktop replies cannot keep the goose waiting indefinitely.
+- Keep an existing pointer permission when you repeat KDE setup, so an unchanged setup does not send you through another permission dialog. Include the desktop companion when preparing the source package.
 - Keep exact desktop window positions when passing them to the goose, preventing a delivery from stopping after its first small movement.
 - Bring controls below the settings scroll area into view when a screen reader activates them, while keeping disabled controls inactive.
 - Let the goose recognize its own transparent drawing surface so granted pointer pranks work while other windows remain protected. Keep desktop observations running during longer sessions.

@@ -39,8 +39,17 @@ All notable changes to this project are documented here. Format based on
 
 ### Behind the scenes
 - Begin separate Hyprland native interface qualification across x64/ARM64 and legacy/Lua generations, checking private socket peers, actual window identity, bounded owned-fixture movement and fullscreen before runtime integration.
+- Record v1.5.0 immutable publication, all-eight fresh-public qualification and independent verification of all 47 assets. Close both website handoffs against the actual renderer SVG deployment and verified Linux/Pi guidance with all 22 download mappings.
+
+### Behind the scenes
+- Reconcile v1.4.0 final-source publication and fresh-public evidence across current guidance, accessibility ADRs, the audit and completed foundation/settings/art tasks. Retain separate website/next-stage gates and track unresolved presence observation in its own milestone task.
+
+## [1.7.0] - Unreleased candidate
 
 ### Fixed
+- Preserve healthy Sway observations during frame-publication contention. Accept legitimate null titles and retain visible fullscreen clients whose process identity is unavailable; regression tests reproduce both decoder failures, and native qualification includes an untitled XWayland client without an advertised PID.
+- Replace the Windows smoke's obsolete full-canvas transparency assumption for bounded captures with exact DIB-to-DWM comparison of every pixel over both backgrounds and a complete clear perimeter. Preserve semantic, clipping, channel, premultiplication and black-surface checks; add regressions for bounded poses, opaque slabs, incorrect alpha and stale frames.
+- Preserve a healthy Sway observation worker through repeated CLI or native settings setup. Verify the actual worker identity and unchanged consent while fullscreen manners remain enabled.
 - Inherit Sway fullscreen state through real split containers while excluding the synthetic workspace flag. Reject observations without an active powered output. Production decoder regressions fail before both corrections and pass afterward; native fixtures require both compositor states. Enable the private fixture's real accessibility bus before querying its native settings provider.
 
 ### Behind the scenes
@@ -53,12 +62,6 @@ All notable changes to this project are documented here. Format based on
 ### Behind the scenes
 - Qualify the Sway 1.9/1.10.1 native premise on x64/ARM64 Ubuntu and Debian, checking real socket peer identity, window geometry, bounded owned-fixture motion and fullscreen state before runtime implementation. Retain the unresolved active-drag observation boundary before enabling production movement.
 
-### Behind the scenes
-- Record v1.5.0 immutable publication, all-eight fresh-public qualification and independent verification of all 47 assets. Close both website handoffs against the actual renderer SVG deployment and verified Linux/Pi guidance with all 22 download mappings.
-
-### Behind the scenes
-- Reconcile v1.4.0 final-source publication and fresh-public evidence across current guidance, accessibility ADRs, the audit and completed foundation/settings/art tasks. Retain separate website/next-stage gates and track unresolved presence observation in its own milestone task.
-
 ## [1.6.0] - Unreleased candidate
 
 ### Added
@@ -68,6 +71,7 @@ All notable changes to this project are documented here. Format based on
 - Document guided setup, removal, optional system dependencies, session-only pointer permission and independently qualified compositor boundaries.
 
 ### Fixed
+- Preserve the current KWin bridge and active portal grant when CLI or native settings repeats setup for the same healthy consent. Invalid, changed or stale authority still revokes before reconnection. Include the embedded companion in Cargo's actual source-package file selection.
 - Preserve exact floating-point geometry at the KWin JSON boundary. A captured native coordinate regression reproduces a one-ULP decoding change that made the script correctly reject every move after the first fractional position; float_roundtrip fixes the data without relaxing the stale-window guard.
 - Scroll native accessibility targets into view through existing bounded scroll containers before activation. The real SDK dispatcher regression reproduces the original failure and preserves disabled-control refusal.
 - Recognize only the current process's click-through Wayland layer when guarding pointer motion, retaining terminal and unknown-window checks beneath it. Retain KWin observation timers at script scope and qualify their continued native updates beyond garbage collection.

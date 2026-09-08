@@ -27,7 +27,7 @@
   - [x] Prove the authenticated native socket, window identity and actual bounded placement premise.
   - [x] Resolve the active-drag boundary: keep movement unsupported under ADR 0046.
   - [x] Qualify the production read-only Rust transport and untrusted-peer refusal.
-  - [ ] Integrate explicit Rust and native settings setup/removal with disconnect handling and unsupported action checks.
+  - [x] Integrate explicit Rust and native settings setup/removal with disconnect handling and unsupported action checks.
   - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
 - [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) #rkde
   - [x] Prepare guided setup documentation and the distinct release metadata.
