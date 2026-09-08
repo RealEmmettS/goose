@@ -34,6 +34,7 @@ All notable changes to this project are documented here. Format based on
 - Report an expired Mac fullscreen sample as failed while its replacement is blocked; reserve unprobed for a new target, preserve the original freshness limit and recover on a fresh result.
 
 ### Behind the scenes
+- Integrate the reproduced GNOME extension-disable status correction and repeat final-source native and distribution gates, preserving the qualified Mac observer and every held-ride cancellation assertion.
 - Keep private GNOME drag input clear of the goose's return route, guarantee an actual initial pointer change and record the compositor's picked surface alongside native input acknowledgments.
 - Use GTK's typed click signals for native input acknowledgment on the supported Python bindings, preserving unclaimed event propagation and actual window-handle movement.
 - Acknowledge each real GTK motion and primary-button event before issuing the next private GNOME drag step; retain actual Mutter grabs, engine rides, terminal refusal and every held-action cancellation check.

@@ -41,6 +41,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Show a clear temporary failure when a Mac app stops answering, and restore its fullscreen status when it responds again.
 
 ### Behind the scenes
+- Include the corrected GNOME disconnect status and repeat the complete desktop and download checks before publishing the final manners update.
 - Keep private drag tests clear of the goose's walk back and record which window actually receives the pointer, while preserving the same required desktop behavior.
 - Use the desktop toolkit's supported click signal to observe private test input without taking over the window's normal drag behavior.
 - Wait for private test windows to receive each mouse action before continuing a drag, so delayed input cannot hide or falsely report a desktop behavior failure.
