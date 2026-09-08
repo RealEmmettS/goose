@@ -82,11 +82,14 @@ impl Worker {
             state.sample = None;
             wake.notify_one();
         }
-        state
-            .sample
-            .filter(|(started, _)| started.elapsed() <= FRESHNESS)
-            .map(|(_, result)| result)
-            .unwrap_or(Err(CapabilityStatus::Unprobed))
+        match state.sample {
+            Some((started, result)) if started.elapsed() <= FRESHNESS => result,
+            // A completed observation that expired while its replacement is
+            // blocked is a failed observation, not a target never probed. Keep
+            // the same strict age bound for successful and failed native calls.
+            Some(_) => Err(CapabilityStatus::Failed),
+            None => Err(CapabilityStatus::Unprobed),
+        }
     }
 }
 
@@ -312,9 +315,40 @@ mod tests {
         release_tx.send(()).unwrap();
         // The next real query starts only after the first result was delivered.
         started_rx.recv_timeout(Duration::from_secs(1)).unwrap();
-        assert!(worker.poll(Some(target)).is_err());
+        assert_eq!(worker.poll(Some(target)), Err(CapabilityStatus::Failed));
         worker.poll(None).ok();
         release_tx.send(()).unwrap();
+        drop(worker);
+    }
+
+    #[test]
+    fn a_blocked_replacement_expires_and_a_fresh_result_recovers() {
+        let (started_tx, started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let worker = Worker::new(move |_| {
+            started_tx.send(()).unwrap();
+            release_rx.recv_timeout(Duration::from_secs(2)).unwrap()
+        })
+        .unwrap();
+        let target = Target {
+            pid: 3,
+            generation: 1,
+        };
+        assert_eq!(worker.poll(Some(target)), Err(CapabilityStatus::Unprobed));
+        started_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        release_tx.send(Ok(true)).unwrap();
+        started_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert_eq!(worker.poll(Some(target)), Ok(true));
+        thread::sleep(FRESHNESS + Duration::from_millis(10));
+        assert_eq!(worker.poll(Some(target)), Err(CapabilityStatus::Failed));
+        release_tx.send(Err(CapabilityStatus::Failed)).unwrap();
+        started_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert_eq!(worker.poll(Some(target)), Err(CapabilityStatus::Failed));
+        release_tx.send(Ok(false)).unwrap();
+        started_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert_eq!(worker.poll(Some(target)), Ok(false));
+        worker.poll(None).ok();
+        release_tx.send(Ok(false)).unwrap();
         drop(worker);
     }
 }

@@ -31,6 +31,7 @@ All notable changes to this project are documented here. Format based on
 
 ### Fixed
 - Recover Windows notification-observation status after a successful poll follows an error, and expose the current Linux compositor fullscreen capability independently of unsupported DND observation.
+- Report an expired Mac fullscreen sample as failed while its replacement is blocked; reserve unprobed for a new target, preserve the original freshness limit and recover on a fresh result.
 
 ### Behind the scenes
 - Require native Mac fullscreen/restore, denied app identity, live settings, unresponsive-target recovery and graceful shutdown, plus separate Windows UI Automation and Linux AT-SPI presence labels, as release qualification. Preserve the unqualified app-specific Focus experiment without production prompts or inferred support.

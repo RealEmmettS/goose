@@ -38,6 +38,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ### Fixed
 - Refresh Windows manners availability after a temporary failure recovers, and show Linux fullscreen support according to the desktop integration that is actually connected.
+- Show a clear temporary failure when a Mac app stops answering, and restore its fullscreen status when it responds again.
 
 ### Behind the scenes
 - Check real Mac fullscreen changes, denied access, interrupted apps, live settings and shutdown. Verify that assistive software can read both manners status labels, and keep do-not-disturb unavailable where its signal has not been verified.
