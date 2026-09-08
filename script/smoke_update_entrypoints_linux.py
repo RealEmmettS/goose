@@ -296,8 +296,14 @@ exec "$@" > "$HONK300_ENTRYPOINT_EVIDENCE/helper.stdout.txt" 2> "$HONK300_ENTRYP
                 (directory / 'failure.stderr.txt').write_text(text(directory / 'helper.stderr.txt'))
                 stop_helper(directory)
                 (directory / 'offline').unlink()
+                editor.find('Updater opened. Its result will remain in the update window.')
                 editor.invoke('Check for updates')
+                # Native actions are queued. The old Update button can remain
+                # enabled until Check is handled, so its state alone does not
+                # prove this new check has completed. Await the real response.
+                editor.find('Ready.')
                 editor.invoke('Update now')
+                wait(lambda: (directory / 'helper.pid').exists(), 'GUI retry helper process')
                 wait_helper(directory, success=True)
             verify_receipt(latest)
             no_op = run(INSTALLED, 'update', '--json', capture_output=True, text=True)

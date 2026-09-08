@@ -54,6 +54,7 @@ All notable changes to this project are documented here. Format based on
 - Aim cursor-seeking locomotion at the body position that brings the beak to the pointer, avoiding a stationary-pointer chase that could never reach the grab distance.
 
 ### Development
+- Wait for the GUI's new check response before retrying an update in the native Debian fixture; queued accessibility actions must not reuse the previous enabled state. Require a new retained helper before awaiting transaction success.
 - Exercise captured Windows CLI/app starts through real process EOF and runtime readiness on x64/ARM64. Give the disposable Linux TUI update fixture its own controlling PTY and preserve failed terminal output for diagnosis.
 - Scroll the real settings pane before toggling controls below smaller host viewports, checking every changed switch and all eight saved values while retaining the zero-dispatch-error gate.
 - Keep disposable settings lifecycle checks scoped to their CI environment and use Linux's explicit headless fallback where the fixture has no compositor; the independent Linux overlay gate continues to require visible pixels.
