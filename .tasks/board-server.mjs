@@ -420,7 +420,9 @@ async function serve({ open = false, port: requested } = {}) {
           const completionId = String(req.headers['x-completion-task-id'] || '').toLowerCase();
           const completionRevision = String(req.headers['x-completion-detail-revision'] || '');
           const deletionId = String(req.headers['x-delete-task-id'] || '').toLowerCase();
+          const deletionRevision = String(req.headers['x-delete-detail-revision'] || '');
           if (!!completionId !== !!completionRevision
+              || !!deletionId !== !!deletionRevision
               || (completionId && !/^[0-9a-z]{2,8}$/.test(completionId))
               || (deletionId && !/^[0-9a-z]{2,8}$/.test(deletionId))
               || (completionId && deletionId)) {
@@ -509,9 +511,9 @@ async function serve({ open = false, port: requested } = {}) {
               const detailTarget = path.join(TASK_DETAIL_DIR, completionId + '.md');
               const currentDetail = await readOptionalUtf8(detailTarget);
               const currentRevision = detailRevision(currentDetail);
-              if (currentRevision !== completionRevision) {
+              if (!currentDetail.trim() || currentRevision !== completionRevision) {
                 return send(res, 412, 'application/json', JSON.stringify({
-                  error: 'task detail changed before completion',
+                  error: 'task detail is missing, empty or changed before completion',
                   taskId: completionId,
                   actualRevision: currentRevision,
                 }), { 'X-Detail-Revision': currentRevision });
@@ -525,6 +527,14 @@ async function serve({ open = false, port: requested } = {}) {
             let detailCleanupWarning = '';
             if (deletionId) {
               const detailTarget = path.join(TASK_DETAIL_DIR, deletionId + '.md');
+              const currentRevision = detailRevision(await readOptionalUtf8(detailTarget));
+              if (currentRevision !== deletionRevision) {
+                return send(res, 412, 'application/json', JSON.stringify({
+                  error: 'task detail changed before deletion',
+                  taskId: deletionId,
+                  actualRevision: currentRevision,
+                }), { 'X-Detail-Revision': currentRevision });
+              }
               const tombstoneDir = TASK_DETAIL_TOMBSTONE_DIR;
               await fsp.mkdir(tombstoneDir, { recursive: true });
               detailTombstone = path.join(

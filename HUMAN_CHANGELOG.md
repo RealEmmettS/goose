@@ -48,6 +48,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - On a desktop that only offers Wayland, starting the goose explains how to enable its reduced mode instead of selecting that mode silently.
 - Linux notes and pictures use a clearly named Close button that accessibility tools can identify.
 - The goose pauses new note and picture deliveries when several are already open, leaving your existing notes intact and resuming after you close one.
+- Keep login-start changes consistent with the saved preference when two settings windows are editing at once, and report conflicting external edits.
+- Refuse to delete a task after someone else updates its details, and require saved task details before marking it complete.
 - Opening settings now respects the installer's latest start-at-login choice, so changing an unrelated preference cannot undo it.
 - Settings remain editable when the goose cannot report its status, and unusual configuration filenames no longer prevent the window from loading.
 - Reloading after a configuration file disappears keeps the goose's current choices instead of silently resetting them.
@@ -82,6 +84,7 @@ Settings now expose their text and controls to Windows accessibility tools, with
 - Automatically check changes to the new Linux prop host on both processor types during development.
 - Build the Linux note and picture host and checks for text, image fit, closing windows and cleaning up when the goose stops.
 - Prepare Linux deliveries to use the desktop's normal placement when animated window dragging is unavailable.
+- Correct the age of the saved preference used in installer-choice checks, so the test really covers an older preference and records the evidence needed to diagnose failures.
 - Check unusual filenames on systems that allow creating them, while respecting the Mac filesystem's own filename rules.
 - Add focused startup and settings checks, and refresh the project dashboard while preserving its existing settings.
 - Linux builds now receive the same strict code checks as Windows, including unused platform-specific code.

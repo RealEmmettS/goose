@@ -36,6 +36,25 @@ impl ConfigRevision {
     pub fn read(path: &Path) -> Result<Self, ConfigError> {
         Ok(revision(read_document(path)?.as_deref()))
     }
+
+    /// Hold the same lock as GUI/TUI saves through a revision-dependent OS effect.
+    /// External editors that ignore our lock are detected again after the effect.
+    pub fn with_guard<T, E: From<ConfigError>>(
+        &self,
+        path: &Path,
+        operation: impl FnOnce() -> Result<T, E>,
+    ) -> Result<T, E> {
+        let target = save_target(path)?;
+        let _lock = lock_document(&target)?;
+        if Self::read(&target)? != *self {
+            return Err(ConfigError::Conflict.into());
+        }
+        let result = operation()?;
+        if Self::read(&target)? != *self {
+            return Err(ConfigError::Conflict.into());
+        }
+        Ok(result)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -164,32 +183,7 @@ pub(super) fn save(
 ) -> Result<ConfigRevision, ConfigError> {
     config.validate()?;
     let target = save_target(path)?;
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let mut lock_name = target.as_os_str().to_owned();
-    lock_name.push(".lock");
-    let lock_path = Path::new(&lock_name);
-    if fs::symlink_metadata(lock_path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
-        return Err(ConfigError::InvalidTarget(
-            "configuration lock must not be a symlink".into(),
-        ));
-    }
-    let mut options = fs::OpenOptions::new();
-    options.read(true).write(true).create(true).truncate(false);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    // Retain the inode after closing: unlinking an advisory lock allows two owners.
-    // GUI/TUI saves fail promptly when another editor is committing.
-    let lock = options.open(lock_path)?;
-    lock.try_lock().map_err(|error| {
-        ConfigError::Io(io::Error::other(format!(
-            "another configuration save is active: {error}"
-        )))
-    })?;
+    let _lock = lock_document(&target)?;
     let source = read_document(&target)?;
     if expected.is_some_and(|expected| *expected != revision(source.as_deref())) {
         return Err(ConfigError::Conflict);
@@ -218,9 +212,76 @@ pub(super) fn save(
     Ok(revision(Some(&document.to_string())))
 }
 
+fn lock_document(target: &Path) -> Result<fs::File, ConfigError> {
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut lock_name = target.as_os_str().to_owned();
+    lock_name.push(".lock");
+    let lock_path = Path::new(&lock_name);
+    if fs::symlink_metadata(lock_path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
+        return Err(ConfigError::InvalidTarget(
+            "configuration lock must not be a symlink".into(),
+        ));
+    }
+    let mut options = fs::OpenOptions::new();
+    options.read(true).write(true).create(true).truncate(false);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    // Retain the inode after closing: unlinking an advisory lock allows two owners.
+    // GUI/TUI saves fail promptly when another editor is committing.
+    let lock = options.open(lock_path)?;
+    lock.try_lock().map_err(|error| {
+        ConfigError::Io(io::Error::other(format!(
+            "another configuration save is active: {error}"
+        )))
+    })?;
+    Ok(lock)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn guarded_effect_excludes_config_saves_and_rejects_stale_intent() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        Config::default().save_atomic(&path).unwrap();
+        let snapshot = ConfigSnapshot::load(&path).unwrap();
+        let mut changed = snapshot.config.clone();
+        changed.lifecycle.autostart_on_login = true;
+        let result: Result<(), ConfigError> = snapshot.revision.with_guard(&path, || {
+            assert!(changed.save_if_revision(&path, &snapshot.revision).is_err());
+            assert_eq!(ConfigRevision::read(&path).unwrap(), snapshot.revision);
+            Ok(())
+        });
+        result.unwrap();
+        changed.save_if_revision(&path, &snapshot.revision).unwrap();
+        let mut invoked = false;
+        let result: Result<(), ConfigError> = snapshot.revision.with_guard(&path, || {
+            invoked = true;
+            Ok(())
+        });
+        assert!(matches!(result, Err(ConfigError::Conflict)));
+        assert!(!invoked);
+    }
+
+    #[test]
+    fn guarded_effect_reports_an_external_editor_ignoring_the_lock() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        Config::default().save_atomic(&path).unwrap();
+        let snapshot = ConfigSnapshot::load(&path).unwrap();
+        let result: Result<(), ConfigError> = snapshot.revision.with_guard(&path, || {
+            fs::write(&path, "# external editor\n").unwrap();
+            Ok(())
+        });
+        assert!(matches!(result, Err(ConfigError::Conflict)));
+    }
 
     #[test]
     fn path_identity_stays_stable_through_first_save_and_distinguishes_other_files() {
