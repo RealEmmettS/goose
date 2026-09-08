@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Correct the isolated GNOME test environment so the desktop does not try to use a login service that is absent there.
+
+### Behind the scenes
 - Check that GNOME desktop observations really come from the running desktop before trusting them.
 
 ### Behind the scenes

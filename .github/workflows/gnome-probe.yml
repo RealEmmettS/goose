@@ -44,6 +44,10 @@ jobs:
               libgl1-mesa-dri libegl-mesa0 xvfb xauth xwayland wayland-utils imagemagick \
               util-linux passwd libasound2t64 dconf-cli
             dpkg-query -W > target/gnome-evidence/packages.txt
+            # Package installation may create an empty seats directory even
+            # though this private container has no systemd/login session. Keep
+            # GNOME on its normal no-logind path; never substitute a fake service.
+            if test -d /run/systemd/seats; then rmdir /run/systemd/seats; fi
             mkdir -p /run/dbus
             dbus-daemon --system --fork
             useradd --create-home honkprobe

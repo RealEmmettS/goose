@@ -40,6 +40,10 @@ Active. Begin the real Shell extension lifecycle, native window interface and
 compatible XWayland goose overlay premise. No GNOME production capability is enabled.
 
 ## Activity
+- 2026-09-08 — Inspect the first failure: GNOME initializes real rendering but
+  mistakes an empty package-created seats directory for a running logind session.
+  Remove only that empty marker in the disposable container so upstream selects
+  its normal no-logind path. No service, extension API or observation is simulated.
 - 2026-09-08 — Pin the probe to the actual unique bus owner and verify its kernel
   process identity before trusting extension observations; do not infer authority
   from a process ID reported inside the reply itself.

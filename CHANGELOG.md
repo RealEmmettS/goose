@@ -27,6 +27,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Correct the native GNOME fixture's false logind detection by removing only an empty package-created seats directory in its private container, preserving the upstream no-logind path and real desktop API tests.
+
+### Behind the scenes
 - Bind the GNOME native probe to its unique D-Bus owner and verify the bus-reported process identity before accepting extension observations.
 
 ### Behind the scenes
