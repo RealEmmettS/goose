@@ -30,7 +30,11 @@ Exact desktop versions, request semantics and native behavior require direct qua
 - [ ] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Queued. Upstream IPC reviewed; implementation and native acceptance have not begun.
+Active. Begin native socket/window qualification on separately packaged Hyprland
+generations, with private configuration and no production runtime claims yet.
 
 ## Activity
+- 2026-09-08 — Exercise the native headless interface on Ubuntu and Debian x64/ARM64.
+  Use each generation's actual configuration and dispatcher syntax, bound each socket
+  transaction, attest the launched peer, and touch only exact fixture-owned windows.
 - 2026-09-08 — Split the approved follow-on scope into a separately verifiable adapter task.

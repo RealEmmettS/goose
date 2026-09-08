@@ -26,6 +26,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Behind the scenes
+- Begin separate Hyprland native interface qualification across x64/ARM64 and legacy/Lua generations, checking private socket peers, actual window identity, bounded owned-fixture movement and fullscreen before runtime integration.
+
 ### Fixed
 - Inherit Sway fullscreen state through real split containers while excluding the synthetic workspace flag. Reject observations without an active powered output. Production decoder regressions fail before both corrections and pass afterward; native fixtures require both compositor states. Enable the private fixture's real accessibility bus before querying its native settings provider.
 

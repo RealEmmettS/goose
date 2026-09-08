@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Behind the scenes
+- Test optional Hyprland support in isolated desktops before offering it, checking that desktop observations are trustworthy and unrelated windows remain untouched.
+
 ### Added
 - Add optional Sway window and fullscreen awareness with setup and removal in settings and the command line. Keep desktop checks responsive, stop using observations when the connection changes, and preserve unsaved settings through permission changes and goose restarts.
 - Add optional KDE support with clear setup, status and removal in graphical settings and the command line. Window support and pointer permission remain separate choices.
