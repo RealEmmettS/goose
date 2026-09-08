@@ -55,6 +55,12 @@
         return value.length === 4 && value.every(finite) && value[2] > 0 && value[3] > 0;
     }
     function onDesktop(window) {
+        // Plasma 5's QtScript does not reliably expose QVector<VirtualDesktop*>.
+        // Its numeric desktop property remains authoritative for this membership.
+        if (typeof workspace.currentDesktop === "number") {
+            return window.onAllDesktops === true || (typeof window.desktop === "number" &&
+                window.desktop > 0 && window.desktop === workspace.currentDesktop);
+        }
         var current = workspace.currentVirtualDesktop || workspace.currentDesktop;
         var desktops = window.desktops;
         if (!current || !desktops || typeof desktops.length !== "number") return false;

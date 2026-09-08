@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import selectors
 import subprocess
+import threading
 import time
 
 
@@ -154,7 +155,28 @@ def main():
                 except Exception as error:
                     invocation.return_dbus_error('org.emmetts.Honk300.Invalid', str(error))
 
-            registration = bus.register_object('/org/emmetts/Honk300/KWin', interface, exchange, None, None)
+            # Export the fixture responder in its own GLib context. Native GTK paint
+            # and synchronous test control calls must not starve protocol replies.
+            service_context = GLib.MainContext.new()
+            service_loop = GLib.MainLoop.new(service_context, False)
+            service_ready = threading.Event()
+            service_registration = []
+
+            def run_service():
+                service_context.push_thread_default()
+                try:
+                    service_registration.append(bus.register_object('/org/emmetts/Honk300/KWin',
+                        interface, exchange, None, None))
+                    service_ready.set()
+                    service_loop.run()
+                finally:
+                    if service_registration:
+                        bus.unregister_object(service_registration[0])
+                    service_context.pop_thread_default()
+
+            service_thread = threading.Thread(target=run_service, daemon=True)
+            service_thread.start()
+            assert service_ready.wait(3), 'Fixture D-Bus responder did not start'
             request = call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
                            'RequestName', GLib.Variant('(su)', ('org.emmetts.Honk300.Wayland', 4))).unpack()[0]
             assert request == 1, request
@@ -177,7 +199,18 @@ def main():
             assert ordinary['on_desktop'] and ordinary['on_activity'] and ordinary['drag_known'], ordinary
             assert latest['stacking_order'] == (major >= 6), latest
 
+            fixture_name = None
+
+            def unload_fixture():
+                nonlocal fixture_name
+                if fixture_name:
+                    assert call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'unloadScript',
+                        GLib.Variant('(s)', (fixture_name,))).unpack()[0]
+                    fixture_name = None
+
             def fixture_action(name, action):
+                nonlocal fixture_name
+                unload_fixture()
                 # This script is fixture-only and never packaged. The test owns the
                 # private compositor and selects only its exact native window/PID.
                 helper = evidence / f'fixture-{name}.js'
@@ -196,6 +229,7 @@ def main():
                 identifier = call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'loadScript',
                     GLib.Variant('(ss)', (str(helper), f'honk300-fixture-{name}'))).unpack()[0]
                 assert identifier >= 0
+                fixture_name = f'honk300-fixture-{name}'
                 address = f'/Scripting/Script{identifier}' if major >= 6 else f'/{identifier}'
                 call('org.kde.KWin', address, 'org.kde.kwin.Script', 'run')
 
@@ -225,7 +259,9 @@ def main():
             assert after <= before + 1, (before, after)
             call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'unloadScript',
                  GLib.Variant('(s)', ('honk300-native-probe',)))
-            bus.unregister_object(registration)
+            service_loop.quit()
+            service_thread.join(timeout=3)
+            assert not service_thread.is_alive(), 'Fixture D-Bus responder did not stop'
             call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
                  'ReleaseName', GLib.Variant('(s)', ('org.emmetts.Honk300.Wayland',)))
             if args.bridge:
@@ -237,6 +273,10 @@ def main():
                     call('org.kde.KWin', address, 'org.kde.kwin.Script', 'run')
 
                 def unload_rust_script():
+                    # KWin allocates ids from the current script list length. Remove
+                    # the last fixture script first so a later reconnect cannot reuse
+                    # an id whose D-Bus object is still occupied by our test helper.
+                    unload_fixture()
                     call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'unloadScript',
                          GLib.Variant('(s)', ('honk300-rust-probe',)))
 
