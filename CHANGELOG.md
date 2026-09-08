@@ -27,6 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- Arrange exact private GNOME drag fixtures through the isolated test extension after native focus-stealing prevention rejects a background GTK presentation; retain real compositor input and production ride observations.
 - Wait for independent GNOME owned-prop readiness before asserting its complete observation/placement startup contract.
 - Bound GNOME credential lookup separately from authenticated snapshot delivery so rejected callers cannot terminate the retained runtime by occupying its lookup slot; retry only explicit busy replies from the same pinned Shell and withdraw stale frames.
 - Keep the native GNOME authentication regression after production items so strict Linux test linting remains enforced.

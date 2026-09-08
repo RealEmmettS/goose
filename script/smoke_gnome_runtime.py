@@ -123,6 +123,12 @@ preserve = "untouched"
     def drag(target, protected=False):
         target.present()
         title = target.get_title()
+        arranged = wait(lambda: find_window(title), 'existing native drag fixture')
+        bus.call_sync(shell_owner, '/dev/emmetts/Honk300/GnomeProbe1',
+            'dev.emmetts.Honk300.GnomeProbe1', 'FocusFixture',
+            GLib.Variant('(tus)', (arranged['id'], os.getpid(),
+                json.dumps(arranged['rect'], separators=(',', ':')))),
+            GLib.VariantType.new('(s)'), Gio.DBusCallFlags.NONE, 1000, None)
         native = wait(lambda: (node if (node := find_window(title)) and node['focused']
                               and not snapshot()['overview'] else None), 'native drag focus')
         x, y, width, height = native['rect']

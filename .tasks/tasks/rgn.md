@@ -41,6 +41,7 @@ boundary, recoverable consent and native settings are implemented under ADR 0048
 Run the actual integrated desktop fixture before any supported capability or publication claim.
 
 ## Activity
+- 2026-09-08 — Native consent, capability separation and unapproved-caller refusal pass; arrange the exact private window after GNOME prevents its background focus request, retaining actual compositor input for the next ride gate.
 - 2026-09-08 — The fixed native run passes Rust/authentication/lint/SDK builds and the actual Shell/overlay premise. The integrated fixture reads default-off observations before the separate prop child reports ready, then asserts prop positioning too early. Wait for both independent capability states before checking their full contract; the previous runtime log confirms actual native prop readiness.
 - 2026-09-08 — The actual silent-bus authentication timeout and peer cleanup regression passes on all four Linux lanes. Strict clippy stops the run because the test module precedes production items; move that module to the end without suppressing lint or changing the test.
 - 2026-09-08 — The first integrated native run correctly refuses a bind-mounted executable owned by the unrelated host runner UID before installing anything. Keep the production ownership check and install byte-identical Rust/settings outputs as a root-owned private fixture release, then compare both files before starting the desktop.

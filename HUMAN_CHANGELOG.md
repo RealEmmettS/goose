@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Added
+- Bring each private drag-test window forward explicitly so the desktop can keep its normal protection against background apps taking focus.
 - Check GNOME startup after its note and picture window helper has finished opening.
 - Keep the goose connected when GNOME refuses another program’s observation request, without giving that program access or keeping old window information.
 - Keep the GNOME connection checks compatible with the project’s strict build checks.

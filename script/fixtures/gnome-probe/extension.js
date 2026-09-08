@@ -10,6 +10,8 @@ const XML = `<node><interface name="dev.emmetts.Honk300.GnomeProbe1">
 <method name="ShowDesktop"><arg type="s" direction="out"/></method>
 <method name="MoveFixture"><arg type="t" direction="in"/><arg type="u" direction="in"/>
 <arg type="s" direction="in"/><arg type="s" direction="out"/></method>
+<method name="FocusFixture"><arg type="t" direction="in"/><arg type="u" direction="in"/>
+<arg type="s" direction="in"/><arg type="s" direction="out"/></method>
 </interface></node>`;
 
 export default class Probe extends Extension {
@@ -73,6 +75,21 @@ export default class Probe extends Extension {
         if (failures.length) throw new Error('Stale or unrelated probe target: ' + failures.join(', '));
         const rect = window.get_frame_rect();
         window.move_frame(false, rect.x + 6, rect.y);
+        return 'ok';
+    }
+
+    FocusFixture(id, pid, expected) {
+        // Arrange only our private test windows. This API never ships in the
+        // production companion and provides no production focus capability.
+        const window = this._windows().find(value => value.get_stable_sequence() === id);
+        if (!window || pid !== Number(GLib.getenv('HONK300_GNOME_PROBE_PID')) ||
+            window.get_pid() !== pid || window.get_wm_class() !== 'honk300-gnome-probe' ||
+            !['Honk300 ordinary GNOME probe', 'ChatGPT Codex terminal probe'].includes(window.get_title()) ||
+            JSON.stringify(this._window(window).rect) !== expected ||
+            this._drag || global.display.is_grabbed())
+            throw new Error('Stale or unrelated focus fixture');
+        Main.overview.hide();
+        window.activate(global.get_current_time());
         return 'ok';
     }
 
