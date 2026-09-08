@@ -99,7 +99,9 @@ def main():
                 inspected += 1
                 if node.get_name() == 'Note':
                     text = node.get_text_iface()
-                    if text and text.get_text(0, -1) == expected:
+                    # Noble's GI object also has Accessible.get_text(), whose
+                    # deprecated no-argument method shadows Text.get_text().
+                    if text and Atspi.Text.get_text(text, 0, -1) == expected:
                         return
                 stack.extend(child for i in range(node.get_child_count())
                              if (child := node.get_child_at_index(i)) is not None)
