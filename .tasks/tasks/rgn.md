@@ -44,6 +44,7 @@ All four integrated desktop fixtures pass. Final-source architecture/settings,
 complete candidate/main/publication, fresh-public and website gates remain open.
 
 ## Activity
+- 2026-09-08 — The strengthened fixture reaches the later cancellation cases; actual captures show the goose covering the centered title-bar input after a prior ride. Keep natural goose hit-testing unchanged and send the real gesture to the clear left title-bar portion, still requiring exact GTK entry and an actual compositor grab.
 - 2026-09-08 — Actual GTK pointer-entry checks expose the restored fixture at (0, 0), with its title bar under Shell's panel. Arrange only authenticated private fixture windows inside the usable stage before real input, retain all engine/grab assertions, and use typed GTK motion callbacks because this PyGObject version cannot expose boxed GDK events.
 - 2026-09-08 — Three desktops pass the native title-bar gesture. The newer ARM desktop rejects the protected fixture's grab despite correct Shell coordinates; await actual GTK surface entry and record unconsumed native capture events before repeating all four desktops. No runtime or grab assertion is relaxed.
 - 2026-09-08 — Final PR and candidate newer-x64 captures both show the exact protected private window focused with Alt/button held, but no native grab. Use an actual title-bar gesture and retain the required Mutter grab signal, raw target exclusion and production cancellation assertions. Invalidate the old candidate before repeating final-source gates.
