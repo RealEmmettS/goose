@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [codex/goose-wayland-integrations]
-    paths: ['integrations/kwin/**', 'script/smoke_kwin*', '.github/workflows/kwin-probe.yml']
+    paths: ['integrations/kwin/**', 'crates/honk-platform-linux/**', 'Cargo.lock', 'script/smoke_kwin*', '.github/workflows/kwin-probe.yml']
 
 permissions:
   contents: read
@@ -21,6 +21,14 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.95'
+      - name: Build and check the actual Rust KWin boundary
+        run: |
+          cargo test --locked -p honk-platform-linux --lib
+          cargo clippy --locked -p honk-platform-linux --all-targets -- -D warnings
+          cargo build --locked -p honk-platform-linux --example kwin_bridge_probe
       - name: Exercise the real isolated compositor and script
         env:
           HONK_DISTRIBUTION: ${{ matrix.distribution }}

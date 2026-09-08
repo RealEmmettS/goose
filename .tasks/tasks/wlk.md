@@ -42,6 +42,9 @@ without claiming occlusion order. The repeat native probe remains open, followed
 Rust bridge and setup. No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: Both native KWin generations pass in run 34189071395. Record ADR 0044;
+  implement the bounded Rust state and authenticated session-bus endpoint. Six new
+  production-state tests pass locally, with actual native transport qualification next.
 - 2026-09-08: Run 34188879003 passes the entire earliest KWin 6.3.6 native premise.
   KWin 5.27.11 reaches the script but sends no frame because stackingOrder is unavailable.
   Upstream Plasma/5.27 workspace_wrapper.h exposes clientList instead. Add that compatibility

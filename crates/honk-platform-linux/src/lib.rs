@@ -7,6 +7,9 @@
 #[cfg(target_os = "linux")]
 mod tray;
 
+#[cfg(any(target_os = "linux", test))]
+pub mod kwin;
+
 #[cfg(target_os = "linux")]
 pub use tray::StatusTray;
 
@@ -1918,6 +1921,7 @@ pub fn is_protected_terminal_app(wm_class: Option<&str>, app_name: Option<&str>)
             matches!(
                 token.as_str(),
                 "terminal"
+                    | "console"
                     | "xterm"
                     | "uxterm"
                     | "rxvt"
@@ -1938,6 +1942,17 @@ pub fn is_protected_terminal_app(wm_class: Option<&str>, app_name: Option<&str>)
                     | "rio"
                     | "code"
                     | "codex"
+                    | "chatgpt"
+                    | "contour"
+                    | "tabby"
+                    | "warp"
+                    | "zellij"
+                    | "st"
+                    | "terminology"
+                    | "guake"
+                    | "yakuake"
+                    | "tilda"
+                    | "extraterm"
             )
         })
 }
