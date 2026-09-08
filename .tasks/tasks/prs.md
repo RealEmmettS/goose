@@ -25,10 +25,21 @@ status are implemented. Native Intel and Apple Silicon pass actual fullscreen,
 frozen-target expiry/recovery, live settings, unavailable windows, graceful stop
 and the private denied app. Mac/Linux DND stays explicitly unsupported. The complete
 shared stopping/reversal correction from #rst is integrated and passes the local
-workspace and separate settings checks. Native, candidate, main, publication,
-fresh-public and website qualification remain required on this source.
+workspace and separate settings checks. All 33 standalone gates pass at 2285eb0,
+including both Mac architectures. Candidate 34284306818 then exposes a transient
+broken IPC connection being treated as permanent startup failure in native Intel
+settings. Correct that readiness policy and repeat final-source qualification.
 
 ## Activity
+- 2026-09-08 — Preserve candidate 34284306818's Intel settings failure and cancel
+  the incomplete candidate. The actual Start control reports Broken pipe before
+  readiness; production-loop regressions reproduce the immediate rejection.
+  Retry only the read-only startup status probe for dropped connections within
+  the unchanged deadline, retaining child-exit, permission and protocol errors.
+  Exercise three actual GUI start/stop cycles per native lifecycle lane, keep
+  failure status before cleanup, and repeat all final-stage gates. Formatting,
+  strict workspace lint, complete Rust tests, release build, 138 Python checks
+  (three platform skips), and separate Native SDK test/check/build pass locally.
 - 2026-09-08 — Integrate f25e700's corrected airborne prediction, acceleration
   travel bound, four actual World witnesses and reviewed turn fixtures. Native
   diagnostic 34280092759 confirms the old failure in actual foot state. Production

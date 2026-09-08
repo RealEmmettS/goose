@@ -30,6 +30,7 @@ All notable changes to this project are documented here. Format based on
 - Add a retained, bounded macOS Accessibility fullscreen observer with live target identity, permission withdrawal and stale-sample expiry. Add independent fullscreen/DND capabilities through an additive bounded IPC frame, CLI, TUI and Native SDK settings; older runtimes remain unprobed.
 
 ### Fixed
+- Retry only the startup Status probe after a broken/reset IPC connection within the existing readiness deadline. Preserve child-exit, permission and malformed-response failures; add production readiness-loop recovery/deadline regressions, exercise three actual GUI start/stop cycles per native lifecycle lane, and retain failure status before cleanup.
 - Include ADR 0050's current-motion landing and stopping correction, preserving planted contacts and lift phase through reversal and acceleration. Carry four actual World delivery witnesses, bounded native foot/capture evidence and two visually reviewed turn-golden updates with unchanged comparison tolerances and gait bounds.
 - Recover Windows notification-observation status after a successful poll follows an error, and expose the current Linux compositor fullscreen capability independently of unsupported DND observation.
 - Report an expired Mac fullscreen sample as failed while its replacement is blocked; reserve unprobed for a new target, preserve the original freshness limit and recover on a fresh result.

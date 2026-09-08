@@ -37,6 +37,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Let the Mac goose notice fullscreen apps through its existing desktop permission, while keeping commands responsive if an app stops answering. Show fullscreen and do-not-disturb support separately in every settings interface.
 
 ### Fixed
+- Keep a brief connection drop during startup from making settings report failure while the goose is still starting.
 - Include the improved turning and stopping motion so a quick return with a note does not leave a leg stretched behind the goose.
 - Refresh Windows manners availability after a temporary failure recovers, and show Linux fullscreen support according to the desktop integration that is actually connected.
 - Show a clear temporary failure when a Mac app stops answering, and restore its fullscreen status when it responds again.

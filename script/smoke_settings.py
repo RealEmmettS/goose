@@ -53,6 +53,7 @@ def main() -> None:
                                    stderr=subprocess.DEVNULL, env=environment)
         snapshot_path = work / ".zig-cache/native-sdk-automation/snapshot.txt"
         started_runtime = False
+        lifecycle_cycles = 0
 
         def control(*arguments: str):
             return subprocess.run([str(service), *arguments], capture_output=True, text=True,
@@ -187,14 +188,16 @@ def main() -> None:
             if args.lifecycle:
                 assert "honk300: not running" in control("status").stdout, "fixture found an existing runtime"
                 click("General")
-                started_runtime = True
-                click("Start goose")
-                wait('role=text name="start ready"')
-                assert "honk300: running" in control("status").stdout
-                click("Stop goose")
-                wait('role=text name="Goose stopped.')
-                assert "honk300: not running" in control("status").stdout
-                started_runtime = False
+                for _ in range(3):
+                    started_runtime = True
+                    click("Start goose")
+                    wait('role=text name="start ready"')
+                    assert "honk300: running" in control("status").stdout
+                    click("Stop goose")
+                    wait('role=text name="Goose stopped.')
+                    assert "honk300: not running" in control("status").stdout
+                    started_runtime = False
+                    lifecycle_cycles += 1
             if args.network:
                 click("Platform & status")
                 click("Check for updates")
@@ -204,6 +207,7 @@ def main() -> None:
             (evidence / "result.json").write_text(json.dumps({
                 "ok": True, "binary": str(binary), "network": args.network,
                 "lifecycle": args.lifecycle,
+                "lifecycle_cycles": lifecycle_cycles,
                 "checks": ["five-pages", "save-readback", "comment-preservation", "revision-conflict",
                            "keep-draft", "discard-reload", "numeric-validation", "keyboard-input",
                            "modal-layout", "scale-two", "largest-dirty-page", "no-dispatch-errors"],
@@ -212,6 +216,14 @@ def main() -> None:
             print("Native settings smoke passed; evidence:", evidence)
         finally:
             if started_runtime:
+                try:
+                    status = control("status")
+                    observed = dict(returncode=status.returncode,
+                                    stdout=status.stdout, stderr=status.stderr)
+                except (OSError, subprocess.TimeoutExpired) as error:
+                    observed = dict(error=str(error))
+                (evidence / "status-before-cleanup.json").write_text(
+                    json.dumps(observed, indent=2) + "\n", encoding="utf-8")
                 control("stop", "--force")
             if snapshot_path.exists():
                 (evidence / "final-snapshot.txt").write_text(snapshot(), encoding="utf-8")
