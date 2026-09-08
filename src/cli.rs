@@ -133,6 +133,18 @@ pub enum Integration {
         #[arg(value_enum, default_value = "status")]
         action: IntegrationAction,
     },
+    /// Ephemeral pointer permission through the native KDE portal.
+    Pointer {
+        #[arg(value_enum, default_value = "status")]
+        action: PointerAction,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum PointerAction {
+    Request,
+    Cancel,
+    Status,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

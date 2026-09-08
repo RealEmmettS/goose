@@ -47,7 +47,12 @@ device references. Only absolute pointer motion is bound; no keyboard/button/tou
 is exposed. Missing libraries or unsupported loading remains unsupported. Devices must
 resume, provide an unambiguous virtual region and pass a newly authenticated KWin frame
 for every bounded movement. Paused/removed devices end the session and need a new grant.
-Native grant and motion acceptance is required before wiring this into runtime controls.
+Native grant and actual pointer motion passed on both KDE 6 architectures before runtime
+wiring. CLI and Native SDK request/cancel operations now reach the running Rust owner,
+which polls the retained session, exposes pending/granted/ended state and cancels on
+companion expiry, permission/device loss, explicit removal or shutdown. No grant is
+restored after restart. Each engine command rechecks the current terminal-safe path;
+capability loss clears already queued engine cursor commands immediately.
 The [liboeffis API](https://libinput.pages.freedesktop.org/libei/api/group__liboeffis.html)
 and [libei sender API](https://libinput.pages.freedesktop.org/libei/api/group__libei-sender.html)
 define the context, descriptor and device ownership used at this boundary.
@@ -77,4 +82,7 @@ The first script premise passed in
 [run 34189071395](https://github.com/RealEmmettS/goose/actions/runs/34189071395).
 Upstream [KWin scripting APIs](https://develop.kde.org/docs/plasma/kwin/api/) and
 [Remote Desktop portal interface](https://github.com/flatpak/xdg-desktop-portal/blob/main/data/org.freedesktop.portal.RemoteDesktop.xml)
-define the distinct authority boundaries. Native runtime and portal evidence remain open.
+define the distinct authority boundaries. Run 34203908233 passes both KDE generations and
+architectures, including actual owned-note movement and the separate KDE 6 native portal
+premise. The integrated pointer runtime/settings lifecycle and final release qualification
+remain open until their production desktop and package evidence passes.

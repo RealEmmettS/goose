@@ -154,6 +154,10 @@ pub fn run(
         }
 
         if overlay.take_topology_changed() {
+            kwin.cancel_pointer();
+            if overlay_mode == OverlayMode::Wayland {
+                world.set_cursor_warp_supported(false);
+            }
             let layout = desktop_layout_for(
                 effective.world.multi_monitor_chase,
                 overlay.monitor_bounds(),
@@ -211,11 +215,38 @@ pub fn run(
                 }
                 ControlCommand::KwinDisable => {
                     kwin.disable();
+                    if overlay_mode == OverlayMode::Wayland {
+                        world.set_cursor_warp_supported(false);
+                    }
                     world.set_foreign_window_watch_supported(false);
                     world.set_foreign_window_drag(None);
                     request.respond(ControlResponse::Ok);
                 }
+                ControlCommand::PointerRequest => {
+                    let response = if overlay_mode != OverlayMode::Wayland
+                        || world.graceful_exit_requested()
+                    {
+                        ControlResponse::Err("UNSUPPORTED".into())
+                    } else {
+                        match kwin.request_pointer() {
+                            Ok(()) => ControlResponse::Ok,
+                            Err(error) => {
+                                eprintln!("honk300: pointer permission request failed ({error})");
+                                ControlResponse::Err("POINTER_UNAVAILABLE".into())
+                            }
+                        }
+                    };
+                    request.respond(response);
+                }
+                ControlCommand::PointerCancel => {
+                    kwin.cancel_pointer();
+                    if overlay_mode == OverlayMode::Wayland {
+                        world.set_cursor_warp_supported(false);
+                    }
+                    request.respond(ControlResponse::Ok);
+                }
                 ControlCommand::Stop => {
+                    kwin.cancel_pointer();
                     println!("honk300: stop command received.");
                     request.respond(ControlResponse::Ok);
                     RuntimeCore::begin_graceful_stop(&mut world);
@@ -333,6 +364,26 @@ pub fn run(
 
         world.set_local_time(local_time());
         let kwin_frame = kwin.poll();
+        if world.graceful_exit_requested() {
+            kwin.cancel_pointer();
+        }
+        if overlay_mode == OverlayMode::Wayland {
+            cursor_warp = match kwin.pointer_status() {
+                CapabilityStatus::Supported => BackendCapability::Supported,
+                CapabilityStatus::Unprobed => BackendCapability::Denied,
+                CapabilityStatus::Denied => BackendCapability::Denied,
+                CapabilityStatus::Failed => BackendCapability::Failed,
+                CapabilityStatus::Unsupported => BackendCapability::Unsupported,
+            };
+            // A granted device does not authorize a prank over a protected or
+            // unknown window. Recheck the complete path again at actual warp.
+            world.set_cursor_warp_supported(
+                cursor_warp.active()
+                    && kwin_frame
+                        .as_ref()
+                        .is_some_and(|frame| frame.permits_pointer_motion(frame.pointer)),
+            );
+        }
         world.set_collect_window_positioning(
             collect_window == BackendCapability::Supported
                 && (overlay_mode == OverlayMode::X11 || kwin_frame.is_some()),
@@ -401,7 +452,12 @@ pub fn run(
 
         let cursor_commands = world.take_cursor_commands();
         if let Some(CursorCommand::WarpTo(pos)) = cursor_commands.last().copied() {
-            if let Err(err) = overlay.warp_cursor(pos) {
+            let result = if overlay_mode == OverlayMode::Wayland {
+                kwin.warp_pointer(pos)
+            } else {
+                overlay.warp_cursor(pos)
+            };
+            if let Err(err) = result {
                 cursor_warp = if err.kind() == std::io::ErrorKind::Unsupported {
                     BackendCapability::Unsupported
                 } else {

@@ -17,6 +17,8 @@ class NativeObserver:
         self.frames = []
         self.count = 0
         self.latest = []
+        self.pointer = None
+        self.pointers = []
         self.times = []
         self.owner = call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
             'GetNameOwner', GLib.Variant('(s)', ('org.kde.KWin',))).unpack()[0]
@@ -47,7 +49,8 @@ class NativeObserver:
                 }
                 pending = true;
                 callDBus(''' + json.dumps(self.bus.get_unique_name()) + ''', '/org/emmetts/Honk300/NativeObserver',
-                    'org.emmetts.Honk300.NativeObserver', 'Capture', JSON.stringify(result), function () { pending = false; });
+                    'org.emmetts.Honk300.NativeObserver', 'Capture', JSON.stringify({windows:result,
+                        pointer:[workspace.cursorPos.x,workspace.cursorPos.y]}), function () { pending = false; });
             }); timer.start();
         }());''')
         identifier = call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'loadScript',
@@ -73,7 +76,11 @@ class NativeObserver:
             assert sender == self.owner
             raw = parameters.unpack()[0]
             assert len(raw) <= 65536
-            frame = json.loads(raw)
+            capture = json.loads(raw)
+            frame = capture['windows']
+            self.pointer = capture['pointer']
+            self.pointers.append(self.pointer)
+            self.pointers = self.pointers[-256:]
             assert len(frame) <= 64
             self.latest = frame
             self.count += 1
@@ -87,7 +94,7 @@ class NativeObserver:
 
     def close(self):
         (self.evidence / 'native-observer-frames.json').write_text(json.dumps(
-            dict(count=self.count, frames=self.frames, times=self.times), indent=2) + '\n')
+            dict(count=self.count, frames=self.frames, times=self.times, pointers=self.pointers), indent=2) + '\n')
         self.call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'unloadScript',
             self.GLib.Variant('(s)', ('honk300-fixture-observer',)))
         self.loop.quit()

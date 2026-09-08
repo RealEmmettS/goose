@@ -111,6 +111,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cli::Integration::Kde {
                     action: cli::IntegrationAction::Status,
                 } => integrations::status(),
+                cli::Integration::Pointer {
+                    action: cli::PointerAction::Request,
+                } => integrations::pointer(true)?,
+                cli::Integration::Pointer {
+                    action: cli::PointerAction::Cancel,
+                } => integrations::pointer(false)?,
+                cli::Integration::Pointer {
+                    action: cli::PointerAction::Status,
+                } => integrations::status(),
             };
             println!("{}", serde_json::to_string_pretty(&result)?);
             Ok(())

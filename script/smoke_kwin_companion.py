@@ -448,7 +448,8 @@ def main():
                 qualify_independently('settings', lambda: qualify(args.settings.resolve(), evidence, wait, call, GLib))
             if args.portal and major >= 6:
                 from smoke_kwin_portal import qualify
-                qualify_independently('portal', lambda: qualify(args.bridge.resolve(), evidence, wait, call, GLib, Gtk, RustBridge))
+                qualify_independently('portal', lambda: qualify(args.bridge.resolve(), evidence, wait, call, GLib, Gtk, RustBridge,
+                    args.goose.resolve() if args.goose else None, args.settings.resolve() if args.settings else None))
             assert not failures, f'Native qualifiers failed: {failures}'
             (evidence / 'result.json').write_text(json.dumps(dict(ok=True, kwin=version,
                 architecture=os.uname().machine, native_identity=True, bounded_move=True,

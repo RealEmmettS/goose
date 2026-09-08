@@ -35,23 +35,67 @@ pub(crate) fn status() -> Value {
             Ok(None) => (false, false, "KDE integration is off. Setup enables window observation, fullscreen awareness and bounded window actions. Pointer control requires a separate portal grant.".to_owned()),
             Err(error) => (false, false, format!("KDE setup cannot be read: {error}")),
         };
-        let capabilities = match honk_control::send_command(
-            honk_control::ControlCommand::WaylandStatus,
-        ) {
-            Ok(honk_control::ControlResponse::Wayland(status)) => json!({
+        let runtime = match honk_control::send_command(honk_control::ControlCommand::WaylandStatus)
+        {
+            Ok(honk_control::ControlResponse::Wayland(status)) => Some(status),
+            _ => None,
+        };
+        let capabilities = runtime.map(|status| json!({
                 "windows": status.windows.label(), "movement": status.movement.label(),
                 "pointer_observation": status.pointer_observation.label(),
                 "pointer_control": status.pointer_control.label(), "fullscreen": status.fullscreen.label(),
                 "dnd": status.dnd.label(), "prop_positioning": status.prop_positioning.label(),
-            }),
-            _ => Value::Null,
-        };
+            })).unwrap_or(Value::Null);
         json!({"supported": true, "installed": installed, "current": current,
-            "description": detail, "capabilities": capabilities})
+            "description": detail, "capabilities": capabilities,
+            "pointer": pointer_summary(runtime.map(|state| state.pointer_control))})
     }
     #[cfg(not(target_os = "linux"))]
     json!({"supported": false, "installed": false, "current": false,
         "description": "Optional Wayland integrations are available on Linux."})
+}
+
+#[cfg(target_os = "linux")]
+fn pointer_summary(state: Option<honk_control::CapabilityStatus>) -> Value {
+    use honk_control::CapabilityStatus::*;
+    let state = state.unwrap_or(Unsupported);
+    let description = match state {
+        Unprobed => "Waiting for the desktop permission dialog. Access lasts only for the running goose session.",
+        Supported => "Pointer access is active for this running session. Terminal windows remain protected.",
+        Denied => "Pointer access is off. Request access to open the desktop permission dialog.",
+        Failed => "Pointer access ended or could not connect. Request access again to retry.",
+        Unsupported => "Pointer access needs a running native Wayland goose on KDE 6, its enabled KDE integration, the GNU build, and the optional liboeffis/libei system libraries.",
+    };
+    json!({"description": description, "can_request": matches!(state, Denied | Failed),
+        "can_cancel": matches!(state, Unprobed | Supported)})
+}
+
+pub(crate) fn pointer(request: bool) -> Result<Value, Error> {
+    #[cfg(target_os = "linux")]
+    {
+        use honk_control::{send_command, ControlCommand, ControlResponse};
+        let command = if request {
+            ControlCommand::PointerRequest
+        } else {
+            ControlCommand::PointerCancel
+        };
+        match send_command(command) {
+            Ok(ControlResponse::Ok) => Ok(json!({
+                "message": if request { "Pointer permission requested. Complete the desktop dialog, then refresh status." }
+                    else { "Pointer access cancelled." },
+                "integrations": status(),
+            })),
+            Ok(ControlResponse::Err(_)) => Err("Pointer access is unavailable. Use the GNU Linux build on KDE 6 in native Wayland mode, enable KDE integration, and install the optional liboeffis/libei system libraries.".into()),
+            Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused) =>
+                Err("Start the goose in native Wayland mode on KDE before requesting pointer access.".into()),
+            _ => Err("The running goose could not confirm the pointer request. Refresh status before trying again.".into()),
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = request;
+        Err("Optional portal pointer permission requires Linux.".into())
+    }
 }
 
 pub(crate) fn setup() -> Result<Value, Error> {

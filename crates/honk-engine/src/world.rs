@@ -547,8 +547,11 @@ impl World {
     /// Reflect a backend capability change after startup, e.g. cursor warp failed.
     pub fn set_cursor_warp_supported(&mut self, supported: bool) {
         self.options.mouse_steal.warp_supported = supported;
-        if !supported && self.is_cursor_mischief_active() {
-            self.resume_or_wander();
+        if !supported {
+            self.pending_cursor_commands.clear();
+            if self.is_cursor_mischief_active() {
+                self.resume_or_wander();
+            }
         }
         self.rebuild_pickable();
     }
@@ -2754,6 +2757,32 @@ mod tests {
             assert!(world.take_cursor_commands().is_empty());
             assert_ne!(world.current_task(), "nab_mouse");
         }
+    }
+
+    #[test]
+    fn cursor_capability_revocation_discards_an_already_queued_real_warp() {
+        let mut world = World::with_options(
+            bounds(),
+            9,
+            WorldOptions {
+                mouse_steal: MouseStealOptions::with_backend_support(true),
+                ..WorldOptions::default()
+            },
+        );
+        world.current = Box::new(NabMouseTask::new());
+        world.set_pointer(Pointer {
+            pos: world.goose.rig.beak_tip,
+            present: true,
+            left_down: false,
+        });
+        world.tick();
+        assert!(
+            !world.pending_cursor_commands.is_empty(),
+            "The actual task must queue a warp before revocation"
+        );
+        world.set_cursor_warp_supported(false);
+        assert!(world.take_cursor_commands().is_empty());
+        assert_ne!(world.current_task(), "nab_mouse");
     }
 
     #[test]

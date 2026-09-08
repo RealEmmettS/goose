@@ -45,6 +45,8 @@ enum Operation {
     Update {},
     KdeSetup {},
     KdeRemove {},
+    PointerRequest {},
+    PointerCancel {},
 }
 
 pub(crate) fn run(path: Option<PathBuf>) -> Result<(), Error> {
@@ -125,6 +127,8 @@ fn execute(operation: Operation, path: &Path) -> Result<Value, Error> {
         }
         Operation::KdeSetup {} => crate::integrations::setup(),
         Operation::KdeRemove {} => crate::integrations::remove(),
+        Operation::PointerRequest {} => crate::integrations::pointer(true),
+        Operation::PointerCancel {} => crate::integrations::pointer(false),
         Operation::Start {} => {
             let message = honk_config_tui::start_from_config(path)?;
             Ok(json!({"message": message, "runtime": runtime_json()}))

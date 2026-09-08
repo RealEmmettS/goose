@@ -45,6 +45,7 @@ All notable changes to this project are documented here. Format based on
 - Correct the Linux runtime's pointer-distance call to the production engine vector API, as caught by the expanded native KWin build gate.
 
 ### Added
+- Connect explicit portal pointer request/cancel controls in CLI and Native SDK settings to the running Rust owner. Require fresh KDE 6 terminal guards for engine cursor commands, discard queued cursor movement on capability loss, and keep every grant ephemeral across stop, crash, removal and device failure.
 - Export editable SVG headings, named poses and every motion frame from the same statically dispatched vector drawing routine as the desktop, with unchanged raster output (ADR 0045).
 - Add explicit KDE setup/removal through CLI and Native SDK settings, with private consent, sealed companion loading, live Rust runtime capabilities, owned-only crash recovery and immediate IPC revocation. Keep portal control, DND and native prop positioning unsupported pending separate implementation and qualification.
 

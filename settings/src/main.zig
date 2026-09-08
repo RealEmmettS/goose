@@ -45,7 +45,7 @@ const fonts = [_]SettingsApp.FontRegistration{
 };
 const Buffer = canvas.TextBuffer;
 const Page = enum { general, appearance, behavior, sound, platform };
-const Action = enum { read, save, validate, status, start, stop, check_updates, update, kde_setup, kde_remove };
+const Action = enum { read, save, validate, status, start, stop, check_updates, update, kde_setup, kde_remove, pointer_request, pointer_cancel };
 
 pub const Field = struct {
     index: usize = 0,
@@ -107,6 +107,8 @@ pub const Msg = union(enum) {
     kde_confirm,
     kde_cancel,
     kde_remove,
+    pointer_request,
+    pointer_cancel,
     completed: native_sdk.EffectExit,
     system_appearance: native_sdk.Appearance,
     pub const view_unbound = .{ "completed", "system_appearance" };
@@ -114,7 +116,7 @@ pub const Msg = union(enum) {
 
 pub const Model = struct {
     // Used by derived view methods or the stdio lifecycle, never bound directly.
-    pub const view_unbound = .{ "fields", "field_count", "page", "service", "config_path", "revision", "version", "status_buffer", "runtime_buffer", "update_buffer", "integration_buffer", "loaded", "request_id", "editing", "edit_buffer", "update_available", "update_managed", "system_appearance" };
+    pub const view_unbound = .{ "fields", "field_count", "page", "service", "config_path", "revision", "version", "status_buffer", "runtime_buffer", "update_buffer", "integration_buffer", "pointer_buffer", "pointer_request_available", "pointer_cancel_available", "loaded", "request_id", "editing", "edit_buffer", "update_available", "update_managed", "system_appearance" };
     system_appearance: native_sdk.Appearance = .{},
     fields: [64]Field = @splat(.{}),
     field_count: usize = 0,
@@ -138,6 +140,19 @@ pub const Model = struct {
     integration_supported: bool = false,
     kde_installed: bool = false,
     kde_prompt: bool = false,
+    pointer_buffer: Buffer(1024) = .{},
+    pointer_request_available: bool = false,
+    pointer_cancel_available: bool = false,
+
+    pub fn pointerStatus(m: *const Model) []const u8 {
+        return m.pointer_buffer.text();
+    }
+    pub fn canRequestPointer(m: *const Model) bool {
+        return m.pointer_request_available and !m.busy;
+    }
+    pub fn canCancelPointer(m: *const Model) bool {
+        return m.pointer_cancel_available and !m.busy;
+    }
 
     pub fn integrationStatus(m: *const Model) []const u8 {
         return m.integration_buffer.text();
@@ -261,6 +276,8 @@ pub fn update(model: *Model, msg: Msg, fx: *Effects) void {
             submit(model, .kde_setup, fx);
         },
         .kde_remove => if (model.canSetupKde()) { submit(model, .kde_remove, fx); },
+        .pointer_request => if (model.canRequestPointer()) { submit(model, .pointer_request, fx); },
+        .pointer_cancel => if (model.canCancelPointer()) { submit(model, .pointer_cancel, fx); },
         .check_updates => submit(model, .check_updates, fx),
         .update_now => if (model.canUpdate()) {
             submit(model, .update, fx);
@@ -412,8 +429,16 @@ pub fn acceptResponse(model: *Model, bytes: []const u8) !void {
     if (data.object.get("integrations")) |integrations| {
         model.integration_supported = flag(integrations, "supported");
         model.kde_installed = flag(integrations, "installed");
+        model.pointer_request_available = false;
+        model.pointer_cancel_available = false;
+        model.pointer_buffer.set("");
         const detail = string(integrations, "description");
         if (integrations == .object) {
+            if (integrations.object.get("pointer")) |pointer| {
+                model.pointer_request_available = flag(pointer, "can_request");
+                model.pointer_cancel_available = flag(pointer, "can_cancel");
+                model.pointer_buffer.set(string(pointer, "description"));
+            }
             if (integrations.object.get("capabilities")) |caps| {
                 if (caps == .object) {
                     model.integration_buffer.set(try std.fmt.allocPrint(allocator,

@@ -28,15 +28,16 @@ uses this exact path, and settings clearly distinguish grant, readiness and unsu
 - [ ] Fresh target/terminal checks, device pause/removal and disconnects fail closed.
 
 ## Status
-Run 34202408579 passes the real KDE 6 portal on both x64 and ARM64: native consent
-was explicitly accepted, the granted libei device moved the pointer, protected/excessive
-motion was refused and cancellation ended permission. Runtime and native settings wiring
-can now use that qualified path. The complete KDE release remains blocked by the separate
-ARM owned-note movement check and subsequent production/package qualification.
-Active: checking the real library and KDE 6 grant before enabling a runtime capability.
+Run 34203908233 passes all four native KDE desktops, with actual owned-note motion and
+the KDE 6 native portal premise. The production Rust runtime, CLI and native settings now
+own explicit ephemeral pointer request/cancel controls. Strict local workspace checks,
+the queued-warp revocation regression and native settings tests/check/build pass. The new
+native desktop qualifier must still prove integrated consent, engine pointer movement,
+denial/retry, cancellation, removal, stop/crash recovery and backend loss before completion.
 KDE 5 has separate window evidence; no EIS or portal control is claimed for it.
 
 ## Activity
+- 2026-09-08: Wire the qualified portal into the running Rust owner and native settings without saving configuration drafts. A real engine regression first reproduced an already queued warp surviving capability loss, then passed after immediate queue clearing. Add actual desktop lifecycle qualification; preserve the existing 250 ms and terminal oracles.
 - 2026-09-08: Both KDE 6 architectures pass portal/result.json with real native consent, libei readiness, compositor pointer readback, terminal/excessive refusal and explicit cancellation. Preserve the accepted dialog tree instead of overwriting it after dismissal; proceed to runtime and native controls.
 - 2026-09-08: Native evidence now separates loaded plugins from failed service authorization. Debian's plasma-workspace file list identifies the missing menu; restore normal service discovery and PipeWire startup order in the private fixture before repeating the actual grant and motion oracle.
 - 2026-09-08: Run 34199983732 records empty AvailablePlugins and LoadedPlugins on both KDE 6 desktops. Debian puts screencast/EIS plugins in the separately recommended kwin-common package; include that actual desktop package in the isolated fixture while retaining normal consent and protocol permissions.

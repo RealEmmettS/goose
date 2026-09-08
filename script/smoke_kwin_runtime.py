@@ -84,8 +84,14 @@ preserve = "untouched"
         active = wait(supported, 'explicitly enabled runtime KWin capabilities')
         for capability in ('windows', 'movement', 'pointer_observation', 'fullscreen'):
             assert active['capabilities'][capability] == 'supported', active
-        for capability in ('pointer_control', 'dnd'):
-            assert active['capabilities'][capability] == 'unsupported', active
+        major = int((evidence / 'version.txt').read_text().split()[-1].split('.')[0])
+        assert active['capabilities']['dnd'] == 'unsupported', active
+        assert active['capabilities']['pointer_control'] == ('denied' if major >= 6 else 'unsupported'), active
+        if major < 6:
+            unavailable = subprocess.run([str(binary), 'integrations', 'pointer', 'request'],
+                capture_output=True, text=True, timeout=10)
+            assert unavailable.returncode != 0, 'KDE 5 advertised unqualified portal input'
+            assert supported(), 'Unavailable pointer permission damaged window support'
         wait(lambda: status()['capabilities']['prop_positioning'] == 'supported', 'native prop placement readiness')
         active = status()
         service = subprocess.run([str(binary), '__settings-service', '--config', str(config)],

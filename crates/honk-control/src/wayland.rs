@@ -75,6 +75,8 @@ mod tests {
             ControlCommand::WaylandStatus,
             ControlCommand::KwinEnable,
             ControlCommand::KwinDisable,
+            ControlCommand::PointerRequest,
+            ControlCommand::PointerCancel,
         ] {
             assert_eq!(
                 ControlCommand::decode(command.encode().as_bytes()).unwrap(),

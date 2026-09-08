@@ -19,6 +19,8 @@ pub enum ControlCommand {
     WaylandStatus,
     KwinEnable,
     KwinDisable,
+    PointerRequest,
+    PointerCancel,
     Do(PokeAction),
 }
 
@@ -119,6 +121,8 @@ impl ControlCommand {
             Self::WaylandStatus => format!("{VERSION} WAYLAND\n"),
             Self::KwinEnable => format!("{VERSION} KWIN_ENABLE\n"),
             Self::KwinDisable => format!("{VERSION} KWIN_DISABLE\n"),
+            Self::PointerRequest => format!("{VERSION} POINTER_REQUEST\n"),
+            Self::PointerCancel => format!("{VERSION} POINTER_CANCEL\n"),
             Self::Do(action) => format!("{VERSION} DO {}\n", encode_action(action)),
         }
     }
@@ -139,12 +143,14 @@ impl ControlCommand {
             return Err(ProtocolError::UnknownCommand);
         };
         match command {
-            "WAYLAND" | "KWIN_ENABLE" | "KWIN_DISABLE" => {
+            "WAYLAND" | "KWIN_ENABLE" | "KWIN_DISABLE" | "POINTER_REQUEST" | "POINTER_CANCEL" => {
                 ensure_end(parts)?;
                 Ok(match command {
                     "WAYLAND" => Self::WaylandStatus,
                     "KWIN_ENABLE" => Self::KwinEnable,
-                    _ => Self::KwinDisable,
+                    "KWIN_DISABLE" => Self::KwinDisable,
+                    "POINTER_REQUEST" => Self::PointerRequest,
+                    _ => Self::PointerCancel,
                 })
             }
             "STOP" => {

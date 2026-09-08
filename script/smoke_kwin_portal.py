@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 
 
-def qualify(binary, evidence, wait, call, GLib, Gtk, RustBridge):
+def qualify(binary, evidence, wait, call, GLib, Gtk, RustBridge, goose=None, settings=None):
     assert os.environ.get('GITHUB_ACTIONS') == 'true'
     directory = evidence / 'portal'
     directory.mkdir()
@@ -145,6 +145,14 @@ def qualify(binary, evidence, wait, call, GLib, Gtk, RustBridge):
         (directory / 'result.json').write_text(json.dumps(dict(ok=True, native_consent=True,
             real_libei_device=True, actual_pointer_motion=True, terminal_refused=True,
             excessive_motion_refused=True, explicit_cancel=True), indent=2) + '\n')
+        bridge.close()
+        bridge = None
+        window.destroy()
+        window = None
+        if goose and settings:
+            from smoke_kwin_pointer_runtime import qualify as qualify_runtime
+            qualify_runtime(goose, settings, evidence, wait, call, GLib, Atspi,
+                            lambda: nodes(backend_pid), backend)
     finally:
         if bridge:
             bridge.close()

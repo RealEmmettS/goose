@@ -29,6 +29,11 @@
               <button disabled="{not canSetupKde}" on-press="kde_setup">Set up KDE</button>
               <if test="{kde_installed}"><button disabled="{busy}" on-press="kde_remove">Remove KDE integration</button></if>
             </row>
+            <text wrap="true">{pointerStatus}</text>
+            <row gap="8">
+              <button disabled="{not canRequestPointer}" on-press="pointer_request">Request pointer access</button>
+              <button disabled="{not canCancelPointer}" on-press="pointer_cancel">Cancel pointer access</button>
+            </row>
           </if>
           <separator/>
           <text wrap="true">{updateStatus}</text>
