@@ -163,18 +163,19 @@ preserve = "untouched"
         native = wait(lambda: settled(focused=True), 'settled native drag focus: ' + label)
         (directory / f'arranged-{label}.json').write_text(json.dumps(native, indent=2))
         x, y, width, height = native['rect']
+        pointer_x, pointer_y = x + width // 2, y + 18
         def event(*arguments):
             subprocess.run(['xdotool', *map(str, arguments)], env=capture_environment,
                            check=True, capture_output=True, timeout=5)
         try:
-            event('mousemove', x + width // 2, y + height // 2)
-            wait(lambda: snapshot()['pointer'] == [x + width // 2, y + height // 2],
+            event('mousemove', pointer_x, pointer_y)
+            wait(lambda: snapshot()['pointer'] == [pointer_x, pointer_y],
                  'native pointer reaches the private fixture: ' + label)
-            event('keydown', 'Alt_L')
-            wait(lambda: snapshot()['alt_pressed'], 'native Alt modifier: ' + label)
+            # Drag the actual native title bar. A modifier mask alone does not
+            # prove Mutter accepted a move gesture on a Wayland client surface.
             event('mousedown', 1)
             wait(lambda: snapshot()['button_pressed'], 'native held button: ' + label)
-            event('mousemove', x + width // 2 + 12, y + height // 2 + 12)
+            event('mousemove', pointer_x + 12, pointer_y + 12)
             try:
                 wait(lambda: (value if (value := snapshot())['drag'] and
                               value['drag']['id'] == native['id'] else None), 'actual native held drag: ' + label)
@@ -193,7 +194,7 @@ preserve = "untouched"
                     return value['anchor'] and sum((a-b)**2 for a,b in
                         zip(value['position'], value['anchor'])) < 1
                 state = observed(perched, 'goose reaches the actual window anchor')
-                event('mousemove', x + width // 2 + 36, y + height // 2 + 24)
+                event('mousemove', pointer_x + 36, pointer_y + 24)
                 moved = observed(lambda value: perched(value) and value['anchor'] != state['anchor'],
                                  'perched goose follows the actual user drag')
                 (directory / f'native-ride-{label}.json').write_text(json.dumps(dict(before=state, moved=moved), indent=2))
