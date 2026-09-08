@@ -198,8 +198,19 @@ preserve = "untouched"
             event('mousemove', pointer_x, pointer_y)
             wait(lambda: snapshot()['pointer'] == [pointer_x, pointer_y],
                  'native pointer reaches the private client: ' + label)
-            wait(lambda: surface.get_device_position(device)[0] and controller.contains_pointer(),
-                 'GTK receives pointer entry on the native drag handle: ' + label)
+            # Adding a controller while the pointer is already over its widget
+            # need not replay enter or initialize contains_pointer. The actual
+            # newly delivered capture event proves this gesture's target.
+            def delivered_to_handle():
+                if not surface.get_device_position(device)[0] or not native_events:
+                    return False
+                current = native_events[-1]
+                if current['type'] not in ('enter', 'motion'):
+                    return False
+                local_x, local_y = current['coordinates']
+                return 0 <= local_x < handle.get_width() and 0 <= local_y < handle.get_height()
+            wait(delivered_to_handle,
+                 'GTK delivers native motion inside the actual drag handle: ' + label)
             # Gtk.WindowHandle asks Mutter to begin the real native gesture
             # using the delivered button event. Never synthesize a grab signal.
             event('mousedown', 1)
