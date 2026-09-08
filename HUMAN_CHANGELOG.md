@@ -59,6 +59,19 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ### Behind the scenes
 - Test the real GNOME desktop and goose display together before offering an optional companion, including removing it while other windows stay open.
+- Keep the website's KDE setup guidance and download choices aligned with the freshly verified desktop release.
+
+### Behind the scenes
+- Keep the release guidance aligned with the published KDE update and freshly checked downloads across every supported platform.
+
+### Behind the scenes
+- Verify the process identity actually reported by the desktop when checking an untitled application, and distinguish that native result from the missing-identity regression.
+
+### Fixed
+- Keep fullscreen quiet behavior working when an application has no title or does not report its process identity, and avoid briefly losing desktop observations while a fresh view is being recorded.
+
+### Behind the scenes
+- Check the goose against its actual on-screen outline, including every transparent edge, so a complete bird in a compact drawing area can pass while damaged colors, dark boxes and mismatched frames still fail.
 
 ### Added
 - Add optional Sway window and fullscreen awareness with setup and removal in settings and the command line. Keep desktop checks responsive, stop using observations when the connection changes, and preserve unsaved settings through permission changes and goose restarts.

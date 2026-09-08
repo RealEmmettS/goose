@@ -1283,7 +1283,7 @@ function Start-ExactRuntime {
         'Process'
     )
     try {
-        if ($captureMode -eq 'hosted-arm64-presenter-surface') {
+        if ($captureMode -in @('paired-dwm', 'hosted-arm64-presenter-surface')) {
             [Environment]::SetEnvironmentVariable(
                 'HONK300_WINDOWS_SMOKE_PRESENT',
                 $rendererPresentPath,
@@ -1291,7 +1291,7 @@ function Start-ExactRuntime {
             )
         }
         else {
-            # Paired-DWM evidence must not activate a diagnostic hook inherited from the caller.
+            # Lifecycle and prop checks must not inherit a diagnostic capture hook.
             [Environment]::SetEnvironmentVariable(
                 'HONK300_WINDOWS_SMOKE_PRESENT',
                 $null,
@@ -1796,7 +1796,7 @@ light_sha256=$lightProofHash
         Invoke-ExactBinary -Arguments @('do', 'wander') | Out-Null
         Start-Sleep -Milliseconds 900
 
-        if ($captureMode -eq 'hosted-arm64-presenter-surface') {
+        if ($captureMode -in @('paired-dwm', 'hosted-arm64-presenter-surface')) {
             # Request only after the pose delay. The backend atomically records the next exact DIB
             # after UpdateLayeredWindow succeeds, so the evidence cannot be an early stale frame.
             if (Test-Path -LiteralPath $rendererPresentPath) {
@@ -1847,6 +1847,7 @@ light_sha256=$lightProofHash
             $lightCapture = Join-Path $evidence "overlay-attempt-$attempt-light.png"
             $surfaceCapture = Join-Path $evidence "overlay-attempt-$attempt-present.bgra"
             $analysis = Join-Path $evidence "overlay-attempt-$attempt-analysis.json"
+            Copy-Item -LiteralPath $rendererPresentPath -Destination $surfaceCapture -Force
             if ($captureMode -eq 'paired-dwm') {
                 Set-ControlledBackground -Hex $darkHex
                 Save-ScreenRect -Rect $rect -Path $darkCapture
@@ -1857,11 +1858,11 @@ light_sha256=$lightProofHash
                     '--light', $lightCapture,
                     '--dark-bg', $darkHex,
                     '--light-bg', $lightHex,
+                    '--expected-surface', $surfaceCapture,
                     '--output', $analysis
                 )
             }
             elseif ($captureMode -eq 'hosted-arm64-presenter-surface') {
-                Copy-Item -LiteralPath $rendererPresentPath -Destination $surfaceCapture -Force
                 $analysisArguments = @('--surface', $surfaceCapture, '--output', $analysis)
             }
             else {
@@ -1884,7 +1885,7 @@ light_sha256=$lightProofHash
                     $PSNativeCommandUseErrorActionPreference = $oldNativePreference
                 }
             }
-            if ($analysisExit -eq 0 -and $captureMode -eq 'hosted-arm64-presenter-surface') {
+            if ($analysisExit -eq 0) {
                 $analysisDocument = Get-Content -LiteralPath $analysis -Raw | ConvertFrom-Json
                 $expectedHwnd = "0x$overlayHandle"
                 $expectedRect = "$($rect.X),$($rect.Y),$($rect.Width),$($rect.Height)"
@@ -1905,6 +1906,11 @@ light_sha256=$lightProofHash
                         $deltaWidth -le $presenterRectTolerancePixels -and
                         $deltaHeight -le $presenterRectTolerancePixels
                     )
+                    if ($captureMode -eq 'paired-dwm') {
+                        # A pixel-for-pixel comparison cannot use the ARM fallback's
+                        # bounded geometry race allowance; every coordinate must agree.
+                        $rectAgreement = $deltaX -eq 0 -and $deltaY -eq 0 -and $deltaWidth -eq 0 -and $deltaHeight -eq 0
+                    }
                 }
                 if (
                     $actualHwnd -cne $expectedHwnd -or
@@ -1919,6 +1925,7 @@ light_sha256=$lightProofHash
                 if ($captureMode -eq 'paired-dwm') {
                     Copy-Item -LiteralPath $darkCapture -Destination (Join-Path $evidence 'overlay-dark.png') -Force
                     Copy-Item -LiteralPath $lightCapture -Destination (Join-Path $evidence 'overlay-light.png') -Force
+                    Copy-Item -LiteralPath $surfaceCapture -Destination (Join-Path $evidence 'overlay-present.bgra') -Force
                 }
                 elseif ($captureMode -eq 'hosted-arm64-presenter-surface') {
                     Copy-Item -LiteralPath $surfaceCapture -Destination (Join-Path $evidence 'overlay-present.bgra') -Force

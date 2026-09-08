@@ -203,6 +203,15 @@ def _has_complete_margin(bounds: Sequence[int] | None, width: int, height: int) 
     )
 
 
+def _transparent_perimeter(mask: Sequence[bool], width: int, height: int) -> bool:
+    """Require actual clear pixels around all four sides of a bounded surface."""
+    return bool(width > 2 and height > 2 and sum(mask) >= 25 and all(
+        mask[y * width + x]
+        for y in range(height) for x in range(width)
+        if x in (0, width - 1) or y in (0, height - 1)
+    ))
+
+
 def _classify_pose(
     palette_counts: dict[str, int],
     orange_components: Sequence[dict],
@@ -267,6 +276,7 @@ def analyze_captures(
     light_pixels: Sequence[tuple[int, int, int, int]],
     dark_background: tuple[int, int, int],
     light_background: tuple[int, int, int],
+    expected_pixels: Sequence[tuple[int, int, int, int]] | None = None,
 ) -> dict:
     if len(dark_pixels) != width * height or len(light_pixels) != width * height:
         raise ValueError("capture dimensions and pixel counts disagree")
@@ -282,6 +292,7 @@ def analyze_captures(
     orange_mask = [False] * (width * height)
     unchanged_near_black_mask = [False] * (width * height)
     content_mask = [False] * (width * height)
+    transparent_mask = [False] * (width * height)
 
     background_delta = [light_background[i] - dark_background[i] for i in range(3)]
     if any(abs(delta) < 64 for delta in background_delta):
@@ -292,6 +303,7 @@ def analyze_captures(
         light = light_rgba[:3]
         if _close(dark, dark_background, 3) and _close(light, light_background, 3):
             transparent_pixels += 1
+            transparent_mask[index] = True
         if max((*dark, *light)) <= 12 and _close(dark, light, 3):
             unchanged_near_black_mask[index] = True
 
@@ -388,10 +400,9 @@ def analyze_captures(
         default=0,
     )
     checks = {
-        # Every committed side-view golden is more than 94% transparent and a real
-        # monitor-sized overlay has still more margin.  An 80% floor leaves ample
-        # room for animation/effects while rejecting an opaque or mostly opaque
-        # layered-window rectangle.
+        # Historical full-canvas evidence retains its area guard. A tightly bounded
+        # DamageCanvas may instead prove every composited pixel against the exact
+        # accepted DIB below, plus the complete transparent perimeter.
         "controlled_transparent_background": transparent_pixels >= max(25, total * 4 // 5),
         # A channel/alpha bridge failure can preserve a small colorful goose while
         # turning most of the transparent surface into an opaque black rectangle.
@@ -415,9 +426,30 @@ def analyze_captures(
         ),
         "view_appropriate_articulation": pose_kind != "unknown",
     }
+    comparison = None
+    if expected_pixels is not None:
+        if len(expected_pixels) != total:
+            raise ValueError("presented surface and capture pixel counts disagree")
+        mismatched = 0
+        for expected, dark, light in zip(expected_pixels, dark_pixels, light_pixels):
+            alpha = expected[3]
+            for actual, background in ((dark, dark_background), (light, light_background)):
+                composited = tuple(min(255, channel + (backdrop * (255 - alpha) + 127) // 255)
+                                   for channel, backdrop in zip(expected[:3], background))
+                if not _close(actual[:3], composited, 3):
+                    mismatched += 1
+                    break
+        surface = analyze_surface(width, height, expected_pixels)
+        checks["controlled_transparent_background"] = _transparent_perimeter(
+            transparent_mask, width, height)
+        checks["exact_presented_surface"] = surface["passed"]
+        checks["every_composited_pixel_matches"] = mismatched == 0
+        comparison = {"mismatched_pixels": mismatched, "channel_tolerance": 3,
+                      "surface_checks": surface["checks"]}
     return {
         "passed": all(checks.values()),
         "pose_kind": pose_kind,
+        "surface_comparison": comparison,
         "dimensions": [width, height],
         "backgrounds": {
             "dark": list(dark_background),
@@ -445,6 +477,7 @@ def analyze_files(
     light_path: Path,
     dark_background: tuple[int, int, int],
     light_background: tuple[int, int, int],
+    expected_surface: Path | None = None,
 ) -> dict:
     dark_width, dark_height, dark_pixels = read_png_rgba(dark_path)
     light_width, light_height, light_pixels = read_png_rgba(light_path)
@@ -453,14 +486,23 @@ def analyze_files(
             f"capture sizes differ: dark={dark_width}x{dark_height}, "
             f"light={light_width}x{light_height}"
         )
-    return analyze_captures(
+    expected_pixels = None
+    present = None
+    if expected_surface is not None:
+        width, height, expected_pixels, present = read_presented_surface(expected_surface)
+        if (width, height) != (dark_width, dark_height):
+            raise ValueError("presented surface and capture dimensions disagree")
+    result = analyze_captures(
         dark_width,
         dark_height,
         dark_pixels,
         light_pixels,
         dark_background,
         light_background,
+        expected_pixels,
     )
+    result["present"] = present
+    return result
 
 
 def analyze_surface(
@@ -493,12 +535,14 @@ def analyze_surface(
     orange_mask = [False] * (width * height)
     opaque_near_black_mask = [False] * (width * height)
     content_mask = [False] * (width * height)
+    transparent_mask = [False] * (width * height)
 
     for index, (red, green, blue, alpha) in enumerate(pixels):
         if any(channel > alpha for channel in (red, green, blue)):
             invalid_premultiplied_pixels += 1
         if alpha <= 3:
             transparent_pixels += 1
+            transparent_mask[index] = True
         else:
             content_mask[index] = True
         if 4 <= alpha <= 244:
@@ -573,7 +617,7 @@ def analyze_surface(
     )
     checks = {
         "premultiplied_channel_bounds": invalid_premultiplied_pixels == 0,
-        "transparent_surface_margin": transparent_pixels >= max(25, total * 4 // 5),
+        "transparent_surface_margin": _transparent_perimeter(transparent_mask, width, height),
         "no_opaque_black_surface": (
             largest_opaque_near_black_component <= max(25, total // 100)
         ),
@@ -689,6 +733,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--dark", type=Path)
     parser.add_argument("--light", type=Path)
     parser.add_argument("--surface", type=Path)
+    parser.add_argument("--expected-surface", type=Path)
     parser.add_argument("--dark-bg", default="203040")
     parser.add_argument("--light-bg", default="f4ede4")
     parser.add_argument("--output", type=Path)
@@ -700,7 +745,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.surface is not None:
-            if args.dark is not None or args.light is not None:
+            if args.dark is not None or args.light is not None or args.expected_surface is not None:
                 parser.error("--surface cannot be combined with --dark/--light")
             result = analyze_surface_file(args.surface)
         else:
@@ -711,6 +756,7 @@ def main(argv: Iterable[str] | None = None) -> int:
                 args.light,
                 parse_rgb(args.dark_bg),
                 parse_rgb(args.light_bg),
+                args.expected_surface,
             )
     except (OSError, ValueError, zlib.error) as error:
         print(f"Windows overlay capture analysis failed: {error}", file=sys.stderr)

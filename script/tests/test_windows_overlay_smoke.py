@@ -110,6 +110,56 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
         self.assertGreaterEqual(len(result["orange_components"]), 2)
         self.assertTrue(result["pose_checks"]["continuous"]["semi_transparent_shadow"])
 
+    def bounded_source(self):
+        occupied = [i for i, pixel in enumerate(self.source) if pixel[3] > 0]
+        left = min(i % self.width for i in occupied) - 2
+        right = max(i % self.width for i in occupied) + 3
+        top = min(i // self.width for i in occupied) - 2
+        bottom = max(i // self.width for i in occupied) + 3
+        return right - left, bottom - top, [self.source[y * self.width + x]
+            for y in range(top, bottom) for x in range(left, right)]
+
+    def test_bounded_damage_requires_exact_presented_composition(self):
+        width, height, source = self.bounded_source()
+        dark = composite(source, self.dark_background)
+        light = composite(source, self.light_background)
+        baseline = ANALYZER.analyze_captures(width, height, dark, light,
+            self.dark_background, self.light_background)
+        self.assertFalse(baseline["checks"]["controlled_transparent_background"])
+        result = ANALYZER.analyze_captures(width, height, dark, light,
+            self.dark_background, self.light_background, premultiply_rgba(source))
+        self.assertTrue(result["passed"], result)
+        self.assertEqual(result["surface_comparison"]["mismatched_pixels"], 0)
+
+    def test_exact_composition_rejects_slabs_alpha_and_frame_drift(self):
+        width, height, source = self.bounded_source()
+        for name in ("black-slab", "colored-slab", "wrong-alpha", "stale-frame"):
+            with self.subTest(name=name):
+                damaged = list(source)
+                if name.endswith("slab"):
+                    color = (0, 0, 0, 255) if name == "black-slab" else (155, 75, 190, 255)
+                    for y in range(2, height - 2):
+                        for x in range(2, width - 2):
+                            if damaged[y * width + x][3] == 0:
+                                damaged[y * width + x] = color
+                elif name == "wrong-alpha":
+                    damaged = [(r, g, b, max(0, a - 30)) for r, g, b, a in source]
+                else:
+                    damaged = [(0, 0, 0, 0)] + source[:-1]
+                result = ANALYZER.analyze_captures(width, height,
+                    composite(damaged, self.dark_background), composite(damaged, self.light_background),
+                    self.dark_background, self.light_background, premultiply_rgba(source))
+                self.assertFalse(result["passed"], result)
+                self.assertFalse(result["checks"]["every_composited_pixel_matches"])
+
+    def test_presented_margin_rejects_opaque_rectangles_of_any_color(self):
+        width, height, source = self.bounded_source()
+        for color in ((0, 0, 0, 255), (170, 70, 160, 255)):
+            damaged = [color if pixel[3] == 0 else pixel for pixel in source]
+            result = ANALYZER.analyze_surface(width, height, premultiply_rgba(damaged))
+            self.assertFalse(result["passed"], result)
+            self.assertFalse(result["checks"]["transparent_surface_margin"])
+
     def test_committed_side_golden_proves_exact_layered_presenter_surface(self):
         result = ANALYZER.analyze_surface(self.width, self.height, self.presented)
         self.assertTrue(result["passed"], result)

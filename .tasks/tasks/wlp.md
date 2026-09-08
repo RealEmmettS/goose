@@ -28,14 +28,15 @@ uses this exact path, and settings clearly distinguish grant, readiness and unsu
 - [x] Fresh target/terminal checks, device pause/removal and disconnects fail closed.
 
 ## Status
-The complete production Rust/runtime/GUI pointer lifecycle passes both KDE 6 architectures
-in 34210973568, including actual engine motion, native consent denial/retry, pending and
-granted cancellation, unchanged drafts, external removal, stop/crash recovery and backend
-loss during active movement. Stationary native readback verifies cancellation, and a
-restart never restores permission. Final-source and complete release qualification remain
-under #rkde. KDE 5 has separate window evidence; no portal control is claimed for it.
+Done. Final-source native KDE 6 tests pass actual engine motion, native consent
+denial/retry, pending/granted cancellation, unchanged drafts, external removal,
+stop/crash recovery and backend loss during motion. Repeated healthy CLI/native
+setup preserves the active grant. The complete candidate/main/publication and
+eight fresh-public lanes pass at d38e4845 in v1.6.0. KDE 5 and musl remain
+explicitly unsupported for pointer control; the website record is #rkde.
 
 ## Activity
+- 2026-09-08 — Complete exact-source native pointer qualification, unchanged main, immutable v1.6.0 publication and all fresh-public lanes; confirm idempotent setup preserves the actual grant and source packages include the companion.
 - 2026-09-08: Read back both complete native pointer-runtime results in 34210973568,
   including actual movement and stationary cancellation, all intermediate permission
   states and active-motion backend removal. Retain final-source publication gates.
