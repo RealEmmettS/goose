@@ -49,6 +49,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ### Behind the scenes
 - Require actual desktop permission, movement, settings and recovery checks before publishing optional KDE support. Keep useful failure evidence and use the desktop's normal services without granting extra computer privileges.
+- Record the completed pointer-permission checks and clarify that removing desktop integration keeps delivered notes while an active picture delivery follows its normal cleanup.
 - Check that pointer motion really stops when the desktop permission service closes during a prank, and keep the observed recovery results available if a later check fails.
 - Avoid duplicate desktop builds while retaining the required release checks.
 - Keep limited delivery diagnostics in the isolated desktop tests so an interrupted delivery can be investigated without recording window titles or note contents.

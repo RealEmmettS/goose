@@ -24,19 +24,21 @@ uses this exact path, and settings clearly distinguish grant, readiness and unsu
 
 ## Verification
 - [x] Actual portal consent, granted libei devices, motion and cancellation are observed.
-- [ ] Runtime and native settings use the qualified path without changing saved drafts.
-- [ ] Fresh target/terminal checks, device pause/removal and disconnects fail closed.
+- [x] Runtime and native settings use the qualified path without changing saved drafts.
+- [x] Fresh target/terminal checks, device pause/removal and disconnects fail closed.
 
 ## Status
-Run 34203908233 passes all four native KDE desktops, with actual owned-note motion and
-the KDE 6 native portal premise. The production Rust runtime, CLI and native settings now
-own explicit ephemeral pointer request/cancel controls. Strict local workspace checks,
-the queued-warp revocation regression and native settings tests/check/build pass. The new
-native desktop qualifier must still prove integrated consent, engine pointer movement,
-denial/retry, cancellation, removal, stop/crash recovery and backend loss before completion.
-KDE 5 has separate window evidence; no EIS or portal control is claimed for it.
+The complete production Rust/runtime/GUI pointer lifecycle passes both KDE 6 architectures
+in 34210973568, including actual engine motion, native consent denial/retry, pending and
+granted cancellation, unchanged drafts, external removal, stop/crash recovery and backend
+loss during active movement. Stationary native readback verifies cancellation, and a
+restart never restores permission. Final-source and complete release qualification remain
+under #rkde. KDE 5 has separate window evidence; no portal control is claimed for it.
 
 ## Activity
+- 2026-09-08: Read back both complete native pointer-runtime results in 34210973568,
+  including actual movement and stationary cancellation, all intermediate permission
+  states and active-motion backend removal. Retain final-source publication gates.
 - 2026-09-08: Run 34209445052 reaches actual engine cursor movement, stationary cancellation, external revocation, graceful stop and crash recovery. KDE backend shutdown emits device removal before disconnect, which production correctly maps to denied; the test had expected failed. Assert the observed removal state and additionally interrupt active native cursor motion, retaining the stationary-pointer and rejected-new-prank checks. Save all intermediate states even if a later gate fails.
 - 2026-09-08: Run 34208034861 proves actual settings denial/retry/pending cancellation/grant and retained drafts. The integrated pointer motion identifies Honk300's own full-output, empty-caption layer as an unknown target. Reproduce the production guard failure and recognize only the exact runtime PID and layer identity; foreign lookalikes and protected windows beneath it remain refused. Native observer evidence also stops after a few seconds, so retain timer objects at script scope and require continued native updates before motion.
 - 2026-09-08: Integrated run 34205879636 passes both KDE 5 lanes and the window/portal premises on KDE 6, then exposes the settings pointer button being advertised but rejected outside the scroll viewport. Reproduce this through the real SDK accessibility dispatcher, fix bounded ancestor scrolling before activation, and verify the same regression passes while disabled controls remain inert.

@@ -50,6 +50,7 @@ All notable changes to this project are documented here. Format based on
 
 ### Behind the scenes
 - Require exact-commit KDE 5/6 x64/ARM64 qualification in candidate and public release orchestration, alongside all existing architecture, native package and signing gates.
+- Record the complete native pointer lifecycle results and keep final-source package qualification open; clarify the existing note-retention and active-picture cleanup behavior on integration removal.
 - Verify KDE's native device-removal outcome when a portal backend exits during active cursor motion, including stationary readback and rejection of subsequent pranks; preserve intermediate lifecycle evidence on later failures.
 - Run native KDE PR qualification without a duplicate development-branch run; exact-commit main, candidate and public gates remain required.
 - Capture bounded collection task, pose and geometry diagnostics only in explicitly enabled CI fixtures to distinguish engine release from native movement refusal, without logging window titles or user content.
