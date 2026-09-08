@@ -33,6 +33,10 @@ null-handle launcher defect was refuted against the pinned binding and an actual
 Windows process test. No v1.4.0 tag/public bytes exist; user installation is unchanged.
 
 ## Activity
+- 2026-09-08: The x64 Debian probe stopped at its older-config precondition because
+  reproducible packages preserve receipt timestamps. Set the isolated fixture's config
+  age explicitly before installation and record both times. The real settings Read/Save,
+  false autostart and unchanged protected-receipt assertions remain unchanged; repeat native gates.
 - 2026-09-07: Native Mac tests rejected the raw-byte fixture filename with APFS EILSEQ before any service call. Limit that filesystem-specific regression to Linux/Windows, where actual valid non-Unicode files reproduce the original panic. Production fixes are unchanged; repeat final-source qualification.
 - 2026-09-07: Reproduced and corrected missing-file reload and native non-Unicode path failures; added installer-intent snapshot ordering, degraded-status and concurrent-autostart regressions plus a real Debian GUI read/save intent probe. Full local Rust/GUI/Python checks pass. Preserve the merged candidate as evidence and qualify the new source before tagging.
 - 2026-09-07: Complete candidate 34181368273 passed at e51b76f, and 6ed7666 passed the corrected genuine GUI retry plus CLI/TUI transactions. The separate Linux work exposed a harmless but strict-Clippy-failing import from the installer extraction; correct its cfg and add native Linux strict checks before merging. All public/install state remains unchanged.

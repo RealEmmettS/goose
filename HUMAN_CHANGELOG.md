@@ -56,6 +56,7 @@ Save remains available to accessibility tools after changing settings, including
 Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
 
 ### Behind the scenes
+- Correct the age of the saved preference used in installer-choice checks, so the test really covers an older preference and records the evidence needed to diagnose failures.
 - Check unusual filenames on systems that allow creating them, while respecting the Mac filesystem's own filename rules.
 - Add focused startup and settings checks, and refresh the project dashboard while preserving its existing settings.
 - Linux builds now receive the same strict code checks as Windows, including unused platform-specific code.
