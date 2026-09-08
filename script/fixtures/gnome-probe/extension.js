@@ -84,7 +84,8 @@ export default class Probe extends Extension {
         const window = this._windows().find(value => value.get_stable_sequence() === id);
         if (!window || pid !== Number(GLib.getenv('HONK300_GNOME_PROBE_PID')) ||
             window.get_pid() !== pid || window.get_wm_class() !== 'honk300-gnome-probe' ||
-            !['Honk300 ordinary GNOME probe', 'ChatGPT Codex terminal probe'].includes(window.get_title()) ||
+            !['Honk300 ordinary GNOME probe', 'ChatGPT Codex terminal probe',
+                'Honk300 transient GNOME probe'].includes(window.get_title()) ||
             JSON.stringify(this._window(window).rect) !== expected ||
             this._drag || global.display.is_grabbed())
             throw new Error('Stale or unrelated focus fixture');

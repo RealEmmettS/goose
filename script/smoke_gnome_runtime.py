@@ -13,7 +13,7 @@ def qualify(binary, settings, evidence, wait, window, protected_window, find_win
     os.environ.update(environment)
     import gi
     gi.require_version('Atspi', '2.0')
-    from gi.repository import Atspi, Gio
+    from gi.repository import Atspi, Gio, Gtk
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     bus.call_sync('org.a11y.Bus', '/org/a11y/bus', 'org.freedesktop.DBus.Properties', 'Set',
         GLib.Variant('(ssv)', ('org.a11y.Status', 'IsEnabled', GLib.Variant('b', True))),
@@ -45,13 +45,14 @@ preserve = "untouched"
     runtime = ui = None
     logs = []
     states = []
+    thread_states = []
 
     def launch(executable, label, *arguments):
         path = directory / f'{label}-{len(logs)}.log'
         logs.append(path)
         with path.open('w') as log:
             process = subprocess.Popen([str(executable), *arguments], stdout=log, stderr=log,
-                                       env=dict(os.environ, HONK300_TRACE_PRESENCE='1', HONK300_TRACE_GNOME='1'))
+                                       env=dict(os.environ, HONK300_TRACE_PRESENCE='1', HONK300_TRACE_GNOME='1', HONK300_TRACE_OBSERVER='1'))
         return process, path
 
     def control(*arguments, success=True):
@@ -76,8 +77,25 @@ preserve = "untouched"
         return result
 
     def workers():
-        return sorted(p.parent.name for p in Path(f'/proc/{runtime.pid}/task').glob('*/comm')
-                      if p.read_text().strip() == 'gnome-observer'[:15])
+        threads = []
+        for p in Path(f'/proc/{runtime.pid}/task').glob('*/comm'):
+            try:
+                if p.read_text().strip() == 'gnome-observer'[:15]:
+                    threads.append(dict(id=p.parent.name, stat=(p.parent / 'stat').read_text()))
+            except FileNotFoundError:
+                continue
+        thread_states.append(dict(at=time.monotonic(), threads=threads))
+        return sorted(thread['id'] for thread in threads)
+
+    def joined_count():
+        return runtime_log.read_text().count('honk300 observer trace: name=gnome joined=true')
+
+    def removed(previous_joins):
+        assert joined_count() == previous_joins + 1, runtime_log.read_text()[-2000:]
+        def retired():
+            assert status()['capabilities']['windows'] == 'unsupported'
+            return not workers()
+        wait(retired, 'joined GNOME worker retired from proc', timeout=1)
 
     def nodes():
         assert ui.poll() is None, f'Settings exited with {ui.returncode}'
@@ -120,7 +138,7 @@ preserve = "untouched"
             return entries and entries[-1] if entries and check(entries[-1]) else None
         return wait(current, label)
 
-    def drag(target, protected=False):
+    def drag(target, protected=False, interrupt=None, label='ordinary'):
         target.present()
         title = target.get_title()
         arranged = wait(lambda: find_window(title), 'existing native drag fixture')
@@ -154,8 +172,13 @@ preserve = "untouched"
                 event('mousemove', x + width // 2 + 36, y + height // 2 + 24)
                 moved = observed(lambda value: perched(value) and value['anchor'] != state['anchor'],
                                  'perched goose follows the actual user drag')
-                (directory / 'native-ride.json').write_text(json.dumps(dict(before=state, moved=moved), indent=2))
-            (directory / ('protected-drag.json' if protected else 'ordinary-drag.json')).write_text(json.dumps(state, indent=2))
+                (directory / f'native-ride-{label}.json').write_text(json.dumps(dict(before=state, moved=moved), indent=2))
+                if interrupt:
+                    interrupt(native)
+                    cancelled = observed(lambda value: value['task'] != 'perch_ride',
+                                         'actual held ride cancellation: ' + label)
+                    (directory / f'interrupted-{label}.json').write_text(json.dumps(cancelled, indent=2))
+            (directory / ('protected-drag.json' if protected else f'{label}-drag.json')).write_text(json.dumps(state, indent=2))
         finally:
             event('mouseup', 1, 'keyup', 'Alt_L')
         wait(lambda: not snapshot()['grabbed'], 'native drag release')
@@ -238,30 +261,64 @@ preserve = "untouched"
         window.unfullscreen()
         wait(lambda: not find_window('Honk300 ordinary GNOME probe')['fullscreen'], 'fixture leaves fullscreen')
         trace(False, False)
+        def disable_rides(native):
+            config.write_text(original.replace('no_window_ride = false', 'no_window_ride = true'))
+            control('reload')
+            observed(lambda value: value['observed'] and value['drag_id'] == native['id']
+                     and value['task'] != 'perch_ride', 'live config ends a still-held ride')
+            assert snapshot()['drag']['id'] == native['id'], 'Fixture released before config cancellation'
+        drag(window, interrupt=disable_rides, label='config-disabled')
+        config.write_text(original)
+        control('reload')
+        transient = Gtk.Window(title='Honk300 transient GNOME probe')
+        transient.set_default_size(300, 200)
+        transient.set_child(Gtk.Label(label='Close during an actual held ride'))
+        transient.present()
+        def destroy_target(native):
+            assert snapshot()['drag']['id'] == native['id']
+            transient.destroy()
+            wait(lambda: find_window('Honk300 transient GNOME probe') is None, 'destroyed held native target')
+            observed(lambda value: value['observed'] and value['drag_id'] is None
+                     and value['task'] != 'perch_ride', 'destroyed target withdraws the live ride')
+        try:
+            drag(transient, interrupt=destroy_target, label='destroyed-target')
+        finally:
+            transient.destroy()
         invoke('Refresh status')
         invoke('Appearance')
         wait(lambda: (node := find('Reduced motion', Atspi.Role.TOGGLE_BUTTON)) and
              node.get_state_set().contains(Atspi.StateType.PRESSED), 'draft survives GNOME setup and status')
         assert config.read_text() == original
         invoke('Platform & status')
+        previous_joins = joined_count()
         invoke('Remove GNOME observations')
         expect('unsupported', 'native settings revokes live observations')
-        assert not workers() and not record.exists()
+        removed(previous_joins)
+        # The runtime loses authority before the asynchronous native settings
+        # action finishes disabling Shell and removing the recorded files.
+        wait(lambda: find('GNOME companion and observations removed.'), 'native removal completion')
+        assert not record.exists(), 'Completed native removal retained consent'
         control('integrations', 'gnome', 'setup')
         expect('supported', 'explicit CLI setup')
         saved_record = record.read_bytes()
         revoked = json.loads(saved_record)
         revoked['phase'] = 'revoking'
+        previous_joins = joined_count()
         record.write_text(json.dumps(revoked))
         expect('unsupported', 'external durable consent revocation')
-        assert not workers()
+        removed(previous_joins)
         control('integrations', 'gnome', 'remove')
         control('integrations', 'gnome', 'setup')
         expect('supported', 'new consent after external revocation')
-        subprocess.run(['gnome-extensions', 'disable', 'honk300@emmetts.dev'],
-                       check=True, capture_output=True, timeout=5)
-        expect('failed', 'native extension disable withdraws observations')
-        trace(False, False, observed=False)
+        def disable_extension(native):
+            assert snapshot()['drag']['id'] == native['id']
+            subprocess.run(['gnome-extensions', 'disable', 'honk300@emmetts.dev'],
+                           check=True, capture_output=True, timeout=5)
+            expect('failed', 'native extension disable withdraws observations during a held ride')
+            trace(False, False, observed=False)
+            observed(lambda value: not value['observed'] and value['drag_id'] is None
+                     and value['task'] != 'perch_ride', 'extension loss cancels the still-held ride')
+        drag(window, interrupt=disable_extension, label='extension-disabled')
         subprocess.run(['gnome-extensions', 'enable', 'honk300@emmetts.dev'],
                        check=True, capture_output=True, timeout=5)
         for _ in range(10):
@@ -294,6 +351,7 @@ preserve = "untouched"
         assert config.read_text() == original
         (directory / 'result.json').write_text(json.dumps(dict(ok=True, default_off=True,
             native_settings_consent=True, native_user_ride=True, protected_drag_excluded=True, foreign_caller_refused=True, engine_fullscreen_manners=True, live_config_toggle=True,
+            ride_config_cancellation=True, destroyed_ride_target=True, extension_loss_during_ride=True,
             idempotent_setup_preserves_worker=True,
             draft_preserved=True, unsupported_actions=True, exact_worker_removed=True,
             live_remove=True, external_revocation=True, native_extension_disable=True,
@@ -301,11 +359,18 @@ preserve = "untouched"
             stopped_removal=True, unrelated_state_preserved=True), indent=2) + '\n')
     finally:
         (directory / 'observed-states.json').write_text(json.dumps(states, indent=2) + '\n')
-        if ui is not None and ui.poll() is None:
-            (directory / 'native-settings-tree.json').write_text(json.dumps([
-                dict(name=node.get_name(), role=node.get_role_name()) for node in nodes()
-            ], indent=2) + '\n')
-        close(ui)
-        close(runtime)
-        if record.exists():
-            control('integrations', 'gnome', 'remove')
+        (directory / 'worker-identities.json').write_text(json.dumps(thread_states, indent=2) + '\n')
+        try:
+            if ui is not None and ui.poll() is None:
+                diagnostic = []
+                for node in nodes():
+                    try:
+                        diagnostic.append(dict(name=node.get_name(), role=node.get_role_name()))
+                    except GLib.Error:
+                        continue
+                (directory / 'native-settings-tree.json').write_text(json.dumps(diagnostic, indent=2) + '\n')
+        finally:
+            close(ui)
+            close(runtime)
+            if record.exists():
+                control('integrations', 'gnome', 'remove')
