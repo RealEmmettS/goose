@@ -193,4 +193,25 @@ mod tests {
         assert!(Frame::decode(&raw, 500, &"c".repeat(64)).is_err());
         assert!(Frame::decode(&vec![b' '; MAX_REPLY + 1], 500, &"c".repeat(64)).is_err());
     }
+
+    #[test]
+    fn sent_windows_still_require_nonempty_bounded_geometry() {
+        for geometry in [
+            [0, 0, 0, 200],
+            [0, 0, 300, 0],
+            [0, 0, -1, 200],
+            [0, 0, 300, -1],
+            [0, 0, 1_000_001, 200],
+            [i32::MIN, 0, 300, 200],
+        ] {
+            let mut value = native();
+            value["windows"][0]["geometry"] = json!(geometry);
+            assert!(decode(&value).is_err(), "{geometry:?}");
+        }
+        let mut value = native();
+        value["windows"] = json!([]);
+        let frame = decode(&value).unwrap();
+        assert!(!frame.fullscreen());
+        assert!(frame.dragged_window().is_none());
+    }
 }

@@ -1,6 +1,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
+import Clutter from 'gi://Clutter';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Config from 'resource:///org/gnome/shell/misc/config.js';
@@ -47,12 +48,16 @@ export default class Probe extends Extension {
 
     Snapshot() {
         const windows = this._windows();
+        const [x, y, modifiers] = global.get_pointer();
         if (windows.length > 64)
             throw new Error('Too many probe windows');
         return JSON.stringify({version: Config.PACKAGE_VERSION, pid: new Gio.Credentials().get_unix_pid(),
             display: GLib.getenv('DISPLAY'), wayland: GLib.getenv('WAYLAND_DISPLAY'),
             session_wayland: Meta.is_wayland_compositor(), drag: this._drag,
             grabbed: global.display.is_grabbed(),
+            pointer: [x, y],
+            alt_pressed: (modifiers & Clutter.ModifierType.MOD1_MASK) !== 0,
+            button_pressed: (modifiers & Clutter.ModifierType.BUTTON1_MASK) !== 0,
             overview: Main.overview.visible, stage: [global.stage.width, global.stage.height],
             windows: windows.map(window => this._window(window))});
     }

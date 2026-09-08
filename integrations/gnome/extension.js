@@ -138,8 +138,8 @@ export default class Honk300Observations extends Extension {
             if (!this._active || generation !== this._generation ||
                 this._consent().nonce !== nonce)
                 throw new Error('GNOME observations were revoked');
-            const windows = global.get_window_actors().map(actor => actor.meta_window);
-            if (windows.length > 64)
+            const actors = global.get_window_actors();
+            if (actors.length > 64)
                 throw new Error('Too many GNOME windows');
             const workspace = global.workspace_manager.get_active_workspace();
             const grabbed = global.display.is_grabbed();
@@ -147,8 +147,15 @@ export default class Honk300Observations extends Extension {
                 boundary: BOUNDARY, build: BUILD, version: Config.PACKAGE_VERSION,
                 pid: new Gio.Credentials().get_unix_pid(), session_wayland: true,
                 grabbed, overview: Main.overview.visible,
-                windows: windows.map(window => {
+                windows: actors.filter(actor => !actor.is_destroyed()).map(actor => {
+                    const window = actor.meta_window;
                     const rect = window.get_frame_rect();
+                    // Mutter retains actors while their surfaces are created,
+                    // remapped or destroyed. An empty frame has no live target;
+                    // omit it rather than ending all desktop observations.
+                    // Rust still rejects invalid geometry on every sent window.
+                    if (rect.width === 0 || rect.height === 0)
+                        return null;
                     const pid = window.get_pid();
                     const app = window.get_gtk_application_id() || window.get_wm_class();
                     const title = window.get_title();
@@ -163,7 +170,7 @@ export default class Honk300Observations extends Extension {
                         fullscreen: window.is_fullscreen(),
                         dragging: grabbed && this._drag === window.get_stable_sequence(),
                     };
-                }),
+                }).filter(window => window !== null),
             };
             const raw = JSON.stringify(data);
             if (new TextEncoder().encode(raw).length > 65536)

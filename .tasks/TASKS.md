@@ -9,6 +9,7 @@
   - [ ] Qualify macOS fullscreen and supported system do-not-disturb observation paths.
   - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
   - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
+
 ## Active
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
   - [x] Complete the separately qualified Sway implementation (needs #rsw).

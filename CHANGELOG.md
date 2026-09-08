@@ -31,12 +31,14 @@ All notable changes to this project are documented here. Format based on
 - Add Rust CLI, versioned IPC and Native SDK setup/removal controls with private recoverable consent, exact executable ownership, retained drafts, comments and unknown configuration.
 
 ### Fixed
+- Omit destroyed and zero-area Mutter surfaces from GNOME observations during creation and remapping, retaining strict Rust validation for every reported target.
 - Gate GNOME settings actions on their own capability instead of the unrelated Hyprland flag; exercise the actual update handlers with opposite compositor support values.
 
 ### Security
 - Authenticate the pinned system Shell and approved runtime executable before returning bounded observations. Apply one total deadline through bus authentication and each complete snapshot; discard stale or revoked data and require explicit reconnection after terminal failure. Keep rejected credential lookups separate from authenticated delivery.
 
 ### Behind the scenes
+- Prepare distinct GNOME release identities and make all four native GNOME desktops required same-source candidate/publication dependencies. Acknowledge native pointer/modifier delivery before private test grabs.
 - Distinguish invalid GNOME identity, empty geometry, coordinate bounds and inconsistent grabs without logging private window content, to diagnose native mapping transitions while retaining every rejection.
 - Close the Sway website handoff against deployed version/capability guidance, all mapped downloads and matching public manifest hashes, preserving the user's restored artwork.
 - Start native drag fixtures only after compositor geometry and GTK allocation settle, including fullscreen restoration. Parse only complete trace records while retaining malformed complete records as failures.

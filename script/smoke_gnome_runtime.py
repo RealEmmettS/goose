@@ -167,8 +167,13 @@ preserve = "untouched"
             subprocess.run(['xdotool', *map(str, arguments)], env=capture_environment,
                            check=True, capture_output=True, timeout=5)
         try:
-            event('mousemove', x + width // 2, y + height // 2,
-                  'keydown', 'Alt_L', 'mousedown', 1)
+            event('mousemove', x + width // 2, y + height // 2)
+            wait(lambda: snapshot()['pointer'] == [x + width // 2, y + height // 2],
+                 'native pointer reaches the private fixture: ' + label)
+            event('keydown', 'Alt_L')
+            wait(lambda: snapshot()['alt_pressed'], 'native Alt modifier: ' + label)
+            event('mousedown', 1)
+            wait(lambda: snapshot()['button_pressed'], 'native held button: ' + label)
             event('mousemove', x + width // 2 + 12, y + height // 2 + 12)
             try:
                 wait(lambda: (value if (value := snapshot())['drag'] and
@@ -200,7 +205,8 @@ preserve = "untouched"
             (directory / ('protected-drag.json' if protected else f'{label}-drag.json')).write_text(json.dumps(state, indent=2))
         finally:
             event('mouseup', 1, 'keyup', 'Alt_L')
-        wait(lambda: not snapshot()['grabbed'], 'native drag release')
+        wait(lambda: not (value := snapshot())['grabbed'] and not value['alt_pressed']
+             and not value['button_pressed'], 'native drag and modifier release')
         observed(lambda value: value['drag_id'] is None and value['task'] != 'perch_ride',
                  'actual goose leaves the released window')
 
@@ -251,7 +257,7 @@ preserve = "untouched"
                 raise AssertionError('Unapproved executable queried production observations')
         expect('supported', 'rejected foreign callers preserve the authenticated runtime')
         drag(window)
-        drag(protected_window, protected=True)
+        drag(protected_window, protected=True, label='protected')
         invoke('Refresh status')
         window.set_visible(False)
         protected_window.set_visible(False)

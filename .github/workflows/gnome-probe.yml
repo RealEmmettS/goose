@@ -2,9 +2,16 @@ name: Native GNOME adapter
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      commit:
+        required: true
+        type: string
+  pull_request:
+    paths: ['script/smoke_gnome*', 'script/smoke_owned_props_linux.py', 'script/smoke_runtime_props_linux.py', 'script/fixtures/gnome-probe/**', '.github/workflows/gnome-probe.yml', '.github/workflows/release.yml', 'integrations/gnome/**', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
   push:
-    branches: [codex/goose-gnome-integration]
-    paths: ['script/smoke_gnome*', 'script/fixtures/gnome-probe/**', '.github/workflows/gnome-probe.yml', 'integrations/gnome/**', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
+    branches: [main, codex/goose-gnome-integration]
+    paths: ['script/smoke_gnome*', 'script/smoke_owned_props_linux.py', 'script/smoke_runtime_props_linux.py', 'script/fixtures/gnome-probe/**', '.github/workflows/gnome-probe.yml', 'integrations/gnome/**', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
 
 permissions:
   contents: read
@@ -21,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:

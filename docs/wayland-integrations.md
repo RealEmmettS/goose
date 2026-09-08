@@ -60,7 +60,7 @@ The equivalent commands are `honk300 integrations pointer request`,
 
 Window observation, placement, pointer observation, pointer control and fullscreen
 awareness are reported separately. Fullscreen awareness does not establish do-not-disturb
-support. GNOME retains its separate implementation and desktop qualification task. Experimental Raspberry Pi guidance does not establish physical
+support. Each compositor has separate qualification. Experimental Raspberry Pi guidance does not establish physical
 Pi performance or extend the KDE test results to another compositor.
 
 ## Sway window and fullscreen observations
@@ -130,3 +130,44 @@ desktop and repeat setup to reconnect.
 Removing permission also works while the goose is stopped. Normal restarts may
 reuse saved observation permission. Closing settings keeps the goose running;
 setup, removal and stopping the goose preserve the independent settings draft.
+
+## GNOME window, fullscreen and user-drag observations
+
+The GNOME candidate targets **GNOME Shell 46.0** and **48.7**, each on x64 and ARM64.
+Its full native qualification is tracked in [the release record](readiness/v1.9.0-readiness.md).
+Other Shell versions report unavailable observations. Start the goose normally in
+your GNOME Wayland session; GNOME uses the compatible XWayland overlay.
+
+Open **Platform & status**, choose **Set up GNOME**, then confirm **Enable GNOME
+observations**. First setup or an updated companion may require signing out and
+back in so Shell discovers the installed extension. If requested, enable
+**Honk300 desktop observations** in GNOME Extensions and repeat setup. Honk300
+never changes the global extension switch or enables another extension.
+
+The companion observes current windows, fullscreen apps and actual user-held window
+drags. The goose can ride an ordinary window while you drag it and respects
+**Pause on fullscreen**. It excludes terminal windows and stops the ride when the
+drag ends, its window closes, window rides are disabled or observations are lost.
+The companion never moves another app's window. Pointer observation/control and
+do-not-disturb awareness remain unavailable. Honk300-owned notes and pictures use
+their separate XWayland positioning support.
+
+Choose **Remove GNOME observations** to revoke access, or use:
+
+```sh
+honk300 integrations gnome setup
+honk300 integrations gnome status
+honk300 integrations gnome remove
+```
+
+Setup installs only the versioned Honk300 companion and its private permission
+record. Rust verifies the system Shell; the companion accepts observations only
+from the executable you approved. An update requires explicit setup again.
+Changed or unrelated extension files are preserved and reported during removal.
+Removing observations works with the goose stopped and retains your other
+extensions, desktop settings and independent unsaved settings draft.
+
+Lost access, a disabled extension, a replaced Shell owner or invalid data clears
+observations and cancels any window ride. Restore the desktop and repeat setup
+to reconnect. A normal restart may reuse valid saved observations; it never grants
+pointer access.

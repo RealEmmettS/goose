@@ -40,9 +40,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost and keep setup responsive when a connection stops answering.
 
 ### Fixed
+- Keep GNOME observations working while an app creates or remaps a window, and stop following windows that have gone away.
 - Keep GNOME setup available according to its own desktop support, independently of Hyprland.
 
 ### Behind the scenes
+- Require GNOME's own desktop checks before publishing its support, including properly delivered private test input.
 - Make desktop connection failures easier to diagnose without recording window contents or relaxing the safety checks.
 - Keep the Sway website instructions and downloads aligned with the verified release while preserving the artwork you chose.
 - Let private windows finish resizing before testing a drag, and wait for a complete observation record before reading it.
