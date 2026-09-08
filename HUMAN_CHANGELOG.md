@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## GNOME desktop observations — September 2026
 
 ### Fixed
+- Keep a brief connection drop during startup from making settings report failure while the goose is still starting.
 - Keep quick turns near a delivered note from leaving one leg stretched behind the goose.
 - Make private desktop checks show how the goose was moving when a picture was captured, so movement problems are easier to reproduce.
 

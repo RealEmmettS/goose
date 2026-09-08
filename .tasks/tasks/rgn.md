@@ -40,15 +40,23 @@ sets of native settings, goose, painted note and complete-image captures were in
 ## Status
 Active. Production companion, authenticated Rust worker, compatible XWayland capability
 boundary, recoverable consent and native settings are implemented under ADR 0048.
-The complete 43-job candidate passed at `6ff7611`, but main and integrated native
-qualification exposed another input-fixture failure and an extension-disable
-status race. The production correction has a reproducing regression; strict
-native input passes on all four desktops at c2827ff. A later integrated capture
-exposes a shared stopping-art defect tracked by #rst. Actual motion, complete
-candidate/main/publication, fresh-public and website qualification repeat on the
-corrected source before any tag is created.
+All 31 standalone gates and the complete 43-job candidate pass at f25e700.
+All 48 repeated native deliveries and worst settling sequences are reviewed;
+the corrected engine resolves #rst. The final-stage candidate then exposes a
+dropped startup connection being rejected by the shared readiness helper.
+Carry its bounded retry correction into both stages and repeat same-source
+qualification before main, immutable publication, fresh-public and website gates.
 
 ## Activity
+- 2026-09-08 — Retain all 43 passing candidate jobs in 34283702176, all 31
+  standalone gates, and the four-desktop 48-delivery visual qualification in
+  34282484203. Before tagging, integrate R14's shared startup-readiness correction
+  after the final-stage Intel settings failure in 34284306818. Repeat only the
+  read-only Status probe for broken/reset connections inside the original
+  deadline, preserve permanent errors and child-exit checks, and require three
+  actual GUI start/stop cycles per native lifecycle lane. No goose art changes.
+  Formatting, strict workspace lint, complete Rust tests, release build, 138
+  Python checks (three platform skips), and separate Native SDK checks pass locally.
 - 2026-09-08 — Complete local qualification of the shared stopping/reversal
   correction under ADR 0050: full workspace checks, release, Python, production
   JavaScript and separate Native SDK checks pass. Actual World witnesses reproduce

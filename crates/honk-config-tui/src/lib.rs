@@ -388,6 +388,8 @@ where
                     err.kind(),
                     std::io::ErrorKind::NotFound
                         | std::io::ErrorKind::ConnectionRefused
+                        | std::io::ErrorKind::BrokenPipe
+                        | std::io::ErrorKind::ConnectionReset
                         | std::io::ErrorKind::WouldBlock
                         | std::io::ErrorKind::TimedOut
                 ) {
@@ -429,6 +431,8 @@ pub fn start_from_config(config_path: &Path) -> Result<String, String> {
                 }
             }
         }
+        // Only this read-only readiness probe is retried. Every attempt first
+        // checks the child and stays inside the original startup deadline.
         send_command(ControlCommand::Status)
     })
     .map(|_| "start ready".into())
@@ -704,35 +708,66 @@ mod tests {
 
     #[test]
     fn readiness_poll_returns_running_status_after_transient_error() {
-        let mut attempts = 0;
-        let status = wait_for_readiness(Duration::from_millis(100), Duration::ZERO, || {
-            attempts += 1;
-            if attempts == 1 {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "not ready yet",
-                ))
-            } else {
-                let mut status = RuntimeStatus::not_running();
-                status.running = true;
-                Ok(ControlResponse::Status(status))
-            }
-        })
-        .unwrap();
-        assert!(status.running);
-        assert_eq!(attempts, 2);
+        for kind in [
+            std::io::ErrorKind::NotFound,
+            std::io::ErrorKind::ConnectionRefused,
+            std::io::ErrorKind::WouldBlock,
+            std::io::ErrorKind::TimedOut,
+            std::io::ErrorKind::BrokenPipe,
+            std::io::ErrorKind::ConnectionReset,
+        ] {
+            let mut attempts = 0;
+            let status = wait_for_readiness(Duration::from_millis(100), Duration::ZERO, || {
+                attempts += 1;
+                if attempts == 1 {
+                    Err(std::io::Error::new(kind, "not ready yet"))
+                } else {
+                    let mut status = RuntimeStatus::not_running();
+                    status.running = true;
+                    Ok(ControlResponse::Status(status))
+                }
+            })
+            .unwrap_or_else(|error| panic!("{kind:?} blocked startup recovery: {error}"));
+            assert!(status.running);
+            assert_eq!(attempts, 2);
+        }
     }
 
     #[test]
-    fn readiness_timeout_reports_the_actual_last_error() {
-        let error = wait_for_readiness(Duration::from_millis(15), Duration::from_millis(1), || {
+    fn readiness_dropped_connection_obeys_the_existing_deadline() {
+        let mut attempts = 0;
+        let error = wait_for_readiness(Duration::ZERO, Duration::ZERO, || {
+            attempts += 1;
             Err(std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                "socket access denied",
+                std::io::ErrorKind::BrokenPipe,
+                "connection dropped",
             ))
         })
         .unwrap_err();
-        assert!(error.contains("socket access denied"), "{error}");
+        assert!(
+            error.contains("did not become ready within 0.0s"),
+            "{error}"
+        );
+        assert!(error.contains("connection dropped"), "{error}");
+        assert_eq!(attempts, 1);
+    }
+
+    #[test]
+    fn readiness_does_not_retry_permission_protocol_or_child_exit_errors() {
+        for kind in [
+            std::io::ErrorKind::PermissionDenied,
+            std::io::ErrorKind::InvalidData,
+            std::io::ErrorKind::Other,
+        ] {
+            let mut attempts = 0;
+            let error = wait_for_readiness(Duration::from_secs(10), Duration::ZERO, || {
+                attempts += 1;
+                Err(std::io::Error::new(kind, "permanent startup failure"))
+            })
+            .unwrap_err();
+            assert_eq!(error, "permanent startup failure");
+            assert_eq!(attempts, 1, "{kind:?} must not be retried");
+        }
     }
 
     #[test]
