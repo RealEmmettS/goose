@@ -47,14 +47,18 @@ before production movement. Pointer authority remains separately unsupported.
 - [ ] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Active. The initial socket/window/fullscreen premise passed all four native lanes.
+Active. Immutable v1.7.0 is published from 40bafeba4a08f0c0074c3cd16c0e0e12ec26a452
+after final-source PR, all-architecture settings, complete candidate and unchanged
+main qualification. All 47 public artifacts pass an independent download audit.
+All eight fresh-public installation lanes pass in run 34239956864; website
+verification finishes the remaining release gate.
 The actual bounded Rust decoder/transport and untrusted-peer refusal pass all four native
 lanes in run 34215421415. CLI, settings service, native GUI and owned observation worker
 pass integrated desktop lifecycle qualification in all four lanes of run 34218062301. User drag
 and pointer authority remain unsupported.
-Publication remains ordered after the qualified KDE release.
 
 ## Activity
+- 2026-09-08 — Candidate 34226647760, unchanged main CI/settings/KDE/Sway and immutable publication 34235320328 pass. Preserve the original failed Windows fixture evidence and the successful exact-source retry. Independently verify 47 public assets and dispatch all eight fresh-public install lanes in 34239956864 before the website handoff.
 - 2026-09-08 — The reviewed source passes Linux decoder/contention tests on all four native lanes. Actual XWayland maps the intentionally untitled client with a null name but recovers its real PID through XRes, so the fixture's null-PID expectation was false. Require that exact real PID and native null title; retain the separate nullable-PID decoder regression without claiming it was reproduced by this desktop.
 - 2026-09-08 — Reproduce both reviewed decoder failures with production tests, then accept null titles and retain unknown-PID fullscreen windows. Replace observation try-lock failure with the short publication lock and add a contention regression. Extend the real native desktop fixture with a minimal untitled XWayland client omitting its PID; keep all authority and bounds checks.
 - 2026-09-08 — Hold the candidate after the Windows host capture fails its old 80% empty-area assumption. Inspect the complete native image and all twelve reports; only that assumption fails after entry. Require every DWM pixel to match the exact presented surface over both controlled backgrounds, retain clipping/color/anatomy checks, and cover bounded poses and injected damage before rerunning native qualification.

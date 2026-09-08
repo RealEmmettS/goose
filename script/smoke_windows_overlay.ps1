@@ -953,11 +953,7 @@ function Wait-ForRuntime {
         [Parameter(Mandatory = $true)] [string] $EvidenceName
     )
     $last = ''
-    # Cold PowerShell/Add-Type startup on native ARM hosts may exceed five
-    # seconds before creating any surface. Bound fixture startup independently
-    # from the unchanged goose readiness and actual compositor pixel oracles.
-    $backgroundStartup = [Diagnostics.Stopwatch]::StartNew()
-    while ($backgroundStartup.Elapsed.TotalSeconds -lt 30) {
+    for ($attempt = 0; $attempt -lt 100; $attempt += 1) {
         if ($Process.HasExited) {
             throw "runtime exited before status became ready (exit $($Process.ExitCode))"
         }
@@ -1682,7 +1678,11 @@ strict_transparency_proof=disposable-ci-only
         -RedirectStandardOutput (Join-Path $work 'background.stdout.log') `
         -RedirectStandardError (Join-Path $work 'background.stderr.log') `
         -PassThru
-    for ($attempt = 0; $attempt -lt 100; $attempt += 1) {
+    # Cold PowerShell/Add-Type startup on native ARM hosts may exceed five
+    # seconds before creating any surface. Bound fixture startup independently
+    # from the unchanged goose readiness and actual compositor pixel oracles.
+    $backgroundStartup = [Diagnostics.Stopwatch]::StartNew()
+    while ($backgroundStartup.Elapsed.TotalSeconds -lt 30) {
         if ($background.HasExited) {
             $stderr = Get-Content -LiteralPath (Join-Path $work 'background.stderr.log') -Raw -ErrorAction SilentlyContinue
             throw "controlled background host exited early ($($background.ExitCode)): $stderr"

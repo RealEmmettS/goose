@@ -5,24 +5,27 @@ across real monitor layouts, honks, leaves muddy footprints, reacts to the point
 bounded desktop pranks. Configuration and control stay local through a command-line interface
 and native graphical and terminal settings screens.
 
-**New in v1.6.0:** explicit KDE window observations and animated owned deliveries,
-with separately requested temporary pointer permission on qualified KDE 6 GNU desktops.
+**New in v1.7.0:** optional Sway window and fullscreen observations on separately
+qualified desktops, with explicit setup and immediate revocation. KDE keeps its
+animated owned deliveries and separately requested temporary pointer permission.
 Setup and removal are available through native settings and the command line.
 These changes follow the goose redesign, native graphical settings, Linux notes and
 pictures, and experimental Pi 4/5 64-bit Desktop guidance.
 `honk300 settings` and tray Configure open the GUI; `honk300 config` retains the TUI.
-Both edit the same Rust-owned configuration. All eight managed installation checks passed
-against fresh public downloads. See [KDE setup](docs/wayland-integrations.md),
-[stage-three readiness](docs/readiness/v1.6.0-readiness.md),
+Both edit the same Rust-owned configuration. Public download identities are independently
+verified; native installation qualification is tracked in the release record.
+See [desktop setup](docs/wayland-integrations.md),
+[current release readiness](docs/readiness/v1.7.0-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.6.0](https://github.com/RealEmmettS/goose/releases/tag/v1.6.0),
-published from exact commit `d38e4845dd049c25d4719a8abec0c6304f44f013`. It includes the
+**Current stable release:** [v1.7.0](https://github.com/RealEmmettS/goose/releases/tag/v1.7.0),
+published from exact commit `40bafeba4a08f0c0074c3cd16c0e0e12ec26a452`. It includes the
 continuous goose redesign, expressive motion, bounded rendering resources, native
-graphical settings, Linux deliveries and opt-in KDE integration. See [release evidence](docs/readiness/v1.6.0-readiness.md).
+graphical settings, Linux deliveries, opt-in KDE integration and Sway observations.
+See [release evidence](docs/readiness/v1.7.0-readiness.md).
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
