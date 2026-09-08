@@ -2,7 +2,7 @@
 //! The optional system libraries are loaded only for a user-requested session.
 use libloading::Library;
 use std::{
-    ffi::{c_char, c_int, c_void},
+    ffi::{c_char, c_int, c_void, CStr},
     io, ptr,
     time::{Duration, Instant},
 };
@@ -39,6 +39,7 @@ api!(Oeffis, "liboeffis.so.1", {
     oeffis_get_eis_fd: unsafe extern "C" fn(Object) -> c_int,
     oeffis_dispatch: unsafe extern "C" fn(Object),
     oeffis_get_event: unsafe extern "C" fn(Object) -> c_int,
+    oeffis_get_error_message: unsafe extern "C" fn(Object) -> *const c_char,
 });
 api!(Ei, "libei.so.1", {
     ei_new_sender: unsafe extern "C" fn(Object) -> Object,
@@ -153,10 +154,20 @@ impl Session {
                         ))
                     }
                     _ => {
+                        let message = (self.oeffis.oeffis_get_error_message)(self.portal);
+                        let detail = if message.is_null() {
+                            "unknown portal error".into()
+                        } else {
+                            CStr::from_ptr(message)
+                                .to_string_lossy()
+                                .chars()
+                                .take(512)
+                                .collect::<String>()
+                        };
                         return Err(io::Error::new(
                             io::ErrorKind::ConnectionAborted,
-                            "Desktop pointer portal disconnected",
-                        ))
+                            format!("Desktop pointer portal disconnected: {detail}"),
+                        ));
                     }
                 }
             }

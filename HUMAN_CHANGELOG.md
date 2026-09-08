@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Behind the scenes
+- Make failed desktop permission requests easier to diagnose before enabling the goose to move the pointer.
+
 ### Added
 - Add optional KDE setup and removal in graphical settings and the command line. The goose remembers your choice separately from unsaved settings, stops using access when it is removed, and cleans up its own companion after stopping.
 

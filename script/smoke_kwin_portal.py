@@ -30,10 +30,10 @@ def qualify(binary, evidence, wait, call, GLib, Gtk, RustBridge):
     bridge = None
     window = None
 
-    def launch(executable, name):
+    def launch(executable, name, *arguments):
         log = (directory / f'{name}.log').open('w')
         logs.append(log)
-        process = subprocess.Popen([executable], env=environment, stdout=log, stderr=log)
+        process = subprocess.Popen([executable, *arguments], env=environment, stdout=log, stderr=log)
         processes.append(process)
         return process
 
@@ -60,9 +60,15 @@ def qualify(binary, evidence, wait, call, GLib, Gtk, RustBridge):
     try:
         launch('pipewire', 'pipewire')
         backend = launch(program('xdg-desktop-portal-kde', 'xdg-desktop-portal-kde'), 'kde')
-        launch(program('xdg-desktop-portal', 'xdg-desktop-portal'), 'desktop')
+        launch(program('xdg-desktop-portal', 'xdg-desktop-portal'), 'desktop', '--verbose')
         wait(lambda: call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
             'NameHasOwner', GLib.Variant('(s)', ('org.freedesktop.portal.Desktop',))).unpack()[0], 'native portal service')
+        owner_pids = {name: call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+            'GetConnectionUnixProcessID', GLib.Variant('(s)', (name,))).unpack()[0]
+            for name in ('org.freedesktop.portal.Desktop', 'org.freedesktop.impl.portal.desktop.kde')}
+        (directory / 'owners.json').write_text(json.dumps(dict(owners=owner_pids,
+            launched=[dict(pid=process.pid, exit=process.poll()) for process in processes]), indent=2) + '\n')
+        backend_pid = owner_pids['org.freedesktop.impl.portal.desktop.kde']
         window = Gtk.Window()
         window.set_title('Honk300 portal ordinary window')
         window.set_default_size(300, 200)
@@ -83,7 +89,7 @@ def qualify(binary, evidence, wait, call, GLib, Gtk, RustBridge):
                 raise AssertionError(reply)
             if reply['ready']:
                 return True
-            current = nodes(backend.pid)
+            current = nodes(backend_pid)
             last_tree = [dict(name=node.get_name(), role=node.get_role_name()) for node in current]
             (directory / 'native-consent-tree.json').write_text(json.dumps(last_tree, indent=2) + '\n')
             if not approved:

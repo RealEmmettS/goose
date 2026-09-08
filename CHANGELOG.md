@@ -27,6 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Preserve bounded native portal error details and actual service ownership in the isolated consent fixture so a failed grant can be diagnosed before enabling pointer control.
 - Begin native portal/libei qualification using an ephemeral pointer-only session, bounded device ownership, compositor-confirmed terminal exclusions and no runtime enablement before the real grant/motion/cancellation probe passes.
 
 ### Fixed
