@@ -22,13 +22,13 @@
   - [ ] Integrate launch, package identity, signing, update, and uninstall paths.
   - [ ] Qualify actual Windows UI Automation and Linux AT-SPI controls, modal focus, and native package payloads.
 - [ ] **Continuous goose rig and expressive behavior** - replace silhouette crossfades, refine motion, and verify actual render sequences (ms #refine) (owner codex) #rart
-  - [ ] Implement continuous projected geometry and meaningful interaction anchors.
-  - [ ] Add bounded task-driven expressions and reduced motion.
-  - [ ] Review motion exports and update independently checked visual fixtures.
+  - [x] Implement continuous projected geometry and meaningful interaction anchors.
+  - [x] Add bounded task-driven expressions and reduced motion.
+  - [x] Review motion exports and update independently checked visual fixtures.
 - [ ] **Refinement audit and reliability foundation** - evidence-backed corrections, production-path tests, shared bounded rendering resources, and maintainable lifecycle modules (ms #refine) (owner codex) #rfnd
-  - [ ] Record the audit register and baseline measurements.
-  - [ ] Share bounded canvas reuse and accumulator-aware runtime pacing.
-  - [ ] Replace tests disconnected from production behavior.
+  - [x] Record the audit register and baseline measurements.
+  - [x] Share bounded canvas reuse and accumulator-aware runtime pacing.
+  - [x] Replace tests disconnected from production behavior.
   - [x] Separate lifecycle responsibilities and shorten current guidance.
   - [ ] Pass focused regressions and complete local checks.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137

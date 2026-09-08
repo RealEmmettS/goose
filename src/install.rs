@@ -3,6 +3,7 @@ mod media;
 mod provenance;
 #[cfg(windows)]
 pub use autostart::run_windows_config_autostart_protocol;
+#[cfg(any(test, windows, target_os = "linux"))]
 use autostart::*;
 pub use autostart::{prepare_config_autostart, reconcile_config_autostart};
 use media::*;
@@ -512,7 +513,6 @@ fn copy_dir_recursive(source: &Path, dest: &Path) -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(any(windows, target_os = "linux"))]
 fn paths_match(left: &Path, right: &Path) -> bool {
     if let (Ok(left), Ok(right)) = (left.canonicalize(), right.canonicalize()) {
         return left == right;

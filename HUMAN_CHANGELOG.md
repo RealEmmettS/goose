@@ -35,9 +35,13 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ### Improved
 
+Save remains available to accessibility tools after changing settings, including pages with many controls.
+
 Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
 
 ### Behind the scenes
+
+Visual checks now distinguish the goose's outline from nearby seasonal decorations while continuing to catch clipped art, incorrect transparency, and color errors. Build checks keep their supporting components separate, and the reorganized installation code retains its Mac behavior.
 
 Linux accessibility checks now read and edit real settings fields and verify their saved values. Windows on ARM and Alpine checks have dedicated build and display setup so the same native app can be checked there.
 

@@ -34,9 +34,9 @@ pub fn build(b: *std.Build) void {
         b.getInstallStep().dependOn(&dll.step);
         app.run.step.dependOn(&dll.step);
     }
-    // The SDK's unit/analysis/model-contract artifacts do not link a platform
-    // host. Only the app needs the native bridge. Generated output paths carry
-    // the Cargo dependency to any artifact sharing this module in Debug builds.
+    // The pinned SDK patch gives unit/analysis/model-contract artifacts their
+    // own module, even when optimization modes match. Only the app module
+    // links a platform host and its native accessibility bridge.
     app.exe.root_module.addObjectFile(library);
     app.exe.root_module.addIncludePath(b.path("accessibility/native"));
     if (os == .windows) {

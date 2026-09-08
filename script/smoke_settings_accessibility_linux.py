@@ -43,7 +43,7 @@ def main() -> None:
             if app and app.get_process_id() == process.pid:
                 stack.append(app)
         found = []
-        while stack and len(found) < 192:
+        while stack and len(found) < 320:
             node = stack.pop()
             try:
                 node.clear_cache()

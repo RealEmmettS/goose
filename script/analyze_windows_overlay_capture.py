@@ -246,6 +246,20 @@ def _classify_pose(
     return ("continuous" if all(checks.values()) else "unknown"), {"continuous": checks}
 
 
+def _goose_edge_counts(candidates, opaque_goose_pixels, width, height):
+    # Seasonal leaves and puddles share the damage surface but have their own
+    # palettes. Qualify antialias colors only beside identified goose anatomy;
+    # surface transparency, clipping and black-rectangle checks still cover all
+    # pixels. Two pixels cover the supersampled contour's antialias fringe.
+    neighbors = set()
+    for index in opaque_goose_pixels:
+        x, y = index % width, index // width
+        for row in range(max(0, y - 2), min(height, y + 3)):
+            neighbors.update(row * width + col for col in range(max(0, x - 2), min(width, x + 3)))
+    edges = [valid for index, valid in candidates if index in neighbors]
+    return len(edges), sum(edges)
+
+
 def analyze_captures(
     width: int,
     height: int,
@@ -261,8 +275,7 @@ def analyze_captures(
     palette_counts = dict.fromkeys(PALETTE, 0)
     transparent_pixels = 0
     semi_transparent_pixels = 0
-    semantic_edge_candidates = 0
-    semantic_edge_pixels = 0
+    edge_candidates = []
     shadow_candidates: list[int] = []
     goose_palette_pixels: list[int] = []
     eye_pixels: list[int] = []
@@ -328,9 +341,7 @@ def analyze_captures(
             ) / alpha
             reconstructed.append((from_dark + from_light) / 2.0)
         if 0.15 <= alpha <= 0.85 and max(reconstructed) > 80:
-            semantic_edge_candidates += 1
-            if any(_close(reconstructed, expected, 20) for expected in PALETTE.values()):
-                semantic_edge_pixels += 1
+            edge_candidates.append((index, any(_close(reconstructed, expected, 20) for expected in PALETTE.values())))
         if alpha > 0.35:
             continue
         if (
@@ -342,6 +353,9 @@ def analyze_captures(
         ):
             shadow_candidates.append(index)
 
+    semantic_edge_candidates, semantic_edge_pixels = _goose_edge_counts(
+        edge_candidates, goose_palette_pixels, width, height
+    )
     orange_components = _components(orange_mask, width, height, minimum_size=3)
     unchanged_near_black_components = _components(
         unchanged_near_black_mask,
@@ -471,8 +485,7 @@ def analyze_surface(
     palette_counts = dict.fromkeys(PALETTE, 0)
     transparent_pixels = 0
     semi_transparent_pixels = 0
-    semantic_edge_candidates = 0
-    semantic_edge_pixels = 0
+    edge_candidates = []
     invalid_premultiplied_pixels = 0
     opaque_goose_pixels: list[int] = []
     eye_pixels: list[int] = []
@@ -499,9 +512,7 @@ def analyze_surface(
             else (0, 0, 0)
         )
         if 38 <= alpha <= 217 and max(straight) > 80:
-            semantic_edge_candidates += 1
-            if any(_close(straight, expected, 20) for expected in PALETTE.values()):
-                semantic_edge_pixels += 1
+            edge_candidates.append((index, any(_close(straight, expected, 20) for expected in PALETTE.values())))
 
         if alpha >= 245 and _close(straight, (31, 36, 34), 10):
             eye_pixels.append(index)
@@ -529,6 +540,9 @@ def analyze_surface(
         ):
             shadow_candidates.append(index)
 
+    semantic_edge_candidates, semantic_edge_pixels = _goose_edge_counts(
+        edge_candidates, opaque_goose_pixels, width, height
+    )
     orange_components = _components(orange_mask, width, height, minimum_size=3)
     opaque_near_black_components = _components(
         opaque_near_black_mask,

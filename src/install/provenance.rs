@@ -371,6 +371,7 @@ pub(super) fn path_is_in_app_bundle(path: &Path) -> bool {
         .any(|ancestor| ancestor.extension().and_then(|ext| ext.to_str()) == Some("app"))
 }
 
+#[cfg(any(windows, target_os = "linux"))]
 pub(super) fn write_install_marker(root: &Path, source: InstallSource) -> io::Result<()> {
     write_text_file(&root.join(MARKER_FILE), source.marker_value())
 }

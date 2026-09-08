@@ -121,6 +121,21 @@ class WindowsOverlayCaptureAnalyzerTests(unittest.TestCase):
         self.assertTrue(result["pose_checks"]["continuous"]["visible_feet"])
         self.assertTrue(result["pose_checks"]["continuous"]["semi_transparent_shadow"])
 
+    def test_separate_seasonal_colors_do_not_count_as_goose_edge_colors(self):
+        decorated = list(self.source)
+        # A bounded translucent effect in the empty corner uses a distinct
+        # palette. It must not outvote the real goose's correct edge colors.
+        for y in range(8, 28):
+            for x in range(8, 28):
+                index = y * self.width + x
+                self.assertEqual(decorated[index][3], 0)
+                decorated[index] = (165, 83, 25, 160)
+        paired = self.analyze(composite(decorated, self.dark_background), composite(decorated, self.light_background))
+        surface = ANALYZER.analyze_surface(self.width, self.height, premultiply_rgba(decorated))
+        for result in (paired, surface):
+            self.assertTrue(result["passed"], result)
+            self.assertTrue(result["checks"]["semantic_edge_colors"])
+
     def test_committed_top_down_golden_proves_articulated_alpha_composition(self):
         result = ANALYZER.analyze_captures(
             self.top_down_width,

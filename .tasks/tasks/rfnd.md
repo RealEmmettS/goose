@@ -20,13 +20,15 @@ Record actionable findings, correct shared rendering/pacing and false tests, pre
 The requested behavior runs through its production path and the supporting evidence matches the claimed platform and installation.
 
 ## Verification
-- [ ] Relevant production-path regression tests pass.
-- [ ] Actual behavior or rendered output is inspected in its supported environment.
+- [x] Relevant production-path regression tests pass.
+- [x] Actual behavior or rendered output is inspected in its supported environment.
 - [ ] Integration and required package/release checks pass before publication.
 
 ## Status
-Active; shared canvas/pacing, deferred presentation acknowledgement, and actual audio pool checks implemented; validation in progress.
+
+Active: shared bounded rendering, accumulator pacing, production audio/buffer checks and lifecycle extraction are implemented. Full Windows workspace regressions and measured renderer workloads passed. Final native compilation and release gates remain open; the Mac cfg extraction correction awaits hosted verification.
 
 ## Activity
+- 2026-09-07: Reconciled implemented audit corrections and old/new render costs. Corrected native Mac cfg boundaries discovered by hosted compilation; scoped the goose edge-color oracle to its silhouette after reviewing the actual leaf-pile capture.
 - 2026-09-07: Separated provenance, autostart, mutable-media migration, and existing lifecycle regressions into focused modules; current guidance already shortened with complete historical copies retained. Strict workspace clippy, formatting, the full Rust workspace suite, and all 129 Python checks pass (three platform skips). Native cfg checks remain in CI.
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).

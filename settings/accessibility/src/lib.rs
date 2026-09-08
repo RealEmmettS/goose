@@ -14,7 +14,7 @@ use std::{
 };
 
 const ROOT: NodeId = NodeId(u64::MAX);
-const MAX_NODES: usize = 64;
+const MAX_NODES: usize = 128;
 const MAX_JSON: usize = 256 * 1024;
 const MAX_ACTIONS: usize = 32;
 const MAX_TEXT: usize = 4096;

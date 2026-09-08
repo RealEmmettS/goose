@@ -114,5 +114,25 @@
         "after": "    if (state.response <= 0) return 0;\n    if (state.response == 1) return 1;\n    return 2;\n}\n#else\nnative_sdk_gtk_open_dialog_result_t native_sdk_gtk_show_open_dialog(native_sdk_gtk_host_t *host, const native_sdk_gtk_open_dialog_opts_t *opts, char *buffer, size_t buffer_len) {\n    (void)host; (void)opts; (void)buffer; (void)buffer_len;\n    return (native_sdk_gtk_open_dialog_result_t){0};\n}\nsize_t native_sdk_gtk_show_save_dialog(native_sdk_gtk_host_t *host, const native_sdk_gtk_save_dialog_opts_t *opts, char *buffer, size_t buffer_len) {\n    (void)host; (void)opts; (void)buffer; (void)buffer_len;\n    return 0;\n}\nint native_sdk_gtk_show_message_dialog(native_sdk_gtk_host_t *host, const native_sdk_gtk_message_dialog_opts_t *opts) {\n    (void)host; (void)opts;\n    return 0;\n}\n#endif\n"
       }
     ]
+  },
+  {
+    "file": "platform/types.zig",
+    "sha256": "213ee148a0206039a78a1d9260ad08cf7f972bcb8f24f95b8e6e0ba986bc33df",
+    "edits": [
+      {
+        "before": "pub const max_widget_accessibility_nodes: usize = 64;",
+        "after": "// Honk300: retain complete settings pages, including changed-field labels and Save.\npub const max_widget_accessibility_nodes: usize = 128;"
+      }
+    ]
+  },
+  {
+    "file": "../build/app.zig",
+    "sha256": "0b224d560c66f0a111c1cc333c3f81002ab25811dabb81d85d174a89ed491595",
+    "edits": [
+      {
+        "before": "    const test_app_mod = if (app_optimize == optimize) app_mod else appModule(b, dep, target, optimize, app_options, options_mod, ts_stage);",
+        "after": "    // Honk300: platform link inputs belong only to the app executable.\n    // Sharing its module breaks COFF analysis and loads the bridge DLL\n    // into pure test/model-contract executables when modes match.\n    const test_app_mod = appModule(b, dep, target, optimize, app_options, options_mod, ts_stage);"
+      }
+    ]
   }
 ]

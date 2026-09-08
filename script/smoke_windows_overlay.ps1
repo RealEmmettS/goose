@@ -1936,7 +1936,7 @@ light_sha256=$lightProofHash
         }
     }
     if (-not $visualPassed) {
-        throw "no exact $captureMode pose proved a complete side or top-down body, shade, outline, wing, warm articulation, and per-pixel alpha"
+        throw "no exact $captureMode pose proved a complete projected body, shade, outline, wing, warm articulation, and per-pixel alpha"
     }
 
     # Restore the real desktop before lifecycle qualification. Calibration backgrounds exist only

@@ -17,7 +17,8 @@ Windows and Linux. Keep macOS's existing native bridge. Small, exact-source-hash
 patches wire the local SDK dependency's publish, focus, destruction, and action
 events. The global framework remains untouched.
 
-The bridge retains at most 64 nodes and 32 queued actions, rejects malformed
+The bridge retains at most 128 widget nodes, one text run per text widget, and
+32 queued actions. It rejects malformed
 trees and stale or disabled targets, and applies actions on the owning UI thread.
 OS callbacks never enter Zig. Static text uses AccessKit's value representation;
 modal dialogs exclude obscured controls from assistive navigation. Windows uses
@@ -50,3 +51,10 @@ The SDK automation harness remains a separate fixture from native assistive
 technology acceptance. Hosted GTK/AT-SPI, complete native packaging, and final
 release qualification remain required. Physical Mac/Pi acceptance is unavailable
 on the current Windows-only setup and must remain explicit.
+
+Actual editing found that the SDK's original 64-node limit truncated Save after
+changed-field labels appeared on the Appearance page. The pinned local SDK and
+bridge now share a 128-widget ceiling; the OS qualification edits that page and
+requires the final Save action and persistent readback. Text runs expose Unicode
+and empty field contents to native readers without fabricating glyph positions
+or caret selection.
