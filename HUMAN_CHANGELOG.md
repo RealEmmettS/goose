@@ -33,7 +33,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Added
+- The goose can bring notes and pictures on Linux. Compatible desktops animate deliveries, while Wayland chooses where to place them. Settings explain the active desktop capabilities, and new guidance covers experimental Raspberry Pi desktop use.
+
 ### Behind the scenes
+- Prepare the Linux update using checks of the actual shipped companions, while keeping the remaining release checks and real Raspberry Pi testing visible.
 - Use the desktop compositor supplied by Alpine for its isolated note and picture checks, while keeping the same visibility requirements.
 - Check the shipped Linux note and picture windows on Alpine as well as Ubuntu, including visible deliveries and cleanup if the supporting process fails.
 - Add Raspberry Pi desktop setup guidance and explain exactly what has been tested and what still needs a real device.

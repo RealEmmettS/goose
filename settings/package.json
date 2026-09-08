@@ -1,7 +1,7 @@
 {
   "name": "honk300-settings-build",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Pinned Native SDK build toolchain for the Honk300 settings binary.",
   "devDependencies": {
     "@native-sdk/cli": "0.5.4"

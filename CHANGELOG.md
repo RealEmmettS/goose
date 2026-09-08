@@ -26,12 +26,18 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.5.0] - Unreleased candidate
+
+### Added
+- Add Honk300-owned Linux note/image deliveries through the existing verified GTK companion, with X11 animated positioning and native Wayland compositor placement. Expose live session and separate positioning capability in CLI/TUI/GUI, and document experimental Pi 4/5 64-bit Desktop support with native ARM64 labwc evidence.
+
 ### Fixed
 - Honor the documented native Wayland opt-in on desktops without X11: a bare launch explains the existing command/config choice before creating an overlay or companion.
 - Give the native Linux prop close button the visible label Close; GTK's deferred child label had replaced the separate accessibility label with the multiplication symbol.
 - Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.
 
 ### Development
+- Prepare the ordered Linux release candidate and reconcile current capability guidance with successful production GNU/musl and ARM64 labwc evidence; retain every final-source package/publication gate and the physical Pi acceptance boundary.
 - Use Alpine's available picom XRender compositor for private musl prop qualification, retaining the live compositor-selection and visible-note checks; xcompmgr remains the GNU baseline host.
 - Exercise the exact production musl companions with real X11 notes, complete-image pixels, user closes, runtime delivery and child-loss cleanup on native x64/ARM64 Alpine; share the isolated compositor runner with the GNU baseline gate.
 - Document experimental Pi 4/5 64-bit Raspberry Pi OS Desktop setup, actual labwc 0.7.1 x64/ARM64 qualification and the remaining physical-device boundary; index the refinement ADRs.

@@ -13,6 +13,9 @@ so this machine's v1.3.5 installation and protected receipt remain unchanged.
 
 The first refinement candidate is v1.4.0; it is not published. Its current qualification
 record is `docs/readiness/v1.4.0-readiness.md`.
+This branch prepares the second candidate, v1.5.0: owned Linux props, session reporting
+and experimental Pi guidance. See `docs/readiness/v1.5.0-readiness.md`; publication stays
+ordered after the first stage. Native GNU/musl and ARM64 labwc proof is not physical Pi acceptance.
 
 The approved refinement is in progress under `.tasks/milestones/refine.md` and ADR 0041:
 1. Reliability cleanup, a fully redesigned continuously projected goose and animations, and a
@@ -85,12 +88,13 @@ not public-release or physical-device acceptance. `docs/refinement-audit.md` tra
 - Ordinary `stop`/`quit`/`exit` and native Quit always use that graceful walk-off. The explicit
   `--force` variants on all three command names terminate immediately through separate IPC.
 - Windows collected notes are Honk300-owned native edit windows, never Notepad or global input.
-  Windows/macOS notes and images share the ADR 0032 monitor-relative fit: hard 48% per-dimension
+  Windows/macOS/Linux notes and images share the ADR 0032 monitor-relative fit: hard 48% per-dimension
   ceiling, aspect-preserving complete-image downscale, no crop, and no upscaling.
 - A user—not program cleanup—closing a spawned note or meme gets an independent 30% annoyed
   reaction roll. The reaction may chain only the existing bounded cursor nab and only after live
-  capability, permission/pointer, configuration, and manners checks. Linux collect windows remain
-  unsupported and therefore produce no native close trigger.
+  capability, permission/pointer, configuration, and manners checks. Linux props are owned
+  by the verified companion: X11 positions only those windows, while native Wayland uses
+  normal compositor placement. User closes and connection-owned cleanup remain distinct.
 - Install/update/uninstall retain the real runtime singleton for the whole mutation. Unix signals
   roll back with explicit nonzero status. Windows payloads remain pinned from same-stream
   size/hash verification through execution; generated bootstrap delegation must reacquire without
