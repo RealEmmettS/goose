@@ -138,13 +138,28 @@ def main() -> None:
             for label in ("Honk on the hour", "Travel across monitors", "Allow cursor nabs",
                           "Random cursor nabs", "Prevent all cursor nabs", "Prevent window rides",
                           "Ride supported windows", "Bring notes and memes"):
-                click(label, "switch")
+                # Exercise the semantic action even when a smaller host viewport
+                # puts the eighth control below the scroll area's visible edge.
+                identifier = widget(label, "switch")
+                before = re.search(r'#' + identifier + r' role=switch .*? value=([01]) ', snapshot())
+                assert before, f"missing switch value: {label}"
+                automate("widget-action", "main-canvas", identifier, "toggle")
+                wait(r'#' + identifier + r' role=switch .*? value=' + str(1 - int(before[1])) + ' ')
             capture("largest-dirty-page")
             click("Save & apply")
             wait(r'role=text name="Saved\.')
             saved = tomllib.loads(config.read_text(encoding="utf-8"))
-            assert saved["safety"]["no_mouse_steal"] is True
-            assert saved["behavior"]["can_attack_mouse"] is False
+            for section, key, expected in (
+                ("behaviors", "on_hour_double_honk", False),
+                ("behaviors", "multi_monitor_chase", False),
+                ("behavior", "can_attack_mouse", False),
+                ("behavior", "attack_randomly", True),
+                ("safety", "no_mouse_steal", True),
+                ("safety", "no_window_ride", True),
+                ("mischief", "perch_and_ride", False),
+                ("mischief", "collect_windows", False),
+            ):
+                assert saved[section][key] is expected, f"saved toggle mismatch: {section}.{key}"
             if args.lifecycle:
                 assert "honk300: not running" in control("status").stdout, "fixture found an existing runtime"
                 click("General")

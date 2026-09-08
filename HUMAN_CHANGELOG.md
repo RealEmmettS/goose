@@ -43,6 +43,8 @@ Settings now expose their text and controls to Windows accessibility tools, with
 
 ### Behind the scenes
 
+Windows installer builds now package each supporting license correctly. Settings checks verify every changed switch even on smaller windows, then confirm all changes were saved.
+
 Graphical-settings start and stop checks use the intended test environment, with desktop drawing checked separately where a compositor is available.
 
 Update checks now cover the command line and both settings screens with real installed packages, including a failed download followed by a retry and checks that the goose can restart afterward. Separate checks start and stop the goose from its graphical settings.

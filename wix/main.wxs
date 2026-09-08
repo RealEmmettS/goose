@@ -89,7 +89,9 @@
                                         </Component>
                                         <Component Id='NativeSdkNotices' Guid='*' Permanent='yes'>
                                             <File Id='NativeSdkLicense' Name='NATIVE_SDK_LICENSE.txt' DiskId='1' Source='$(var.CargoTargetBinDir)\NATIVE_SDK_LICENSE.txt' KeyPath='yes'/>
-                                            <File Id='NativeSdkFontLicense' Name='NATIVE_SDK_FONT_LICENSE.txt' DiskId='1' Source='$(var.CargoTargetBinDir)\NATIVE_SDK_FONT_LICENSE.txt'/>
+                                        </Component>
+                                        <Component Id='NativeSdkFontNotices' Guid='*' Permanent='yes'>
+                                            <File Id='NativeSdkFontLicense' Name='NATIVE_SDK_FONT_LICENSE.txt' DiskId='1' Source='$(var.CargoTargetBinDir)\NATIVE_SDK_FONT_LICENSE.txt' KeyPath='yes'/>
                                         </Component>
                                     </Directory>
                                 </Directory>
@@ -155,6 +157,7 @@
             <ComponentRef Id='Honk300SettingsExe'/>
             <ComponentRef Id='HonkSettingsAccessibility'/>
             <ComponentRef Id='NativeSdkNotices'/>
+            <ComponentRef Id='NativeSdkFontNotices'/>
             <ComponentRef Id='LegalNotices'/>
             <ComponentRef Id='InstallSourceMarker'/>
             <ComponentRef Id='StartMenuShortcut'/>
