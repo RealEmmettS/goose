@@ -40,11 +40,12 @@ sets of native settings, goose, painted note and complete-image captures were in
 ## Status
 Active. Production companion, authenticated Rust worker, compatible XWayland capability
 boundary, recoverable consent and native settings are implemented under ADR 0048.
-All four earlier integrated desktop fixtures passed. Final review corrections now
-repeat native qualification; final-source architecture/settings, complete
-candidate/main/publication, fresh-public and website gates remain open.
+The complete corrected native suites pass at 99adb7e in run 34260153471 on all four
+desktops. Final-source architecture/settings, complete candidate/main/publication,
+fresh-public and website gates remain open.
 
 ## Activity
+- 2026-09-08 — All four corrected GNOME suites pass at 99adb7e in 34260153471. Inspect twelve native settings/goose, painted-note and complete-image captures, record the one private-window overlap, and verify all sixteen result records plus absent pointer samples. Resolve the four confirmed PR findings and start complete candidate 34261317929 on the unchanged source.
 - 2026-09-08 — Corrected run 34258094137 passes the entire newer-ARM desktop. Older ARM cancels its held ride correctly but exhausts the 64-transition diagnostic cap; use the existing bounded post-tick trace for actual manners assertions. The two x64 captures expose remapped decoration/input assumptions. Give private fixtures explicit GTK title bars and send distinct client motion before the unchanged native grab. Check independent consent files concurrently, retaining every opened identity, both full consent checks, cancellation cleanup and original deadline; seven production JavaScript regressions pass.
 - 2026-09-08 — The same diagnostic run reaches late remapped-window grabs on both x64 desktops. Captures show the pointer on a native frame decoration while GTK correctly reports it outside its client surface. Prove GTK pointer entry inside the exact client first, then require the unchanged real title-bar gesture and Mutter grab; preserve engine ride, terminal and interruption assertions.
 - 2026-09-08 — Diagnostic run 34256746560 identifies the actual older-ARM interruption as the unchanged Shell deadline during the final consent read. Retry only late/busy queries on the retained authenticated connection, withdrawing old data before recovery; keep revoked consent, changed identity, extension loss and invalid replies terminal. Extend actual production request cancellation/recovery coverage and repeat all native gates.

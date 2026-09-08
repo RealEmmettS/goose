@@ -34,6 +34,7 @@ All notable changes to this project are documented here. Format based on
 - Report an expired Mac fullscreen sample as failed while its replacement is blocked; reserve unprobed for a new target, preserve the original freshness limit and recover on a fresh result.
 
 ### Behind the scenes
+- Record all four corrected GNOME desktop passes and reviewed native output before freezing the combined final-stage candidate; preserve the qualified Mac implementation and every publication gate.
 - Record repeated Intel/Apple Silicon fullscreen and denied-identity qualification after GNOME review integration; carry bounded native recovery and verified Hyprland publication into the final stage while preserving public release order.
 - Require native Mac fullscreen/restore, denied app identity, live settings, unresponsive-target recovery and graceful shutdown, plus separate Windows UI Automation and Linux AT-SPI presence labels, as release qualification. Preserve the unqualified app-specific Focus experiment without production prompts or inferred support.
 - Run strict native Mac workspace lint with correct platform bindings and Linux-only Debian uninstall helpers; retain explicit permission-loss and timeout boundaries.

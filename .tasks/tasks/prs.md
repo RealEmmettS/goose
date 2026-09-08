@@ -28,6 +28,7 @@ the GNOME review fixes, then complete final-source candidate, main, publication,
 fresh-public and website gates.
 
 ## Activity
+- 2026-09-08 — Integrate the final GNOME source after all four corrected native suites pass in 34260153471. Preserve the independently qualified Mac implementation and freeze the combined source for complete candidate, main, public distribution and website qualification.
 - 2026-09-08 — Final merged Mac repeat 34255297607 passes both architectures and denied-identity scenarios at a9d8a89; inspect both native fullscreen captures. Integrate GNOME's diagnosed timeout recovery and remapped-frame input qualification while retaining strict deadlines, terminal failures and ordered public releases. Hyprland publication and website records are complete.
 - 2026-09-08 — Run 34253150265 passes both native Mac architectures on the corrected expiry implementation, including independent denied-identity scenarios. Inspect both fullscreen captures; status and graceful-stop bounds pass. Integrate the four GNOME review corrections before final-source release qualification; earlier candidates remain cancelled and unpublished.
 - 2026-09-08 — Apple Silicon repeat 34251439574 withdraws fullscreen correctly but exposes expired results flickering back to unprobed during the actual frozen-target check. Report completed-but-expired observations as Failed, retaining the exact freshness deadline; add actual worker expiry/recovery coverage and repeat the unchanged native oracle. Intel passes both runtime and private denied-identity scenarios.
