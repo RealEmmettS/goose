@@ -59,6 +59,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost, keep setup responsive when a connection stops answering, and preserve unrelated desktop settings.
 
 ### Behind the scenes
+- Wait until each private test desktop is actually ready before checking the goose, while keeping communication and behavior checks strict.
 - Start test drags on a clear part of the title bar when the goose is sitting over its middle, preserving the goose's normal response to clicks.
 - Place private test windows clear of desktop panels, wait until they receive the pointer, and require an actual window drag before checking the goose.
 - Check the real GNOME desktop, goose and settings together before publishing, including readable notes, complete pictures, lost access, restarts and unexpected failures. Keep private test permissions out of the evidence files.

@@ -52,6 +52,7 @@ All notable changes to this project are documented here. Format based on
 - Authenticate the pinned system Shell and approved runtime executable, bound complete connection and snapshot operations, preserve exact owned files and recoverable consent, and withdraw stale or revoked observations until explicit reconnection.
 
 ### Behind the scenes
+- Wait for the private Sway and Hyprland compositor to answer its initial read-only version request; preserve per-transaction bounds, peer checks and non-retried mutation commands.
 - Keep native drag qualification clear of the goose's actual post-ride hit region while continuing to require input delivery to the exact GTK window and a real Mutter grab.
 - Qualify real native title-bar gestures only after the authenticated private fixture is clear of Shell panels and GTK confirms pointer entry. Capture actual motion and failed desktop state while retaining mandatory compositor grabs, terminal refusal and production engine rides.
 - Require the real GNOME runtime, native settings and owned-prop scenarios as same-source release gates, including unapproved callers, actual held input, terminal protection, saved drafts, native note text, uncropped images, helper failures and restart. Preserve private display authentication and omit private consent from evidence.
