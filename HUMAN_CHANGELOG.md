@@ -40,6 +40,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost and keep setup responsive when a connection stops answering.
 
 ### Behind the scenes
+- Check that GNOME notes and pictures are readable, complete and correctly placed, including closing them and recovering after their helper unexpectedly exits.
 - Check the real GNOME desktop, goose and settings together, including private test-window drags, lost access, restarts and unexpected failures. Preserve unrelated desktop settings and keep private test permissions out of the evidence files.
 
 ## Hyprland desktop observations — September 2026

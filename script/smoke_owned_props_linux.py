@@ -72,13 +72,13 @@ class Host:
         self.log.close()
 
 
-def capture_complete_picture(host, capture_prefix=('import', '-window', 'root')):
+def capture_complete_picture(host, capture_prefix=('import', '-window', 'root'), capture_environment=None):
     from PIL import Image
     colors = [(255, 255, 0), (0, 255, 0), (255, 0, 0), (0, 0, 255)]
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         path = host.directory / 'desktop.png'
-        subprocess.run([*capture_prefix, str(path)], check=True)
+        subprocess.run([*capture_prefix, str(path)], env=capture_environment, check=True, timeout=10)
         with Image.open(path).convert('RGB') as image:
             points = {color: [] for color in colors}
             for y in range(image.height):
@@ -113,9 +113,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', required=True, type=Path)
     parser.add_argument('--evidence', required=True, type=Path)
+    parser.add_argument('--capture-display')
+    parser.add_argument('--capture-authority')
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
+    capture_environment = dict(os.environ)
+    if args.capture_display:
+        capture_environment['DISPLAY'] = args.capture_display
+    if args.capture_authority:
+        capture_environment['XAUTHORITY'] = args.capture_authority
     subprocess.run(['gdbus', 'call', '--session', '--dest', 'org.a11y.Bus', '--object-path', '/org/a11y/bus',
                     '--method', 'org.freedesktop.DBus.Properties.Set', 'org.a11y.Status', 'IsEnabled', '<true>'], check=True)
     Atspi.init()
@@ -214,7 +221,8 @@ def main():
                              if (child := node.get_child_at_index(i)) is not None)
             (host.directory / 'close-tree.json').write_text(json.dumps(records, indent=2) + '\n')
             time.sleep(0.1)
-        subprocess.run([*capture_prefix, str(host.directory / 'failed-close.png')], check=True)
+        subprocess.run([*capture_prefix, str(host.directory / 'failed-close.png')],
+                       env=capture_environment, check=True, timeout=10)
         raise RuntimeError('Native owned Close action is unavailable')
 
 
@@ -242,6 +250,17 @@ def main():
                 if positioning:
                     host.send('move', id=1, x=500, y=300)
                     host.wait(lambda event: event.get('id') == 1 and event.get('x') == 500 and event.get('y') == 300)
+                    deadline = time.monotonic() + 10
+                    while True:
+                        geometries = []
+                        for window_id in require_window_count(host.process.pid, 8):
+                            output = subprocess.check_output(['xdotool', 'getwindowgeometry', '--shell', window_id], text=True)
+                            geometries.append(dict(line.split('=', 1) for line in output.splitlines()))
+                        (host.directory / 'moved-native-windows.json').write_text(json.dumps(geometries, indent=2) + '\n')
+                        if sum((int(g['X']), int(g['Y'])) == (500, 300) for g in geometries) == 1:
+                            break
+                        assert time.monotonic() < deadline, geometries
+                        time.sleep(0.05)
                 owned = require_window_count(host.process.pid, 8)
                 user_close_note(host)
                 closed = host.wait(lambda event: event.get('event') == 'window' and not event['alive'] and event['origin'] == 'user')
@@ -260,7 +279,7 @@ def main():
                           pixel_width=180, pixel_height=120, title='All four corners', pixels=base64.b64encode(pixels).decode())
                 picture = host.window(11)
                 assert picture['width'] <= 180 and picture['height'] <= 154
-                capture_complete_picture(host, capture_prefix)
+                capture_complete_picture(host, capture_prefix, capture_environment)
                 host.send('shutdown')
                 assert host.process.wait(timeout=10) == 0
                 assert not native_windows(host.process.pid)

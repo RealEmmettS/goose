@@ -34,6 +34,7 @@ All notable changes to this project are documented here. Format based on
 - Authenticate the pinned system Shell and approved runtime executable before returning bounded observations. Apply one total deadline through bus authentication and each complete snapshot; discard stale or revoked data and require explicit reconnection after terminal failure. Keep rejected credential lookups separate from authenticated delivery.
 
 ### Behind the scenes
+- Qualify owned GNOME XWayland props through actual native geometry, rendered text, uncropped image corners, capacity, user/program close, child failure and restart. Capture final Shell composition through its separate private outer display while enforcing bounds against the real inner desktop dimensions.
 - Qualify the actual production runtime and graphical settings on isolated GNOME Shell desktops on both native architectures, including user-held window rides, terminal exclusions, fullscreen manners, live changes, revocation and restart. Arrange exact private test windows without adding production focus authority, and retain normal authenticated XWayland access.
 - Test actual GNOME connection cancellation against a silent authentication peer, complete bounded private-file reads and preservation of unrelated extensions. Install byte-identical fixture executables with real managed ownership; omit private consent from uploaded diagnostics.
 

@@ -247,11 +247,30 @@ def main():
             subprocess.run(['gnome-extensions', 'disable', uuid], env=environment, check=True, timeout=5)
             wait(lambda: not owner(), 'actual extension disable')
             assert windows[1].get_mapped(), 'Disabling the extension closed the unrelated window'
+            windows[1].destroy()
+            wait(lambda: not windows[1].get_mapped(), 'closed private protected fixture')
+            # Props use their actual XWayland backend. Capture the final Shell
+            # composition through the separate outer Xvfb connection, preserving
+            # both private authentication files without reading either cookie.
+            capture_arguments = ['--capture-display', capture_environment['DISPLAY']]
+            if capture_environment.get('XAUTHORITY'):
+                capture_arguments += ['--capture-authority', capture_environment['XAUTHORITY']]
+            props_environment = dict(environment, GDK_BACKEND='x11')
+            for label, script, binary, extra in (
+                ('owned-props', 'smoke_owned_props_linux.py', args.settings.resolve(), []),
+                ('runtime-props', 'smoke_runtime_props_linux.py', args.goose.resolve(), ['--expected-desktop', 'GNOME']),
+            ):
+                with (evidence / (label + '.log')).open('w') as log:
+                    subprocess.run(['python3', str(Path(__file__).with_name(script)),
+                        '--binary', str(binary), '--evidence', str(evidence / label),
+                        *capture_arguments, *extra], env=props_environment, stdout=log,
+                        stderr=log, check=True, timeout=300)
             result = dict(ok=True, version=initial['version'], architecture=os.uname().machine,
                 shell_pid=shell.pid, peer_credentials=True, layer_shell=layer_shell,
                 production_runtime=True, xwayland_overlay_ready=True, normal_desktop=True, actual_fixture_move=True, stale_geometry_refused=True,
                 native_fullscreen=True, extension_disable=True, initial=ordinary, moved=moved,
-                protected=protected, user_drag_qualified=True, pointer_control_qualified=False)
+                protected=protected, user_drag_qualified=True, pointer_control_qualified=False,
+                native_owned_props=True, native_runtime_prop_delivery=True)
             (evidence / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result))
         finally:
