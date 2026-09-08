@@ -42,9 +42,13 @@ def main():
                 time.sleep(0.1)
             else:
                 raise RuntimeError('Private labwc did not create its socket')
-            outputs = json.loads(subprocess.check_output(['wlr-randr', '--json'], env=environment))
-            assert len(outputs) == 1, outputs
-            output = outputs[0]['name']
+            # Ubuntu's supported wlr-randr predates --json. Output headers are
+            # the only unindented lines; read the actual private head name.
+            listing = subprocess.check_output(['wlr-randr'], env=environment, text=True, timeout=10)
+            (evidence / 'outputs.txt').write_text(listing)
+            outputs = [line.split()[0] for line in listing.splitlines() if line and not line[0].isspace()]
+            assert len(outputs) == 1 and outputs[0].startswith('HEADLESS-'), listing
+            output = outputs[0]
             subprocess.run(['wlr-randr', '--output', output, '--custom-mode', '1280x900@60Hz'], env=environment, check=True)
             for scale in (1, 2):
                 subprocess.run(['wlr-randr', '--output', output, '--scale', str(scale)], env=environment, check=True)

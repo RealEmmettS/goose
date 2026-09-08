@@ -55,7 +55,7 @@ jobs:
           xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session -- bash -euc '
             openbox >target/props-evidence/window-manager.log 2>&1 &
             manager=$!
-            xcompmgr -a >target/props-evidence/compositor.log 2>&1 &
+            xcompmgr -n >target/props-evidence/compositor.log 2>&1 &
             compositor=$!
             trap "kill $manager $compositor 2>/dev/null || true" EXIT
             GDK_BACKEND=x11 python3 script/smoke_owned_props_linux.py --binary target/props-probe/honk300-settings --evidence target/props-evidence

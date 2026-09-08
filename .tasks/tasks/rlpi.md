@@ -25,9 +25,9 @@ The requested behavior runs through its production path and the supporting evide
 - [ ] Integration and required package/release checks pass before publication.
 
 ## Status
-Active development in the isolated Linux expansion checkout while the first release qualifies.
-Shared runtime session/placement reporting is implemented and undergoing local/native tests;
-real prop delivery and labwc gates remain open. Publication still follows #rr1 and #lpr.
+Queued behind #rr1 and #lpr. Shared runtime session/placement reporting is implemented under
+the independent #lpr task and undergoing native tests; real delivery and labwc gates remain
+open. Package/publication work begins after its prerequisites qualify.
 
 ## Activity
 - 2026-09-07: Session inspection found a pure Wayland socket could silently select native mode despite the documented opt-in. Enforce the existing command/config choice before native initialization and add a real labwc refusal/readback probe.

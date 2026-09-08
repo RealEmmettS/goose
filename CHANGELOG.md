@@ -32,6 +32,8 @@ All notable changes to this project are documented here. Format based on
 - Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.
 
 ### Development
+- Use client-side X11 composition in the native-delivery fixture and require actual note pixels plus owned geometry, not only AT-SPI text. Read labwc's real private output using the installed wlr-randr text interface instead of its unavailable JSON option.
+- Refresh the versioned task dashboard and separate independent Linux implementation from ordered publication gates; retain existing board settings and stopped server state.
 - Report the live Linux display backend, bounded desktop-session hint and separate owned-prop positioning capability through an additive SESSION request, CLI/TUI status and graphical settings. Preserve legacy STATUS frames and never enable privileges from environment hints.
 - Give the real delivery fixture a valid positive initial-wander duration and report early runtime exits directly; retained logs exposed configuration rejection before overlay initialization.
 - Start and verify the disposable X11 compositor before real prop delivery; GTK windows alone do not satisfy the production overlay's transparent-composition contract.

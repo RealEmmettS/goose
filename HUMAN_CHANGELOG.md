@@ -34,6 +34,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Native delivery checks now verify that the note is actually visible beside the goose, as well as readable by accessibility tools.
+- The project board now keeps implementation progress and release prerequisites clearer, using the current dashboard while preserving its existing settings.
 - Delivery checks now report startup failures immediately and keep the goose from choosing a random errand while a requested note is being checked.
 - Linux delivery checks now start a complete test desktop before asking the goose to bring a note.
 

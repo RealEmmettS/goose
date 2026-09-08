@@ -98,6 +98,36 @@ def main():
         result = subprocess.run(['xdotool', 'search', '--onlyvisible', '--pid', str(pid), '--name', '^Honk300 (note|picture)$'], capture_output=True, text=True)
         return result.stdout.splitlines() if result.returncode == 0 else []
 
+    def capture_visible_note(pid, directory):
+        from PIL import Image
+        path = directory / 'delivered-note.png'
+        prefix = ['import', '-window', 'root'] if positioning else ['grim']
+
+        def visible():
+            subprocess.run([*prefix, str(path)], check=True, timeout=10)
+            if positioning:
+                windows = owned_windows(pid)
+                assert len(windows) == 1, windows
+                output = subprocess.check_output(['xdotool', 'getwindowgeometry', '--shell', windows[0]], text=True)
+                geometry = dict(line.split('=', 1) for line in output.splitlines())
+                x, y, width, height = (int(geometry[key]) for key in ('X', 'Y', 'WIDTH', 'HEIGHT'))
+                (directory / 'note-geometry.json').write_text(json.dumps(geometry, indent=2) + '\n')
+                with Image.open(path).convert('RGB') as picture:
+                    assert 0 <= x <= picture.width - width and 0 <= y <= picture.height - height, geometry
+                    assert width <= picture.width * 0.48 and height <= picture.height * 0.48, geometry
+                    # Native text readback is necessary but cannot prove a
+                    # transparent overlay has not obscured the entire prop.
+                    pixels = picture.crop((x, y, x + width, y + height))
+                    painted = sum(max(pixel) > 12 for pixel in pixels.getdata())
+                    return painted > width * height * 0.3
+            # Wayland does not expose global prop coordinates. On this empty,
+            # black test desktop, a real painted note is much larger than the
+            # goose, while AT-SPI separately confirms its owned native text.
+            with Image.open(path).convert('RGB') as picture:
+                return sum(max(pixel) > 12 for pixel in picture.getdata()) > 25_000
+
+        wait(visible, 'visible native note in the composited desktop', 15)
+
     config = evidence / 'config.toml'
     config.write_text('''goose_config_version = 2
 [behavior]
@@ -140,8 +170,7 @@ autumn = false
                     control('do', 'note')
                     value = wait(lambda: delivered_text(host_pid), 'engine delivery and native note text', 100)
                     (directory / 'note.txt').write_text(value)
-                    capture_prefix = ['import', '-window', 'root'] if positioning else ['grim']
-                    subprocess.run([*capture_prefix, str(directory / 'delivered-note.png')], check=True)
+                    capture_visible_note(host_pid, directory)
                     assert owned_windows(host_pid), 'Delivered note has no native window'
                     status = control('status').stdout
                     assert 'collect: supported' in status
