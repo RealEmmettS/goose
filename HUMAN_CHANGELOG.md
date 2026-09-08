@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Keep the website's KDE setup guidance and download choices aligned with the freshly verified desktop release.
+
+### Behind the scenes
 - Keep the release guidance aligned with the published KDE update and freshly checked downloads across every supported platform.
 
 ### Behind the scenes

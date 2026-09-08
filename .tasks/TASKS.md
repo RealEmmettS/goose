@@ -29,11 +29,6 @@
   - [x] Qualify the production read-only Rust transport and untrusted-peer refusal.
   - [x] Integrate explicit Rust and native settings setup/removal with disconnect handling and unsupported action checks.
   - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
-- [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) #rkde
-  - [x] Prepare guided setup documentation and the distinct release metadata.
-  - [x] Pass integrated native pointer and settings lifecycle checks.
-  - [x] Pass complete candidate, unchanged-source main and immutable publication gates.
-  - [ ] Verify fresh public downloads and deployed website guidance.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
@@ -55,6 +50,11 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) (done 2026-09-08) #rkde
+  - [x] Prepare guided setup documentation and the distinct release metadata.
+  - [x] Pass integrated native pointer and settings lifecycle checks.
+  - [x] Pass complete candidate, unchanged-source main and immutable publication gates.
+  - [x] Verify fresh public downloads and deployed website guidance.
 - [x] **KDE native Wayland companion** - implement the explicitly enabled KWin bridge and prove exact identities, bounded movement, terminal exclusions and revocation (needs #a6e) (ms #refine) (owner codex) (done 2026-09-08) #wlk
   - [x] Prove the real KWin script API and owned test-window movement on KDE 5/6.
   - [x] Connect the authenticated bounded Rust bridge and live runtime capabilities.
