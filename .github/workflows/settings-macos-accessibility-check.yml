@@ -1,6 +1,8 @@
 name: Native Mac settings Accessibility check
 
 on:
+  push:
+    branches: [codex/goose-mac-settings-accessibility-check]
   workflow_dispatch:
 
 permissions:
