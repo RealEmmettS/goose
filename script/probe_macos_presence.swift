@@ -1,4 +1,5 @@
-// Native API premise only. This fixture never requests or changes permissions.
+// Native API premise on disposable CI only. Observe never requests permission;
+// focus explicitly requests it for the private, separately launched probe app.
 import AppKit
 import ApplicationServices
 import Intents
@@ -51,7 +52,20 @@ final class Fixture: NSObject, NSApplicationDelegate, NSWindowDelegate {
 }
 
 final class FocusFixture: NSObject, NSApplicationDelegate {
+    var window: NSWindow!
     func applicationDidFinishLaunching(_ notification: Notification) {
+        window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 520, height: 260),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.title = "Honk300 private Focus qualification"
+        let button = NSButton(title: "Request private probe Focus access", target: self, action: #selector(request))
+        button.frame = NSRect(x: 30, y: 100, width: 450, height: 40)
+        window.contentView?.addSubview(button)
+        window.makeKeyAndOrderFront(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        // Let LaunchServices finish activation before the explicit setup action.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { button.performClick(nil) }
+    }
+    @objc func request() {
         guard #available(macOS 12, *) else { exit(1) }
         let center = INFocusStatusCenter.default
         write(["stage": "before-request", "authorization": center.authorizationStatus.rawValue,
