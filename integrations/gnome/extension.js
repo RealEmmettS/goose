@@ -190,8 +190,11 @@ export default class Honk300Observations extends Extension {
                 GLib.file_read_link(`/proc/${pid}/exe`) !== consent.executable.path)
                 throw new Error('GNOME caller is not the explicitly approved executable');
             stage = 'consent-after';
-            if (!this._active || generation !== this._generation ||
-                (await this._consent(cancellable)).nonce !== nonce)
+            // Losing this extension instance does not revoke stored consent.
+            // Native I/O may finish successfully after disable cancels it.
+            if (!this._active || generation !== this._generation)
+                throw new Error('GNOME companion is inactive');
+            if ((await this._consent(cancellable)).nonce !== nonce)
                 throw new ConsentRevoked();
             if (cancellable.is_cancelled())
                 throw new Error('GNOME observation deadline exceeded');

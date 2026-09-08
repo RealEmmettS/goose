@@ -21,7 +21,7 @@
   - [x] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
   - [x] Prove live user-drag observation and automatic movement refusal through actual desktop input.
   - [x] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
-  - [x] Pass complete runtime, native settings, held-ride cancellation and owned-prop scenarios on both Shell versions and native architectures.
+  - [ ] Pass complete runtime, native settings, held-ride cancellation and owned-prop scenarios on both Shell versions and native architectures.
   - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.

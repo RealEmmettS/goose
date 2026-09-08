@@ -40,12 +40,14 @@ sets of native settings, goose, painted note and complete-image captures were in
 ## Status
 Active. Production companion, authenticated Rust worker, compatible XWayland capability
 boundary, recoverable consent and native settings are implemented under ADR 0048.
-All four final-review desktop fixtures passed at `99adb7e`. The complete candidate
-then exposed a late native input failure; corrected private drag handles repeat
-qualification. Final-source architecture/settings, complete
-candidate/main/publication, fresh-public and website gates remain open.
+The complete 43-job candidate passed at `6ff7611`, but main and integrated native
+qualification exposed another input-fixture failure and an extension-disable
+status race. The production correction has a reproducing regression; strict
+native input, complete candidate/main/publication, fresh-public and website
+qualification repeat on the corrected source before any tag is created.
 
 ## Activity
+- 2026-09-08 — Candidate 34265477487 passes all 43 jobs and exact 6ff7611 reaches main. Main 34269778219 passes three desktops but repeats a pre-drag input failure on newer x64. Integrated final-stage run 34269817286 exposes a real disable/query race: the ride cancels, but unchanged consent is misclassified as revoked. A production regression reproduces the wrong status; separate inactive-generation failure from actual consent revocation, adopt strict per-step native input acknowledgments clear of the goose's return route, and repeat complete qualification before creating any tag.
 - 2026-09-08 — Run 34262984345 captures actual new motion inside the native handle while its newly attached controller still reports contains_pointer false because no enter event was replayed. Require the captured motion/enter event within the current handle bounds and current native surface ownership; retain the real grab and all behavior assertions.
 - 2026-09-08 — All four GNOME review lanes pass in run 34260153471. Candidate 34261317929 and integrated run 34261718352 then capture a late gesture that leaves GTK before Mutter receives a grab, while fresh runtime observations continue. Use the real client-area GTK WindowHandle and await its input before the unchanged native grab, ride, terminal and interruption checks. Cancel both incomplete release candidates and repeat native qualification; publication remains held.
 - 2026-09-08 — All four corrected GNOME suites pass at 99adb7e in 34260153471. Inspect twelve native settings/goose, painted-note and complete-image captures, record the one private-window overlap, and verify all sixteen result records plus absent pointer samples. Resolve the four confirmed PR findings and start complete candidate 34261317929 on the unchanged source.
