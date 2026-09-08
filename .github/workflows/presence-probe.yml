@@ -42,7 +42,12 @@ jobs:
                   NSFocusStatusUsageDescription='This disposable qualification probe checks whether macOS supplies an authorized Focus observation.'), output)
           PY
           codesign --force --sign - "$app"
-          "$app/Contents/MacOS/HonkPresenceProbe" focus "$PWD/target/presence-evidence"
+          /usr/bin/open -n -W --env GITHUB_ACTIONS=true "$app" --args focus "$PWD/target/presence-evidence"
+          python3 - "$PWD/target/presence-evidence/focus.json" <<'PY'
+          import json,sys
+          result=json.load(open(sys.argv[1]))
+          assert result['stage'] == 'request-returned', result
+          PY
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}
         with:
