@@ -31,7 +31,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ---
 
-## Remaining manners observations — In development
+## Fullscreen manners and clearer status — September 2026
 
 ### Added
 - Let the Mac goose notice fullscreen apps through its existing desktop permission, while keeping commands responsive if an app stops answering. Show fullscreen and do-not-disturb support separately in every settings interface.

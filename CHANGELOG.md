@@ -24,7 +24,7 @@ All notable changes to this project are documented here. Format based on
 > release packaging with artifact evidence. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
-## [Unreleased]
+## [1.10.0] - 2026-09-08
 
 ### Added
 - Add a retained, bounded macOS Accessibility fullscreen observer with live target identity, permission withdrawal and stale-sample expiry. Add independent fullscreen/DND capabilities through an additive bounded IPC frame, CLI, TUI and Native SDK settings; older runtimes remain unprobed.
