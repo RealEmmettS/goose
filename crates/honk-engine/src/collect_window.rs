@@ -9,6 +9,8 @@ use tiny_skia::{FilterQuality, Pixmap, PixmapPaint, Transform};
 
 /// A collect prop may be noticeable without becoming a temporary full-screen surface.
 pub const COLLECT_PROP_MAX_SCREEN_FRACTION: f32 = 0.48;
+/// Retained user notes count toward admission; never destroy one to make room.
+pub const MAX_OWNED_COLLECT_WINDOWS: usize = 8;
 const COLLECT_IMAGE_MAX_WIDTH: u32 = 900;
 const COLLECT_IMAGE_MAX_HEIGHT: u32 = 700;
 
@@ -129,6 +131,8 @@ pub struct CollectWindowCapabilities {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CollectWindowOptions {
     pub enabled: bool,
+    /// Transient admission pressure, independent of capability and config.
+    pub capacity_available: bool,
     pub capabilities: CollectWindowCapabilities,
     pub available_notes: u32,
     pub available_memes: u32,
@@ -140,6 +144,7 @@ impl Default for CollectWindowOptions {
     fn default() -> Self {
         Self {
             enabled: true,
+            capacity_available: true,
             capabilities: CollectWindowCapabilities::default(),
             available_notes: 0,
             available_memes: 0,
@@ -164,7 +169,7 @@ impl CollectWindowOptions {
     }
 
     pub fn kind_active(self, kind: CollectWindowKind) -> bool {
-        if !self.enabled || !self.capabilities.move_window {
+        if !self.enabled {
             return false;
         }
         match kind {

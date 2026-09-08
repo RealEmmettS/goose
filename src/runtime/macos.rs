@@ -128,6 +128,7 @@ pub fn run(
         if !overlay.pump() {
             break;
         }
+        world.set_collect_window_capacity(collect_controller.has_capacity());
 
         if let Some(command) = overlay.take_status_menu_command() {
             let action = control_surface::command_name(command);
@@ -370,6 +371,7 @@ pub fn run(
         }
         world.set_foreign_window_drag(dragged_window);
         world.set_collect_window_snapshot(collect_controller.snapshot());
+        world.set_collect_window_capacity(collect_controller.has_capacity());
 
         core.tick(&mut world, frame);
 

@@ -8,11 +8,16 @@
 
 ## To-Do
 
-- [ ] **Linux props and experimental Raspberry Pi support** - own note/image windows, improve session reporting, and qualify ARM64 labwc packages (needs #rr1) (ms #refine) (owner codex) #rlpi
+- [ ] **Linux props and experimental Raspberry Pi support** - integrate and publish owned props, session reporting, and ARM64 labwc packages after the first refinement release (needs #rr1, #lpr) (ms #refine) (owner codex) #rlpi
 - [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi) (ms #refine) (owner codex) #rkde
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
 
 ## Active
+- [ ] **Linux owned prop implementation** - bounded native note/image windows and honest compositor placement in an isolated follow-on checkout (ms #refine) (owner codex) #lpr
+  - [ ] Bound owned prop admission and preserve existing notes when the capacity is full.
+  - [ ] Implement the companion protocol and native GTK note/image host.
+  - [ ] Connect X11 delivery and Wayland compositor placement to the real runtime.
+  - [ ] Exercise close, cleanup, disconnect, invalid input, image fitting and repeated delivery.
 - [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
   - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
   - [x] Correct captured Windows start and verify native GUI Start, independent settings close, and graceful Stop.

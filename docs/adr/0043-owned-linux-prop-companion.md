@@ -1,0 +1,60 @@
+# ADR 0043: bounded owned Linux props through the existing companion
+
+Date: 2026-09-07
+Status: accepted; implementation and native qualification pending
+
+## Context
+
+ADR 0041 approves Linux-owned notes and images and permits normal compositor placement
+on native Wayland. The Rust CLI remains useful without GTK, while official packages
+already include the Native SDK settings executable and its native GTK4 dependency.
+Windows/macOS notes remain open after delivery; their current controller maps do not
+bound the number of retained windows. That must not be copied into the Linux host.
+
+## Decision
+
+- Reuse the exact installed `honk300-settings` payload in a separate internal
+  `--owned-props` process mode on Linux. Its ordinary settings UI remains Native SDK/Zig.
+  A small GTK4 prop host uses native text/picture widgets and no webview. The mode has no
+  settings editor, updater, tray, startup mechanism or installation authority.
+- Rust verifies the companion using the existing installation receipt boundary, launches
+  one private child, validates and bounds messages, and retains its lifetime. Stdin EOF,
+  shutdown and a failed protocol end only the child and its owned windows. Missing GTK
+  or a companion failure leaves CLI/TUI and overlay behavior usable with honest capability
+  reporting.
+- Keep at most eight owned props per runtime on every supported native backend. A full
+  set refuses new admission as temporary busy and recovers after a close. Existing notes
+  are never discarded to make room. An admitted delivery continues at the limit.
+- Pass opaque ids, bounded UTF-8 text and already fitted pixels through a versioned
+  private protocol. Do not pass arbitrary window ids, shell commands or user filesystem
+  paths. A child controls only GTK objects in its own bounded registry.
+- On X11, including XWayland, use the GTK surface's own XID for bounded positioning and
+  input shaping. On native Wayland, use normal toplevel placement with no global position,
+  pointer or foreign-window claim. The engine completes a placement-only delivery without
+  pretending to drag a window at an invented desktop coordinate.
+- Preserve the existing monitor-relative hard ceiling, full-image downscale and no-upscale
+  rules. Include the owned close control within the fitted outer dimensions. Distinguish
+  user close from program cleanup; only the former enters the existing reaction policy.
+
+## Compatibility and limits
+
+The helper is already an immutable, independently verified package payload, so this adds
+no separately installed executable or lifecycle owner. The Rust runtime and Zig decoder
+both reject unknown/oversized malformed protocol input. Configuration does not gain an
+ambient permission bypass.
+
+GTK initialization uses [`gtk_init_check`](https://docs.gtk.org/gtk4/func.init_check.html)
+so missing display support returns an error. The X11 adapter is explicit because
+[`gdk_x11_surface_get_xid`](https://docs.gtk.org/gdk4-x11/method.X11Surface.get_xid.html)
+is platform-specific and deprecated in newer GTK4; its continued availability is a native
+build/runtime gate, not evidence of a portable Wayland operation. Input regions use the
+documented [`GdkSurface` API](https://docs.gtk.org/gdk4/method.Surface.set_input_region.html).
+
+## Qualification
+
+Exercise actual child protocol, note/image fit, user and program closes, capacity
+exhaustion/recovery, disconnect, stale ids, display change and graceful shutdown.
+Run GTK behavior under Xvfb and labwc on native Linux architectures, with exact GNU/musl
+payload checks. Stage-two publication waits for stage one and the complete existing
+release gates. Physical Pi performance remains open under the user's approved experimental
+support boundary.

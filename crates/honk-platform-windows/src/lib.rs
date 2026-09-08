@@ -20,7 +20,7 @@ pub use tray::StatusTray;
 
 use honk_engine::collect_window::{
     collect_note_size, fit_collect_image, CollectWindowCloseOrigin, CollectWindowId,
-    CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot,
+    CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot, MAX_OWNED_COLLECT_WINDOWS,
 };
 use honk_engine::math::Rect;
 use honk_engine::{ForeignWindowId, ForeignWindowSnapshot, PresenceSnapshot};
@@ -637,16 +637,26 @@ impl CollectWindowController {
         self.spawn_top_left = Vec2::new(bounds.min.x + 40.0, bounds.min.y + 80.0);
     }
 
-    pub fn spawn_note(&mut self, request: CollectWindowRequestId) -> Result<CollectWindowId> {
+    pub fn has_capacity(&self) -> bool {
+        self.windows.len() < MAX_OWNED_COLLECT_WINDOWS
+    }
+
+    pub fn spawn_note(
+        &mut self,
+        request: CollectWindowRequestId,
+    ) -> Result<Option<CollectWindowId>> {
         if let Some(id) = self.find_request(request, CollectWindowKind::Note) {
             self.active_request = Some((request, CollectWindowKind::Note));
-            return Ok(id);
+            return Ok(Some(id));
+        }
+        if !self.has_capacity() {
+            return Ok(None);
         }
         let id = self.alloc_id();
         let window = NoteWindow::new(request, self.spawn_top_left, self.display_bounds)?;
         self.windows.insert(id, ControlledWindow::Note(window));
         self.active_request = Some((request, CollectWindowKind::Note));
-        Ok(id)
+        Ok(Some(id))
     }
 
     pub fn spawn_image(
@@ -654,10 +664,13 @@ impl CollectWindowController {
         request: CollectWindowRequestId,
         title: &str,
         pixmap: &Pixmap,
-    ) -> Result<CollectWindowId> {
+    ) -> Result<Option<CollectWindowId>> {
         if let Some(id) = self.find_request(request, CollectWindowKind::Meme) {
             self.active_request = Some((request, CollectWindowKind::Meme));
-            return Ok(id);
+            return Ok(Some(id));
+        }
+        if !self.has_capacity() {
+            return Ok(None);
         }
         let id = self.alloc_id();
         let window = ImageWindow::new(
@@ -669,7 +682,7 @@ impl CollectWindowController {
         )?;
         self.windows.insert(id, ControlledWindow::Image(window));
         self.active_request = Some((request, CollectWindowKind::Meme));
-        Ok(id)
+        Ok(Some(id))
     }
 
     pub fn move_window(&mut self, id: CollectWindowId, top_left: Vec2) -> Result<()> {
@@ -1494,6 +1507,64 @@ mod tests {
     use honk_engine::collect_window::{
         fitted_collect_image_size, COLLECT_PROP_MAX_SCREEN_FRACTION,
     };
+    use windows::Win32::UI::WindowsAndMessaging::SendMessageW;
+
+    #[test]
+    #[ignore = "creates owned native windows; run on a disposable CI desktop"]
+    fn native_owned_prop_capacity_preserves_notes_and_recovers() {
+        assert_eq!(std::env::var("GITHUB_ACTIONS").as_deref(), Ok("true"));
+        for _ in 0..2 {
+            let mut controller =
+                CollectWindowController::new(Rect::new(Vec2::ZERO, Vec2::new(1280.0, 720.0)));
+            let mut ids = Vec::new();
+            let mut handles = Vec::new();
+            for index in 0..MAX_OWNED_COLLECT_WINDOWS {
+                let id = controller
+                    .spawn_note(CollectWindowRequestId(index as u64 + 1))
+                    .unwrap()
+                    .unwrap();
+                handles.push(controller.windows[&id].hwnd().unwrap());
+                ids.push(id);
+            }
+            controller
+                .type_text(ids[0], "Keep this existing note")
+                .unwrap();
+            assert!(!controller.has_capacity());
+            assert!(controller
+                .spawn_note(CollectWindowRequestId(99))
+                .unwrap()
+                .is_none());
+            assert_eq!(controller.windows.len(), MAX_OWNED_COLLECT_WINDOWS);
+            let ControlledWindow::Note(first) = &controller.windows[&ids[0]] else {
+                panic!("note")
+            };
+            let mut text = [0_u16; 64];
+            let length = unsafe { GetWindowTextW(first.edit, &mut text) } as usize;
+            assert_eq!(
+                String::from_utf16(&text[..length]).unwrap(),
+                "Keep this existing note"
+            );
+            // A native close control destroys only this owned window. Snapshot
+            // pruning must free admission and preserve its user-close origin.
+            unsafe {
+                SendMessageW(first.hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+            }
+            let dead = controller.snapshot().expect("native close event");
+            assert!(!dead.alive);
+            assert_eq!(dead.close_origin, Some(CollectWindowCloseOrigin::User));
+            assert!(controller.has_capacity());
+            let replacement = controller
+                .spawn_note(CollectWindowRequestId(100))
+                .unwrap()
+                .unwrap();
+            handles.push(controller.windows[&replacement].hwnd().unwrap());
+            assert!(!controller.has_capacity());
+            drop(controller);
+            assert!(handles
+                .into_iter()
+                .all(|hwnd| unsafe { !IsWindow(hwnd).as_bool() }));
+        }
+    }
 
     #[test]
     fn layered_window_preserves_asymmetric_channels_and_alpha_when_swizzling_to_bgra() {

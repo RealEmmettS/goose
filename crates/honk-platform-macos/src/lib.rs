@@ -127,6 +127,7 @@ mod platform {
     use honk_engine::collect_window::{
         collect_note_size, fit_collect_image, CollectWindowCloseOrigin, CollectWindowId,
         CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot,
+        MAX_OWNED_COLLECT_WINDOWS,
     };
     use honk_engine::{
         ForeignWindowId, ForeignWindowSnapshot, LocalTime, PresenceSnapshot, Rect, Vec2,
@@ -1489,13 +1490,20 @@ mod platform {
             })
         }
 
+        pub fn has_capacity(&self) -> bool {
+            self.windows.len() < MAX_OWNED_COLLECT_WINDOWS
+        }
+
         pub fn spawn_note(
             &mut self,
             request: CollectWindowRequestId,
-        ) -> io::Result<CollectWindowId> {
+        ) -> io::Result<Option<CollectWindowId>> {
             if let Some(id) = self.find_request(request, CollectWindowKind::Note) {
                 self.active_request = Some((request, CollectWindowKind::Note));
-                return Ok(id);
+                return Ok(Some(id));
+            }
+            if !self.has_capacity() {
+                return Ok(None);
             }
             let mtm = self
                 .mtm
@@ -1534,7 +1542,7 @@ mod platform {
                 }),
             );
             self.active_request = Some((request, CollectWindowKind::Note));
-            Ok(id)
+            Ok(Some(id))
         }
 
         pub fn spawn_image(
@@ -1542,10 +1550,13 @@ mod platform {
             request: CollectWindowRequestId,
             title: &str,
             pixmap: &Pixmap,
-        ) -> io::Result<CollectWindowId> {
+        ) -> io::Result<Option<CollectWindowId>> {
             if let Some(id) = self.find_request(request, CollectWindowKind::Meme) {
                 self.active_request = Some((request, CollectWindowKind::Meme));
-                return Ok(id);
+                return Ok(Some(id));
+            }
+            if !self.has_capacity() {
+                return Ok(None);
             }
             let mtm = self
                 .mtm
@@ -1581,7 +1592,7 @@ mod platform {
                 }),
             );
             self.active_request = Some((request, CollectWindowKind::Meme));
-            Ok(id)
+            Ok(Some(id))
         }
 
         pub fn move_window(&mut self, id: CollectWindowId, top_left: Vec2) -> io::Result<()> {

@@ -144,6 +144,7 @@ pub fn run(
         if !overlay.pump() {
             break;
         }
+        world.set_collect_window_capacity(collect_controller.has_capacity());
 
         if status_tray
             .as_mut()
@@ -370,6 +371,7 @@ pub fn run(
         }
         world.set_foreign_window_drag(dragged_window);
         world.set_collect_window_snapshot(collect_controller.snapshot());
+        world.set_collect_window_capacity(collect_controller.has_capacity());
 
         core.tick(&mut world, frame);
 
@@ -385,6 +387,7 @@ pub fn run(
                 CollectWindowCommand::Spawn { request, payload } => match payload {
                     CollectWindowPayload::Note { .. } => {
                         collect_controller.spawn_note(request).and_then(|id| {
+                            let Some(id) = id else { return Ok(()) };
                             if let Some(text) = smoke_note.as_deref() {
                                 collect_controller.type_text(id, text)?;
                                 smoke_note_id = Some(id);
@@ -399,10 +402,9 @@ pub fn run(
                     }
                     CollectWindowPayload::Meme { index } => {
                         if let Some(meme) = assets.meme(index) {
-                            let result = collect_controller
-                                .spawn_image(request, &meme.title, &meme.pixmap)
-                                .map(|_| ());
-                            if result.is_ok() && !smoke_image_recorded {
+                            let result =
+                                collect_controller.spawn_image(request, &meme.title, &meme.pixmap);
+                            if matches!(result, Ok(Some(_))) && !smoke_image_recorded {
                                 if let Some(path) = smoke_image_evidence.as_deref() {
                                     write_smoke_image_evidence(
                                         path,
@@ -414,7 +416,7 @@ pub fn run(
                                     smoke_image_recorded = true;
                                 }
                             }
-                            result
+                            result.map(|_| ())
                         } else {
                             Ok(())
                         }

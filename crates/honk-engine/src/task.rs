@@ -900,6 +900,9 @@ impl Task for CollectWindowTask {
 
         match self.state {
             CollectState::Choose => {
+                if !ctx.collect_window.capacity_available {
+                    return true;
+                }
                 let Some(payload) = self.choose_payload(ctx) else {
                     return true;
                 };
@@ -919,10 +922,22 @@ impl Task for CollectWindowTask {
                 deadline,
             } => {
                 if let Some(snapshot) = Self::live_snapshot(ctx, request, payload) {
-                    goose.target_pos = ctx
-                        .layout
-                        .clamp_point(beak_locomotion_target(goose, snapshot.center()));
-                    self.state = CollectState::RunToPickup { request, payload };
+                    if ctx.collect_window.capabilities.move_window {
+                        goose.target_pos = ctx
+                            .layout
+                            .clamp_point(beak_locomotion_target(goose, snapshot.center()));
+                        self.state = CollectState::RunToPickup { request, payload };
+                    } else {
+                        // The compositor owns placement. Do not invent a global
+                        // position or send the goose toward a local window rect.
+                        goose.target_pos = goose.position;
+                        self.state = CollectState::Release {
+                            request,
+                            payload,
+                            typed: false,
+                            visible_until: ctx.now + COLLECT_VISIBLE_DWELL,
+                        };
+                    }
                     false
                 } else {
                     ctx.now >= deadline
@@ -990,11 +1005,13 @@ impl Task for CollectWindowTask {
                     return true;
                 };
                 if !typed {
-                    ctx.collect_window_commands
-                        .push(CollectWindowCommand::SetPassthrough {
-                            id: snapshot.id,
-                            passthrough: false,
-                        });
+                    if ctx.collect_window.capabilities.set_passthrough {
+                        ctx.collect_window_commands
+                            .push(CollectWindowCommand::SetPassthrough {
+                                id: snapshot.id,
+                                passthrough: false,
+                            });
+                    }
                     if let CollectWindowPayload::Note { index } = payload {
                         ctx.collect_window_commands
                             .push(CollectWindowCommand::Focus { id: snapshot.id });
@@ -1877,6 +1894,9 @@ mod tests {
             other => panic!("unexpected collect command: {other:?}"),
         };
         ctx.collect_window_commands.clear();
+        // The final admitted note fills the backend. It must still be delivered
+        // and receive its text, even though no further prop can be started.
+        ctx.collect_window.capacity_available = false;
 
         let rect = Rect {
             min: Vec2::new(200.0, 100.0),
@@ -1942,6 +1962,62 @@ mod tests {
             ],
             "release must restore clickability, focus, then type"
         );
+    }
+
+    #[test]
+    fn collect_window_placement_only_delivers_without_invented_desktop_movement() {
+        for kind in [CollectWindowKind::Note, CollectWindowKind::Meme] {
+            let mut rng = SplitMix64::seed(64);
+            let mut sounds = Vec::new();
+            let mut cursors = Vec::new();
+            let mut goose = GooseEntity::new();
+            goose.position = Vec2::new(480.0, 320.0);
+            let mut task = CollectWindowTask::forced(kind);
+            let mut ctx = base_ctx(0.0, &mut rng, &mut sounds, &mut cursors);
+            ctx.collect_window = collect_options(1, 1);
+            ctx.collect_window.capabilities.move_window = false;
+            ctx.collect_window.capabilities.set_passthrough = false;
+            assert!(!task.run(&mut goose, &mut ctx));
+            let request = match ctx.collect_window_commands[0] {
+                CollectWindowCommand::Spawn { request, .. } => request,
+                other => panic!("expected spawn, got {other:?}"),
+            };
+            ctx.collect_window_commands.clear();
+            ctx.collect_window.capacity_available = false;
+            // Wayland can supply local dimensions, but no global position.
+            // This deliberately distant rectangle must never become a target.
+            ctx.collect_window_snapshot = Some(collect_snapshot(
+                request,
+                kind,
+                Rect::new(Vec2::new(-9000.0, -8000.0), Vec2::new(-8500.0, -7600.0)),
+            ));
+            assert!(!task.run(&mut goose, &mut ctx));
+            assert_eq!(goose.target_pos, goose.position);
+            assert!(!task.run(&mut goose, &mut ctx));
+            if kind == CollectWindowKind::Note {
+                assert!(matches!(
+                    ctx.collect_window_commands.as_slice(),
+                    [
+                        CollectWindowCommand::Focus { .. },
+                        CollectWindowCommand::TypeNote { .. }
+                    ]
+                ));
+            } else {
+                assert!(ctx.collect_window_commands.is_empty());
+            }
+            ctx.collect_window_commands.clear();
+            ctx.now = COLLECT_VISIBLE_DWELL + 0.1;
+            assert!(task.run(&mut goose, &mut ctx));
+            assert!(ctx
+                .collect_window_commands
+                .iter()
+                .all(|command| matches!(command, CollectWindowCommand::Close { .. })));
+            assert_eq!(
+                ctx.collect_window_commands.len(),
+                usize::from(kind == CollectWindowKind::Meme)
+            );
+            assert!(ctx.cursor_commands.is_empty());
+        }
     }
 
     #[test]

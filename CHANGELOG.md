@@ -26,6 +26,12 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Fixed
+- Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.
+
+### Development
+- Add placement-only collect behavior for a native host that can create its own props but cannot position them globally. Pin the behavior and admission recovery in production engine tests; Linux native host implementation remains pending under ADR 0043.
+
 ## [1.4.0] - Unreleased candidate
 
 ### Added

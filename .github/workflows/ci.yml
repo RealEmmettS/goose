@@ -81,6 +81,8 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Test
         run: cargo test --workspace
+      - name: Native owned prop capacity and close recovery
+        run: cargo test --locked -p honk-platform-windows native_owned_prop_capacity -- --ignored --test-threads=1
       - name: Clippy
         run: cargo clippy --all-targets --workspace -- -D warnings
       - name: Release build
@@ -149,6 +151,7 @@ jobs:
       - name: Native ARM64 tests and release build
         run: |
           cargo test --workspace --locked --target aarch64-pc-windows-msvc
+          cargo test --locked -p honk-platform-windows --target aarch64-pc-windows-msvc native_owned_prop_capacity -- --ignored --test-threads=1
           cargo build --release --locked --target aarch64-pc-windows-msvc --bin honk300 --bin honk300-app
       - uses: actions/setup-node@v4
         with:

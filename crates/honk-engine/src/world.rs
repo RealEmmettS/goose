@@ -635,16 +635,33 @@ impl World {
 
     /// Force a collect-window action for smoke tests before M10/M11 public pokes exist.
     pub fn force_collect_window(&mut self, kind: CollectWindowKind) {
-        if !self.permission_waiting() && self.options.collect_window.kind_active(kind) {
+        if !self.permission_waiting()
+            && self.options.collect_window.capacity_available
+            && self.options.collect_window.kind_active(kind)
+        {
             self.pending_collect = Some(kind);
         }
+    }
+
+    /// A full owned-window set blocks new work, without interrupting the last
+    /// admitted delivery or permanently disabling a healthy backend.
+    pub fn set_collect_window_capacity(&mut self, available: bool) {
+        self.options.collect_window.capacity_available = available;
+    }
+
+    /// Owned toplevels may be supported without global positioning (Wayland).
+    /// This does not grant any foreign-window or pointer capability.
+    pub fn set_collect_window_positioning(&mut self, animated: bool) {
+        self.options.collect_window.capabilities.move_window = animated;
+        self.options.collect_window.capabilities.set_passthrough = animated;
     }
 
     fn poke_collect(&mut self, kind: CollectWindowKind) -> PokeOutcome {
         if !self.options.collect_window.kind_active(kind) {
             return PokeOutcome::Unsupported;
         }
-        if self.is_cursor_mischief_active()
+        if !self.options.collect_window.capacity_available
+            || self.is_cursor_mischief_active()
             || self.is_perch_ride_active()
             || self.is_collect_window_active()
             || self.interrupted.is_some()
@@ -1059,7 +1076,8 @@ impl World {
 
         if !lifecycle_exiting {
             if let Some(kind) = self.pending_collect.take() {
-                if self.options.collect_window.kind_active(kind)
+                if self.options.collect_window.capacity_available
+                    && self.options.collect_window.kind_active(kind)
                     && !self.is_cursor_mischief_active()
                     && !self.is_perch_ride_active()
                     && !self.is_collect_window_active()
@@ -1169,6 +1187,7 @@ impl World {
                 && self.excursion_prank
                 && !manners_active
                 && self.options.collect_window.active()
+                && self.options.collect_window.capacity_available
             {
                 // Came back from the errand with mischief in mind: chain a collect
                 // right away; the suspended task resumes when the collect finishes.
@@ -3279,6 +3298,29 @@ mod tests {
             w.take_collect_window_commands().as_slice(),
             [CollectWindowCommand::Spawn { .. }]
         ));
+    }
+
+    #[test]
+    fn full_owned_prop_capacity_is_busy_and_recovers_without_capability_loss() {
+        for seed in [21, 73, 88] {
+            let mut w = world_with_collect(seed);
+            w.set_collect_window_capacity(false);
+            assert_eq!(w.poke(PokeAction::Note), PokeOutcome::Busy);
+            assert_eq!(w.poke(PokeAction::Meme), PokeOutcome::Busy);
+            w.force_collect_window(CollectWindowKind::Note);
+            assert!(w.pending_collect.is_none());
+            assert!(w.options.collect_window.active());
+            w.set_collect_window_capacity(true);
+            assert_eq!(w.poke(PokeAction::Note), PokeOutcome::Applied);
+            w.tick();
+            assert!(matches!(
+                w.take_collect_window_commands().as_slice(),
+                [CollectWindowCommand::Spawn {
+                    payload: crate::CollectWindowPayload::Note { .. },
+                    ..
+                }]
+            ));
+        }
     }
 
     #[test]

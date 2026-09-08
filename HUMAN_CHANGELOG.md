@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Fixed
+- The goose pauses new note and picture deliveries when several are already open, leaving your existing notes intact and resuming after you close one.
 
 The goose can keep bringing notes and pictures when Windows leaves focus with the app you are using. Notes still receive their text without typing into another app.
 
@@ -52,6 +53,7 @@ Save remains available to accessibility tools after changing settings, including
 Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
 
 ### Behind the scenes
+- Prepare Linux deliveries to use the desktop's normal placement when animated window dragging is unavailable.
 
 Start checks now wait for the command's complete output while confirming the goose is still alive. Terminal update checks use a complete terminal session and retain any failure message.
 
