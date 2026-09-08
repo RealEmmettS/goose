@@ -27,7 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
-- Reconcile v1.4.0 final-source publication and fresh-public evidence, current guidance and completed foundation/settings/art tasks; retain the separate website and next-stage gates.
+- Reconcile v1.4.0 final-source publication and fresh-public evidence across current guidance, accessibility ADRs, the audit and completed foundation/settings/art tasks. Retain separate website/next-stage gates and track unresolved presence observation in its own milestone task.
 
 ## [1.5.0] - Unreleased candidate
 

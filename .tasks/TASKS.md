@@ -7,14 +7,18 @@
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## To-Do
-- [ ] **Linux props and experimental Raspberry Pi support** - integrate and publish owned props, session reporting, and ARM64 labwc packages after the first refinement release (needs #rr1, #lpr) (ms #refine) (owner codex) #rlpi
-  - [x] Qualify native ARM64 labwc placement, scaling and dependency/standalone behavior.
-  - [x] Document experimental Pi 4/5 setup and the physical acceptance boundary.
-  - [ ] Integrate the first release and complete every platform/package/public-byte gate.
+- [ ] **Fullscreen and do-not-disturb observations** - resolve audit R05 with separately proven platform observations and honest fallback (needs #rfnd) (ms #refine) (owner codex) #prs
+  - [ ] Qualify macOS fullscreen and supported system do-not-disturb observation paths.
+  - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
+  - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
 - [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi) (ms #refine) (owner codex) #rkde
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
 
 ## Active
+- [ ] **Linux props and experimental Raspberry Pi support** - integrate and publish owned props, session reporting, and ARM64 labwc packages after the first refinement release (needs #rfnd, #rart, #rgui, #lpr) (ms #refine) (owner codex) #rlpi
+  - [x] Qualify native ARM64 labwc placement, scaling and dependency/standalone behavior.
+  - [x] Document experimental Pi 4/5 setup and the physical acceptance boundary.
+  - [ ] Integrate the first release and complete every platform/package/public-byte gate.
 - [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
   - [ ] Deliver editable renderer SVGs and verify the website against the published release.
   - [x] Resolve final PR review findings and repeat qualification before tagging.

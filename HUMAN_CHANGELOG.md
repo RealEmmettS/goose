@@ -34,7 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
-- Record the redesigned goose and graphical settings as published after checking fresh downloads, and keep the upcoming Linux and website work visible.
+- Record the redesigned goose and graphical settings as published after checking fresh downloads. Keep the upcoming Linux and website work visible, along with the remaining gap in detecting fullscreen and do-not-disturb states.
 
 ### Behind the scenes
 - Let the isolated Linux release test desktop start without requesting extra computer privileges.

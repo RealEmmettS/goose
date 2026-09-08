@@ -1,6 +1,6 @@
 # ADR 0042: Native settings accessibility and its Windows payload
 
-Status: accepted implementation refinement of ADR 0041; native qualification in progress.
+Status: accepted implementation refinement of ADR 0041; native and release qualification completed for v1.4.0.
 
 ## Context
 
@@ -48,9 +48,11 @@ modal filtering, and action admission. Windows file-lease regressions exercise
 write/replacement rejection for both files and reject a missing or changed DLL.
 
 The SDK automation harness remains a separate fixture from native assistive
-technology acceptance. Hosted GTK/AT-SPI, complete native packaging, and final
-release qualification remain required. Physical Mac/Pi acceptance is unavailable
-on the current Windows-only setup and must remain explicit.
+technology acceptance. Hosted GTK/AT-SPI, complete native packaging and final
+release qualification passed for v1.4.0 at source `85c9d426f7409800198ee5e89bca7d6042034082`;
+the [readiness record](../readiness/v1.4.0-readiness.md) links the native, candidate,
+unchanged-main, publication and eight fresh-public runs. Physical Mac/Pi acceptance
+is unavailable on the current Windows-only setup and remains explicit.
 
 Actual editing found that the SDK's original 64-node limit truncated Save after
 changed-field labels appeared on the Appearance page. The pinned local SDK and
