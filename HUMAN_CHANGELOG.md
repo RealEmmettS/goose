@@ -40,6 +40,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Keep Hyprland connected to the same desktop when you repeat setup during a slow fullscreen transition, while continuing to discard old window information.
 
 ### Added
+- Wait for a delivered note’s words to appear before capturing its desktop proof.
 - Check the real Hyprland settings window and delivered notes and pictures, including what happens when their window helper closes unexpectedly.
 - Add an optional Hyprland setup in graphical settings and the command line so the goose can notice fullscreen windows. Turning it off removes its access immediately and keeps your unsaved settings and other desktop integrations intact.
 
