@@ -165,11 +165,33 @@ def main():
             ordinary, protected = (find(window.get_title()) for window in windows)
             for node in (ordinary, protected):
                 assert node['mapped'] and not node['hidden'] and not node['xwayland'], node
+            def run_bridge(probe_environment):
+                process = subprocess.Popen([str(args.bridge.resolve())], env=probe_environment,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                deadline = time.monotonic() + 5
+                try:
+                    while time.monotonic() < deadline:
+                        try:
+                            stdout, stderr = process.communicate(timeout=0.01)
+                            return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
+                        except subprocess.TimeoutExpired:
+                            # A separate observer must not freeze its GTK target.
+                            # Keep native fullscreen configure acknowledgements
+                            # flowing while Rust performs its bounded requests.
+                            context = GLib.MainContext.default()
+                            for _ in range(100):
+                                if not context.pending():
+                                    break
+                                context.iteration(False)
+                    raise TimeoutError('Native Rust probe exceeded its process deadline')
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.communicate(timeout=2)
             def rust_snapshot(label):
                 if args.bridge is None:
                     return None
-                result = subprocess.run([str(args.bridge.resolve())], env=environment,
-                    capture_output=True, text=True, timeout=5)
+                result = run_bridge(environment)
                 assert result.returncode == 0, result.stderr
                 observed = json.loads(result.stdout)
                 assert observed['peer_pid'] == compositor.pid and observed['peer_uid'] == os.getuid()
@@ -190,9 +212,7 @@ def main():
                     listener.bind(str(fake_socket))
                     listener.listen(1)
                     listener.settimeout(2)
-                    denied = subprocess.run([str(args.bridge.resolve())],
-                        env=dict(environment, HYPRLAND_INSTANCE_SIGNATURE=fake_signature),
-                        capture_output=True, text=True, timeout=5)
+                    denied = run_bridge(dict(environment, HYPRLAND_INSTANCE_SIGNATURE=fake_signature))
                     assert denied.returncode != 0 and 'system-owned compositor executable' in denied.stderr, denied.stderr
                     client, _ = listener.accept()
                     with client:

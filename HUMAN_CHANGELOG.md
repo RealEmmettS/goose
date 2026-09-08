@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Keep private test windows responsive while the separate desktop observer runs, including fullscreen transitions.
+
+### Behind the scenes
 - Begin connecting Hyprland desktop observations to the goose, with strict ownership checks and separate fullscreen awareness. Window movement remains unavailable until the desktop can reliably identify an active user drag.
 
 ### Behind the scenes
