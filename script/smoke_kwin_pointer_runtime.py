@@ -146,6 +146,8 @@ preserve = "untouched"
         expect('supported', 'closing settings preserves the running permission owner')
         observer = NativeObserver(directory, call, GLib)
         wait(lambda: observer.pointer, 'independent native pointer observation')
+        wait(lambda: observer.count >= 220, 'continuous pointer observations beyond script collection', timeout=15)
+        expect('supported', 'pointer grant remains live during the observation soak')
         initial = observer.pointer[:]
         control('do', 'nab')
         moved = wait(lambda: observer.pointer[:] if sum((observer.pointer[i] - initial[i]) ** 2

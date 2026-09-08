@@ -42,6 +42,7 @@ All notable changes to this project are documented here. Format based on
 
 ### Fixed
 - Scroll native accessibility targets into view through existing bounded scroll containers before activation. The real SDK dispatcher regression reproduces the original failure and preserves disabled-control refusal.
+- Recognize only the current process's click-through Wayland layer when guarding pointer motion, retaining terminal and unknown-window checks beneath it. Retain KWin observation timers at script scope and qualify their continued native updates beyond garbage collection.
 - Clear queued engine cursor movement on capability loss; cancel portal sessions on adapter expiry, device pause/removal, explicit revocation and shutdown. A restart never restores a pointer grant.
 - Apply owned Wayland prop identities after GTK maps the native surface, and match geometry to an unreaped child and per-window token before positioning. Revocation cancels motion and preserves delivered notes.
 

@@ -32,7 +32,8 @@ class NativeObserver:
         self.thread.start()
         assert self.ready.wait(3)
         source = evidence / 'native-observer.js'
-        source.write_text('''(function () {
+        source.write_text('''// Keep the QObject reachable until this script is unloaded.
+        var honk300NativeObserverTimer = (function () {
             var timer = new QTimer(); timer.interval = 50;
             var pending = false;
             timer.timeout.connect(function () {
@@ -51,7 +52,7 @@ class NativeObserver:
                 callDBus(''' + json.dumps(self.bus.get_unique_name()) + ''', '/org/emmetts/Honk300/NativeObserver',
                     'org.emmetts.Honk300.NativeObserver', 'Capture', JSON.stringify({windows:result,
                         pointer:[workspace.cursorPos.x,workspace.cursorPos.y]}), function () { pending = false; });
-            }); timer.start();
+            }); timer.start(); return timer;
         }());''')
         identifier = call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'loadScript',
             GLib.Variant('(ss)', (str(source), 'honk300-fixture-observer'))).unpack()[0]

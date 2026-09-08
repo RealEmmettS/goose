@@ -41,6 +41,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ### Fixed
 - Bring controls below the settings scroll area into view when a screen reader activates them, while keeping disabled controls inactive.
+- Let the goose recognize its own transparent drawing surface so granted pointer pranks work while other windows remain protected. Keep desktop observations running during longer sessions.
 - Stop pending pointer and delivery movement when permission disappears, preserving already delivered notes and requiring fresh consent after a restart.
 - Give delivered notes their own desktop identity once their window appears, so optional KDE support can recognize and move the correct note.
 

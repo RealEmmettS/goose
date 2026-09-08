@@ -130,6 +130,18 @@ impl Frame {
             if !window.valid() || window.dragging || !window.drag_known {
                 return false;
             }
+            // KWin includes our click-through layer surface in its window list
+            // with an empty caption. Its live native PID establishes ownership;
+            // an application-name lookalike never exempts a foreign window.
+            // Keep checking every window beneath this transparent surface.
+            if window.pid == std::process::id()
+                && window.app == "honk300"
+                && window.title.is_empty()
+                && !window.moveable
+                && !window.fullscreen
+            {
+                return true;
+            }
             let [x, y, width, height] = window.geometry;
             let intersects = right >= x && left <= x + width && bottom >= y && top <= y + height;
             !intersects
@@ -368,6 +380,36 @@ mod tests {
         frame.windows[0].dragging = false;
         frame.windows[0].fullscreen = true;
         assert!(!frame.permits_pointer_motion([116.0, 110.0]));
+    }
+
+    #[test]
+    fn pointer_guard_recognizes_only_this_process_overlay_and_preserves_windows_below() {
+        let mut frame = fixture();
+        let mut overlay = frame.windows[0].clone();
+        overlay.id = "{efec6f86-5174-4ff5-a84b-431aade70d25}".into();
+        overlay.pid = std::process::id();
+        overlay.app = "honk300".into();
+        overlay.title.clear();
+        overlay.geometry = [0.0, 0.0, 1280.0, 900.0];
+        overlay.moveable = false;
+        overlay.protected = true;
+        frame.windows.push(overlay.clone());
+        assert!(frame.permits_pointer_motion([645.0, 449.0]));
+        for foreign in [true, false] {
+            frame.windows[1] = overlay.clone();
+            if foreign {
+                frame.windows[1].pid = overlay.pid.checked_add(1).unwrap();
+            } else {
+                frame.windows[1].app = "another-app".into();
+            }
+            assert!(!frame.permits_pointer_motion([645.0, 449.0]));
+        }
+        frame.windows[1] = overlay;
+        frame.windows[0].geometry = [630.0, 440.0, 100.0, 100.0];
+        frame.windows[0].title = "ChatGPT Codex".into();
+        assert!(!frame.permits_pointer_motion([645.0, 449.0]));
+        frame.windows[0].title.clear();
+        assert!(!frame.permits_pointer_motion([645.0, 449.0]));
     }
 
     #[test]

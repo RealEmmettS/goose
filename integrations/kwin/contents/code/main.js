@@ -1,6 +1,7 @@
 // Honk300's explicitly loaded KWin companion. No shortcuts or startup hooks.
 // The native probe exercises this same script before Rust enables its capabilities.
-(function () {
+// A script-global root retains the QObject throughout long-lived observations.
+var honk300CompanionTimer = (function () {
     "use strict";
     var service = "org.emmetts.Honk300.Wayland";
     var path = "/org/emmetts/Honk300/KWin";
@@ -179,4 +180,5 @@
     }
     timer.timeout.connect(exchange);
     timer.start();
+    return timer;
 }());

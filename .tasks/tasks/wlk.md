@@ -43,6 +43,7 @@ its remaining failures to the new pointer settings control being outside the vie
 complete versioned packages must still pass final-source qualification under #rkde.
 
 ## Activity
+- 2026-09-08: Run 34208034861 retains native settings passes but three note movement checks fail with the independent observer ending after about five seconds. Keep observer and production timer objects rooted until script unload, and require a continued-observation soak before the unchanged native movement and revocation assertions.
 - 2026-09-08: The optimized native gate passes three full runtime lanes. Both KDE 6 portal grant/movement/cancel checks now pass independently; the remaining ARM note-motion failure gets first-loss/refusal diagnostics and timestamped compositor observations before the next correction.
 - 2026-09-08: Correct note identity and off-center placement are now observed in all lanes. Both x64 movement checks pass; both ARM checks remain failures. Switch the native runtime and bridge to release builds before repeating, without increasing any freshness deadline or lowering the movement threshold.
 - 2026-09-08: Run 34199983732 proves the application-id correction and actual owned movement/revocation on KDE 5 x64. Other approaches can pick up the compositor-centered note already at the engine's center release point, giving no required drag distance. Establish and observe an off-center initial fixture placement before measuring only subsequent engine-driven movement; keep all ownership and revocation assertions.

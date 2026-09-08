@@ -28,6 +28,10 @@ implementation of the Rust boundary, not a public capability claim.
   Movement stays within the target's real output and within 24 logical pixels per exchange.
 - Keep terminal protection at both boundaries. Blank, oversized or ambiguous identities do
   not authorize operations. Codex, ChatGPT and Visual Studio Code remain protected.
+  The pointer guard recognizes only the running process's own immovable `honk300`
+  layer surface, whose native KWin caption is empty. Its exact compositor-reported PID
+  is required; a foreign process using the same application name receives no exemption.
+  Every underlying window still undergoes the full terminal and unknown-identity checks.
 - Report window observation, foreign movement, owned-prop positioning, pointer observation,
   pointer control, fullscreen and DND individually. KWin window evidence supplies no portal
   grant. KWin fullscreen evidence supplies no DND claim. Plasma 5's client list supplies no

@@ -103,6 +103,8 @@ preserve = "untouched"
         from smoke_kwin_observer import NativeObserver
         observer = NativeObserver(directory, call, GLib)
         wait(lambda: observer.frames, 'native runtime observer')
+        wait(lambda: observer.count >= 220, 'continuous native observation beyond script collection', timeout=15)
+        assert supported(), 'Production companion lost its long-lived observation timer'
         control('do', 'note')
         def note():
             return next((item for item in observer.latest if item['title'] == 'Honk300 note'), None)
