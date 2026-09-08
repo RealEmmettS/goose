@@ -49,7 +49,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Wait until settings reports a completed save before checking its file, so the test itself cannot block saving.
 
 ### Behind the scenes
-- Record the Linux deliveries as published after checking every fresh download, and confirm the website now uses the desktop goose artwork, explains graphical settings, and includes the Linux and experimental Raspberry Pi setup guidance.
+- Record the completed Linux publication after checking every fresh download, and confirm the website now uses the desktop goose artwork, explains graphical settings, and includes the Linux and experimental Raspberry Pi setup guidance.
 
 ### Behind the scenes
 - Record the redesigned goose and graphical settings as published after checking fresh downloads. Keep the upcoming Linux and website work visible, along with the remaining gap in detecting fullscreen and do-not-disturb states.
