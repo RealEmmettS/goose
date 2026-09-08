@@ -172,10 +172,11 @@ preserve = "untouched"
         x, y, width, height = native['rect']
         # Use GTK's real window-drag handle inside the client. Remapping and
         # fullscreen restoration can change decoration input regions, while
-        # the client center stays clear of the goose's window-top ride anchor.
+        # a point at the left of the client stays clear of both the window-top
+        # ride anchor and the goose's return route through the window center.
         handle = target.get_child()
         assert isinstance(handle, Gtk.WindowHandle)
-        pointer_x, pointer_y = x + width // 2, y + height // 2
+        pointer_x, pointer_y = x + min(64, width // 5), y + height // 2
         # A Shell coordinate is not proof that the native client has received
         # pointer entry. Record the actual GTK capture events without consuming
         # them, and await the target surface before beginning the gesture.
@@ -207,6 +208,10 @@ preserve = "untouched"
         def event(*arguments):
             subprocess.run(['xdotool', *map(str, arguments)], env=capture_environment,
                            check=True, capture_output=True, timeout=5)
+        def pointer_target():
+            return json.loads(bus.call_sync(shell_owner, '/dev/emmetts/Honk300/GnomeProbe1',
+                'dev.emmetts.Honk300.GnomeProbe1', 'PointerTarget', None,
+                GLib.VariantType.new('(s)'), Gio.DBusCallFlags.NONE, 1000, None).unpack()[0])
         try:
             def delivered_to_handle(after, expected=None):
                 if not surface.get_device_position(device)[0] or len(native_events) <= after:
@@ -221,13 +226,19 @@ preserve = "untouched"
                 return current if inside and matches else False
             # A newly raised surface may be under an unchanged outer pointer.
             # Two distinct handle points guarantee a real motion event.
-            event('mousemove', pointer_x + 20, pointer_y + 20)
-            wait(lambda: snapshot()['pointer'] == [pointer_x + 20, pointer_y + 20],
+            entry_x, entry_y = pointer_x + 20, pointer_y + 20
+            before_input = pointer_target()
+            (directory / f'input-target-before-{label}.json').write_text(json.dumps(before_input, indent=2))
+            if before_input['pointer'] == [entry_x, entry_y]:
+                entry_x = pointer_x - 20
+            event('mousemove', entry_x, entry_y)
+            wait(lambda: snapshot()['pointer'] == [entry_x, entry_y],
                  'native motion enters the private client: ' + label)
             first = wait(lambda: delivered_to_handle(0),
                          'GTK acknowledges preparatory handle motion: ' + label)
             first_count = len(native_events)
-            expected = [coordinate - 20 for coordinate in first['coordinates']]
+            expected = [first['coordinates'][0] + pointer_x - entry_x,
+                        first['coordinates'][1] + pointer_y - entry_y]
             event('mousemove', pointer_x, pointer_y)
             wait(lambda: snapshot()['pointer'] == [pointer_x, pointer_y],
                  'native pointer reaches the private client: ' + label)
@@ -238,6 +249,7 @@ preserve = "untouched"
             # the client queue. Relative coordinates include real decorations.
             wait(lambda: delivered_to_handle(first_count, expected),
                  'GTK acknowledges final handle motion: ' + label)
+            (directory / f'input-target-ready-{label}.json').write_text(json.dumps(pointer_target(), indent=2))
             # Gtk.WindowHandle asks Mutter to begin the real native gesture
             # using the delivered button event. Never synthesize a grab signal.
             before_press = len(native_events)
@@ -272,6 +284,7 @@ preserve = "untouched"
         except BaseException:
             failed = snapshot()
             failed['gtk_surface_pointer'] = list(surface.get_device_position(device))
+            failed['pointer_target'] = pointer_target()
             (directory / f'failed-grab-{label}.json').write_text(json.dumps(failed, indent=2))
             subprocess.run(['import', '-display', capture_environment['DISPLAY'], '-window', 'root',
                 str(directory / f'failed-grab-{label}.png')], env=capture_environment, check=True, timeout=8)

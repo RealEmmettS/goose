@@ -8,6 +8,7 @@ import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 
 const XML = `<node><interface name="dev.emmetts.Honk300.GnomeProbe1">
 <method name="Snapshot"><arg type="s" direction="out"/></method>
+<method name="PointerTarget"><arg type="s" direction="out"/></method>
 <method name="ShowDesktop"><arg type="s" direction="out"/></method>
 <method name="MoveFixture"><arg type="t" direction="in"/><arg type="u" direction="in"/>
 <arg type="s" direction="in"/><arg type="s" direction="out"/></method>
@@ -65,6 +66,17 @@ export default class Probe extends Extension {
     ShowDesktop() {
         Main.overview.hide();
         return 'ok';
+    }
+
+    PointerTarget() {
+        // Read actual compositor picking only in this disposable test desktop.
+        const [x, y] = global.get_pointer();
+        let actor = global.stage.get_actor_at_pos(Clutter.PickMode.REACTIVE, x, y);
+        for (let depth = 0; actor && depth < 16; depth++, actor = actor.get_parent()) {
+            if (actor instanceof Meta.WindowActor)
+                return JSON.stringify({pointer: [x, y], window: this._window(actor.meta_window)});
+        }
+        return JSON.stringify({pointer: [x, y], window: null});
     }
 
     MoveFixture(id, pid, expected) {
