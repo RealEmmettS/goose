@@ -24,6 +24,7 @@
   - [ ] Qualify actual KDE-owned prop movement and immediate placement revocation.
   - [ ] Exercise the guided native settings controls and qualifying package integrations.
 - [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
+  - [ ] Deliver editable renderer SVGs and verify the website against the published release.
   - [ ] Resolve final PR review findings and repeat qualification before tagging.
   - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
   - [x] Correct captured Windows start and verify native GUI Start, independent settings close, and graceful Stop.

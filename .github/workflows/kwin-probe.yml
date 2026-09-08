@@ -58,7 +58,7 @@ jobs:
               at-spi2-core gir1.2-atspi-2.0
             if test "$HONK_DISTRIBUTION" = "debian:trixie-slim"; then
               DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
-                xdg-desktop-portal xdg-desktop-portal-kde liboeffis1 libei1 \
+                kwin-common xdg-desktop-portal xdg-desktop-portal-kde liboeffis1 libei1 \
                 at-spi2-core gir1.2-atspi-2.0 pipewire qt6-wayland
             fi
             dpkg-query -W > target/kwin-evidence/packages.txt

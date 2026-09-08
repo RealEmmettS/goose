@@ -37,6 +37,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Give delivered notes their own desktop identity once their window appears, so optional KDE support can recognize and move the correct note.
 
 ### Behind the scenes
+- Wait until settings reports a completed save before checking the saved file, so the test itself cannot block saving.
+- Give the desktop test its normal built-in features and a meaningful delivery distance before checking note movement and pointer permission.
+
+### Added
+- Export editable goose artwork and animation frames directly from the app's drawing code, keeping the website's character consistent with the desktop goose.
 - Prepare the test desktop's normal application registry before checking permission dialogs, and record which desktop features are actually available.
 - Stop moving a delivered window as soon as desktop integration is removed, keeping notes available to use.
 - Give the isolated permission test a fresh desktop service before opening consent.

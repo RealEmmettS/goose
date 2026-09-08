@@ -54,3 +54,5 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0041 — Refinement, Native Settings, and Continuous Goose](./0041-refinement-native-settings-and-continuous-goose.md)
 - [0042 — Native Settings Accessibility Bridge](./0042-native-settings-accessibility-bridge.md)
 - [0043 — Owned Linux Prop Companion](./0043-owned-linux-prop-companion.md)
+- [0044 — Explicit KWin and Portal Adapters](./0044-explicit-kwin-and-portal-adapters.md)
+- [0045 — Shared Vector Preview Export](./0045-shared-vector-preview-export.md)

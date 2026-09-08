@@ -1,7 +1,7 @@
 //! Actual engine frames; HTML only displays the exported PNGs.
 use honk_engine::{
     math::Vec2,
-    render::{render_rig_scaled, RenderPalette},
+    render::{render_rig_scaled, render_rig_svg, RenderPalette},
     rig::{Rig, RigAnim, RigInput},
     time::DT,
     tiny_skia::{Pixmap, PixmapPaint, Transform},
@@ -27,6 +27,7 @@ const SEQUENCES: [&str; 10] = [
 pub fn export(out: &str) {
     let out = Path::new(out);
     fs::create_dir_all(out).unwrap();
+    fs::create_dir_all(out.join("svg")).unwrap();
     let mut manifest = String::from("{\"developmentPreview\":true,\"fps\":30,\"cell\":128,\"scale\":2,\"columns\":12,\"count\":120,\"sequences\":{");
     for (index, name) in SEQUENCES.iter().enumerate() {
         let mut sheet = Pixmap::new(CELL * 2 * COLS, CELL * 2 * (COUNT / COLS)).unwrap();
@@ -107,6 +108,16 @@ pub fn export(out: &str) {
                 RenderPalette::default(),
             )
             .unwrap();
+            let vector = render_rig_svg(
+                &rig,
+                rig.ground - ANCHOR,
+                CELL as f32,
+                CELL as f32,
+                2.0,
+                RenderPalette::default(),
+            )
+            .unwrap();
+            fs::write(out.join(format!("svg/{name}-{frame:03}.svg")), &vector).unwrap();
             sheet.draw_pixmap(
                 ((frame % COLS) * CELL * 2) as i32,
                 ((frame / COLS) * CELL * 2) as i32,
@@ -121,6 +132,7 @@ pub fn export(out: &str) {
             trace.push_str(&format!("[{:.2},{:.2}]", center.x, center.y));
             if frame == 30 {
                 cell.save_png(out.join(format!("{name}-pose.png"))).unwrap();
+                fs::write(out.join(format!("{name}-pose.svg")), &vector).unwrap();
             }
         }
         sheet.save_png(out.join(format!("{name}.png"))).unwrap();
@@ -147,6 +159,19 @@ pub fn export(out: &str) {
         .unwrap()
         .save_png(out.join(format!("heading-{degrees:03}.png")))
         .unwrap();
+        fs::write(
+            out.join(format!("heading-{degrees:03}.svg")),
+            render_rig_svg(
+                &rig,
+                rig.ground - ANCHOR,
+                CELL as f32,
+                CELL as f32,
+                4.0,
+                RenderPalette::default(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
         headings.push_str(&format!("<figure><img src='heading-{degrees:03}.png' width='128' height='128'><figcaption>{degrees}&deg;</figcaption></figure>"));
     }
     fs::write(
@@ -156,6 +181,6 @@ pub fn export(out: &str) {
             .replace("HEADING_IMAGES", &headings),
     )
     .unwrap();
-    fs::write(out.join("README.md"), "# Actual renderer development preview\n\nOpen index.html to play, pause, scrub, and inspect at 100/150/200 percent on light/dark backgrounds. PNG sheets: 120 frames, 30fps, 12 columns, 256px cells displayed at 128 CSS pixels. Heading PNGs: 512px cells displayed at 128 CSS pixels. Ground anchor: 60,93 world units in every cell. manifest.json records travel for the contact ruler. These are development exports, not released artwork or native desktop acceptance.\n").unwrap();
+    fs::write(out.join("README.md"), "# Actual renderer development preview\n\nOpen index.html to play, pause, scrub, and inspect at 100/150/200 percent on light/dark backgrounds. PNG sheets: 120 frames, 30fps, 12 columns, 256px cells displayed at 128 CSS pixels. Heading PNGs: 512px cells displayed at 128 CSS pixels. Ground anchor: 60,93 world units in every cell. manifest.json records travel for the contact ruler.\n\nEvery named pose and heading also has an editable SVG. Individual motion frames are svg/<sequence>-000.svg through -119.svg. These are the same paths, colors, opacity, strokes and drawing order emitted by the production projected renderer; they contain no embedded raster, fonts, scripts or external resources. The shared rig and geometry remain authoritative. These are development exports, not public release or native desktop acceptance.\n").unwrap();
     println!("wrote actual renderer motion review to {}", out.display());
 }

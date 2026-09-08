@@ -46,6 +46,15 @@ function Invoke-Named([string] $Name) {
     $pattern.Invoke()
 }
 
+function Wait-Saved {
+    # Poll the native UI while Rust performs atomic replacement. Holding the
+    # destination open with Get-Content can itself deny replacement on Windows.
+    Wait-For {
+        $null -eq (Find-Named 'Unsaved changes') -and
+        $null -ne (Find-Named 'Saved. The goose will use these settings when it starts.')
+    } 'the completed native save response'
+}
+
 try {
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $binaryPath
@@ -63,6 +72,7 @@ try {
     $toggle.Toggle()
     Wait-For { $toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::On } 'the changed switch state'
     Invoke-Named 'Save & apply'
+    Wait-Saved
     Wait-For { (Get-Content -LiteralPath $config -Raw) -match 'reduced_motion = true' } 'persisted switch state'
     Invoke-Named 'General'
     Wait-For { $null -ne (Find-Named 'First wander (seconds)') } 'the general page'
@@ -84,6 +94,7 @@ try {
     Invoke-Named 'Apply to draft'
     Wait-For { $null -eq (Find-Named 'Edit setting') } 'dialog dismissal'
     Invoke-Named 'Save & apply'
+    Wait-Saved
     Wait-For { (Get-Content -LiteralPath $config -Raw) -match 'first_wander_time_seconds = 25' } 'the saved numeric value'
     Wait-For { $null -ne (Find-Named 'Saved. The goose will use these settings when it starts.') } 'the readable saved status'
     # Dirty badges on the largest page exceed the former 128-node ceiling.
@@ -98,6 +109,7 @@ try {
         Wait-For { $toggle.Current.ToggleState -ne $wasOn } ('changed ' + $name)
     }
     Invoke-Named 'Save & apply'
+    Wait-Saved
     Wait-For { $text = Get-Content -LiteralPath $config -Raw; $text -match 'no_mouse_steal = true' -and $text -match 'can_attack_mouse = false' } 'the saved full-page changes'
     [ordered]@{
         schema = 'honk300.settings-uia-smoke.v1'

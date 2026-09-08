@@ -4,14 +4,14 @@ use crate::{
     math::Vec2,
     rig::{project, Rig},
 };
-use tiny_skia::{Path, PathBuilder, Pixmap};
+use tiny_skia::{Path, PathBuilder};
 
-struct Draw<'a> {
-    pixels: &'a mut Pixmap,
+struct Draw<'a, C: VectorCanvas> {
+    pixels: &'a mut C,
     origin: Vec2,
     scale: f32,
 }
-impl Draw<'_> {
+impl<C: VectorCanvas> Draw<'_, C> {
     fn pt(&self, p: Vec2) -> Vec2 {
         (p - self.origin) * self.scale
     }
@@ -58,7 +58,7 @@ impl Draw<'_> {
 }
 
 pub(super) fn paint_goose(
-    pixels: &mut Pixmap,
+    pixels: &mut impl VectorCanvas,
     rig: &Rig,
     origin: Vec2,
     scale: f32,

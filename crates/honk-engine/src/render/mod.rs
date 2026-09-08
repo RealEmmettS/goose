@@ -4,6 +4,7 @@
 mod canvas;
 mod geom;
 mod projected;
+mod svg;
 
 use crate::autumn::{AutumnLeafColor, AutumnState};
 use crate::footmarks::{FootMarkTiming, FootMarks};
@@ -12,6 +13,7 @@ use crate::rig::{GoosePose, Rig};
 pub use canvas::DamageCanvas;
 use geom::{disc, ellipse, paint};
 use std::cell::RefCell;
+pub use svg::render_rig_svg;
 use tiny_skia::{Color, FilterQuality, Pixmap, PixmapPaint, Transform};
 
 /// Goose raster supersample factor (rendered at 2x, composited down at 0.5x).

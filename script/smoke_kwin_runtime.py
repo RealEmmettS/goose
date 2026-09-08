@@ -106,6 +106,38 @@ preserve = "untouched"
         assert int(parent) == process.pid, initial
         assert initial['app'] == 'honk300.prop.1', initial
         assert initial['geometry'][2] <= 1280 * 0.48 and initial['geometry'][3] <= 900 * 0.48
+        # The compositor centers new windows exactly where the engine releases
+        # deliveries. Depending on approach direction, that valid trip has no
+        # dragging distance. Establish an off-center fixture placement first;
+        # only subsequent engine-driven movement counts toward this assertion.
+        placement = directory / 'note-initial-placement.js'
+        placement.write_text('''(function () {
+            var windows = workspace.stackingOrder !== undefined ? workspace.stackingOrder : workspace.clientList();
+            for (var i = 0; i < windows.length; i++) {
+                var window = windows[i];
+                if (String(window.internalId) === ''' + json.dumps(initial['id']) + ''' &&
+                    Number(window.pid) === ''' + str(initial['pid']) + ''' &&
+                    String(window.resourceClass) === 'honk300.prop.1') {
+                    var geometry = window.frameGeometry;
+                    geometry.x = 120; geometry.y = 160;
+                    window.frameGeometry = geometry;
+                }
+            }
+        }());''')
+        placement_name = 'honk300-fixture-note-placement'
+        identifier = call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'loadScript',
+            GLib.Variant('(ss)', (str(placement), placement_name))).unpack()[0]
+        assert identifier >= 0
+        major = int((evidence / 'version.txt').read_text().split()[-1].split('.')[0])
+        script_path = f'/Scripting/Script{identifier}' if major >= 6 else f'/{identifier}'
+        try:
+            call('org.kde.KWin', script_path, 'org.kde.kwin.Script', 'run')
+            initial = wait(lambda: (item if (item := note()) and
+                abs(item['geometry'][0] - 120) < 0.1 and abs(item['geometry'][1] - 160) < 0.1 else None),
+                'off-center initial fixture placement')
+        finally:
+            call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'unloadScript',
+                 GLib.Variant('(s)', (placement_name,)))
         moved = wait(lambda: (item if (item := note()) and
             sum((item['geometry'][i] - initial['geometry'][i]) ** 2 for i in (0, 1)) > 16 else None),
             'engine-driven native KDE note movement', timeout=30)

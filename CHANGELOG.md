@@ -27,6 +27,8 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Wait for the completed native UI save response before opening the Windows fixture's config file for readback; this prevents the test reader from denying atomic replacement.
+- Include KDE's packaged compositor plugins in the private portal fixture, and establish a nonzero owned-note delivery distance before measuring engine-driven motion.
 - Preserve bounded native prop observations and use monotonic capture counts for revocation checks; run the runtime, GUI and portal qualifiers independently while requiring all results for acceptance.
 - Explain that optional portal pointer permission requires the GNU Linux executable; the statically linked musl executable keeps its separate KDE window capabilities.
 - Extend both KDE generations and architectures with production Native SDK consent/removal actions through AT-SPI, including modal isolation and preservation of unsaved settings.
@@ -41,6 +43,7 @@ All notable changes to this project are documented here. Format based on
 - Correct the Linux runtime's pointer-distance call to the production engine vector API, as caught by the expanded native KWin build gate.
 
 ### Added
+- Export editable SVG headings, named poses and every motion frame from the same statically dispatched vector drawing routine as the desktop, with unchanged raster output (ADR 0045).
 - Add explicit KDE setup/removal through CLI and Native SDK settings, with private consent, sealed companion loading, live Rust runtime capabilities, owned-only crash recovery and immediate IPC revocation. Keep portal control, DND and native prop positioning unsupported pending separate implementation and qualification.
 
 ### Development

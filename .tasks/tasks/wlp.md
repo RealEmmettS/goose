@@ -36,6 +36,7 @@ Active: checking the real library and KDE 6 grant before enabling a runtime capa
 KDE 5 has separate window evidence; no EIS or portal control is claimed for it.
 
 ## Activity
+- 2026-09-08: Run 34199983732 records empty AvailablePlugins and LoadedPlugins on both KDE 6 desktops. Debian puts screencast/EIS plugins in the separately recommended kwin-common package; include that actual desktop package in the isolated fixture while retaining normal consent and protocol permissions.
 - 2026-09-08: The corrected frontend ownership reaches CreateSession. Native KDE reports zkde_screencast_unstable_v1 unavailable. Add the normal isolated KService cache refresh, backend package inventory and compositor plugin/permission diagnostics before repeating the real grant premise; do not disable compositor permission checks.
 - 2026-09-08: Keep the static musl archive's pointer control explicitly unsupported with a GNU-build explanation; its static runtime cannot dynamically load the optional input libraries. KDE window support remains separate. Portal qualification now runs independently of the owned-prop test and still blocks the complete native gate on failure.
 - 2026-09-08: Run 34196877360 passes all native GUI checks but portal discovery still reaches a previously activated frontend without RemoteDesktop. The replacement frontend exports the interface in its log but had not claimed the shared name. Use its documented --replace option in the private bus and require its exact PID to own the name before requesting permission.
