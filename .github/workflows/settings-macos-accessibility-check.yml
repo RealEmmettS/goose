@@ -13,11 +13,15 @@ jobs:
   native:
     name: Native AX (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-15-intel]
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
     steps:
       - uses: actions/checkout@v6
         with:
@@ -34,16 +38,29 @@ jobs:
           run-id: 34287192377
           github-token: ${{ github.token }}
           path: target/qualified-app
-      - name: Exercise native Accessibility against the existing production app
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build the corrected production companion beside the exact Rust service
         env:
           FIXTURE_RUNNER: ${{ matrix.runner }}
+          FIXTURE_TARGET: ${{ matrix.target }}
         run: |
           ditto -x -k "target/qualified-app/Honk300-$FIXTURE_RUNNER.zip" target/qualified-app/expanded
           app="$PWD/target/qualified-app/expanded/Honk300.app"
           codesign --verify --strict "$app"
           shasum -a 256 "$app/Contents/MacOS/honk300" "$app/Contents/MacOS/honk300-settings"
+          python3 script/build_settings.py --target "$FIXTURE_TARGET" --output target/ax-release --test
+          cp "$app/Contents/MacOS/honk300" target/ax-release/honk300
+          cmp "$app/Contents/MacOS/honk300" target/ax-release/honk300
+          shasum -a 256 target/ax-release/honk300-settings
+      - name: Exercise the real native Accessibility provider
+        run: |
           xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework Cocoa -framework ApplicationServices script/smoke_settings_accessibility_macos.m -o target/settings-ax
-          target/settings-ax "$app/Contents/MacOS/honk300-settings" "$PWD/target/native-mac-ax-evidence"
+          target/settings-ax "$PWD/target/ax-release/honk300-settings" "$PWD/target/native-mac-ax-evidence" --independent-presence
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}
         with:

@@ -15,7 +15,16 @@ Exercise native names, button actions, switch state, focused text editing, modal
 - [ ] Record final-source evidence and retain native reader coverage in future settings qualification.
 
 ## Status
-Active. A separate two-host diagnostic consumes the completed source-CI app artifacts without rebuilding or modifying either pending release source.
+Active. The actual production provider exposes enabled background page actions
+behind its editor dialog. A pinned Mac SDK correction filters the real semantic
+dialog ancestry and checks cached actions against the current published scope.
+Repeat actual native reader checks before integrating either pending release.
 
 ## Activity
+- 2026-09-08 — Preserve run 34290279357's actual modal failure and both captured
+  native trees; its initial Intel artifact transfer failure is separate. Cancel
+  candidates 34287468666 and 34287505007 before publication. Add ADR 0051,
+  bounded modal publication, current-action checks, an actual retained-reference
+  regression and permanent production-Mac reader qualification. Local SDK hash
+  checks pass; both native corrected-companion runs are next.
 - 2026-09-08 — Identify the missing independent Mac reader result during final acceptance reconciliation; add a bounded actual Accessibility API fixture using the built universal app and isolated settings.

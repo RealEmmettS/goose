@@ -117,7 +117,8 @@ static void captureTree(NSString *name) {
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
-        if (argc != 3) { fprintf(stderr, "usage: settings-ax BINARY FRESH_EVIDENCE_DIRECTORY\n"); return 2; }
+        if (argc != 3 && (argc != 4 || strcmp(argv[3], "--independent-presence") != 0)) { fprintf(stderr, "usage: settings-ax BINARY FRESH_EVIDENCE_DIRECTORY [--independent-presence]\n"); return 2; }
+        BOOL independentPresence = argc == 4;
         NSString *binary = [[NSString stringWithUTF8String:argv[1]] stringByStandardizingPath];
         evidenceDirectory = [[NSString stringWithUTF8String:argv[2]] stringByStandardizingPath];
         NSFileManager *files = NSFileManager.defaultManager;
@@ -150,9 +151,12 @@ int main(int argc, const char *argv[]) {
             press(@"Save & apply", @"AXButton");
             waitFor(^BOOL { return [[NSString stringWithContentsOfFile:config encoding:NSUTF8StringEncoding error:NULL] containsString:@"reduced_motion = true"]; }, @"persisted switch");
             press(@"General", @"AXButton");
+            id backgroundReference = waitForNode(@"Appearance", @"AXButton");
             press(@"First wander (seconds)", @"AXButton");
             waitForNode(@"Edit setting", @"AXGroup");
             require(find(@"General", @"AXButton") == nil, @"Native modal still exposes background page actions");
+            require(AXUIElementPerformAction((__bridge AXUIElementRef)backgroundReference, kAXPressAction) != kAXErrorSuccess,
+                    @"A retained background reference still accepts an action during the modal");
             id field = waitForNode(@"First wander (seconds)", @"AXTextField");
             require([stringAttribute(field, kAXValueAttribute) isEqualToString:@"20"], @"Native reader cannot read initial editor text");
             require(AXUIElementSetAttributeValue((__bridge AXUIElementRef)field, kAXFocusedAttribute, kCFBooleanTrue) == kAXErrorSuccess, @"Native reader could not focus the editor");
@@ -175,7 +179,7 @@ int main(int argc, const char *argv[]) {
             press(@"Save & apply", @"AXButton");
             waitFor(^BOOL { NSString *saved = [NSString stringWithContentsOfFile:config encoding:NSUTF8StringEncoding error:NULL]; return [saved containsString:@"no_mouse_steal = true"] && [saved containsString:@"can_attack_mouse = false"]; }, @"saved complete dirty page");
             press(@"Platform & status", @"AXButton");
-            waitFor(^BOOL { for (id node in tree()) { NSString *name = nodeName(node); if ([name containsString:@"Goose: stopped"] && [name containsString:@"Fullscreen observation: unprobed"] && [name containsString:@"Do not disturb: unprobed"]) return YES; } return NO; }, @"independent native presence status");
+            if (independentPresence) waitFor(^BOOL { for (id node in tree()) { NSString *name = nodeName(node); if ([name containsString:@"Goose: stopped"] && [name containsString:@"Fullscreen observation: unprobed"] && [name containsString:@"Do not disturb: unprobed"]) return YES; } return NO; }, @"independent native presence status");
             id update = waitForNode(@"Update now", @"AXButton");
             require(attribute(update, kAXEnabledAttribute) != nil && ![attribute(update, kAXEnabledAttribute) boolValue], @"Unavailable update was exposed as enabled");
             CFArrayRef actions = NULL;
@@ -184,8 +188,10 @@ int main(int argc, const char *argv[]) {
             NSArray *disabledActions = CFBridgingRelease(actions);
             require(![disabledActions containsObject:(__bridge NSString *)kAXPressAction], @"Disabled update still advertises a press action");
             captureTree(@"platform-tree.json");
+            NSMutableArray *checks = [NSMutableArray arrayWithArray:@[@"native-names",@"action",@"checkbox-state",@"text-interface",@"focus",@"native-text-edit",@"modal-isolation",@"stale-modal-action",@"save-readback",@"largest-dirty-page",@"disabled-button-state"]];
+            if (independentPresence) [checks addObject:@"independent-presence-status"];
             writeJSON(@"result.json", @{@"schema":@"honk300.settings-macos-ax-smoke.v1", @"ok":@YES, @"pid":@(settings.processIdentifier), @"automation_harness":@NO,
-                @"checks":@[@"native-names",@"action",@"checkbox-state",@"text-interface",@"focus",@"native-text-edit",@"modal-isolation",@"save-readback",@"largest-dirty-page",@"disabled-button-state",@"independent-presence-status"]});
+                @"independent_presence":@(independentPresence), @"checks":checks});
             result = 0;
         } @catch (NSException *exception) {
             fprintf(stderr, "%s\n", exception.reason.UTF8String);

@@ -144,5 +144,53 @@
         "after": "            // Honk300: assistive activation must reveal an offscreen control\n            // through the real bounded scroll owner before keyboard routing.\n            // Published semantics still reject hidden, concealed and disabled controls.\n            const permitted = canvasWidgetActionsForId(self, view_index, id) orelse return error.InvalidCommand;\n            if (!permitted.focus) return error.InvalidCommand;\n            const target_index = self.views[view_index].canvasWidgetNodeIndexById(id) orelse return error.InvalidCommand;\n            var ancestor = self.views[view_index].widget_layout_nodes[target_index].parent_index;\n            var remaining = self.views[view_index].widget_layout_node_count;\n            while (ancestor) |parent_index| {\n                if (remaining == 0 or parent_index >= self.views[view_index].widget_layout_node_count) return error.InvalidCommand;\n                remaining -= 1;\n                const parent = self.views[view_index].widget_layout_nodes[parent_index];\n                ancestor = parent.parent_index;\n                if (parent.widget.kind != .scroll_view) continue;\n                const bounds = self.views[view_index].widget_layout_nodes[target_index].frame.normalized();\n                const viewport = parent.frame.inset(parent.widget.layout.padding).normalized();\n                if (viewport.isEmpty() or bounds.maxX() <= viewport.x or bounds.x >= viewport.maxX()) return error.InvalidCommand;\n                const delta: f32 = if (bounds.y < viewport.y or bounds.height > viewport.height) bounds.y - viewport.y\n                    else if (bounds.maxY() > viewport.maxY()) bounds.maxY() - viewport.maxY() else 0;\n                if (delta != 0) {\n                    if (try self.views[view_index].applyCanvasWidgetScroll(parent_index, delta, .discrete, false)) |dirty| {\n                        try CanvasWidgetEventMethods().reconcileCanvasWidgetRenderStateAfterScrollWithTooltipIntent(self, view_index, null);\n                        try CanvasWidgetEventMethods().invalidateForCanvasWidgetDirty(self, view_index, dirty);\n                    }\n                }\n            }\n            const target = self.views[view_index].widgetLayoutTree().focusTargetById(id) orelse return error.InvalidCommand;\n            try self.focusView(self.views[view_index].window_id, self.views[view_index].label);"
       }
     ]
+  },
+  {
+    "file": "platform/macos/root.zig",
+    "sha256": "980888b6c53acf2dac2bca908f878214dce8707a71c7c8f4365aa0ade821ffc6",
+    "edits": [
+      {
+        "before": "    var nodes: [platform_mod.max_widget_accessibility_nodes]AppKitWidgetAccessibilityNode = undefined;\n    for (snapshot.nodes, 0..) |node, index| {\n        nodes[index] = .{",
+        "after": "    // Honk300: expose only the active dialog to native assistive navigation.\n    var dialog: ?u64 = null;\n    for (snapshot.nodes) |node| {\n        if (node.role == .dialog) dialog = node.id;\n    }\n    var nodes: [platform_mod.max_widget_accessibility_nodes]AppKitWidgetAccessibilityNode = undefined;\n    var count: usize = 0;\n    for (snapshot.nodes) |node| {\n        if (!honkWidgetWithinDialog(snapshot.nodes, node.id, dialog)) continue;\n        nodes[count] = .{"
+      },
+      {
+        "before": "            .action_flags = widgetActionFlags(node.actions),\n        };\n    }\n    if (native_sdk_appkit_update_widget_accessibility(",
+        "after": "            .action_flags = widgetActionFlags(node.actions),\n        };\n        count += 1;\n    }\n    if (native_sdk_appkit_update_widget_accessibility("
+      },
+      {
+        "before": "        nodes[0..snapshot.nodes.len].ptr,\n        snapshot.nodes.len,",
+        "after": "        nodes[0..count].ptr,\n        count,"
+      },
+      {
+        "before": "fn widgetStateFlags(node: platform_mod.WidgetAccessibilityNode) u32 {",
+        "after": "// Follow the real semantic parents with the snapshot's existing bounded capacity.\n// Missing or cyclic ancestry never exposes a background control through a modal.\nfn honkWidgetWithinDialog(nodes: []const platform_mod.WidgetAccessibilityNode, id: u64, dialog: ?u64) bool {\n    const active = dialog orelse return true;\n    var cursor: ?u64 = id;\n    for (0..nodes.len) |_| {\n        const current = cursor orelse return false;\n        if (current == active) return true;\n        cursor = null;\n        for (nodes) |node| {\n            if (node.id == current) {\n                cursor = node.parent_id;\n                break;\n            }\n        }\n    }\n    return false;\n}\n\nfn widgetStateFlags(node: platform_mod.WidgetAccessibilityNode) u32 {"
+      }
+    ]
+  },
+  {
+    "file": "platform/macos/appkit_host.m",
+    "sha256": "df07d1e67688b307752f5ff850108664d76e5c3f44335970d21fa0139f9ec7d5",
+    "edits": [
+      {
+        "before": "- (NSArray *)accessibilityActionNames {\n    if (!self.accessibilityEnabled) return @[];\n    NSMutableArray *actions = [NSMutableArray arrayWithCapacity:3];\n    if ((self.actionFlags & NativeSdkWidgetPressActionFlags) != 0) {\n        [actions addObject:NSAccessibilityPressAction];\n    }\n    if ((self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_INCREMENT) != 0) {\n        [actions addObject:NSAccessibilityIncrementAction];\n    }\n    if ((self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_DECREMENT) != 0) {\n        [actions addObject:NSAccessibilityDecrementAction];\n    }\n    if ((self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_DISMISS) != 0) {\n        [actions addObject:NSAccessibilityCancelAction];\n    }\n    return actions;\n}\n",
+        "after": "// Honk300: a cached native element never keeps authority after its page or modal changes.\n- (BOOL)honkAllowsPublishedActionFlags:(uint32_t)flags {\n    for (NativeSdkWidgetAccessibilityElement *current in self.surfaceView.widgetAccessibilityElements) {\n        if (current.widgetId == self.widgetId) {\n            return current.accessibilityEnabled && (current.actionFlags & flags) != 0;\n        }\n    }\n    return NO;\n}\n\n- (NSArray *)accessibilityActionNames {\n    if (!self.accessibilityEnabled) return @[];\n    NSMutableArray *actions = [NSMutableArray arrayWithCapacity:3];\n    if ([self honkAllowsPublishedActionFlags:NativeSdkWidgetPressActionFlags]) {\n        [actions addObject:NSAccessibilityPressAction];\n    }\n    if ([self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_INCREMENT]) {\n        [actions addObject:NSAccessibilityIncrementAction];\n    }\n    if ([self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_DECREMENT]) {\n        [actions addObject:NSAccessibilityDecrementAction];\n    }\n    if ([self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_DISMISS]) {\n        [actions addObject:NSAccessibilityCancelAction];\n    }\n    return actions;\n}\n"
+      },
+      {
+        "before": "- (BOOL)isAccessibilitySelectorAllowed:(SEL)selector {\n    if (selector == @selector(accessibilityPerformPress)) {\n        return self.accessibilityEnabled && (self.actionFlags & NativeSdkWidgetPressActionFlags) != 0;\n    }\n    if (selector == @selector(accessibilityPerformIncrement)) {\n        return self.accessibilityEnabled && (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_INCREMENT) != 0;\n    }\n    if (selector == @selector(accessibilityPerformDecrement)) {\n        return self.accessibilityEnabled && (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_DECREMENT) != 0;\n    }\n    if (selector == @selector(accessibilityPerformCancel)) {\n        return self.accessibilityEnabled && (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_DISMISS) != 0;\n    }\n    return [super isAccessibilitySelectorAllowed:selector];\n}\n",
+        "after": "- (BOOL)isAccessibilitySelectorAllowed:(SEL)selector {\n    if (selector == @selector(accessibilityPerformPress)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NativeSdkWidgetPressActionFlags];\n    }\n    if (selector == @selector(accessibilityPerformIncrement)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_INCREMENT];\n    }\n    if (selector == @selector(accessibilityPerformDecrement)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_DECREMENT];\n    }\n    if (selector == @selector(accessibilityPerformCancel)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_DISMISS];\n    }\n    if (selector == @selector(setAccessibilityFocused:)) {\n        return [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_FOCUS];\n    }\n    return [super isAccessibilitySelectorAllowed:selector];\n}\n"
+      },
+      {
+        "before": "        return (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_TEXT) != 0;",
+        "after": "        return [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_TEXT];"
+      },
+      {
+        "before": "        return (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_SELECTION) != 0;",
+        "after": "        return [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_SELECTION];"
+      },
+      {
+        "before": "    if (!self.host || self.surfaceLabel.length == 0 || widgetId == 0) return NO;\n    const char *labelBytes = self.surfaceLabel.UTF8String ?: \"\";",
+        "after": "    if (!self.host || self.surfaceLabel.length == 0 || widgetId == 0) return NO;\n    if (action < NATIVE_SDK_APPKIT_WIDGET_ACCESSIBILITY_ACTION_FOCUS ||\n        action > NATIVE_SDK_APPKIT_WIDGET_ACCESSIBILITY_ACTION_DISMISS) return NO;\n    BOOL allowed = NO;\n    // These pinned ABI action values correspond to their action-flag bit positions.\n    uint32_t requiredFlag = 1u << (unsigned int)action;\n    for (NativeSdkWidgetAccessibilityElement *current in self.widgetAccessibilityElements) {\n        if (current.widgetId == widgetId) {\n            allowed = current.accessibilityEnabled && (current.actionFlags & requiredFlag) != 0;\n            break;\n        }\n    }\n    if (!allowed) return NO;\n    const char *labelBytes = self.surfaceLabel.UTF8String ?: \"\";"
+      }
+    ]
   }
 ]

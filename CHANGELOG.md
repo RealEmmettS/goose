@@ -31,6 +31,11 @@ All notable changes to this project are documented here. Format based on
   independent native reader on Intel and Apple Silicon, using exact completed
   source-CI app artifacts and isolated configuration without the SDK harness.
 
+### Fixed
+- Bound Mac settings accessibility to the active dialog and validate cached
+  native actions against current published permissions under ADR 0051; retain
+  both actual native reader checks in the production companion matrix.
+
 ## [1.10.0] - 2026-09-08
 
 ### Added

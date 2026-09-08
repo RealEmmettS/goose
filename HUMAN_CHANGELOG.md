@@ -37,6 +37,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Check what native assistive tools can read and operate in Mac settings,
   including switches, text fields, dialogs and saved changes.
 
+### Fixed
+- Keep assistive navigation inside an open settings dialog and prevent older
+  controls from acting after the page or dialog changes.
+
 ## Fullscreen manners and clearer status — September 2026
 
 ### Added
