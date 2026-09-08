@@ -23,10 +23,11 @@
   - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
 
 ## Active
-- [ ] **Sway desktop integration** - explicit native window support with bounded owned-prop placement and exact-version evidence (needs #rkde) (ms #refine) (owner codex) #rsw
+- [ ] **Sway desktop observations** - explicit native window/fullscreen support with exact-version evidence and honest action limitations (needs #rkde) (ms #refine) (owner codex) #rsw
   - [x] Prove the authenticated native socket, window identity and actual bounded placement premise.
-  - [ ] Resolve authoritative user-drag exclusion before advertising animated delivery.
-  - [ ] Integrate explicit Rust and native settings setup/removal with cancellation and terminal protection.
+  - [x] Resolve the active-drag boundary: keep movement unsupported under ADR 0046.
+  - [ ] Qualify the production read-only Rust transport and untrusted-peer refusal.
+  - [ ] Integrate explicit Rust and native settings setup/removal with disconnect handling and unsupported action checks.
   - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
 - [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) #rkde
   - [x] Prepare guided setup documentation and the distinct release metadata.

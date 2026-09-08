@@ -14,6 +14,7 @@ def main():
     assert os.environ.get('GITHUB_ACTIONS') == 'true', 'Disposable CI only'
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence', type=Path, required=True)
+    parser.add_argument('--bridge', type=Path)
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -121,6 +122,41 @@ def main():
                 assert node['visible'] is True, node
                 assert isinstance(node['id'], int) and node['id'] > 0
             assert ordinary['type'] == 'floating_con', ordinary
+            def rust_snapshot(label):
+                if args.bridge is None:
+                    return None
+                result = subprocess.run([str(args.bridge.resolve())], env=environment,
+                    capture_output=True, text=True, timeout=5)
+                assert result.returncode == 0, result.stderr
+                details = json.loads(result.stdout)
+                assert details['peer_pid'] == compositor.pid and details['peer_uid'] == os.getuid()
+                assert not details['movement'] and not details['pointer_control']
+                assert not details['pointer_observation']
+                (evidence / f'rust-{label}.json').write_text(json.dumps(details, indent=2) + '\n')
+                return details
+
+            rust = rust_snapshot('initial')
+            if rust:
+                observed = next(item for item in rust['windows'] if item['id'] == ordinary['id'])
+                assert observed['pid'] == os.getpid() and observed['app'] == ordinary['app_id']
+                assert observed['geometry'] == [ordinary['rect'][key] for key in ('x', 'y', 'width', 'height')]
+                assert not rust['fullscreen']
+                # An unrelated same-user listener cannot impersonate the
+                # system compositor, even with a private socket and valid UID.
+                fake = runtime / 'fake-sway.sock'
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
+                    listener.bind(str(fake))
+                    listener.listen(1)
+                    listener.settimeout(2)
+                    rejected = subprocess.run([str(args.bridge.resolve())],
+                        env=dict(environment, SWAYSOCK=str(fake)), capture_output=True,
+                        text=True, timeout=5)
+                    assert rejected.returncode != 0
+                    assert 'system-owned compositor executable' in rejected.stderr, rejected.stderr
+                    client, _ = listener.accept()
+                    with client:
+                        assert client.recv(32) == b'', 'Untrusted peer received a query before rejection'
+                fake.unlink()
             # Only this fixture-owned node receives commands. Native criteria bind
             # its numeric id, process id and exact application identity together.
             criteria = f'[con_id={ordinary["id"]} pid={os.getpid()} app_id="^honk300-sway-probe$"]'
@@ -132,6 +168,9 @@ def main():
             windows[0].fullscreen()
             fullscreen = wait(lambda: (node if (node := find(ordinary['name'])) and
                 node['fullscreen_mode'] > 0 else None), 'native fullscreen observation')
+            rust = rust_snapshot('fullscreen')
+            if rust:
+                assert rust['fullscreen']
             windows[0].unfullscreen()
             wait(lambda: find(ordinary['name'])['fullscreen_mode'] == 0, 'fullscreen revocation')
             windows[0].destroy()
@@ -142,7 +181,9 @@ def main():
                 version=version, architecture=os.uname().machine, initial=ordinary,
                 moved=moved, protected=protected, fullscreen=fullscreen,
                 vanished=True, pointer_control_qualified=False,
-                user_drag_observation_qualified=False), indent=2) + '\n')
+                user_drag_observation_qualified=False,
+                production_rust_observation=args.bridge is not None,
+                untrusted_peer_refused=args.bridge is not None), indent=2) + '\n')
         finally:
             for window in windows:
                 window.destroy()

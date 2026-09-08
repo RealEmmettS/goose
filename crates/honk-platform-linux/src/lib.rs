@@ -10,6 +10,9 @@ mod tray;
 #[cfg(any(target_os = "linux", test))]
 pub mod kwin;
 
+#[cfg(any(target_os = "linux", test))]
+pub mod sway;
+
 #[cfg(target_os = "linux")]
 pub mod portal;
 

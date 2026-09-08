@@ -49,6 +49,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ### Behind the scenes
 - Verify Sway's window and desktop operations in an isolated desktop. Keep animated delivery unavailable until it can safely yield when the person takes over a window.
+- Add the foundation for optional Sway window and fullscreen awareness, with bounded desktop requests and checks that they reach the real compositor.
 - Require actual desktop permission, movement, settings and recovery checks before publishing optional KDE support. Keep useful failure evidence and use the desktop's normal services without granting extra computer privileges.
 - Record the completed pointer-permission checks and clarify that removing desktop integration keeps delivered notes while an active picture delivery follows its normal cleanup.
 - Check that pointer motion really stops when the desktop permission service closes during a prank, and keep the observed recovery results available if a later check fails.

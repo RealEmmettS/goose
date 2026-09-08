@@ -26,6 +26,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- Implement the read-only Sway window/fullscreen decoder and bounded native transport for independently qualified 1.9/1.10.1 desktops, requiring private socket ownership and a system-owned compositor peer. ADR 0046 leaves movement and pointer actions unsupported without authoritative user-drag/input evidence.
+
 ### Behind the scenes
 - Qualify the Sway 1.9/1.10.1 native premise on x64/ARM64 Ubuntu and Debian, checking real socket peer identity, window geometry, bounded owned-fixture motion and fullscreen state before runtime implementation. Retain the unresolved active-drag observation boundary before enabling production movement.
 

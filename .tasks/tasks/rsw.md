@@ -1,12 +1,13 @@
-TT;DR: Ship a separately qualified, explicitly enabled Sway adapter.
+TT;DR: Ship separately qualified, explicitly enabled Sway window/fullscreen observations.
 
 ## Why
 The approved refinement requires compositor-specific follow-on integrations after KDE.
 
 ## Scope
-Native window observations, fullscreen awareness and bounded owned-prop placement through
-Sway's own IPC, with explicit setup/removal and independent capability reporting. Pointer
-control requires a separately demonstrated permission and observation path. Preserve current
+Native window observations and fullscreen awareness through Sway's own IPC, with explicit
+setup/removal and independent capability reporting. ADR 0046 keeps production movement
+unsupported because standard Sway IPC supplies no authoritative active-drag state. Pointer
+control also requires a separately demonstrated permission and observation path. Preserve current
 configuration, foreign desktop settings, terminal protection, graceful shutdown and installer
 ownership. KDE evidence does not qualify Sway.
 
@@ -18,8 +19,9 @@ exercise stale identities, user drags, missing outputs, revocation and restart t
 The existing parent #rwl tracks completion of all compositor adapters; #rkde gates publication.
 
 ## Acceptance
-The real goose uses only proven Sway operations after explicit setup, reports unsupported
-operations accurately and cancels work on lost authority. A new immutable public release and
+The real goose uses only proven Sway observations after explicit setup, reports unsupported
+actions accurately and withdraws observations on lost authority. Native owned props retain
+normal compositor placement. A new immutable public release and
 its website guidance follow all project-required candidate/main and public-byte gates.
 
 ## Evidence
@@ -46,10 +48,16 @@ before production movement. Pointer authority remains separately unsupported.
 
 ## Status
 Active. The initial socket/window/fullscreen premise passed all four native lanes.
-The production adapter, live user-drag evidence and pointer authority remain unimplemented.
+The bounded production decoder and read-only socket transport are implemented; local
+platform tests pass. Actual Linux transport, untrusted-peer refusal and subsequent
+runtime/GUI qualification remain required. User drag and pointer authority are unsupported.
 Publication remains ordered after the qualified KDE release.
 
 ## Activity
+- 2026-09-08 — Record ADR 0046 and implement a read-only Rust boundary restricted to
+  qualified versions, private socket peer identity, stable ownership and bounded I/O.
+  Extend the native fixture to exercise that exact decoder/transport and reject a
+  same-user non-compositor listener before it receives any request.
 - 2026-09-08 — Record all four native premise results, including the unresolved user-drag
   observation boundary. Do not promote raw movement support into a production capability.
 - 2026-09-08 — Begin the isolated native socket/window premise with fixed reply bounds,
