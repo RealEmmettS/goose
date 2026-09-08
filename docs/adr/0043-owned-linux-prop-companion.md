@@ -63,6 +63,9 @@ same runtime response; they do not infer runtime state from the caller's environ
 It never enables an integration or authorizes a window/pointer operation. An X11
 overlay in an environment reporting a Wayland session is labeled accordingly; this
 does not claim a native Wayland connection. Unknown values are not echoed into UI.
+On a pure Wayland desktop, a launch without the existing command/config opt-in returns
+an actionable explanation before creating an overlay or prop child. Merely finding a
+Wayland socket no longer silently selects reduced native mode.
 Full-screen/DND observations remain explicitly unsupported until a qualified observer
 supplies them; a saved manners toggle is not evidence of desktop observation.
 

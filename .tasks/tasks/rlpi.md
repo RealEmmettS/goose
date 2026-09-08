@@ -30,5 +30,6 @@ Shared runtime session/placement reporting is implemented and undergoing local/n
 real prop delivery and labwc gates remain open. Publication still follows #rr1 and #lpr.
 
 ## Activity
+- 2026-09-07: Session inspection found a pure Wayland socket could silently select native mode despite the documented opt-in. Enforce the existing command/config choice before native initialization and add a real labwc refusal/readback probe.
 - 2026-09-07: Added an optional finite SESSION response without changing existing STATUS bytes. CLI, TUI and the Rust GUI service show live runtime details; untrusted desktop names are reduced to known labels and cannot enable capabilities. Native readback and packaging remain pending.
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).

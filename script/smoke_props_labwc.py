@@ -51,6 +51,9 @@ def main():
                 subprocess.run(['python3', 'script/smoke_owned_props_linux.py', '--binary', str(directory / 'honk300-settings'),
                                 '--evidence', str(evidence / f'native-scale-{scale}')], env=environment, check=True, timeout=240)
             subprocess.run(['wlr-randr', '--output', output, '--scale', '1'], env=environment, check=True)
+            denied = subprocess.run([str(directory / 'honk300'), 'start'], env=environment, capture_output=True, text=True, timeout=15)
+            assert denied.returncode != 0 and 'Start with --wayland' in denied.stderr, denied
+            (evidence / 'opt-in-required.txt').write_text(denied.stderr)
             subprocess.run(['python3', 'script/smoke_runtime_props_linux.py', '--binary', str(directory / 'honk300'),
                             '--evidence', str(evidence / 'engine')], env=environment, check=True, timeout=300)
             (evidence / 'result.json').write_text(json.dumps({'ok': True, 'scales': [1, 2],

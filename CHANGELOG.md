@@ -27,6 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Fixed
+- Honor the documented native Wayland opt-in on desktops without X11: a bare launch explains the existing command/config choice before creating an overlay or companion.
 - Give the native Linux prop close button the visible label Close; GTK's deferred child label had replaced the separate accessibility label with the multiplication symbol.
 - Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.
 

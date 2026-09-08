@@ -29,6 +29,9 @@ pub fn run(
     println!("honk300: loaded {}", assets.summary());
 
     let session = SessionInfo::detect(options.cli_overrides.wayland || config.platform.wayland);
+    if session.display_server == DisplayServer::Wayland && !session.forced_wayland {
+        return Err("No X11 display is available. Start with --wayland or enable Use native Wayland in settings to opt into reduced native Wayland mode.".into());
+    }
     let mut overlay = Overlay::new(session.display_server)?;
     let mut status_tray = match StatusTray::new() {
         Ok(tray) => Some(tray),
