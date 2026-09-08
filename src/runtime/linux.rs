@@ -126,6 +126,12 @@ pub fn run(
     const AUDIO_RETRY_INTERVAL: f64 = 5.0;
     let mut next_audio_probe = 0.0;
     let mut warned_cursor = false;
+    // Opt-in, bounded state evidence for the isolated native CI fixture. No
+    // window titles, user content, or foreign application identities are logged.
+    let trace_collection = std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true")
+        && std::env::var("HONK300_TRACE_COLLECTION").as_deref() == Ok("1");
+    let mut next_collection_trace = 0.0;
+    let mut collection_trace_count = 0;
 
     println!("honk300: Linux goose control is live. Use `honk300 stop` to send it home.");
 
@@ -417,15 +423,24 @@ pub fn run(
                 .and_then(|frame| kwin.dragged(frame))
                 .or_else(|| overlay.foreign_window_drag()),
         );
-        world.set_collect_window_snapshot(
-            props
-                .as_mut()
-                .and_then(|controller| controller.snapshot(kwin_frame.as_ref())),
-        );
+        let collect_snapshot = props
+            .as_mut()
+            .and_then(|controller| controller.snapshot(kwin_frame.as_ref()));
+        world.set_collect_window_snapshot(collect_snapshot);
         let _ = overlay.set_input_region(Some(world.rig().bounding_box()));
 
         let now = frame.now();
+        let task_before_tick = world.current_task();
         core.tick(&mut world, frame);
+        if trace_collection && now >= next_collection_trace && collection_trace_count < 600 {
+            next_collection_trace = now + 0.1;
+            collection_trace_count += 1;
+            eprintln!(
+                "honk300 collection trace: time={now:.3} task={task_before_tick}->{} position={:?} target={:?} beak={:?} snapshot={collect_snapshot:?} kwin_sequence={:?}",
+                world.current_task(), world.goose.position, world.goose.target_pos,
+                world.goose.rig.beak_tip, kwin_frame.as_ref().map(|frame| frame.sequence)
+            );
+        }
 
         let collect_display = world
             .layout()

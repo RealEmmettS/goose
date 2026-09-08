@@ -11,7 +11,11 @@ Authoritative sources: approved September 7 implementation plan, docs/adr/0041-r
 Preserve saved user settings/media, verified installer ownership, immutable releases, terminal protection, and graceful stop. Native hardware beyond this Windows PC is unavailable; hosted proof is identified separately.
 
 ## Plan
-Implement the linked board subtasks; retain later release stages as separate tasks. At each failed check record the exact failure and fix or leave the gate open.
+The independently scoped implementation and publication tasks are #rsw (Sway), #rhy
+(Hyprland) and #rgn (GNOME). Each starts from its real native desktop premise, then
+connects Rust and native settings, and earns its own complete release evidence. The
+historical #wlg prototype scope is covered by these tasks; do not run a duplicate effort.
+At each failed check record the exact failure and fix or leave the gate open.
 
 ## Impact
 Separate GNOME, Sway, Hyprland implementations and exact supported-desktop evidence. Never borrow KDE claims.
@@ -28,4 +32,5 @@ The requested behavior runs through its production path and the supporting evide
 Queued; not implemented or qualified.
 
 ## Activity
+- 2026-09-08 — Add individual adapter tasks, native premise checks, version boundaries and publication gates after current upstream review; all implementations remain queued behind the KDE stage.
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).

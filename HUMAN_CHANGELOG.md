@@ -50,6 +50,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Require actual desktop permission, movement, settings and recovery checks before publishing optional KDE support. Keep useful failure evidence and use the desktop's normal services without granting extra computer privileges.
 - Check that pointer motion really stops when the desktop permission service closes during a prank, and keep the observed recovery results available if a later check fails.
 - Avoid duplicate desktop builds while retaining the required release checks.
+- Keep limited delivery diagnostics in the isolated desktop tests so an interrupted delivery can be investigated without recording window titles or note contents.
+- Track each additional desktop integration separately so its setup, behavior and release are tested on that desktop before support is advertised.
+- Wait for the restart check to finish writing its result before reading it, so a correctly restarted goose does not produce a false failure.
 - Wait until settings reports a completed save before checking its file, so the test itself cannot block saving.
 
 ### Behind the scenes

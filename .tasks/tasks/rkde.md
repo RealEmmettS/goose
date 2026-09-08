@@ -33,5 +33,6 @@ correction. Publication remains gated on the unchanged desktop tests, all existi
 platform/package lanes and same-source candidate/main qualification.
 
 ## Activity
+- 2026-09-08: Publication-record main run 34209990490 exposes an ARM64 restart-fixture race: the output file exists before its line is written, giving zero fields. Keep the actual restart and exact PID/session/start-argument assertions; wait for the complete line within the existing deadline before readback. Carry the correction into final-source qualification.
 - 2026-09-08: Prepare the next distinct release and make exact-commit native KDE qualification a required candidate/publication dependency. Track the integrated accessibility failure without weakening the actual consent or movement checks.
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).

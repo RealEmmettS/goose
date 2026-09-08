@@ -10,6 +10,21 @@
   - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
   - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
+  - [ ] Complete the separately qualified Sway implementation (needs #rsw).
+  - [ ] Complete the separately qualified Hyprland implementation (needs #rhy).
+  - [ ] Complete the versioned GNOME companion and its desktop qualification (needs #rgn).
+- [ ] **Sway desktop integration** - explicit native window support with bounded owned-prop placement and exact-version evidence (needs #rkde) (ms #refine) (owner codex) #rsw
+  - [ ] Prove the authenticated native socket, window identity and actual bounded placement premise.
+  - [ ] Integrate explicit Rust and native settings setup/removal with cancellation and terminal protection.
+  - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
+- [ ] **Hyprland desktop integration** - separately probe supported native IPC operations and preserve per-operation capability claims (needs #rkde) (ms #refine) (owner codex) #rhy
+  - [ ] Prove native socket ownership, exact window identity and supported bounded placement.
+  - [ ] Integrate explicit setup/removal and exercise disconnect, stale identity and terminal refusals.
+  - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
+- [ ] **GNOME desktop companion** - versioned explicit Shell integration with proven observation, placement and a compatible overlay path (needs #rkde) (ms #refine) (owner codex) #rgn
+  - [ ] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
+  - [ ] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
+  - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
 
 ## Active
 - [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) #rkde

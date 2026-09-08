@@ -645,10 +645,16 @@ mod tests {
 
         launch_authoritative_app(&launcher).unwrap();
         let deadline = Instant::now() + Duration::from_secs(2);
-        while !output.is_file() && Instant::now() < deadline {
+        let fields = loop {
+            match std::fs::read_to_string(&output) {
+                Ok(value) if value.ends_with('\n') => break value,
+                Ok(_) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => panic!("restart probe read failed: {error}"),
+            }
+            assert!(Instant::now() < deadline, "restart probe did not complete");
             std::thread::sleep(Duration::from_millis(10));
-        }
-        let fields = std::fs::read_to_string(output).unwrap();
+        };
         let fields = fields.split_whitespace().collect::<Vec<_>>();
         assert_eq!(fields.len(), 3);
         assert_eq!(

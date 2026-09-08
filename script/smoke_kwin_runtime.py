@@ -64,7 +64,8 @@ preserve = "untouched"
         logs.append(path)
         with path.open('w') as log:
             process = subprocess.Popen([str(binary), 'start', '--config', str(config), '--wayland'],
-                                       stdout=log, stderr=log)
+                                       stdout=log, stderr=log,
+                                       env=dict(os.environ, HONK300_TRACE_COLLECTION='1'))
 
     def kill():
         nonlocal process
@@ -195,6 +196,8 @@ preserve = "untouched"
             graceful_cleanup=True, stopped_removal=True, unrelated_state_preserved=True,
             actual_owned_prop_movement=True, revocation_preserves_note_and_stops_motion=True), indent=2) + '\n')
     finally:
+        if process is not None and process.poll() is None:
+            (directory / 'final-status.json').write_text(json.dumps(status(), indent=2) + '\n')
         if observer:
             observer.close()
         if process is not None and process.poll() is None:

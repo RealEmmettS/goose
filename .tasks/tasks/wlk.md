@@ -35,14 +35,18 @@ this task owns the native implementation evidence and #rkde owns publication.
 - [x] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
-The actual runtime, owned-note movement and revocation, native KDE setup/removal,
-terminal boundaries and crash recovery pass on KDE 5/6 x64/ARM64 in 34203908233 and
-again in 34205879636. No expiry or movement oracle changed. The latter run isolates
-its remaining failures to the new pointer settings control being outside the viewport;
-#wlp owns that integrated pointer check. The shared accessibility correction and
-complete versioned packages must still pass final-source qualification under #rkde.
+The earlier native runtime gates pass in 34203908233 and 34205879636. Final-source
+repetition remains open: 34210973568 passes KDE 5 x64 and the complete KDE 6 ARM64
+pointer lifecycle, but KDE 5 ARM64 stops its note after approximately three pixels
+of motion with continuous compositor observations and no later topology change.
+Bounded CI collection-state diagnostics now distinguish an engine release from
+movement refusal without changing the native movement or freshness assertions.
+The complete versioned packages remain held under #rkde.
 
 ## Activity
+- 2026-09-08: Preserve the remaining native ARM note failure and add opt-in, bounded
+  CI engine/snapshot evidence without logging window titles or user content. The
+  preceding unchanged-topology fix did not resolve every instance of this failure.
 - 2026-09-08: The continuous observer now survives on all four desktops. Run 34209445052 passes three owned-note lanes, but KDE 5 x64 stops after about three pixels. Backend inspection found unchanged layer configure/scale events still reported as topology changes, which cancel active delivery. Report topology only when the effective surface state changes and retain an explicit cancellation diagnostic; repeat the unchanged movement oracle before qualifying this correction.
 - 2026-09-08: Run 34208034861 retains native settings passes but three note movement checks fail with the independent observer ending after about five seconds. Keep observer and production timer objects rooted until script unload, and require a continued-observation soak before the unchanged native movement and revocation assertions.
 - 2026-09-08: The optimized native gate passes three full runtime lanes. Both KDE 6 portal grant/movement/cancel checks now pass independently; the remaining ARM note-motion failure gets first-loss/refusal diagnostics and timestamped compositor observations before the next correction.
