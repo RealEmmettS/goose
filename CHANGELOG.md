@@ -24,29 +24,21 @@ All notable changes to this project are documented here. Format based on
 > release packaging with artifact evidence. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
-## [Unreleased]
+## [1.9.0] - 2026-09-08
 
 ### Added
-- Add an explicitly installed, versioned GNOME Shell companion for native window, fullscreen and user-drag observations. Keep the compatible XWayland overlay, independent owned-prop positioning and honest unsupported native pointer/movement/DND capabilities.
-- Add Rust CLI, versioned IPC and Native SDK setup/removal controls with private recoverable consent, exact executable ownership, retained drafts, comments and unknown configuration.
+- Add explicit GNOME Shell companion setup and removal through Rust CLI and Native SDK settings, with qualified GNOME 46.0/48.7 window, fullscreen and actual user-drag observations on native x64/ARM64. Preserve the compatible XWayland overlay and independent owned-prop positioning; foreign movement, pointer access and DND remain unsupported.
 
 ### Fixed
-- Omit destroyed and zero-area Mutter surfaces from GNOME observations during creation and remapping, retaining strict Rust validation for every reported target.
-- Gate GNOME settings actions on their own capability instead of the unrelated Hyprland flag; exercise the actual update handlers with opposite compositor support values.
+- Omit destroyed and zero-area Mutter actors during mapping transitions while retaining strict validation for every reported target. Cancel held rides on configuration changes, target destruction and extension loss.
+- Gate GNOME settings actions on their own capability and keep wrapped content clear of the native scrollbar.
 
 ### Security
-- Authenticate the pinned system Shell and approved runtime executable before returning bounded observations. Apply one total deadline through bus authentication and each complete snapshot; discard stale or revoked data and require explicit reconnection after terminal failure. Keep rejected credential lookups separate from authenticated delivery.
+- Authenticate the pinned system Shell and approved runtime executable, bound complete connection and snapshot operations, preserve exact owned files and recoverable consent, and withdraw stale or revoked observations until explicit reconnection.
 
 ### Behind the scenes
-- Prepare distinct GNOME release identities and make all four native GNOME desktops required same-source candidate/publication dependencies. Acknowledge native pointer/modifier delivery before private test grabs.
-- Distinguish invalid GNOME identity, empty geometry, coordinate bounds and inconsistent grabs without logging private window content, to diagnose native mapping transitions while retaining every rejection.
-- Close the Sway website handoff against deployed version/capability guidance, all mapped downloads and matching public manifest hashes, preserving the user's restored artwork.
-- Start native drag fixtures only after compositor geometry and GTK allocation settle, including fullscreen restoration. Parse only complete trace records while retaining malformed complete records as failures.
-- Use the same retained-worker ownership query across GNOME and Hyprland, removing the duplicate introduced while integrating their independently developed adapters.
-- Exercise configuration changes, target destruction and extension loss during actual held GNOME rides. Check completed runtime joins separately from asynchronous native companion removal, and retain cleanup even when a diagnostic accessibility node disappears.
-- Qualify owned GNOME XWayland props through actual native geometry, rendered text, uncropped image corners, capacity, user/program close, child failure and restart. Capture final Shell composition through its separate private outer display while enforcing bounds against the real inner desktop dimensions.
-- Qualify the actual production runtime and graphical settings on isolated GNOME Shell desktops on both native architectures, including user-held window rides, terminal exclusions, fullscreen manners, live changes, revocation and restart. Arrange exact private test windows without adding production focus authority, and retain normal authenticated XWayland access.
-- Test actual GNOME connection cancellation against a silent authentication peer, complete bounded private-file reads and preservation of unrelated extensions. Install byte-identical fixture executables with real managed ownership; omit private consent from uploaded diagnostics.
+- Require the real GNOME runtime, native settings and owned-prop scenarios as same-source release gates, including unapproved callers, actual held input, terminal protection, saved drafts, native note text, uncropped images, helper failures and restart. Preserve private display authentication and omit private consent from evidence.
+- Record separately qualified desktop and publication evidence, including the verified Sway website handoff with the user's selected artwork.
 
 ## [1.8.0] - 2026-09-08
 

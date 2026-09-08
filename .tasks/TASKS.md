@@ -19,6 +19,7 @@
   - [x] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
   - [x] Prove live user-drag observation and automatic movement refusal through actual desktop input.
   - [x] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
+  - [x] Pass complete runtime, native settings, held-ride cancellation and owned-prop scenarios on both Shell versions and native architectures.
   - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
 - [ ] **Hyprland desktop integration** - separately probe supported native IPC operations and preserve per-operation capability claims (needs #rkde) (ms #refine) (owner codex) #rhy
   - [x] Prove native socket ownership, exact window identity and supported bounded placement.

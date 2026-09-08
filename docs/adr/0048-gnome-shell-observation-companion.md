@@ -1,6 +1,6 @@
 # ADR 0048: versioned GNOME Shell observations and compatible overlay
 
-Status: accepted for implementation; production desktop qualification pending.
+Status: accepted; production desktop qualification passed, publication pending.
 
 The approved refinement requires separate GNOME evidence. Native run
 [34226098889](https://github.com/RealEmmettS/goose/actions/runs/34226098889)
@@ -51,3 +51,12 @@ identity, owned props and independent settings lifetime. Native x64/ARM64 eviden
 for both exact Shell versions, visual review, all release architectures/packages,
 same-source candidate/main gates and fresh immutable public bytes remain required
 before advertising the integration.
+
+Run [34243427852](https://github.com/RealEmmettS/goose/actions/runs/34243427852)
+passes the complete production lifecycle and owned-prop scenarios on both Shell
+versions and native architectures. Native settings, visible geese, painted note
+text and uncropped images were inspected. Empty actors during creation/remapping
+are omitted by the provider; every reported target still undergoes strict Rust
+validation. Real held-input tests prove cancellation on configuration change,
+target destruction and extension loss. Full distribution and publication remain
+separate gates in the release readiness record.

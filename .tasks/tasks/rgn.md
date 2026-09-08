@@ -28,19 +28,23 @@ Authoritative sources: https://gjs.guide/extensions/development/creating.html,
 https://gjs.guide/extensions/development/debugging.html and
 https://gnome.pages.gitlab.gnome.org/mutter/meta/class.Window.html.
 The current guidance distinguishes the newer devkit launcher from earlier nested shells.
-Exact supported versions and the product's native behavior remain unverified.
+Native run 34243427852 qualifies GNOME 46.0 and 48.7 on x64 and ARM64 with the
+actual runtime, graphical settings, interrupted rides and owned props. All four
+sets of native settings, goose, painted note and complete-image captures were inspected.
 
 ## Verification
-- [ ] Real supported Shell versions and x64/ARM64 desktops pass overlay and companion scenarios.
-- [ ] Rust and native settings preserve explicit authority, drafts, terminal exclusions and recovery.
+- [x] Real supported Shell versions and x64/ARM64 desktops pass overlay and companion scenarios.
+- [x] Rust and native settings preserve explicit authority, drafts, terminal exclusions and recovery.
 - [ ] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
 Active. Production companion, authenticated Rust worker, compatible XWayland capability
 boundary, recoverable consent and native settings are implemented under ADR 0048.
-Run the actual integrated desktop fixture before any supported capability or publication claim.
+All four integrated desktop fixtures pass. Final-source architecture/settings,
+complete candidate/main/publication, fresh-public and website gates remain open.
 
 ## Activity
+- 2026-09-08 — Complete all four native suites in run 34243427852; inspect all native settings/goose, delivered-note and complete-image captures. Prepare the distinct release candidate and leave space between wrapped settings content and the native scrollbar.
 - 2026-09-08 — Diagnostic run 34242057898 confirms nonpositive native dimensions during remapping on older ARM and transient creation on newer ARM. Omit empty/destroyed actors in the provider and keep strict parser rejection. The older x64 desktop passes the entire runtime/settings/owned-prop suite. Newer private input failures have no held native grab; acknowledge Shell pointer/modifier/button state before moving, and give protected captures their own label.
 - 2026-09-08 — Inspect runtime evidence from 34240205186: observations terminate with the combined invalid-window error after remapping on older ARM and creating a transient window on newer x64. Split the static error reasons without logging window content or relaxing validation before deciding whether the native provider mishandles an unmapped surface.
 - 2026-09-08 — Native interruption run 34239360128 exposes fixture races: both older desktops click using geometry still restoring from fullscreen; newer x64 rejects a newly mapped transient target as stale; newer ARM reads an unfinished trace line. Wait for both real compositor geometry and GTK allocation to settle before exact focus/input, and parse only newline-complete records. Preserve malformed complete records as failures and retain native grab screenshots on failure.

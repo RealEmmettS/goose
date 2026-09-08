@@ -14,7 +14,7 @@
     </row>
     <text size="lg"><span weight="bold">{heading}</span></text>
     <scroll grow="1" key="settings-scroll">
-      <column gap="12">
+      <column gap="12" padding="8">
         <if test="{isGeneral}">
           <row gap="8"><button disabled="{not canEdit}" on-press="start">Start goose</button><button disabled="{not canEdit}" on-press="stop">Stop goose</button></row>
         </if>

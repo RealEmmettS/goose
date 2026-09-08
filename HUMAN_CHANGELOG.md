@@ -31,27 +31,21 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ---
 
-## GNOME desktop observations — In development
+## GNOME desktop observations — September 2026
 
 ### Added
 - Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
 
-### Security
-- Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost and keep setup responsive when a connection stops answering.
-
 ### Fixed
-- Keep GNOME observations working while an app creates or remaps a window, and stop following windows that have gone away.
-- Keep GNOME setup available according to its own desktop support, independently of Hyprland.
+- Keep GNOME observations working while an app creates or remaps a window. End a window ride when you turn it off, close its window or remove desktop access.
+- Keep GNOME setup available according to its own desktop support, and prevent the scrollbar from covering the end of a settings description.
+
+### Security
+- Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost, keep setup responsive when a connection stops answering, and preserve unrelated desktop settings.
 
 ### Behind the scenes
-- Require GNOME's own desktop checks before publishing its support, including properly delivered private test input.
-- Make desktop connection failures easier to diagnose without recording window contents or relaxing the safety checks.
-- Keep the Sway website instructions and downloads aligned with the verified release while preserving the artwork you chose.
-- Let private windows finish resizing before testing a drag, and wait for a complete observation record before reading it.
-- Share the connection-worker checks across optional desktop integrations so they follow the same shutdown rules.
-- Check that a window ride ends when you turn it off, close its window or remove desktop access, and that removing access finishes even while settings is still updating its display.
-- Check that GNOME notes and pictures are readable, complete and correctly placed, including closing them and recovering after their helper unexpectedly exits.
-- Check the real GNOME desktop, goose and settings together, including private test-window drags, lost access, restarts and unexpected failures. Preserve unrelated desktop settings and keep private test permissions out of the evidence files.
+- Check the real GNOME desktop, goose and settings together before publishing, including readable notes, complete pictures, lost access, restarts and unexpected failures. Keep private test permissions out of the evidence files.
+- Keep each desktop's support claims tied to its own checks, and keep website instructions and downloads aligned with the verified release while preserving the artwork you chose.
 
 ## Hyprland desktop observations — September 2026
 
