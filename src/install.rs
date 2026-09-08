@@ -3,7 +3,7 @@ mod media;
 mod provenance;
 #[cfg(windows)]
 pub use autostart::run_windows_config_autostart_protocol;
-#[cfg(any(test, windows, target_os = "linux"))]
+#[cfg(any(test, windows))]
 use autostart::*;
 pub use autostart::{prepare_config_autostart, reconcile_config_autostart};
 use media::*;

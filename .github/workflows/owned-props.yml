@@ -30,7 +30,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y build-essential pkg-config libgtk-4-dev \
             libasound2-dev xvfb xauth dbus-x11 xz-utils python3-gi gir1.2-atspi-2.0 \
-            at-spi2-core xdotool libglib2.0-bin openbox imagemagick python3-pil
+            at-spi2-core xdotool libglib2.0-bin openbox imagemagick python3-pil labwc wlr-randr grim
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -57,8 +57,11 @@ jobs:
             manager=$!
             trap "kill $manager 2>/dev/null || true" EXIT
             GDK_BACKEND=x11 python3 script/smoke_owned_props_linux.py --binary target/props-probe/honk300-settings --evidence target/props-evidence
+            GDK_BACKEND=x11 GDK_SCALE=2 python3 script/smoke_owned_props_linux.py --binary target/props-probe/honk300-settings --evidence target/props-evidence-scale-2
             GDK_BACKEND=x11 python3 script/smoke_runtime_props_linux.py --binary target/props-probe/honk300 --evidence target/runtime-props-evidence
           '
+      - name: Exercise real labwc placement and scaled native Wayland windows
+        run: dbus-run-session -- python3 script/smoke_props_labwc.py --directory target/props-probe --evidence target/props-labwc
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}
         with:
@@ -66,5 +69,7 @@ jobs:
           path: |
             target/props-evidence
             target/runtime-props-evidence
+            target/props-evidence-scale-2
+            target/props-labwc
             target/props-probe/settings-build.json
           if-no-files-found: warn

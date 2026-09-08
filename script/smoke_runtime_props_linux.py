@@ -11,8 +11,9 @@ import time
 
 
 def main():
-    if os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('GDK_BACKEND') != 'x11':
-        raise RuntimeError('This probe requires the disposable GitHub X11 desktop')
+    if os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('GDK_BACKEND') not in ('x11', 'wayland'):
+        raise RuntimeError('This probe requires the disposable GitHub desktop')
+    positioning = os.environ['GDK_BACKEND'] == 'x11'
     import gi
     gi.require_version('Atspi', '2.0')
     from gi.repository import Atspi, GLib
@@ -66,6 +67,10 @@ def main():
         return None
 
     def owned_windows(pid):
+        if not Path(f'/proc/{pid}').exists():
+            return []
+        if not positioning:
+            return [node for node in nodes(pid) if node.get_role() == Atspi.Role.FRAME]
         result = subprocess.run(['xdotool', 'search', '--onlyvisible', '--pid', str(pid), '--name', '^Honk300 (note|picture)$'], capture_output=True, text=True)
         return result.stdout.splitlines() if result.returncode == 0 else []
 
@@ -91,7 +96,8 @@ autumn = false
             directory = evidence / f'cycle-{cycle}'
             directory.mkdir()
             with (directory / 'runtime.log').open('w') as log:
-                runtime = subprocess.Popen([str(binary), 'start', '--config', str(config)], stdout=log, stderr=log)
+                runtime = subprocess.Popen([str(binary), 'start', '--config', str(config),
+                                            *([] if positioning else ['--wayland'])], stdout=log, stderr=log)
                 host_pid = None
                 try:
                     wait(lambda: 'collect: supported' in control('status', check=False).stdout, 'real prop readiness')
@@ -103,9 +109,13 @@ autumn = false
                     control('do', 'note')
                     value = wait(lambda: delivered_text(host_pid), 'engine delivery and native note text', 100)
                     (directory / 'note.txt').write_text(value)
-                    subprocess.run(['import', '-window', 'root', str(directory / 'delivered-note.png')], check=True)
+                    capture_prefix = ['import', '-window', 'root'] if positioning else ['grim']
+                    subprocess.run([*capture_prefix, str(directory / 'delivered-note.png')], check=True)
                     assert owned_windows(host_pid), 'Delivered note has no native window'
                     assert 'collect: supported' in control('status').stdout
+                    if not positioning:
+                        status = control('status').stdout
+                        assert 'cursor: unsupported' in status and 'window: unsupported' in status, status
                     if cycle == 0:
                         # Simulate the actual owned child disappearing, using a
                         # descriptor and fresh command identity to avoid PID reuse.

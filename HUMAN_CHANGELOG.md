@@ -54,6 +54,7 @@ Save remains available to accessibility tools after changing settings, including
 Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
 
 ### Behind the scenes
+- Linux desktop checks now include display scaling and ordinary Wayland window placement. They also check code paths that a Windows build cannot exercise.
 - Linux delivery checks now follow a real note from the goose into its window and test recovery when the supporting process disappears. Picture checks wait until the complete image is visible.
 - Keep picture memory valid while closing, allow dragging a note by its header, and capture the native controls when close checks fail.
 - Test closing a Linux note through its real Close button and retain better diagnostics for unexpected exits.
