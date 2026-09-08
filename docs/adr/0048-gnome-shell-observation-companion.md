@@ -44,6 +44,18 @@ Credential lookup allows at most four concurrent requests. A busy response from
 the same pinned Shell withdraws any old frame and may retry a bounded snapshot;
 an unapproved caller cannot terminate the real worker merely by using a lookup slot.
 
+Consent monitoring is part of that authenticated worker exchange. The rendering
+thread performs no periodic user-data file reads. Shell reads private metadata
+and bounded file contents through [asynchronous GIO operations](https://gjs.guide/guides/gio/file-operations.html),
+checks the opened stream's identity and cancels the complete request after 200 ms
+or extension removal. Admission is bounded before any file work. A distinct
+authenticated revocation reply retires and joins the retained Rust worker;
+other unavailable replies remain failed until explicit reconnection. No cancelled
+or obsolete generation may publish a snapshot. Discard destroyed or empty native
+actors before counting the 64 reportable windows, and reject the next live entry
+without building an oversized report. GNOME Wayland always supplies an absent
+pointer to the engine until an independent native pointer path is qualified.
+
 The production desktop fixture must exercise the actual companion, Rust runtime,
 native settings controls, ordinary and terminal user drags, fullscreen manners,
 wrong-executable refusal, live revocation, extension disable and recovery, worker

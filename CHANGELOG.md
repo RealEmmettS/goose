@@ -30,6 +30,8 @@ All notable changes to this project are documented here. Format based on
 - Add explicit GNOME Shell companion setup and removal through Rust CLI and Native SDK settings, with qualified GNOME 46.0/48.7 window, fullscreen and actual user-drag observations on native x64/ARM64. Preserve the compatible XWayland overlay and independent owned-prop positioning; foreign movement, pointer access and DND remain unsupported.
 
 ### Fixed
+- Include both embedded GNOME files in Cargo source selection, omit blind XWayland pointer input on GNOME Wayland and enforce the window bound only on reportable native actors.
+- Consume authenticated consent revocation from the retained observation worker instead of reading user-data files on every runtime poll. Use bounded cancellable asynchronous GIO reads in Shell, retain opened-file identity checks and cancel pending requests on removal.
 - Omit destroyed and zero-area Mutter actors during mapping transitions while retaining strict validation for every reported target. Cancel held rides on configuration changes, target destruction and extension loss.
 - Gate GNOME settings actions on their own capability and keep wrapped content clear of the native scrollbar.
 

@@ -21,6 +21,7 @@ pub trait Source: Send + Sized + 'static {
 struct State<F> {
     frame: Option<(Instant, F)>,
     failed: bool,
+    revoked: bool,
 }
 
 /// No native I/O runs in the presentation loop. A source may retry a late
@@ -42,6 +43,7 @@ impl<S: Source> Observer<S> {
         let state = Arc::new(Mutex::new(State {
             frame: None,
             failed: false,
+            revoked: false,
         }));
         let stop = Arc::new(AtomicBool::new(false));
         let shared = Arc::clone(&state);
@@ -66,10 +68,12 @@ impl<S: Source> Observer<S> {
                                 // renews information that was already too old.
                                 state.frame = Some((started, frame));
                                 state.failed = false;
+                                state.revoked = false;
                             }
                             Err(error) => {
                                 state.frame = None;
                                 state.failed = true;
+                                state.revoked = error.kind() == io::ErrorKind::PermissionDenied;
                                 if !S::retryable(&error) {
                                     return Err(error);
                                 }
@@ -89,6 +93,8 @@ impl<S: Source> Observer<S> {
                 if let Ok(mut state) = shared.lock() {
                     state.frame = None;
                     state.failed = result.is_err();
+                    state.revoked =
+                        result.is_err_and(|error| error.kind() == io::ErrorKind::PermissionDenied);
                 }
             })?;
         Ok(Self {
@@ -111,6 +117,9 @@ impl<S: Source> Observer<S> {
     }
     pub fn failed(&self) -> bool {
         self.state.lock().map_or(true, |state| state.failed)
+    }
+    pub fn revoked(&self) -> bool {
+        self.state.lock().is_ok_and(|state| state.revoked)
     }
     /// A recovering or connecting worker still owns its authenticated source.
     /// Snapshot freshness determines capability, not permission to replace it.
@@ -164,6 +173,7 @@ mod tests {
             state: Arc::new(Mutex::new(State {
                 frame: Some((Instant::now(), ())),
                 failed: false,
+                revoked: false,
             })),
             stop: Arc::new(AtomicBool::new(false)),
             worker: None,
@@ -238,6 +248,7 @@ mod tests {
         answers.send(Err(io::ErrorKind::TimedOut.into())).unwrap();
         eventually(|| observer.failed() && observer.snapshot().is_none());
         calls.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(!observer.revoked());
         assert!(observer.snapshot().is_none());
         answers.send(Ok(8)).unwrap();
         eventually(|| !observer.failed() && observer.snapshot() == Some(8));
@@ -246,6 +257,7 @@ mod tests {
             .send(Err(io::ErrorKind::PermissionDenied.into()))
             .unwrap();
         eventually(|| observer.failed() && observer.snapshot().is_none());
+        assert!(observer.revoked());
         assert!(matches!(
             calls.recv_timeout(Duration::from_secs(2)),
             Err(mpsc::RecvTimeoutError::Disconnected)

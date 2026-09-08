@@ -542,7 +542,13 @@ pub fn run(
                 );
             }
         }
-        let mut pointer = overlay.pointer_state();
+        // XWayland cannot observe the global pointer on GNOME Wayland. Do not
+        // feed its partial/stale X11 sample into hover, pat or click reactions.
+        let mut pointer = if gnome_wayland {
+            honk_engine::Pointer::default()
+        } else {
+            overlay.pointer_state()
+        };
         if let Some(frame) = &kwin_frame {
             let pos = honk_engine::Vec2::new(frame.pointer[0] as f32, frame.pointer[1] as f32);
             // KWin supplies position only. Retain a native button observation only
@@ -589,6 +595,8 @@ pub fn run(
                     "drag_pid": native_drag.and_then(|window| window.pid),
                     "task": world.current_task(),
                     "position": [world.goose.position.x, world.goose.position.y],
+                    "pointer_present": pointer.present,
+                    "pointer_left_down": pointer.left_down,
                     "anchor": gnome_drag.map(|window| [window.ride_anchor.x, window.ride_anchor.y]),
                 })
             );
