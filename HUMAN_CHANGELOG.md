@@ -53,6 +53,7 @@ Save remains available to accessibility tools after changing settings, including
 Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
 
 ### Behind the scenes
+- Automatically check changes to the new Linux prop host on both processor types during development.
 - Build the Linux note and picture host and checks for text, image fit, closing windows and cleaning up when the goose stops.
 - Prepare Linux deliveries to use the desktop's normal placement when animated window dragging is unavailable.
 

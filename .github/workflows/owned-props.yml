@@ -2,6 +2,9 @@ name: Owned Linux props
 
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/goose-linux-expansion]
+    paths: ['settings/**', 'script/smoke_owned_props_linux.py', '.github/workflows/owned-props.yml']
 
 permissions:
   contents: read
