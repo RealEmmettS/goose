@@ -44,6 +44,10 @@ movement refusal without changing the native movement or freshness assertions.
 The complete versioned packages remain held under #rkde.
 
 ## Activity
+- 2026-09-08: The diagnostic run passes both KDE 5 architectures and KDE 6 ARM64
+  without a production correction for the intermittent short delivery. Require four
+  independent actual-runtime delivery/revocation/restart repetitions per native lane
+  to capture the remaining failure and prevent a single favorable approach from hiding it.
 - 2026-09-08: Preserve the remaining native ARM note failure and add opt-in, bounded
   CI engine/snapshot evidence without logging window titles or user content. The
   preceding unchanged-topology fix did not resolve every instance of this failure.

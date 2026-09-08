@@ -5,9 +5,9 @@ from pathlib import Path
 import subprocess
 
 
-def qualify(binary, evidence, wait, call, GLib):
+def qualify(binary, evidence, wait, call, GLib, *, iteration=1):
     assert os.environ.get('GITHUB_ACTIONS') == 'true'
-    directory = evidence / 'goose'
+    directory = evidence / ('goose' if iteration == 1 else f'goose-{iteration}')
     directory.mkdir()
     config = directory / 'config.toml'
     original = '''# Preserve this user's existing settings.

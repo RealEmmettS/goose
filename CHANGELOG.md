@@ -52,6 +52,7 @@ All notable changes to this project are documented here. Format based on
 - Verify KDE's native device-removal outcome when a portal backend exits during active cursor motion, including stationary readback and rejection of subsequent pranks; preserve intermediate lifecycle evidence on later failures.
 - Run native KDE PR qualification without a duplicate development-branch run; exact-commit main, candidate and public gates remain required.
 - Capture bounded collection task, pose and geometry diagnostics only in explicitly enabled CI fixtures to distinguish engine release from native movement refusal, without logging window titles or user content.
+- Require four independent runtime delivery, revocation and restart repetitions on every native KDE lane, retaining each attempt's bounded observations and state diagnostics.
 - Scope the approved Sway, Hyprland and GNOME follow-ons as separate dashboard tasks with native premise, ownership, version and publication gates; no additional compositor support is claimed by this release.
 - Qualify real consent, bounded motion, protected targets, native settings drafts and recovery in disposable desktops with normal Plasma service registration and PipeWire. Retain bounded failure/observer evidence without granting container or compositor privileges.
 - Await the completed native settings save response before Windows test readback, so the fixture does not deny atomic replacement.
