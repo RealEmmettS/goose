@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""Qualify real GTK prop windows on a disposable X11 desktop, never the user's desktop."""
+from __future__ import annotations
+import argparse
+import base64
+import json
+import os
+from pathlib import Path
+import selectors
+import subprocess
+import time
+
+
+class Host:
+    def __init__(self, binary, directory):
+        self.directory = directory
+        directory.mkdir()
+        self.log = (directory / 'process.log').open('w')
+        self.process = subprocess.Popen([str(binary), '--owned-props'], stdin=subprocess.PIPE,
+                                        stdout=subprocess.PIPE, stderr=self.log)
+        self.selector = selectors.DefaultSelector()
+        self.selector.register(self.process.stdout, selectors.EVENT_READ)
+        self.buffer = b''
+        self.events = []
+        try:
+            self.wait(lambda event: event.get('event') == 'ready' and event.get('positioning') is True)
+        except BaseException:
+            self.close()
+            raise
+
+    def send(self, op, **fields):
+        self.process.stdin.write((json.dumps({'v': 1, 'op': op, **fields}) + '\n').encode())
+        self.process.stdin.flush()
+
+    def wait(self, predicate, timeout=20):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if b'\n' in self.buffer:
+                line, self.buffer = self.buffer.split(b'\n', 1)
+                event = json.loads(line)
+                self.events.append(event)
+                (self.directory / 'events.json').write_text(json.dumps(self.events, indent=2) + '\n')
+                if predicate(event):
+                    return event
+            elif self.selector.select(timeout=0.1):
+                chunk = os.read(self.process.stdout.fileno(), 65536)
+                if not chunk:
+                    raise RuntimeError(f'Prop host exited: {self.process.poll()}; {self.directory / "process.log"}')
+                self.buffer += chunk
+        raise RuntimeError(f'Missing expected native event; received {self.events[-8:]}')
+
+    def window(self, identity):
+        return self.wait(lambda event: event.get('event') == 'window' and event.get('id') == identity and event['alive'])
+
+    def close(self):
+        if self.process.poll() is None:
+            self.process.stdin.close()
+            try:
+                self.process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait()
+        self.selector.close()
+        self.log.close()
+
+
+def main():
+    if os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('GDK_BACKEND') != 'x11':
+        raise RuntimeError('Use a disposable GitHub Xvfb runner with GDK_BACKEND=x11')
+    import gi
+    gi.require_version('Atspi', '2.0')
+    from gi.repository import Atspi, GLib
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--binary', required=True, type=Path)
+    parser.add_argument('--evidence', required=True, type=Path)
+    args = parser.parse_args()
+    evidence = args.evidence.resolve()
+    evidence.mkdir(parents=True, exist_ok=True)
+    subprocess.run(['gdbus', 'call', '--session', '--dest', 'org.a11y.Bus', '--object-path', '/org/a11y/bus',
+                    '--method', 'org.freedesktop.DBus.Properties.Set', 'org.a11y.Status', 'IsEnabled', '<true>'], check=True)
+    Atspi.init()
+
+    def read_note(pid, expected):
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            context = GLib.MainContext.default()
+            for _ in range(100):
+                if not context.pending():
+                    break
+                context.iteration(False)
+            root = Atspi.get_desktop(0)
+            root.clear_cache()
+            stack = [root.get_child_at_index(i) for i in range(root.get_child_count())]
+            stack = [node for node in stack if node and node.get_process_id() == pid]
+            inspected = 0
+            while stack and inspected < 512:
+                node = stack.pop()
+                node.clear_cache()
+                inspected += 1
+                if node.get_name() == 'Note':
+                    text = node.get_text_iface()
+                    if text and text.get_text(0, -1) == expected:
+                        return
+                stack.extend(child for i in range(node.get_child_count())
+                             if (child := node.get_child_at_index(i)) is not None)
+            time.sleep(0.1)
+        raise RuntimeError('The native GTK text interface did not retain the note')
+
+    def native_windows(pid):
+        result = subprocess.run(['xdotool', 'search', '--onlyvisible', '--pid', str(pid), '--name', '^Honk300 (note|picture)$'],
+                                capture_output=True, text=True)
+        return result.stdout.splitlines() if result.returncode == 0 else []
+
+    results = []
+    try:
+        for cycle in range(2):
+            host = Host(args.binary.resolve(), evidence / f'cycle-{cycle}')
+            owned = []
+            try:
+                for identity in range(1, 9):
+                    host.send('note', id=identity, x=50 + identity * 12, y=50 + identity * 8,
+                              width=400, height=250, title='A note from your goose')
+                    event = host.window(identity)
+                    assert event['width'] <= 400 and event['height'] <= 250, event
+                assert len(native_windows(host.process.pid)) == 8
+                host.send('text', id=1, text='Café 🦆\nKeep this note.')
+                read_note(host.process.pid, 'Café 🦆\nKeep this note.')
+                host.send('note', id=9, width=400, height=250, title='No room yet')
+                host.wait(lambda event: event.get('event') == 'busy' and event.get('id') == 9)
+                assert len(native_windows(host.process.pid)) == 8
+                read_note(host.process.pid, 'Café 🦆\nKeep this note.')
+                host.send('move', id=1, x=500, y=300)
+                host.wait(lambda event: event.get('id') == 1 and event.get('x') == 500 and event.get('y') == 300)
+                owned = native_windows(host.process.pid)
+                assert len(owned) == 8
+                subprocess.run(['xdotool', 'windowclose', owned[-1]], check=True)
+                closed = host.wait(lambda event: event.get('event') == 'window' and not event['alive'] and event['origin'] == 'user')
+                assert closed['id'] in range(1, 9)
+                host.send('note', id=10, x=40, y=40, width=400, height=250, title='Room again')
+                host.window(10)
+                assert len(native_windows(host.process.pid)) == 8
+                host.send('close', id=10)
+                host.wait(lambda event: event.get('id') == 10 and not event['alive'] and event['origin'] == 'program')
+                # Distinct colored corners expose stretching/cropping in the native capture.
+                pixels = bytearray()
+                for y in range(120):
+                    for x in range(180):
+                        pixels.extend((255 if x < 90 else 0, 255 if y < 60 else 0, 255 if x >= 90 and y >= 60 else 0, 255))
+                host.send('image', id=11, x=700, y=100, width=180, height=154,
+                          pixel_width=180, pixel_height=120, title='All four corners', pixels=base64.b64encode(pixels).decode())
+                picture = host.window(11)
+                assert picture['width'] <= 180 and picture['height'] <= 154
+                subprocess.run(['import', '-window', 'root', str(host.directory / 'desktop.png')], check=True)
+                host.send('shutdown')
+                assert host.process.wait(timeout=10) == 0
+                assert not native_windows(host.process.pid)
+                results.append({'cycle': cycle, 'capacity': 8, 'native_text': True, 'owned_move': True,
+                                'user_close': True, 'program_close': True, 'recovery': True,
+                                'complete_picture_capture': True, 'shutdown_removed_windows': True})
+            finally:
+                host.close()
+        disconnected = Host(args.binary.resolve(), evidence / 'disconnect')
+        try:
+            disconnected.send('note', id=1, x=80, y=80, width=400, height=250, title='Connection-owned note')
+            disconnected.window(1)
+            disconnected.process.stdin.close()
+            assert disconnected.process.wait(timeout=10) == 0
+            assert not native_windows(disconnected.process.pid)
+        finally:
+            disconnected.close()
+        (evidence / 'result.json').write_text(json.dumps({'schema': 'honk300.owned-props.v1', 'ok': True,
+            'cycles': results, 'stdin_eof_removed_windows': True, 'proof': 'native GTK on disposable Xvfb'}, indent=2) + '\n')
+    finally:
+        Atspi.exit()
+
+
+if __name__ == '__main__':
+    main()

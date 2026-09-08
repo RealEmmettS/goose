@@ -30,5 +30,6 @@ Evidence: locked Rust tests and native GTK builds plus at least two real deliver
 Active in the isolated `codex/goose-linux-expansion` checkout. Architecture and admission implementation are starting; no Linux prop capability is yet implemented or advertised.
 
 ## Activity
+- 2026-09-07: Added the internal GTK companion host and bounded Zig decoder. Decoder tests pass locally; the first dedicated native GNU x64/ARM64 host build and two-cycle Xvfb note/image/capacity/close probe are next. Do not claim Linux runtime delivery before that earliest native premise is verified.
 - 2026-09-07: Implemented bounded admission in the real engine and Windows/macOS controllers, with exhausted/recovered capacity and placement-only note/meme regressions. Added a disposable Windows native exhaustion/close/recovery test. Linux companion implementation and its native evidence remain pending.
 - 2026-09-07: Split implementation from the ordered stage-two publication task so work can proceed without changing the first release candidate.

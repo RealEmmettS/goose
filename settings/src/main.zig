@@ -1,6 +1,11 @@
 const std = @import("std");
 const runner = @import("runner");
 const native_sdk = @import("native_sdk");
+const owned_props = @import("owned_props.zig");
+
+test {
+    _ = owned_props;
+}
 
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 
@@ -412,6 +417,12 @@ pub fn main(init: std.process.Init) !void {
     if (args.len == 2 and std.mem.eql(u8, args[1], "--version")) {
         std.debug.print("honk300-settings {s}\n", .{version});
         return;
+    }
+    if (@import("builtin").os.tag == .linux and args.len == 2 and std.mem.eql(u8, args[1], "--owned-props")) {
+        comptime {
+            if (@import("builtin").os.tag == .linux) @export(&owned_props.decode, .{ .name = "honk_props_decode" });
+        }
+        return owned_props.run();
     }
     // The app struct (and any real Model) is multi-MB: `create`
     // heap-allocates and constructs everything in place, so neither

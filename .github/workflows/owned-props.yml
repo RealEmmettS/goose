@@ -1,0 +1,58 @@
+name: Owned Linux props
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: GTK props (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install native GTK and isolated desktop tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential pkg-config libgtk-4-dev \
+            libasound2-dev xvfb xauth dbus-x11 xz-utils python3-gi gir1.2-atspi-2.0 \
+            at-spi2-core xdotool libglib2.0-bin openbox imagemagick
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: settings/package-lock.json
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.95'
+          targets: ${{ matrix.target }}
+      - name: Build the real production companion and decoder tests
+        run: python3 script/build_settings.py --target ${{ matrix.target }} --output target/props-probe --test
+      - name: Exercise owned native X11 windows
+        run: |
+          mkdir -p target/props-evidence
+          xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session -- bash -euc '
+            openbox >target/props-evidence/window-manager.log 2>&1 &
+            manager=$!
+            trap "kill $manager 2>/dev/null || true" EXIT
+            GDK_BACKEND=x11 python3 script/smoke_owned_props_linux.py --binary target/props-probe/honk300-settings --evidence target/props-evidence
+          '
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: owned-props-${{ matrix.target }}
+          path: |
+            target/props-evidence
+            target/props-probe/settings-build.json
+          if-no-files-found: warn
