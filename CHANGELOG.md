@@ -27,6 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- Keep the native GNOME authentication regression after production items so strict Linux test linting remains enforced.
 - Stage byte-identical, root-owned GNOME fixture executables so native consent qualifies real managed executable ownership instead of an unrelated bind-mounted runner UID.
 - Verify GNOME bus authentication uses the same total bounded connection path as production and releases a silent peer on timeout; read private companion files to bounded EOF and keep native fixture consent out of uploaded diagnostics.
 - Add an explicitly installed, versioned GNOME Shell observation companion with authenticated bounded snapshots, live user-drag rides, fullscreen manners, private recoverable setup/removal and Native SDK controls. Retain the XWayland overlay while separating unsupported native pointer/movement capabilities; qualify the actual Shell, runtime and GUI independently.

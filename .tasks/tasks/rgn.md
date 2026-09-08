@@ -41,6 +41,7 @@ boundary, recoverable consent and native settings are implemented under ADR 0048
 Run the actual integrated desktop fixture before any supported capability or publication claim.
 
 ## Activity
+- 2026-09-08 — The actual silent-bus authentication timeout and peer cleanup regression passes on all four Linux lanes. Strict clippy stops the run because the test module precedes production items; move that module to the end without suppressing lint or changing the test.
 - 2026-09-08 — The first integrated native run correctly refuses a bind-mounted executable owned by the unrelated host runner UID before installing anything. Keep the production ownership check and install byte-identical Rust/settings outputs as a root-owned private fixture release, then compare both files before starting the desktop.
 - 2026-09-08 — Implement the real companion and Rust/native settings lifecycle after all four native grab premises pass in run 34226098889. Bound whole bus authentication and snapshots, preserve exact owned-file recovery, and add actual GUI, user-ride, terminal, fullscreen, revocation and restart scenarios for both Shell versions and architectures. Native qualification is pending.
 - 2026-09-08 — Run 34225100825 passes GNOME 46/48 on native x64/ARM64; inspect all four normal-desktop screenshots and confirm a complete visible goose. Qualify Mutter's actual grab state next with input confined to the private outer Xvfb desktop, exact fixture identity, automatic-move refusal while held and real release signals.

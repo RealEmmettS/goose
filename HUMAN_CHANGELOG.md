@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Added
+- Keep the GNOME connection checks compatible with the project’s strict build checks.
 - Check GNOME permissions against correctly installed application files while continuing to reject files owned by an unrelated account.
 - Keep optional GNOME setup and shutdown responsive when the desktop connection stops answering, and retain complete permission files without exposing private test permissions.
 - Add optional GNOME desktop observations with clear setup and removal. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.

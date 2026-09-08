@@ -241,6 +241,34 @@ impl Connection {
     }
 }
 
+impl Source for Connection {
+    type Frame = Frame;
+    const NAME: &'static str = "gnome";
+    const MAX_AGE: Duration = MAX_AGE;
+    fn connect() -> io::Result<Self> {
+        Err(invalid("GNOME requires explicit companion consent"))
+    }
+    fn snapshot(&mut self) -> io::Result<Frame> {
+        self.snapshot()
+    }
+}
+
+pub struct Observer(Worker<Connection>);
+impl Observer {
+    pub fn start(nonce: String, build: String) -> io::Result<Self> {
+        Worker::spawn(move || Connection::connect(nonce, build)).map(Self)
+    }
+    pub fn snapshot(&self) -> Option<Frame> {
+        self.0.snapshot()
+    }
+    pub fn running(&self) -> bool {
+        self.0.running()
+    }
+    pub fn failed(&self) -> bool {
+        self.0.failed()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280,33 +308,5 @@ mod tests {
         server.join().unwrap();
         fs::remove_file(socket).unwrap();
         fs::remove_dir(directory).unwrap();
-    }
-}
-
-impl Source for Connection {
-    type Frame = Frame;
-    const NAME: &'static str = "gnome";
-    const MAX_AGE: Duration = MAX_AGE;
-    fn connect() -> io::Result<Self> {
-        Err(invalid("GNOME requires explicit companion consent"))
-    }
-    fn snapshot(&mut self) -> io::Result<Frame> {
-        self.snapshot()
-    }
-}
-
-pub struct Observer(Worker<Connection>);
-impl Observer {
-    pub fn start(nonce: String, build: String) -> io::Result<Self> {
-        Worker::spawn(move || Connection::connect(nonce, build)).map(Self)
-    }
-    pub fn snapshot(&self) -> Option<Frame> {
-        self.0.snapshot()
-    }
-    pub fn running(&self) -> bool {
-        self.0.running()
-    }
-    pub fn failed(&self) -> bool {
-        self.0.failed()
     }
 }
