@@ -36,7 +36,7 @@
 - [ ] **Explicit portal pointer integration** - request only pointer access through the native portal, validate granted EIS devices and cancel on revocation; terminal exclusion requires independently proven window observation (needs #a6e) (ms #refine) (owner codex) #wlp
   - [x] Prove native portal grant, libei device readiness, cancellation and bounded movement on KDE 6.
   - [x] Connect ephemeral pointer permission to Rust controls and native settings.
-  - [ ] Qualify terminal exclusions, disconnects and unsupported desktop behavior.
+  - [x] Qualify terminal exclusions, disconnects and unsupported desktop behavior.
 - [ ] **KDE native Wayland companion** - implement the explicitly enabled KWin bridge and prove exact identities, bounded movement, terminal exclusions and revocation (needs #a6e) (ms #refine) (owner codex) #wlk
   - [x] Prove the real KWin script API and owned test-window movement on KDE 5/6.
   - [x] Connect the authenticated bounded Rust bridge and live runtime capabilities.

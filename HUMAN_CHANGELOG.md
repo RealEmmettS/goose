@@ -40,6 +40,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Explain optional desktop setup and dependencies without claiming support for desktops that have not been tested.
 
 ### Fixed
+- Keep exact desktop window positions when passing them to the goose, preventing a delivery from stopping after its first small movement.
 - Bring controls below the settings scroll area into view when a screen reader activates them, while keeping disabled controls inactive.
 - Let the goose recognize its own transparent drawing surface so granted pointer pranks work while other windows remain protected. Keep desktop observations running during longer sessions.
 - Stop pending pointer and delivery movement when permission disappears, preserving already delivered notes and requiring fresh consent after a restart.
@@ -49,9 +50,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ### Behind the scenes
 - Verify Sway's window and desktop operations in an isolated desktop. Keep animated delivery unavailable until it can safely yield when the person takes over a window.
 - Require actual desktop permission, movement, settings and recovery checks before publishing optional KDE support. Keep useful failure evidence and use the desktop's normal services without granting extra computer privileges.
+- Record the completed pointer-permission checks and clarify that removing desktop integration keeps delivered notes while an active picture delivery follows its normal cleanup.
 - Check that pointer motion really stops when the desktop permission service closes during a prank, and keep the observed recovery results available if a later check fails.
 - Avoid duplicate desktop builds while retaining the required release checks.
 - Keep limited delivery diagnostics in the isolated desktop tests so an interrupted delivery can be investigated without recording window titles or note contents.
+- Repeat desktop deliveries and permission changes before release so an occasional interrupted delivery cannot hide behind one successful run.
 - Track each additional desktop integration separately so its setup, behavior and release are tested on that desktop before support is advertised.
 - Wait for the restart check to finish writing its result before reading it, so a correctly restarted goose does not produce a false failure.
 - Wait until settings reports a completed save before checking its file, so the test itself cannot block saving.

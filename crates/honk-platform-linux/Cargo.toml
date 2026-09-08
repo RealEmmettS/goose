@@ -14,7 +14,7 @@ honk-engine = { path = "../honk-engine" }
 libc = "0.2"
 tiny-skia.workspace = true
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["float_roundtrip"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libloading = "=0.8.9"

@@ -441,6 +441,30 @@ mod tests {
     }
 
     #[test]
+    fn native_fractional_geometry_survives_decode_and_reply_exactly() {
+        // Captured from the real KWin 6 x64 delivery that moved once and then
+        // refused every subsequent command as stale. These are exact binary
+        // coordinates; the JSON boundary must not shift either by one ULP.
+        let native = [117.48895263671875, 158.00802612304688, 420.0, 288.0];
+        let mut frame = fixture();
+        frame.windows[0].geometry = native;
+        let decoded = Frame::decode(&raw(&frame)).unwrap();
+        assert_eq!(decoded.windows[0].geometry, native);
+
+        let now = Instant::now();
+        let mut state = State::new(":1.10".into());
+        receive(&mut state, &frame, now);
+        let observed = state.snapshot(now).unwrap().windows[0].clone();
+        state
+            .queue_move(&observed, [native[0] + 6.0, native[1]], now)
+            .unwrap();
+        frame.sequence += 1;
+        let reply = receive(&mut state, &frame, now + Duration::from_millis(50));
+        let from: [f64; 4] = serde_json::from_value(reply["commands"][0]["from"].clone()).unwrap();
+        assert_eq!(from, native);
+    }
+
+    #[test]
     fn native_frame_drives_a_single_bounded_move() {
         let now = Instant::now();
         let mut state = State::new(":1.10".into());

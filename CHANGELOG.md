@@ -44,6 +44,7 @@ All notable changes to this project are documented here. Format based on
 - Document guided setup, removal, optional system dependencies, session-only pointer permission and independently qualified compositor boundaries.
 
 ### Fixed
+- Preserve exact floating-point geometry at the KWin JSON boundary. A captured native coordinate regression reproduces a one-ULP decoding change that made the script correctly reject every move after the first fractional position; float_roundtrip fixes the data without relaxing the stale-window guard.
 - Scroll native accessibility targets into view through existing bounded scroll containers before activation. The real SDK dispatcher regression reproduces the original failure and preserves disabled-control refusal.
 - Recognize only the current process's click-through Wayland layer when guarding pointer motion, retaining terminal and unknown-window checks beneath it. Retain KWin observation timers at script scope and qualify their continued native updates beyond garbage collection.
 - Clear queued engine cursor movement on capability loss; cancel portal sessions on adapter expiry, device pause/removal, explicit revocation and shutdown. A restart never restores a pointer grant.
@@ -52,9 +53,11 @@ All notable changes to this project are documented here. Format based on
 
 ### Behind the scenes
 - Require exact-commit KDE 5/6 x64/ARM64 qualification in candidate and public release orchestration, alongside all existing architecture, native package and signing gates.
+- Record the complete native pointer lifecycle results and keep final-source package qualification open; clarify the existing note-retention and active-picture cleanup behavior on integration removal.
 - Verify KDE's native device-removal outcome when a portal backend exits during active cursor motion, including stationary readback and rejection of subsequent pranks; preserve intermediate lifecycle evidence on later failures.
 - Run native KDE PR qualification without a duplicate development-branch run; exact-commit main, candidate and public gates remain required.
 - Capture bounded collection task, pose and geometry diagnostics only in explicitly enabled CI fixtures to distinguish engine release from native movement refusal, without logging window titles or user content.
+- Require four independent runtime delivery, revocation and restart repetitions on every native KDE lane, retaining each attempt's bounded observations and state diagnostics.
 - Scope the approved Sway, Hyprland and GNOME follow-ons as separate dashboard tasks with native premise, ownership, version and publication gates; no additional compositor support is claimed by this release.
 - Qualify real consent, bounded motion, protected targets, native settings drafts and recovery in disposable desktops with normal Plasma service registration and PipeWire. Retain bounded failure/observer evidence without granting container or compositor privileges.
 - Await the completed native settings save response before Windows test readback, so the fixture does not deny atomic replacement.

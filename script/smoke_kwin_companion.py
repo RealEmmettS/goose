@@ -87,6 +87,7 @@ def main():
     parser.add_argument('--goose', type=Path)
     parser.add_argument('--settings', type=Path)
     parser.add_argument('--portal', action='store_true')
+    parser.add_argument('--runtime-repetitions', type=int, choices=range(1, 9), default=1)
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -442,7 +443,9 @@ def main():
 
             if args.goose:
                 from smoke_kwin_runtime import qualify
-                qualify_independently('runtime', lambda: qualify(args.goose.resolve(), evidence, wait, call, GLib))
+                for iteration in range(1, args.runtime_repetitions + 1):
+                    qualify_independently(f'runtime-{iteration}', lambda: qualify(
+                        args.goose.resolve(), evidence, wait, call, GLib, iteration=iteration))
             if args.settings:
                 from smoke_kwin_settings import qualify
                 qualify_independently('settings', lambda: qualify(args.settings.resolve(), evidence, wait, call, GLib))

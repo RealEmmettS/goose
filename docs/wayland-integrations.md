@@ -18,7 +18,8 @@ and pictures. Terminal windows, including Codex and Visual Studio Code, remain p
 The equivalent commands are `honk300 integrations kde setup`,
 `honk300 integrations kde status`, and `honk300 integrations kde remove`.
 Removal takes effect while the goose is running. It stops placement while preserving
-the notes and pictures already delivered. You can also remove the integration while
+delivered notes; an active picture delivery follows the existing cleanup behavior.
+You can also remove the integration while
 the goose is stopped. Only Honk300's registration and permission record are removed.
 
 Window support is separately exercised on KDE Plasma 5 and 6, on x64 and ARM64.

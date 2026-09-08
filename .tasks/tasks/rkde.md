@@ -25,12 +25,13 @@ The requested behavior runs through its production path and the supporting evide
 - [ ] Integration and required package/release checks pass before publication.
 
 ## Status
-Active. Versioned v1.6.0 metadata and readiness are prepared. Native KWin 5/6 window,
-owned-prop and setup/removal checks pass on both architectures; the KDE 6 portal premise
-also passes. Integrated pointer runtime/settings checks exposed inaccessible controls
-below the scroll viewport. A production SDK regression reproduces that failure before
-correction. Publication remains gated on the unchanged desktop tests, all existing
-platform/package lanes and same-source candidate/main qualification.
+Active. Versioned v1.6.0 metadata and readiness are prepared. The complete KDE 6
+pointer runtime/settings lifecycle passes both native architectures. Repeated window
+qualification exposed an exact-number decoding error that caused valid fractional
+geometry to fail KWin's stale-position guard. A captured production regression fails
+before the decoder correction and passes after it. Final-source native repetition,
+all architecture/package lanes and same-source candidate/main qualification remain
+required before publication.
 
 ## Activity
 - 2026-09-08: Publication-record main run 34209990490 exposes an ARM64 restart-fixture race: the output file exists before its line is written, giving zero fields. Keep the actual restart and exact PID/session/start-argument assertions; wait for the complete line within the existing deadline before readback. Carry the correction into final-source qualification.
