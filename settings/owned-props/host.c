@@ -37,6 +37,7 @@ static GMainLoop *loop;
 static GByteArray *input;
 static gboolean positioning, failed, stopping;
 static uint64_t last_id;
+static cairo_user_data_key_t image_pixels_key;
 
 _Static_assert(sizeof(HonkPropCommand) == 72, "Zig/C command ABI must agree");
 
@@ -178,7 +179,9 @@ static int spawn_prop(Prop *prop, const HonkPropCommand *command) {
     g_signal_connect(close, "clicked", G_CALLBACK(close_clicked), prop);
     gtk_box_append(GTK_BOX(header), label);
     gtk_box_append(GTK_BOX(header), close);
-    gtk_box_append(GTK_BOX(box), header);
+    GtkWidget *handle = gtk_window_handle_new();
+    gtk_window_handle_set_child(GTK_WINDOW_HANDLE(handle), header);
+    gtk_box_append(GTK_BOX(box), handle);
     if (prop->kind == HONK_PROP_NOTE) {
         prop->editor = gtk_text_view_new();
         gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(prop->editor), GTK_WRAP_WORD_CHAR);
@@ -205,6 +208,10 @@ static int spawn_prop(Prop *prop, const HonkPropCommand *command) {
         prop->image = cairo_image_surface_create_for_data(prop->pixels, CAIRO_FORMAT_ARGB32,
             (int)prop->pixel_width, (int)prop->pixel_height, (int)prop->pixel_width * 4);
         if (cairo_surface_status(prop->image) != CAIRO_STATUS_SUCCESS) return 0;
+        // A GTK render node may retain the source surface after a window closes.
+        // Tie the pixel allocation to Cairo's final reference, not the registry slot.
+        if (cairo_surface_set_user_data(prop->image, &image_pixels_key, prop->pixels, g_free) != CAIRO_STATUS_SUCCESS) return 0;
+        prop->pixels = NULL;
         GtkWidget *drawing = gtk_drawing_area_new();
         gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing), paint_image, prop, NULL);
         gtk_widget_set_vexpand(drawing, TRUE);

@@ -117,25 +117,39 @@ def main():
                                 capture_output=True, text=True)
         return result.stdout.splitlines() if result.returncode == 0 else []
 
-    def user_close_note(pid):
+    def user_close_note(host):
         # xdotool windowclose uses XDestroyWindow, which bypasses GTK's close
         # handling entirely. Activate the real, process-owned native Close
         # button so this tests the user-close signal and preserves other notes.
-        root = Atspi.get_desktop(0)
-        root.clear_cache()
-        stack = [root.get_child_at_index(i) for i in range(root.get_child_count())]
-        stack = [node for node in stack if node and node.get_process_id() == pid]
-        inspected = 0
-        while stack and inspected < 512:
-            node = stack.pop()
-            node.clear_cache()
-            inspected += 1
-            if node.get_name() == 'Close' and node.get_role() == Atspi.Role.PUSH_BUTTON:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            context = GLib.MainContext.default()
+            for _ in range(100):
+                if not context.pending():
+                    break
+                context.iteration(False)
+            root = Atspi.get_desktop(0)
+            root.clear_cache()
+            stack = [root.get_child_at_index(i) for i in range(root.get_child_count())]
+            stack = [node for node in stack if node and node.get_process_id() == host.process.pid]
+            records = []
+            while stack and len(records) < 512:
+                node = stack.pop()
+                node.clear_cache()
                 action = node.get_action_iface()
-                if action and Atspi.Action.do_action(action, 0):
-                    return
-            stack.extend(child for i in range(node.get_child_count())
-                         if (child := node.get_child_at_index(i)) is not None)
+                count = Atspi.Action.get_n_actions(action) if action else 0
+                record = {'name': node.get_name(), 'role': node.get_role_name(), 'interfaces': list(node.get_interfaces()),
+                          'actions': [Atspi.Action.get_action_name(action, i) for i in range(count)]}
+                records.append(record)
+                if node.get_name() == 'Close' and node.get_role() == Atspi.Role.PUSH_BUTTON:
+                    if action and Atspi.Action.do_action(action, 0):
+                        (host.directory / 'close-tree.json').write_text(json.dumps(records, indent=2) + '\n')
+                        return
+                stack.extend(child for i in range(node.get_child_count())
+                             if (child := node.get_child_at_index(i)) is not None)
+            (host.directory / 'close-tree.json').write_text(json.dumps(records, indent=2) + '\n')
+            time.sleep(0.1)
+        subprocess.run(['import', '-window', 'root', str(host.directory / 'failed-close.png')], check=True)
         raise RuntimeError('Native owned Close action is unavailable')
 
     results = []
@@ -160,7 +174,7 @@ def main():
                 host.wait(lambda event: event.get('id') == 1 and event.get('x') == 500 and event.get('y') == 300)
                 owned = native_windows(host.process.pid)
                 assert len(owned) == 8
-                user_close_note(host.process.pid)
+                user_close_note(host)
                 closed = host.wait(lambda event: event.get('event') == 'window' and not event['alive'] and event['origin'] == 'user')
                 assert closed['id'] in range(1, 9)
                 host.send('note', id=10, x=40, y=40, width=400, height=250, title='Room again')
