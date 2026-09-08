@@ -35,6 +35,7 @@ All notable changes to this project are documented here. Format based on
 ## [1.7.0] - Unreleased candidate
 
 ### Fixed
+- Replace the Windows smoke's obsolete full-canvas transparency assumption for bounded captures with exact DIB-to-DWM comparison of every pixel over both backgrounds and a complete clear perimeter. Preserve semantic, clipping, channel, premultiplication and black-surface checks; add regressions for bounded poses, opaque slabs, incorrect alpha and stale frames.
 - Preserve a healthy Sway observation worker through repeated CLI or native settings setup. Verify the actual worker identity and unchanged consent while fullscreen manners remain enabled.
 - Inherit Sway fullscreen state through real split containers while excluding the synthetic workspace flag. Reject observations without an active powered output. Production decoder regressions fail before both corrections and pass afterward; native fixtures require both compositor states. Enable the private fixture's real accessibility bus before querying its native settings provider.
 

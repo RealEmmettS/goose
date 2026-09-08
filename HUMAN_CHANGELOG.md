@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Behind the scenes
+- Check the goose against its actual on-screen outline, including every transparent edge, so a complete bird in a compact drawing area can pass while damaged colors, dark boxes and mismatched frames still fail.
+
 ### Added
 - Add optional Sway window and fullscreen awareness with setup and removal in settings and the command line. Keep desktop checks responsive, stop using observations when the connection changes, and preserve unsaved settings through permission changes and goose restarts.
 - Add optional KDE support with clear setup, status and removal in graphical settings and the command line. Window support and pointer permission remain separate choices.

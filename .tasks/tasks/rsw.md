@@ -55,6 +55,7 @@ and pointer authority remain unsupported.
 Publication remains ordered after the qualified KDE release.
 
 ## Activity
+- 2026-09-08 — Hold the candidate after the Windows host capture fails its old 80% empty-area assumption. Inspect the complete native image and all twelve reports; only that assumption fails after entry. Require every DWM pixel to match the exact presented surface over both controlled backgrounds, retain clipping/color/anatomy checks, and cover bounded poses and injected damage before rerunning native qualification.
 - 2026-09-08 — Inspect all four complete native runtime results: real fullscreen manners,
   config changes, drafts, exact worker removal, consent revocation, socket replacement,
   deliberate reconnection, graceful/crash recovery and unrelated state preservation pass.
