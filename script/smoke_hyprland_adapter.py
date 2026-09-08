@@ -50,6 +50,8 @@ def main():
     modules = {}
     ipc_path = None
     transactions = []
+    watcher = None
+    watch_events = []
     with (evidence / 'compositor.log').open('w') as log:
         compositor = subprocess.Popen(['Hyprland', '--config', str(config)],
                                       env=environment, stdout=log, stderr=log)
@@ -232,6 +234,32 @@ def main():
                     with client:
                         assert client.recv(32) == b'', 'An impostor received a query before rejection'
                 fake_socket.unlink()
+            watch_buffer = bytearray()
+            def watch_current():
+                if watcher is None:
+                    return None
+                assert watcher.poll() is None, 'Native observation worker exited'
+                while True:
+                    try:
+                        chunk = os.read(watcher.stdout.fileno(), 8192)
+                    except BlockingIOError:
+                        break
+                    if not chunk:
+                        break
+                    watch_buffer.extend(chunk)
+                    assert len(watch_buffer) < 65536
+                while b'\n' in watch_buffer:
+                    line, _, tail = watch_buffer.partition(b'\n')
+                    watch_buffer[:] = tail
+                    assert len(line) < 512 and len(watch_events) < 400
+                    watch_events.append(json.loads(line))
+                return watch_events[-1] if watch_events else None
+            if args.bridge:
+                watcher = subprocess.Popen([str(args.bridge.resolve()), '--watch'],
+                    env=environment, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                os.set_blocking(watcher.stdout.fileno(), False)
+                wait(lambda: (state if (state := watch_current()) and state['observed']
+                    and not state['fullscreen'] else None), 'retained observation worker')
             initial = ordinary['at']
             selector = 'address:' + ordinary['address']
             command("/dispatch hl.dsp.window.move({x=" + str(initial[0] + 6) + ',y=' +
@@ -246,11 +274,17 @@ def main():
             (evidence / 'native-fullscreen.json').write_text(json.dumps(dict(
                 native=fullscreen, gtk_size=[windows[0].get_width(), windows[0].get_height()]),
                 indent=2) + '\n')
+            if watcher:
+                wait(lambda: (state if (state := watch_current()) and state['observed']
+                    and state['fullscreen'] else None), 'fresh fullscreen after native configure')
             rust = rust_snapshot('fullscreen')
             if rust:
                 assert rust['fullscreen']
             windows[0].unfullscreen()
             wait(lambda: find(ordinary['title'])['fullscreen'] == 0, 'fullscreen removal')
+            if watcher:
+                wait(lambda: (state if (state := watch_current()) and state['observed']
+                    and not state['fullscreen'] else None), 'fresh fullscreen removal')
             windows[0].destroy()
             wait(lambda: find(ordinary['title']) is None, 'vanished target')
             assert find(protected['title'])['at'] == protected['at'], 'Protected fixture changed'
@@ -258,10 +292,16 @@ def main():
                 peer_credentials=True, version=version, architecture=os.uname().machine,
                 initial=ordinary, moved=moved, protected=protected, fullscreen=fullscreen,
                 vanished=True, pointer_control_qualified=False, user_drag_observation_qualified=False,
-                production_rust_observation=args.bridge is not None, untrusted_peer_refused=args.bridge is not None)
+                production_rust_observation=args.bridge is not None, untrusted_peer_refused=args.bridge is not None,
+                retained_worker_fullscreen_recovery=watcher is not None,
+                expired_observation_samples=sum(not state['observed'] for state in watch_events))
             (evidence / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result))
         finally:
+            if watcher is not None:
+                watcher.terminate()
+                watcher.wait(timeout=3)
+            (evidence / 'worker-observations.json').write_text(json.dumps(watch_events, indent=2) + '\n')
             (evidence / 'transactions.json').write_text(json.dumps(transactions, indent=2) + '\n')
             for window in windows:
                 window.destroy()

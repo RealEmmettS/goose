@@ -27,6 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Improved
+- Recover late read-only Hyprland snapshots through one retained authenticated worker while immediately withdrawing expired data; keep identity changes, permission loss and disconnects terminal. Share bounded worker ownership with Sway without changing Sway's error policy.
 - Read the Hyprland monitor/client inventory in one fixed read-only native batch, retaining exact peer identity, a single 250 ms deadline, bounded complete replies and matching monitor observations.
 
 ### Behind the scenes

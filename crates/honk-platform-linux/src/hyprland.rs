@@ -10,6 +10,10 @@ pub const MAX_AGE: std::time::Duration = std::time::Duration::from_millis(250);
 mod transport;
 #[cfg(target_os = "linux")]
 pub use transport::{Connection, Peer};
+#[cfg(target_os = "linux")]
+mod observer;
+#[cfg(target_os = "linux")]
+pub use observer::Observer;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Version {

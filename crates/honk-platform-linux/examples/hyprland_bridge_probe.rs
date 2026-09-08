@@ -1,5 +1,20 @@
 #[cfg(target_os = "linux")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|argument| argument == "--watch") {
+        use std::io::Write;
+        let observer = honk_platform_linux::hyprland::Observer::start()?;
+        for _ in 0..400 {
+            let frame = observer.snapshot();
+            println!(
+                "{}",
+                serde_json::json!({"observed":frame.is_some(),
+                "failed":observer.failed(),"fullscreen":frame.as_ref().is_some_and(|frame|frame.fullscreen())})
+            );
+            std::io::stdout().flush()?;
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        return Ok(());
+    }
     let connection = honk_platform_linux::hyprland::Connection::connect()?;
     let frame = connection.snapshot()?;
     let windows: Vec<_> = frame

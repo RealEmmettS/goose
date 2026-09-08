@@ -28,6 +28,15 @@ Optional process/title metadata does not erase known fullscreen presence. Hidden
 unmapped and other-workspace clients remain distinct from visible fullscreen windows.
 The two qualified versions retain their separate visibility semantics.
 
+Native run 34226478369 shows the older compositor stalling every query while its
+fullscreen target still has the old GTK allocation. Retain the single authenticated
+connection owner in a worker; each late read withdraws observations immediately.
+Only a timeout may retry another bounded read against that same pinned process,
+socket inode and executable. Permission loss, a changed owner, disconnection or
+malformed data ends the worker. The presentation loop does not wait for recovery,
+and no stale frame or pending action is retained. Shared worker ownership preserves
+Sway's existing terminal-error policy; Hyprland's timeout recovery has separate native evidence.
+
 Production setup/removal, retained worker ownership, configuration and GUI drafts,
 lost authority, lifecycle recovery and every architecture/package gate still need
 actual native qualification before a new immutable public release can claim support.

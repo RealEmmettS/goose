@@ -5,6 +5,8 @@
 //! out of `honk-engine` while the X11/Wayland presentation backends continue to mature.
 
 #[cfg(target_os = "linux")]
+mod native_observer;
+#[cfg(target_os = "linux")]
 mod native_socket;
 #[cfg(target_os = "linux")]
 mod tray;

@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Improved
+- Let a busy Hyprland desktop resume fresh window observations after a slow transition, without using old information or connecting to a replacement desktop behind your back.
 - Keep Hyprland window observations together so a busy desktop has fewer separate requests to answer, while still discarding late or incomplete information.
 
 ### Behind the scenes
