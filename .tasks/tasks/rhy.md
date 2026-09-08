@@ -27,19 +27,18 @@ Exact desktop versions, request semantics and native behavior require direct qua
 
 ## Verification
 - [x] Actual supported Hyprland versions on x64/ARM64 pass native movement and refusal scenarios.
-- [ ] Rust controls and native settings preserve drafts, ownership and live cancellation.
+- [x] Rust controls and native settings preserve drafts, ownership and live cancellation.
 - [ ] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Active. All four production observation lanes pass at source 617e644 in run 34227542105
-on Hyprland 0.53.3 and 0.55.2, including retained-worker fullscreen recovery and
-untrusted-peer refusal. The shared worker also passes Sway's four independent lanes
-in run 34227540869. Rust CLI/runtime and Native SDK consent, revocation and draft
-handling pass local workspace tests, strict lint, release build and real SDK build.
-Qualify that complete runtime/settings lifecycle on both native architectures next;
-public qualification and website claims remain open.
+Active. Run 34231759048 passes the complete actual runtime and native settings
+lifecycle on Hyprland 0.53.3/0.55.2, each on native x64/ARM64. Repeated setup retains
+one exact worker and consent; live revocation, engine fullscreen/config manners,
+drafts, replaced sockets and graceful/crash recovery pass. Qualify the actual
+rendered settings and owned note/image delivery before freezing the release source.
 
 ## Activity
+- 2026-09-08 — All four integrated desktop lanes pass at b9219f3 in run 34231759048, including every exact worker assertion. Add actual compositor screenshots and reuse the production prop/engine lifecycle fixture on these specific desktops; prior labwc evidence does not stand in for Hyprland.
 - 2026-09-08 — The retained-worker fix passes both older desktop lifecycles, including exact cleanup. The newer ARM fixture fails earlier while unnecessarily launching a second connection/version handshake during fullscreen; diagnostics record a correct bounded timeout while the retained production worker already observes fullscreen. Keep the original authenticated worker across this transition and require its fresh actual fullscreen window identity, PID and geometry. Initial direct transport and impostor checks remain, and no production deadline, identity check or stale-frame rule changes.
 - 2026-09-08 — Integrated run 34229133252 passes the complete newer x64 lifecycle and exposes repeated native setup replacing a worker during transient fullscreen recovery on both ARM desktops. Retain any still-running bounded worker with identical consent; freshness continues to control capability independently. The older x64 host reaches external revocation and fails the exact worker-removal check; retain kernel thread identities/state around every assertion to identify that separate failure without weakening the check.
 - 2026-09-08 — Connect explicit Hyprland setup/removal to its own private consent record, versioned control protocol, native Wayland runtime and real Native SDK dialogs. Preserve drafts, unknown configuration and unrelated compositor consent. Add native lifecycle qualification for the actual runtime and GUI: default-off behavior, fullscreen/config manners, identical worker ownership after repeated setup, external removal, replaced socket refusal, explicit reconnection and graceful/crash recovery.

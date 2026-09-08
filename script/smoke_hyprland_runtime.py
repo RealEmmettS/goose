@@ -151,6 +151,7 @@ preserve = "untouched"
         foreign = record.parent / 'foreign.txt'
         foreign.write_text('Keep unrelated integration data')
         trace(False, False)
+        subprocess.run(['grim', str(directory / 'native-settings-goose.png')], check=True, timeout=8)
         control('do', 'nab', success=False)
         window.fullscreen()
         wait(lambda: find_window('Honk300 ordinary Hyprland probe')['fullscreen'] == 2, 'fixture fullscreen')

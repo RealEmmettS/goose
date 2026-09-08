@@ -301,13 +301,25 @@ def main():
             windows[0].destroy()
             wait(lambda: find(ordinary['title']) is None, 'vanished target')
             assert find(protected['title'])['at'] == protected['at'], 'Protected fixture changed'
+            if args.goose is not None:
+                windows[1].destroy()
+                wait(lambda: find(protected['title']) is None, 'native fixture cleanup before prop qualification')
+                for label, script, executable, extra in (
+                    ('owned-props', 'script/smoke_owned_props_linux.py', args.settings, []),
+                    ('runtime-props', 'script/smoke_runtime_props_linux.py', args.goose,
+                     ['--expected-desktop', 'Hyprland']),
+                ):
+                    with (evidence / f'{label}.log').open('w') as log:
+                        subprocess.run(['python3', script, '--binary', str(executable.resolve()),
+                            '--evidence', str(evidence / label), *extra],
+                            stdout=log, stderr=log, check=True, timeout=300)
             result = dict(ok=True, compositor_pid=compositor.pid, unix_uid=os.getuid(),
                 peer_credentials=True, version=version, architecture=os.uname().machine,
                 initial=ordinary, moved=moved, protected=protected, fullscreen=fullscreen,
                 vanished=True, pointer_control_qualified=False, user_drag_observation_qualified=False,
                 production_rust_observation=args.bridge is not None, untrusted_peer_refused=args.bridge is not None,
                 retained_worker_fullscreen_recovery=args.bridge is not None,
-                production_runtime=args.goose is not None,
+                production_runtime=args.goose is not None, native_owned_props=args.goose is not None,
                 expired_observation_samples=sum(not state['observed'] for state in watch_events))
             (evidence / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result))

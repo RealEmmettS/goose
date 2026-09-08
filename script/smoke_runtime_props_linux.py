@@ -22,6 +22,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
+    parser.add_argument('--expected-desktop', default='labwc')
     args = parser.parse_args()
     binary, evidence = args.binary.resolve(), args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -179,7 +180,7 @@ autumn = false
                     assert f'display backend: {"X11" if positioning else "native Wayland"}' in status, status
                     assert f'note/picture positioning: {"supported" if positioning else "unsupported"}' in status, status
                     if not positioning:
-                        assert 'desktop (session hint): labwc' in status, status
+                        assert f'desktop (session hint): {args.expected_desktop}' in status, status
                     service = subprocess.run([str(binary), '__settings-service', '--config', str(config)],
                         input=json.dumps({'protocol': 1, 'request_id': 78, 'command': {'op': 'status'}}),
                         capture_output=True, text=True, check=True, timeout=15)

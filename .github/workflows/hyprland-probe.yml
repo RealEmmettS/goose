@@ -80,7 +80,7 @@ jobs:
             DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
               dbus-x11 python3 python3-gi gir1.2-gtk-4.0 libgtk-4-1 \
               libgl1-mesa-dri libegl-mesa0 mesa-utils util-linux passwd seatd libasound2t64 \
-              at-spi2-core gir1.2-atspi-2.0
+              at-spi2-core gir1.2-atspi-2.0 grim python3-pil
             if test "$generation" = lua; then
               DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y -t trixie-backports hyprland
             else
