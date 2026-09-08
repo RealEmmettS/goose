@@ -26,6 +26,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [1.9.0] - 2026-09-08
 
+### Behind the scenes
+- Synchronize native GNOME drag qualification with pointer entry on the actual GTK surface and retain capture-event evidence when the compositor rejects a gesture; keep the native grab and real engine ride requirements intact.
+
 ### Added
 - Add explicit GNOME Shell companion setup and removal through Rust CLI and Native SDK settings, with qualified GNOME 46.0/48.7 window, fullscreen and actual user-drag observations on native x64/ARM64. Preserve the compatible XWayland overlay and independent owned-prop positioning; foreign movement, pointer access and DND remain unsupported.
 

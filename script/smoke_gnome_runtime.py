@@ -164,6 +164,20 @@ preserve = "untouched"
         (directory / f'arranged-{label}.json').write_text(json.dumps(native, indent=2))
         x, y, width, height = native['rect']
         pointer_x, pointer_y = x + width // 2, y + 18
+        # A Shell coordinate is not proof that the native client has received
+        # pointer entry. Record the actual GTK capture events without consuming
+        # them, and await the target surface before beginning the gesture.
+        native_events = []
+        controller = Gtk.EventControllerLegacy.new()
+        controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        def record_event(_controller, native_event):
+            native_events.append(dict(type=native_event.get_event_type().value_nick,
+                                      at=time.monotonic()))
+            return False
+        controller.connect('event', record_event)
+        target.add_controller(controller)
+        surface = target.get_surface()
+        device = surface.get_display().get_default_seat().get_pointer()
         def event(*arguments):
             subprocess.run(['xdotool', *map(str, arguments)], env=capture_environment,
                            check=True, capture_output=True, timeout=5)
@@ -171,6 +185,8 @@ preserve = "untouched"
             event('mousemove', pointer_x, pointer_y)
             wait(lambda: snapshot()['pointer'] == [pointer_x, pointer_y],
                  'native pointer reaches the private fixture: ' + label)
+            wait(lambda: surface.get_device_position(device)[0],
+                 'GTK receives pointer entry on the exact native surface: ' + label)
             # Drag the actual native title bar. A modifier mask alone does not
             # prove Mutter accepted a move gesture on a Wayland client surface.
             event('mousedown', 1)
@@ -206,6 +222,8 @@ preserve = "untouched"
             (directory / ('protected-drag.json' if protected else f'{label}-drag.json')).write_text(json.dumps(state, indent=2))
         finally:
             event('mouseup', 1, 'keyup', 'Alt_L')
+            (directory / f'input-events-{label}.json').write_text(json.dumps(native_events, indent=2))
+            target.remove_controller(controller)
         wait(lambda: not (value := snapshot())['grabbed'] and not value['alt_pressed']
              and not value['button_pressed'], 'native drag and modifier release')
         observed(lambda value: value['drag_id'] is None and value['task'] != 'perch_ride',
