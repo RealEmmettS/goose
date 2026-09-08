@@ -269,6 +269,29 @@ test('disable cancels retained requests and prevents a late publication', async 
     f.extension.disable();
     await pending.finished;
     assert.equal(pending.result.frame, undefined);
+    assert.equal(pending.result.error, 'dev.emmetts.Honk300.Gnome1.Unavailable');
+    assert.equal(f.extension._requests.size, 0);
+    assert.equal(f.timers.size, 0);
+});
+
+test('disable during completed caller I/O is unavailable without revoking unchanged consent', async () => {
+    const f = fixture();
+    let finishCaller;
+    const enteredCaller = new Promise(resolve => {
+        f.file.query_info_async = (...args) => {
+            // Cancellation can race a successful native I/O completion that
+            // was already queued. Deliver that actual method's completion.
+            finishCaller = () => args.at(-1)(f.file, f.info);
+            resolve();
+        };
+    });
+    const pending = f.request();
+    await enteredCaller;
+    f.extension.disable();
+    finishCaller();
+    await pending.finished;
+    assert.equal(pending.result.frame, undefined);
+    assert.equal(pending.result.error, 'dev.emmetts.Honk300.Gnome1.Unavailable');
     assert.equal(f.extension._requests.size, 0);
     assert.equal(f.timers.size, 0);
 });

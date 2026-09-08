@@ -37,6 +37,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
 
 ### Fixed
+- Show a consistent disconnected status when the GNOME companion is disabled, while still stopping the goose's window ride immediately.
 - Reduce delays while checking GNOME permissions, while keeping the same ownership checks and finishing cancelled work safely.
 - Recover from a briefly slow GNOME permission check without using old desktop information or restoring access that you removed.
 - Include everything needed to build GNOME support from source, ignore unavailable pointer input and keep transient windows from unnecessarily disabling desktop observations.
@@ -48,6 +49,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost, keep setup responsive when a connection stops answering, and preserve unrelated desktop settings.
 
 ### Behind the scenes
+- Keep failed desktop evidence and repeat the complete release checks after correcting a status race and making private drag input easier to observe accurately.
 - Verify that each test drag actually reaches its native handle, including when the pointer was already over the window.
 - Start test drags on a clearly reachable native window handle, then check the same real window movement, goose ride and interruption behavior.
 - Keep long desktop checks observable and use consistent native test-window title bars without changing the required drag or cancellation behavior.
