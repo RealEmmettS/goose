@@ -54,6 +54,7 @@ expanded native x64/ARM64 probes are next. Runtime and explicit setup remain ope
 No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: Extend all four KDE lanes with the production Native SDK binary and real AT-SPI actions for consent, cancellation, removal, modal isolation and a saved draft that retains comments and unknown fields. This is additional native UI qualification, pending its first run.
 - 2026-09-08: Banked all-four actual-runtime acceptance from 34195263902. Each lane produced goose/result.json with runtime-connected, revocation, crash recovery and state-preservation proof. Keep native UI/package checks visible and portal access off.
 - 2026-09-08: The expanded native gate catches a Linux-only call to a nonexistent vector method before runtime launch. Use the engine's real magnitude operation and repeat native compilation before claiming runtime acceptance.
 - 2026-09-08: Add guided Rust-owned setup/removal, native consent UI and separate capability status. Retain a private stable registration identity for owned-only recovery after crashes. Expand the four native KWin lanes to compile and exercise the actual goose runtime, revocation, graceful cleanup, stopped removal and state preservation.

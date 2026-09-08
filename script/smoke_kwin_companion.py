@@ -60,6 +60,7 @@ def main():
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--bridge', type=Path)
     parser.add_argument('--goose', type=Path)
+    parser.add_argument('--settings', type=Path)
     parser.add_argument('--portal', action='store_true')
     args = parser.parse_args()
     evidence = args.evidence.resolve()
@@ -378,6 +379,9 @@ def main():
             normal.destroy()
             protected.destroy()
             pump()
+            if args.settings:
+                from smoke_kwin_settings import qualify
+                qualify(args.settings.resolve(), evidence, wait, call, GLib)
             if args.portal and major >= 6:
                 from smoke_kwin_portal import qualify
                 qualify(args.bridge.resolve(), evidence, wait, call, GLib, Gtk, RustBridge)
