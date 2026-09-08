@@ -17,7 +17,7 @@
 - [ ] **Stopping foot recovery** - withdraw stale airborne walking lead and qualify actual delivery motion (ms #refine) (owner codex) #rst
   - [x] Reproduce and correct the production gait while preserving planted contacts and timing.
   - [x] Qualify the native-height reversal regression and its actual rendered motion.
-  - [ ] Inspect actual Rust motion and repeat native delivered-note captures.
+  - [x] Inspect actual Rust motion and repeat native delivered-note captures.
   - [ ] Pass complete same-source release and fresh-public verification (needs #rgn).
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
   - [x] Complete the separately qualified Sway implementation (needs #rsw).
@@ -27,6 +27,7 @@
   - [x] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
   - [x] Prove live user-drag observation and automatic movement refusal through actual desktop input.
   - [x] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
+  - [ ] Qualify shared startup-readiness recovery with three actual GUI start/stop cycles.
   - [ ] Pass complete runtime, native settings, held-ride cancellation and owned-prop scenarios on both Shell versions and native architectures.
   - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137

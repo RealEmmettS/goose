@@ -31,6 +31,11 @@ broken IPC connection being treated as permanent startup failure in native Intel
 settings. Correct that readiness policy and repeat final-source qualification.
 
 ## Activity
+- 2026-09-08 — Integrate GNOME source 22810d6 so both pending stages include
+  R14's shared readiness correction before publication. Production Rust, Native
+  SDK, smoke scripts and package configuration are identical to locally qualified
+  6badb02; repeat the final committed-source native and release gates. Retain the
+  GNOME-first public download and website order.
 - 2026-09-08 — Preserve candidate 34284306818's Intel settings failure and cancel
   the incomplete candidate. The actual Start control reports Broken pipe before
   readiness; production-loop regressions reproduce the immediate rejection.
