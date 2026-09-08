@@ -6,7 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::var("GITHUB_ACTIONS").as_deref() != Ok("true") {
         return Err("Use only the disposable native CI fixture".into());
     }
-    let bridge = Bridge::connect()?;
+    let mut bridge = Bridge::connect()?;
     let stdin = std::io::stdin();
     let mut input = stdin.lock();
     let mut output = std::io::stdout().lock();
@@ -23,6 +23,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         let command: serde_json::Value = serde_json::from_slice(&bytes)?;
         let response = match command["op"].as_str() {
+            Some("activate") => match bridge.load_script(
+                "honk300-native-owned-probe",
+                include_bytes!("../../../integrations/kwin/contents/code/main.js"),
+            ) {
+                Ok(()) => serde_json::json!({"ok": true}),
+                Err(error) => serde_json::json!({"ok": false, "error": error.to_string()}),
+            },
             Some("snapshot") => serde_json::json!({"snapshot": bridge.snapshot()}),
             Some("move") => {
                 let window: Window = serde_json::from_value(command["window"].clone())?;

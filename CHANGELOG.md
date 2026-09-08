@@ -27,6 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Development
+- Load the explicitly authorized KWin companion from a retained sealed memfd, reject duplicate registrations, and unload only the runtime-owned script on drop. All four native KDE architecture/version lanes now pass fullscreen, other-desktop, user-drag and reconnect boundaries; qualify sealed activation next.
 - Use Plasma 5's authoritative numeric desktop membership when QtScript does not expose its desktop-vector objects. Isolate the fixture D-Bus responder from native painting and retire fixture scripts before KWin reuses their list-based identities; retain the 250 ms action deadline.
 - Qualify the actual Rust bridge on KWin 5/6, then require current desktop/activity for eligible targets and keep native fullscreen/user-drag observations separate from movement. Refuse movement during a user drag; expand the unchanged native assertions to ARM64.
 - Wait for native fixture windows to map before activating the KWin probe, and record bounded stop reasons without window contents. KWin 5 passed the real Rust transport; investigate KWin 6's startup expiry without relaxing its action deadline.

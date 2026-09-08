@@ -44,6 +44,7 @@ expanded native x64/ARM64 probes are next. Runtime and explicit setup remain ope
 No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: All four KWin 5/6 x64/ARM64 lanes pass the expanded native fullscreen, other-desktop, actual user-drag and reconnect checks in 34191906181. Add retained sealed-script activation and owned-only cleanup to the production Rust bridge; its new native gate is next.
 - 2026-09-08: Run 34191563854 exposes Plasma 5 desktop-vector conversion, fixture script-id reuse during Plasma 6 reconnect and a fixture responder delayed by native painting. Use the documented numeric membership on Plasma 5, unload test helpers in reverse order, and run the responder in its own GLib context before repeating the same native limits.
 - 2026-09-08: Both KWin generations pass the actual Rust transport in 34190701777. Add current-desktop/activity eligibility, separate fullscreen and user-drag observation, and refusal to move a window the user is dragging. Expand the real compositor probe to those states and native ARM64 before runtime integration.
 - 2026-09-08: Run 34190444045 passes actual Rust/KWin 5.27 identity, real movement,

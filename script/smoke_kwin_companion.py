@@ -350,11 +350,24 @@ def main():
                     unload_rust_script()
                 finally:
                     bridge.close()
+                # The production owner loads sealed script bytes itself and retires
+                # only that registration when its retained connection is dropped.
+                bridge = RustBridge(args.bridge.resolve(), evidence)
+                try:
+                    activated = bridge.request('activate')
+                    assert activated['ok'], activated
+                    wait(lambda: bridge.request('snapshot')['snapshot'], 'Rust-owned sealed companion')
+                    assert not bridge.request('activate')['ok'], 'Duplicate activation was accepted'
+                finally:
+                    bridge.close()
+                assert not call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'isScriptLoaded',
+                    GLib.Variant('(s)', ('honk300-native-owned-probe',))).unpack()[0], 'Owned companion leaked after drop'
                 (evidence / 'rust-result.json').write_text(json.dumps(dict(ok=True,
                     native_identity=True, bounded_move=True, untrusted_peer_refused=True,
                     protected_stale_excessive_refused=True, connection_loss_expires=True,
                     explicit_reconnect=True, stop=True, fullscreen_refused=True,
                     other_desktop_refused=True, actual_user_drag_observed=True,
+                    sealed_rust_activation=True, owned_script_cleanup=True,
                     goose_runtime_connected=False), indent=2) + '\n')
             normal.destroy()
             protected.destroy()
