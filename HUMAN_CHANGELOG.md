@@ -37,6 +37,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Keep Hyprland window observations together so a busy desktop has fewer separate requests to answer, while still discarding late or incomplete information.
 
 ### Behind the scenes
+- Preserve more detail when an older Hyprland desktop replies too slowly, so the cause can be identified while that support remains unqualified.
 - Keep private test windows responsive while the separate desktop observer runs, including fullscreen transitions.
 
 ### Behind the scenes

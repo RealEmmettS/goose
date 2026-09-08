@@ -192,6 +192,20 @@ def main():
                 if args.bridge is None:
                     return None
                 result = run_bridge(environment)
+                if result.returncode != 0:
+                    diagnostics = dict(error=result.stderr, phase=label, queries=[])
+                    for query in ('j/clients', 'j/monitors', 'j/version',
+                                  '[[BATCH]]j/monitors;j/clients;j/monitors'):
+                        started = time.monotonic()
+                        try:
+                            reply = ipc(query, decode=False)
+                            diagnostics['queries'].append(dict(query=query, reply=reply,
+                                elapsed_ms=(time.monotonic() - started) * 1000))
+                        except TimeoutError as error:
+                            diagnostics['queries'].append(dict(query=query, error=str(error),
+                                elapsed_ms=(time.monotonic() - started) * 1000))
+                    (evidence / f'rust-{label}-failure.json').write_text(
+                        json.dumps(diagnostics, indent=2) + '\n')
                 assert result.returncode == 0, result.stderr
                 observed = json.loads(result.stdout)
                 assert observed['peer_pid'] == compositor.pid and observed['peer_uid'] == os.getuid()
@@ -229,6 +243,9 @@ def main():
             windows[0].fullscreen()
             fullscreen = wait(lambda: (node if (node := find(ordinary['title'])) and
                 node['fullscreen'] == 2 else None), 'actual fullscreen observation')
+            (evidence / 'native-fullscreen.json').write_text(json.dumps(dict(
+                native=fullscreen, gtk_size=[windows[0].get_width(), windows[0].get_height()]),
+                indent=2) + '\n')
             rust = rust_snapshot('fullscreen')
             if rust:
                 assert rust['fullscreen']
