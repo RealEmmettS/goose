@@ -28,6 +28,14 @@ fn invalid(message: &str) -> io::Error {
 }
 fn bus_error(error: zbus::Error) -> io::Error {
     match error {
+        zbus::Error::MethodError(name, _, _)
+            if name.as_str() == "dev.emmetts.Honk300.Gnome1.Busy" =>
+        {
+            io::Error::new(
+                io::ErrorKind::WouldBlock,
+                "GNOME credential checks are busy",
+            )
+        }
         zbus::Error::InputOutput(error) if error.kind() == io::ErrorKind::TimedOut => {
             io::Error::new(
                 io::ErrorKind::TimedOut,
@@ -250,6 +258,11 @@ impl Source for Connection {
     }
     fn snapshot(&mut self) -> io::Result<Frame> {
         self.snapshot()
+    }
+    fn retryable(error: &io::Error) -> bool {
+        // A bounded busy response from the pinned Shell may retry that same
+        // owner. Stale frames are withdrawn; every authority/error change ends it.
+        error.kind() == io::ErrorKind::WouldBlock
     }
 }
 

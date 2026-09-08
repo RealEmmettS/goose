@@ -40,6 +40,9 @@ The CLI, runtime IPC and Native SDK dialogs share Rust ownership. Repeated setup
 retains the same live worker and permission. Settings drafts survive setup,
 removal and goose shutdown. Observations end on malformed replies, stale owners,
 extension removal or lost consent; reconnecting requires an explicit action.
+Credential lookup allows at most four concurrent requests. A busy response from
+the same pinned Shell withdraws any old frame and may retry a bounded snapshot;
+an unapproved caller cannot terminate the real worker merely by using a lookup slot.
 
 The production desktop fixture must exercise the actual companion, Rust runtime,
 native settings controls, ordinary and terminal user drags, fullscreen manners,

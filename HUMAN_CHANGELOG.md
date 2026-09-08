@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Added
+- Keep the goose connected when GNOME refuses another program’s observation request, without giving that program access or keeping old window information.
 - Keep the GNOME connection checks compatible with the project’s strict build checks.
 - Check GNOME permissions against correctly installed application files while continuing to reject files owned by an unrelated account.
 - Keep optional GNOME setup and shutdown responsive when the desktop connection stops answering, and retain complete permission files without exposing private test permissions.

@@ -192,14 +192,16 @@ preserve = "untouched"
         # Even a client that knows this private fixture's consent cannot query the
         # production API without the kernel-authenticated approved executable.
         consent = json.loads(record.read_bytes())
-        try:
-            bus.call_sync(shell_owner, '/dev/emmetts/Honk300/Gnome1',
-                'dev.emmetts.Honk300.Gnome1', 'Snapshot', GLib.Variant('(s)', (consent['nonce'],)),
-                GLib.VariantType.new('(s)'), Gio.DBusCallFlags.NONE, 1000, None)
-        except GLib.Error:
-            pass
-        else:
-            raise AssertionError('Unapproved executable queried production observations')
+        for _ in range(12):
+            try:
+                bus.call_sync(shell_owner, '/dev/emmetts/Honk300/Gnome1',
+                    'dev.emmetts.Honk300.Gnome1', 'Snapshot', GLib.Variant('(s)', (consent['nonce'],)),
+                    GLib.VariantType.new('(s)'), Gio.DBusCallFlags.NONE, 1000, None)
+            except GLib.Error:
+                pass
+            else:
+                raise AssertionError('Unapproved executable queried production observations')
+        expect('supported', 'rejected foreign callers preserve the authenticated runtime')
         drag(window)
         drag(protected_window, protected=True)
         invoke('Refresh status')

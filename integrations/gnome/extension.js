@@ -61,7 +61,7 @@ export default class Honk300Observations extends Extension {
         this._generation = (this._generation ?? 0) + 1;
         this._active = true;
         this._drag = null;
-        this._pending = false;
+        this._pendingCredentials = 0;
         this._begin = global.display.connect('grab-op-begin', (_display, window, op) => {
             this._drag = window && [Meta.GrabOp.MOVING, Meta.GrabOp.MOVING_UNCONSTRAINED,
                 Meta.GrabOp.KEYBOARD_MOVING].includes(op)
@@ -103,12 +103,20 @@ export default class Honk300Observations extends Extension {
         const generation = this._generation;
         let ownsPending = false;
         try {
-            if (!this._active || this._pending || nonce.length !== 32)
+            if (!this._active || nonce.length !== 32)
                 throw new Error('GNOME observations are unavailable');
             const consent = this._consent();
             if (nonce !== consent.nonce)
                 throw new Error('GNOME observation permission does not match');
-            this._pending = ownsPending = true;
+            // An unapproved caller must not evict the real runtime by occupying
+            // a single in-flight slot while its bus credentials are checked.
+            // Bound the authentication work independently from snapshot validity.
+            if (this._pendingCredentials >= 4) {
+                invocation.return_dbus_error(`${IFACE}.Busy`, 'GNOME observations are busy');
+                return;
+            }
+            this._pendingCredentials++;
+            ownsPending = true;
             const sender = invocation.get_sender();
             const [pid, uid] = await Promise.all([
                 this._credential(sender, 'GetConnectionUnixProcessID'),
@@ -167,7 +175,7 @@ export default class Honk300Observations extends Extension {
             invocation.return_dbus_error(`${IFACE}.Unavailable`, 'GNOME observations unavailable; check explicit setup and extension status');
         } finally {
             if (ownsPending && generation === this._generation)
-                this._pending = false;
+                this._pendingCredentials--;
         }
     }
 
