@@ -88,6 +88,10 @@ pub struct Session {
 impl Session {
     /// Call only in response to explicit user setup. The desktop owns the grant UI.
     pub fn request() -> io::Result<Self> {
+        if cfg!(target_env = "musl") {
+            return Err(io::Error::new(io::ErrorKind::Unsupported,
+                "Pointer permission requires the GNU Linux build. KDE window support remains available."));
+        }
         let oeffis = Oeffis::load()?;
         let ei = Ei::load()?;
         // SAFETY: no custom userdata or callback; null is supported by liboeffis.

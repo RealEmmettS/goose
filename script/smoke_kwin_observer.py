@@ -11,8 +11,10 @@ class NativeObserver:
         gi.require_version('Gio', '2.0')
         from gi.repository import Gio
         self.call, self.GLib = call, GLib
+        self.evidence = evidence
         self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
         self.frames = []
+        self.count = 0
         self.latest = []
         self.owner = call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
             'GetNameOwner', GLib.Variant('(s)', ('org.kde.KWin',))).unpack()[0]
@@ -70,6 +72,7 @@ class NativeObserver:
             frame = json.loads(raw)
             assert len(frame) <= 64
             self.latest = frame
+            self.count += 1
             self.frames.append(frame)
             self.frames = self.frames[-256:]
             invocation.return_value(None)
@@ -77,6 +80,8 @@ class NativeObserver:
             invocation.return_dbus_error('org.emmetts.Honk300.Invalid', str(error))
 
     def close(self):
+        (self.evidence / 'native-observer-frames.json').write_text(json.dumps(
+            dict(count=self.count, frames=self.frames), indent=2) + '\n')
         self.call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'unloadScript',
             self.GLib.Variant('(s)', ('honk300-fixture-observer',)))
         self.loop.quit()

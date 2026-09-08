@@ -39,6 +39,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Wait for desktop permission services to finish starting before testing a request.
 
 ### Behind the scenes
+- Preserve useful delivery-test evidence and report each desktop check even when another check fails.
+- Explain which Linux build can request optional pointer permission.
 - Check the actual KDE setup and removal buttons while keeping unsaved settings intact.
 - Make failed desktop permission requests easier to diagnose before enabling the goose to move the pointer.
 

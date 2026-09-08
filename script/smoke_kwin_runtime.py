@@ -99,11 +99,12 @@ preserve = "untouched"
         wait(lambda: observer.frames, 'native runtime observer')
         control('do', 'note')
         def note():
-            return next((item for item in observer.latest if item['app'] == 'honk300.prop.1'), None)
+            return next((item for item in observer.latest if item['title'] == 'Honk300 note'), None)
         initial = wait(note, 'actual runtime-owned note', timeout=20)
         parent = next(line.split()[1] for line in Path(f"/proc/{initial['pid']}/status").read_text().splitlines()
                       if line.startswith('PPid:'))
         assert int(parent) == process.pid, initial
+        assert initial['app'] == 'honk300.prop.1', initial
         assert initial['geometry'][2] <= 1280 * 0.48 and initial['geometry'][3] <= 900 * 0.48
         moved = wait(lambda: (item if (item := note()) and
             sum((item['geometry'][i] - initial['geometry'][i]) ** 2 for i in (0, 1)) > 16 else None),
@@ -111,12 +112,12 @@ preserve = "untouched"
         control('integrations', 'kde', 'remove')
         wait(unsupported, 'live explicit revocation')
         assert not loaded(name) and not record.exists()
-        count = len(observer.frames)
-        wait(lambda: len(observer.frames) >= count + 2, 'revocation settles in compositor')
+        count = observer.count
+        wait(lambda: observer.count >= count + 2, 'revocation settles in compositor')
         stopped = note()
         assert stopped is not None, 'Revocation destroyed the retained note'
-        count = len(observer.frames)
-        wait(lambda: len(observer.frames) >= count + 10, 'movement remains stopped after revocation')
+        count = observer.count
+        wait(lambda: observer.count >= count + 10, 'movement remains stopped after revocation')
         assert note()['geometry'] == stopped['geometry'], (stopped, note())
         (directory / 'owned-movement.json').write_text(json.dumps(dict(initial=initial,
             moved=moved, stopped=stopped, after=note()), indent=2) + '\n')
@@ -159,3 +160,5 @@ preserve = "untouched"
         if process is not None and process.poll() is None:
             process.kill()
             process.wait(timeout=5)
+        if record.exists():
+            control('integrations', 'kde', 'remove')

@@ -9,6 +9,7 @@ import selectors
 import subprocess
 import threading
 import time
+import traceback
 
 
 class RustBridge:
@@ -382,18 +383,30 @@ def main():
                     other_desktop_refused=True, actual_user_drag_observed=True,
                     sealed_rust_activation=True, owned_script_cleanup=True,
                     goose_runtime_connected=False), indent=2) + '\n')
-            if args.goose:
-                from smoke_kwin_runtime import qualify
-                qualify(args.goose.resolve(), evidence, wait, call, GLib)
             normal.destroy()
             protected.destroy()
             pump()
+            failures = []
+
+            def qualify_independently(name, action):
+                try:
+                    action()
+                except Exception:
+                    failure = traceback.format_exc()
+                    (evidence / f'{name}-failure.txt').write_text(failure)
+                    failures.append(name)
+                    print(failure, flush=True)
+
+            if args.goose:
+                from smoke_kwin_runtime import qualify
+                qualify_independently('runtime', lambda: qualify(args.goose.resolve(), evidence, wait, call, GLib))
             if args.settings:
                 from smoke_kwin_settings import qualify
-                qualify(args.settings.resolve(), evidence, wait, call, GLib)
+                qualify_independently('settings', lambda: qualify(args.settings.resolve(), evidence, wait, call, GLib))
             if args.portal and major >= 6:
                 from smoke_kwin_portal import qualify
-                qualify(args.bridge.resolve(), evidence, wait, call, GLib, Gtk, RustBridge)
+                qualify_independently('portal', lambda: qualify(args.bridge.resolve(), evidence, wait, call, GLib, Gtk, RustBridge))
+            assert not failures, f'Native qualifiers failed: {failures}'
             (evidence / 'result.json').write_text(json.dumps(dict(ok=True, kwin=version,
                 architecture=os.uname().machine, native_identity=True, bounded_move=True,
                 terminal_refused=True, excessive_move_refused=True, stale_refused=True,
