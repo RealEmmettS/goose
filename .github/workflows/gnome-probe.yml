@@ -62,11 +62,18 @@ jobs:
             if test -d /run/systemd/seats; then rmdir /run/systemd/seats; fi
             mkdir -p /run/dbus
             dbus-daemon --system --fork
+            # Bind-mounted runner outputs retain the host UID, which is not
+            # authority for the private desktop user. Install identical bytes
+            # into a root-owned fixture release just like a managed package.
+            install -Dm0755 target/release/honk300 /opt/honk300-qualification/honk300
+            install -Dm0755 target/release/honk300-settings /opt/honk300-qualification/honk300-settings
+            cmp target/release/honk300 /opt/honk300-qualification/honk300
+            cmp target/release/honk300-settings /opt/honk300-qualification/honk300-settings
             useradd --create-home honkprobe
             chown -R honkprobe:honkprobe /work/target/gnome-evidence
             runuser -u honkprobe -- env GITHUB_ACTIONS=true xvfb-run -a -s "-screen 0 1400x1000x24" \
               dbus-run-session -- python3 script/smoke_gnome_adapter.py \
-                --evidence target/gnome-evidence --goose target/release/honk300 --settings target/release/honk300-settings
+                --evidence target/gnome-evidence --goose /opt/honk300-qualification/honk300 --settings /opt/honk300-qualification/honk300-settings
           '
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}
