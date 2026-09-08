@@ -65,7 +65,9 @@ pub fn prepare_config_autostart(
 
     let Some(identity) = managed_autostart_identity()? else {
         return if explicitly_configured {
-            reconcile_config_autostart(config.lifecycle.autostart_on_login)
+            snapshot.revision.with_guard(config_path, || {
+                reconcile_config_autostart(config.lifecycle.autostart_on_login)
+            })
         } else {
             Ok(())
         };
@@ -85,7 +87,9 @@ pub fn prepare_config_autostart(
         }
     }
     if explicitly_configured {
-        reconcile_config_autostart(config.lifecycle.autostart_on_login)?;
+        snapshot.revision.with_guard(config_path, || {
+            reconcile_config_autostart(config.lifecycle.autostart_on_login)
+        })?;
     }
     Ok(())
 }

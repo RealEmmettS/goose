@@ -39,6 +39,8 @@ All notable changes to this project are documented here. Format based on
 - Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
 
 ### Fixed
+- Hold the same configuration revision lock through login-start reconciliation so a concurrent GUI/TUI save cannot be followed by a stale OS setting. Detect external editors that ignore that lock before reporting success.
+- Guard dashboard deletion against changed task-detail contents, and reject completion when task detail is missing or empty; preserve concurrent Status/Activity updates.
 - Reconcile receipt-owned autostart intent before the native settings edit snapshot, preserve its resulting revision, and reject concurrent configuration changes during reconciliation.
 - Keep native settings editable when runtime status cannot be confirmed, display an unknown state instead of stopped, and omit an unused native path field that could panic on non-Unicode filenames.
 - Reject ordinary reload when its configuration file is missing, retaining the running choices instead of silently applying defaults.

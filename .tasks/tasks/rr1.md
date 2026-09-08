@@ -33,6 +33,12 @@ null-handle launcher defect was refuted against the pinned binding and an actual
 Windows process test. No v1.4.0 tag/public bytes exist; user installation is unchanged.
 
 ## Activity
+- 2026-09-08: Final PR #9 review exposed a second autostart race and two vendored-board
+  transaction gaps. Hold the existing OS config lock through reconciliation and add
+  production guard tests. Real disposable HTTP requests reproduced both board failures;
+  require the loaded detail revision for deletion and nonempty detail for completion.
+  The review's malformed P1 prose supplies no independent actionable evidence; the actual
+  Debian timestamp precondition was already diagnosed from native logs and corrected.
 - 2026-09-08: The x64 Debian probe stopped at its older-config precondition because
   reproducible packages preserve receipt timestamps. Set the isolated fixture's config
   age explicitly before installation and record both times. The real settings Read/Save,

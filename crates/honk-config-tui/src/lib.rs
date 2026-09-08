@@ -167,7 +167,11 @@ fn handle_command(
             {
                 Ok(revision) => {
                     saved_revision = Some(revision);
-                    match save_hook(&app.config) {
+                    match reconcile_saved_config(
+                        app,
+                        saved_revision.as_ref().expect("saved revision"),
+                        save_hook,
+                    ) {
                         Err(error) => result(
                             format!("saved; login autostart reconcile failed: {error}"),
                             true,
@@ -290,7 +294,11 @@ where
                 return result(format!("start blocked; save failed: {error}"), true, false)
             }
         }
-        if let Err(error) = save_hook(&app.config) {
+        if let Err(error) = reconcile_saved_config(
+            app,
+            saved_revision.as_ref().expect("saved revision"),
+            save_hook,
+        ) {
             let mut command_result = result(
                 format!("start blocked; saved, but login autostart reconcile failed: {error}"),
                 true,
@@ -310,6 +318,18 @@ where
     }
     command_result.saved_revision = saved_revision;
     command_result
+}
+
+fn reconcile_saved_config(
+    app: &AppState,
+    revision: &honk_config::ConfigRevision,
+    save_hook: &(dyn Fn(&Config) -> std::result::Result<(), String> + Send + Sync),
+) -> Result<(), String> {
+    revision
+        .with_guard(&app.path, || {
+            save_hook(&app.config).map_err(ConfigError::InvalidTarget)
+        })
+        .map_err(|error| error.to_string())
 }
 
 fn wait_for_readiness<F>(
@@ -611,6 +631,25 @@ mod tests {
                 .lifecycle
                 .autostart_on_login
         );
+    }
+
+    #[test]
+    fn dirty_start_holds_the_config_lock_through_its_login_hook() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        Config::default().save_atomic(&path).unwrap();
+        let mut app = AppState::new(Config::default(), path.clone());
+        app.revision = honk_config::ConfigRevision::read(&path).unwrap();
+        app.config.lifecycle.autostart_on_login = true;
+        let result = handle_start_with_hook(&app, |_| Ok("started".into()), &|config| {
+            assert!(config.lifecycle.autostart_on_login);
+            let latest = ConfigSnapshot::load(&path).unwrap();
+            let mut rival = latest.config;
+            rival.lifecycle.autostart_on_login = false;
+            assert!(rival.save_if_revision(&path, &latest.revision).is_err());
+            Ok(())
+        });
+        assert!(!result.is_error, "{}", result.status);
     }
 
     #[test]

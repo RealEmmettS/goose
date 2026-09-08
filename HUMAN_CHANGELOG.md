@@ -34,6 +34,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Fixed
+- Keep login-start changes consistent with the saved preference when two settings windows are editing at once, and report conflicting external edits.
+- Refuse to delete a task after someone else updates its details, and require saved task details before marking it complete.
 - Opening settings now respects the installer's latest start-at-login choice, so changing an unrelated preference cannot undo it.
 - Settings remain editable when the goose cannot report its status, and unusual configuration filenames no longer prevent the window from loading.
 - Reloading after a configuration file disappears keeps the goose's current choices instead of silently resetting them.
