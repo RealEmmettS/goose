@@ -28,14 +28,16 @@ uses this exact path, and settings clearly distinguish grant, readiness and unsu
 - [ ] Fresh target/terminal checks, device pause/removal and disconnects fail closed.
 
 ## Status
-Run 34198830686 now reaches the actual frontend and KDE backend. KDE denies CreateSession
-because its backend cannot see the required screencast protocol. Refresh the private
-desktop's standard KService registry and record loaded/available compositor plugins;
-retain normal interface permissions and require the genuine consent dialog.
+Run 34201107432 now loads the real screencast/EIS plugins, but KService still denies
+the installed backend's declared interface because the private container lacks Plasma's
+application menu. Install the real plasma-workspace package, set its normal menu prefix,
+retain the backend desktop-file evidence, and start PipeWire before the compositor.
+The next native run must reach genuine consent with the normal permission checks intact.
 Active: checking the real library and KDE 6 grant before enabling a runtime capability.
 KDE 5 has separate window evidence; no EIS or portal control is claimed for it.
 
 ## Activity
+- 2026-09-08: Native evidence now separates loaded plugins from failed service authorization. Debian's plasma-workspace file list identifies the missing menu; restore normal service discovery and PipeWire startup order in the private fixture before repeating the actual grant and motion oracle.
 - 2026-09-08: Run 34199983732 records empty AvailablePlugins and LoadedPlugins on both KDE 6 desktops. Debian puts screencast/EIS plugins in the separately recommended kwin-common package; include that actual desktop package in the isolated fixture while retaining normal consent and protocol permissions.
 - 2026-09-08: The corrected frontend ownership reaches CreateSession. Native KDE reports zkde_screencast_unstable_v1 unavailable. Add the normal isolated KService cache refresh, backend package inventory and compositor plugin/permission diagnostics before repeating the real grant premise; do not disable compositor permission checks.
 - 2026-09-08: Keep the static musl archive's pointer control explicitly unsupported with a GNU-build explanation; its static runtime cannot dynamically load the optional input libraries. KDE window support remains separate. Portal qualification now runs independently of the owned-prop test and still blocks the complete native gate on failure.

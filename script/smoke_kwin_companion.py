@@ -2,6 +2,7 @@
 """Earliest real KWin script premise test, confined to a disposable CI compositor."""
 from __future__ import annotations
 import argparse
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -54,6 +55,29 @@ class RustBridge:
         assert self.process.returncode == 0
 
 
+@contextmanager
+def private_pipewire(environment, evidence, enabled):
+    if not enabled:
+        yield
+        return
+    with (evidence / 'pipewire.log').open('w') as log:
+        process = subprocess.Popen(['pipewire'], env=environment, stdout=log, stderr=log)
+        try:
+            deadline = time.monotonic() + 10
+            while not (Path(environment['XDG_RUNTIME_DIR']) / 'pipewire-0').is_socket():
+                assert process.poll() is None, 'Private PipeWire exited before readiness'
+                assert time.monotonic() < deadline, 'Private PipeWire socket did not become ready'
+                time.sleep(0.02)
+            yield
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+
+
 def main():
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise RuntimeError('Use only a disposable GitHub runner')
@@ -72,7 +96,8 @@ def main():
     config.mkdir()
     environment = dict(os.environ, XDG_RUNTIME_DIR=str(runtime), XDG_CONFIG_HOME=str(config),
         XDG_DATA_HOME=str(evidence / 'data'),
-        XDG_CURRENT_DESKTOP='KDE', XDG_SESSION_TYPE='wayland', QT_QPA_PLATFORM='offscreen',
+        XDG_CURRENT_DESKTOP='KDE', XDG_SESSION_TYPE='wayland', XDG_MENU_PREFIX='plasma-',
+        QT_QPA_PLATFORM='offscreen',
         KWIN_COMPOSE='Q', LIBGL_ALWAYS_SOFTWARE='true', GDK_BACKEND='wayland',
         QT_LOGGING_RULES='kwin_core.debug=true')
     environment.pop('DISPLAY', None)
@@ -80,6 +105,10 @@ def main():
     version = subprocess.check_output(['kwin_wayland', '--version'], env=environment, text=True).strip()
     (evidence / 'version.txt').write_text(version)
     if args.portal and 'kwin 6.' in version.lower():
+        backend_desktop = Path('/usr/share/applications/org.freedesktop.impl.portal.desktop.kde.desktop')
+        (evidence / 'backend.desktop').write_bytes(backend_desktop.read_bytes())
+        menu = Path('/etc/xdg/menus/plasma-applications.menu')
+        assert menu.is_file(), 'The installed Plasma service menu is required for KService discovery'
         # A bare container lacks the desktop login's service-cache refresh.
         # Discover the installed backend's own desktop-file permissions through
         # KService; retain the normal compositor interface authorization checks.
@@ -118,7 +147,8 @@ def main():
                            f'compositor: {(evidence / "compositor.log").read_text()[-5000:]}')
 
     latest = None
-    with (evidence / 'compositor.log').open('w') as log:
+    with private_pipewire(environment, evidence, args.portal and 'kwin 6.' in version.lower()), \
+            (evidence / 'compositor.log').open('w') as log:
         compositor = subprocess.Popen(['kwin_wayland', '--virtual', '--width', '1280', '--height', '900',
             '--no-lockscreen', '--socket', 'wayland-honk-kwin'], env=environment, stdout=log, stderr=log)
         try:
@@ -143,7 +173,7 @@ def main():
             # qualifier. Give those services the actual private compositor first.
             activation = {key: value for key, value in os.environ.items()
                 if key in ('WAYLAND_DISPLAY', 'XDG_RUNTIME_DIR', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME',
-                           'XDG_CURRENT_DESKTOP', 'XDG_SESSION_TYPE', 'LANG')}
+                           'XDG_CURRENT_DESKTOP', 'XDG_SESSION_TYPE', 'XDG_MENU_PREFIX', 'LANG')}
             activation.update(QT_QPA_PLATFORM='wayland', QT_ACCESSIBILITY='1',
                               QT_LINUX_ACCESSIBILITY_ALWAYS_ON='1')
             call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',

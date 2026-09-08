@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Behind the scenes
+- Check optional KDE support with the same optimized app people install and the desktop services it expects, so incomplete test desktops do not obscure real failures.
+
 ### Fixed
 - Give delivered notes their own desktop identity once their window appears, so optional KDE support can recognize and move the correct note.
 

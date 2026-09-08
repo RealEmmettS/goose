@@ -36,13 +36,13 @@ jobs:
           cargo test --locked -p honk-platform-linux --lib
           cargo test --locked --bin honk300 integrations
           cargo clippy --locked --workspace --all-targets -- -D warnings
-          cargo build --locked -p honk-platform-linux --example kwin_bridge_probe
-          cargo build --locked --bin honk300
+          cargo build --locked --release -p honk-platform-linux --example kwin_bridge_probe
+          cargo build --locked --release --bin honk300
       - name: Build the production Native SDK settings companion
         run: |
           sudo apt-get install --no-install-recommends -y libgtk-4-dev pkg-config
           target="$(uname -m)-unknown-linux-gnu"
-          python3 script/build_settings.py --target "$target" --output target/debug --test
+          python3 script/build_settings.py --target "$target" --output target/release --test
       - name: Exercise the real isolated compositor and script
         env:
           HONK_DISTRIBUTION: ${{ matrix.distribution }}
@@ -58,7 +58,7 @@ jobs:
               at-spi2-core gir1.2-atspi-2.0
             if test "$HONK_DISTRIBUTION" = "debian:trixie-slim"; then
               DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
-                kwin-common xdg-desktop-portal xdg-desktop-portal-kde liboeffis1 libei1 \
+                kwin-common plasma-workspace xdg-desktop-portal xdg-desktop-portal-kde liboeffis1 libei1 \
                 at-spi2-core gir1.2-atspi-2.0 pipewire qt6-wayland
             fi
             dpkg-query -W > target/kwin-evidence/packages.txt
@@ -72,7 +72,7 @@ jobs:
             # Drop that request for this private software-rendered container;
             # do not grant extra container/host privileges just to launch it.
             if test -n "$capabilities"; then setcap -r "$compositor"; fi
-            dbus-run-session -- python3 script/smoke_kwin_companion.py --evidence target/kwin-evidence --bridge target/debug/examples/kwin_bridge_probe --goose target/debug/honk300 --settings target/debug/honk300-settings --portal
+            dbus-run-session -- python3 script/smoke_kwin_companion.py --evidence target/kwin-evidence --bridge target/release/examples/kwin_bridge_probe --goose target/release/honk300 --settings target/release/honk300-settings --portal
           '
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}

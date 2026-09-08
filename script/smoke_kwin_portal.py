@@ -58,7 +58,7 @@ def qualify(binary, evidence, wait, call, GLib, Gtk, RustBridge):
         return result
 
     try:
-        launch('pipewire', 'pipewire')
+        assert (Path(environment['XDG_RUNTIME_DIR']) / 'pipewire-0').is_socket()
         backend = launch(program('xdg-desktop-portal-kde', 'xdg-desktop-portal-kde'), 'kde')
         desktop = launch(program('xdg-desktop-portal', 'xdg-desktop-portal'), 'desktop', '--verbose', '--replace')
         wait(lambda: call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',

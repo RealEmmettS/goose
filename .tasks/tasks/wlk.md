@@ -35,10 +35,11 @@ this task owns the native implementation evidence and #rkde owns publication.
 - [ ] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
-Current owned-prop qualification is blocked by the native application identity in
-34198830686: both KDE versions report the exact runtime-owned note as GTK Application.
-The GDK setter returns before an xdg_toplevel exists, so apply the token after mapping
-and repeat all four native lanes. The existing movement and ownership oracle is unchanged.
+Run 34201107432 proves actual owned-note movement on both x64 KDE generations, but
+both ARM lanes stop after less than the required four pixels despite correct identity.
+The observer also reports sparse frames under the unoptimized runtime. Qualify the real
+release build next to distinguish debug rendering load from a production cancellation
+defect; preserve the 250 ms expiry and actual movement/revocation requirements.
 The full production runtime and setup path passed all four KWin 5/6 x64/ARM64 lanes
 in 34195263902. Evidence includes default-off state, separate capabilities, native Rust
 settings-service status, live and external removal, crash recovery, graceful cleanup,
@@ -58,6 +59,7 @@ expanded native x64/ARM64 probes are next. Runtime and explicit setup remain ope
 No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: Correct note identity and off-center placement are now observed in all lanes. Both x64 movement checks pass; both ARM checks remain failures. Switch the native runtime and bridge to release builds before repeating, without increasing any freshness deadline or lowering the movement threshold.
 - 2026-09-08: Run 34199983732 proves the application-id correction and actual owned movement/revocation on KDE 5 x64. Other approaches can pick up the compositor-centered note already at the engine's center release point, giving no required drag distance. Establish and observe an off-center initial fixture placement before measuring only subsequent engine-driven movement; keep all ownership and revocation assertions.
 - 2026-09-08: Native observer evidence identifies the actual child-owned note but its app id remains GTK Application. Upstream GDK confirms the setter ignores pre-map calls. Move the exact per-prop identity assignment after GTK mapping and repeat the actual movement/revocation check.
 - 2026-09-08: Native movement run 34198076323 compiles and starts the actual prop host but cannot identify the note. Retain bounded native observer frames, assert the actual note's application token and owned parent process, and use a monotonic frame counter for revocation timing. Independent runtime/UI/portal results remain failures unless every required qualifier passes.
