@@ -64,3 +64,11 @@ changed-field badges and dialogs require more than an intermediate 128-node limi
 the final 256-widget bound covers every current page with all its fields changed.
 Both native OS fixtures toggle eight fields on that page and require Save plus
 readback, in addition to the smaller-page and modal checks.
+
+The longer KDE permissions page exposed a separate SDK focus limitation: native
+accessibility published offscreen buttons but could not activate them. The pinned
+runtime patch now uses the existing clamped ancestor scroll owners before rechecking
+the real focus target and routing keyboard activation. It retains current semantics,
+hidden/modal isolation and disabled-control rejection. The production SDK dispatcher
+regression reproduces the original failure, then passes with actual scrolling and one
+activation; integrated native KDE repetition remains required for release qualification.

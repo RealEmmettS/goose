@@ -2,8 +2,15 @@ name: Native KWin companion
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      commit:
+        required: true
+        type: string
+  pull_request:
+    paths: ['integrations/kwin/**', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock', 'script/smoke_kwin*', '.github/workflows/kwin-probe.yml', '.github/workflows/release.yml']
   push:
-    branches: [codex/goose-wayland-integrations]
+    branches: [main, codex/goose-wayland-integrations]
     paths: ['integrations/kwin/**', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock', 'script/smoke_kwin*', '.github/workflows/kwin-probe.yml']
 
 permissions:
@@ -21,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:

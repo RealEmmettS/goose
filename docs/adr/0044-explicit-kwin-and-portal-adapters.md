@@ -1,7 +1,7 @@
 # ADR 0044: explicit and revocable native Wayland adapters
 
 Date: 2026-09-08
-Status: accepted design; native KWin bridge qualified, runtime/setup qualification in progress
+Status: accepted design; native window/runtime/setup and portal premises qualified, integrated pointer lifecycle in progress
 
 ## Context
 

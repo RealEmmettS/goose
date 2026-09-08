@@ -1,7 +1,7 @@
 .{
     .name = .honk300_settings,
     .fingerprint = 0x1081bc6c5a707070,
-    .version = "1.5.0",
+    .version = "1.6.0",
     .minimum_zig_version = "0.16.0",
     .dependencies = .{ .native_sdk = .{ .path = "node_modules/@native-sdk/cli" } },
     .paths = .{ "build.zig", "build.zig.zon", "src", "assets", "app.zon", "accessibility", "owned-props" },

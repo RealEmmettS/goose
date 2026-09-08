@@ -26,41 +26,23 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
-### Behind the scenes
-- Preserve bounded first-loss diagnostics for KDE frame expiry and refused owned-window binding/movement; retain native observer timing and the accepted portal dialog tree during qualification.
-- Qualify the actual optimized runtime in private KDE desktops with the distribution's Plasma service menu, normal KService registration, and PipeWire ready before compositor startup.
-- Wait for the completed native UI save response before opening the Windows fixture's config file for readback; this prevents the test reader from denying atomic replacement.
-- Include KDE's packaged compositor plugins in the private portal fixture, and establish a nonzero owned-note delivery distance before measuring engine-driven motion.
-- Preserve bounded native prop observations and use monotonic capture counts for revocation checks; run the runtime, GUI and portal qualifiers independently while requiring all results for acceptance.
-- Explain that optional portal pointer permission requires the GNU Linux executable; the statically linked musl executable keeps its separate KDE window capabilities.
-- Extend both KDE generations and architectures with production Native SDK consent/removal actions through AT-SPI, including modal isolation and preservation of unsaved settings.
-- Preserve bounded native portal error details and actual service ownership in the isolated consent fixture so a failed grant can be diagnosed before enabling pointer control.
-- Begin native portal/libei qualification using an ephemeral pointer-only session, bounded device ownership, compositor-confirmed terminal exclusions and no runtime enablement before the real grant/motion/cancellation probe passes.
-
-### Fixed
-- Set each owned Wayland prop's application identity after GTK maps its xdg_toplevel; pre-map setters are ignored by GDK. Refresh the isolated KDE service cache and capture compositor plugins when qualifying native portal permissions.
-- Cancel queued prop movement and restore owned-window input when positioning permission disappears; match native KDE prop geometry to an unreaped child and per-window identity before bounded placement.
-- Bind the private portal qualifier to its replacement frontend's actual D-Bus owner before requesting permission.
-- Wait for the native KDE portal backend and exported RemoteDesktop interface instead of accepting only the frontend bus name; initialize activation with the private compositor environment before GUI startup.
-- Correct the Linux runtime's pointer-distance call to the production engine vector API, as caught by the expanded native KWin build gate.
+## [1.6.0] - Unreleased candidate
 
 ### Added
-- Connect explicit portal pointer request/cancel controls in CLI and Native SDK settings to the running Rust owner. Require fresh KDE 6 terminal guards for engine cursor commands, discard queued cursor movement on capability loss, and keep every grant ephemeral across stop, crash, removal and device failure.
-- Export editable SVG headings, named poses and every motion frame from the same statically dispatched vector drawing routine as the desktop, with unchanged raster output (ADR 0045).
-- Add explicit KDE setup/removal through CLI and Native SDK settings, with private consent, sealed companion loading, live Rust runtime capabilities, owned-only crash recovery and immediate IPC revocation. Keep portal control, DND and native prop positioning unsupported pending separate implementation and qualification.
+- Add explicit KDE setup/removal in CLI and Native SDK settings, backed by a private consent record and sealed, same-user KWin companion. Report window observation, bounded movement, owned-prop positioning, pointer observation, fullscreen and DND separately.
+- Connect ephemeral KDE 6 portal/libei pointer request/cancel controls to the running Rust owner. Require a fresh terminal-safe path for every bounded engine cursor command; preserve independent GNU/musl and KDE generation capabilities.
+- Export editable SVG headings, poses and motion frames from the same statically dispatched vector drawing routine as the desktop, with unchanged raster output (ADR 0045).
+- Document guided setup, removal, optional system dependencies, session-only pointer permission and independently qualified compositor boundaries.
 
-### Development
-- Release the temporary KWin introspection proxy before selecting its owned script path; native Linux compilation caught the borrowed path lifetime before activation could run.
-- Load the explicitly authorized KWin companion from a retained sealed memfd, reject duplicate registrations, and unload only the runtime-owned script on drop. All four native KDE architecture/version lanes now pass fullscreen, other-desktop, user-drag and reconnect boundaries; qualify sealed activation next.
-- Use Plasma 5's authoritative numeric desktop membership when QtScript does not expose its desktop-vector objects. Isolate the fixture D-Bus responder from native painting and retire fixture scripts before KWin reuses their list-based identities; retain the 250 ms action deadline.
-- Qualify the actual Rust bridge on KWin 5/6, then require current desktop/activity for eligible targets and keep native fullscreen/user-drag observations separate from movement. Refuse movement during a user drag; expand the unchanged native assertions to ARM64.
-- Wait for native fixture windows to map before activating the KWin probe, and record bounded stop reasons without window contents. KWin 5 passed the real Rust transport; investigate KWin 6's startup expiry without relaxing its action deadline.
-- Exercise real authenticated Rust/KWin exchange, actual bounded moves, rejected untrusted D-Bus callers, expiry, explicit reconnect and disable. Pin the script's unique bridge owner and stop on replacement, timeout or malformed responses.
-- Define ADR 0044 and the Rust KWin boundary with pinned same-user D-Bus ownership, strict bounded snapshots, one pending move, terminal/identity/geometry checks, expiry and explicit revocation. Native script feasibility is proven; the runtime connection remains gated on actual transport tests.
-- Use Plasma 5's documented managed-client list when Plasma 6's stacking-order property is unavailable; retain live identity checks without inferring occlusion order from the older API. The first native KDE 6 probe passes real bounded movement and refusals.
-- Wait for KWin's actual D-Bus registration after its earlier Wayland socket creation; capture bus ownership and compositor diagnostics on a bounded timeout before testing the script API.
-- Remove the distro KWin binary's realtime file-capability request only inside its disposable software-rendered CI container; preserve capability diagnostics and readable native-probe artifacts without granting host privileges.
-- Begin the explicitly enabled KDE companion with a native KWin 5/6 premise probe for real window identity, bounded geometry changes, terminal/stale-target refusal and disable; no production capability is enabled before runtime qualification.
+### Fixed
+- Scroll native accessibility targets into view through existing bounded scroll containers before activation. The real SDK dispatcher regression reproduces the original failure and preserves disabled-control refusal.
+- Clear queued engine cursor movement on capability loss; cancel portal sessions on adapter expiry, device pause/removal, explicit revocation and shutdown. A restart never restores a pointer grant.
+- Apply owned Wayland prop identities after GTK maps the native surface, and match geometry to an unreaped child and per-window token before positioning. Revocation cancels motion and preserves delivered notes.
+
+### Behind the scenes
+- Require exact-commit KDE 5/6 x64/ARM64 qualification in candidate and public release orchestration, alongside all existing architecture, native package and signing gates.
+- Qualify real consent, bounded motion, protected targets, native settings drafts and recovery in disposable desktops with normal Plasma service registration and PipeWire. Retain bounded failure/observer evidence without granting container or compositor privileges.
+- Await the completed native settings save response before Windows test readback, so the fixture does not deny atomic replacement.
 
 ## [1.5.0] - Unreleased candidate
 

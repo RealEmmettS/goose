@@ -37,6 +37,7 @@ denial/retry, cancellation, removal, stop/crash recovery and backend loss before
 KDE 5 has separate window evidence; no EIS or portal control is claimed for it.
 
 ## Activity
+- 2026-09-08: Integrated run 34205879636 passes both KDE 5 lanes and the window/portal premises on KDE 6, then exposes the settings pointer button being advertised but rejected outside the scroll viewport. Reproduce this through the real SDK accessibility dispatcher, fix bounded ancestor scrolling before activation, and verify the same regression passes while disabled controls remain inert.
 - 2026-09-08: Wire the qualified portal into the running Rust owner and native settings without saving configuration drafts. A real engine regression first reproduced an already queued warp surviving capability loss, then passed after immediate queue clearing. Add actual desktop lifecycle qualification; preserve the existing 250 ms and terminal oracles.
 - 2026-09-08: Both KDE 6 architectures pass portal/result.json with real native consent, libei readiness, compositor pointer readback, terminal/excessive refusal and explicit cancellation. Preserve the accepted dialog tree instead of overwriting it after dismissal; proceed to runtime and native controls.
 - 2026-09-08: Native evidence now separates loaded plugins from failed service authorization. Debian's plasma-workspace file list identifies the missing menu; restore normal service discovery and PipeWire startup order in the private fixture before repeating the actual grant and motion oracle.

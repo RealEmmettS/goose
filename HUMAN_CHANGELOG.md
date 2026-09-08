@@ -33,33 +33,21 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
-### Behind the scenes
-- Explain when optional KDE observations become unavailable or a delivered window no longer matches, while keeping repeated diagnostic messages limited.
-- Check optional KDE support with the same optimized app people install and the desktop services it expects, so incomplete test desktops do not obscure real failures.
+### Added
+- Add optional KDE support with clear setup, status and removal in graphical settings and the command line. Window support and pointer permission remain separate choices.
+- Let you request temporary pointer permission through your desktop's own dialog and cancel it from settings. Closing settings leaves the goose running; a later goose session needs fresh permission.
+- Export editable artwork and animation frames directly from the desktop drawing code, keeping the website's goose consistent with the app.
+- Explain optional desktop setup and dependencies without claiming support for desktops that have not been tested.
 
 ### Fixed
+- Bring controls below the settings scroll area into view when a screen reader activates them, while keeping disabled controls inactive.
+- Stop pending pointer and delivery movement when permission disappears, preserving already delivered notes and requiring fresh consent after a restart.
 - Give delivered notes their own desktop identity once their window appears, so optional KDE support can recognize and move the correct note.
 
 ### Behind the scenes
-- Wait until settings reports a completed save before checking the saved file, so the test itself cannot block saving.
-- Give the desktop test its normal built-in features and a meaningful delivery distance before checking note movement and pointer permission.
+- Require actual desktop permission, movement, settings and recovery checks before publishing optional KDE support. Keep useful failure evidence and use the desktop's normal services without granting extra computer privileges.
+- Wait until settings reports a completed save before checking its file, so the test itself cannot block saving.
 
-### Added
-- Let you explicitly ask your desktop for temporary pointer permission, see its status, and cancel it from settings. Closing settings keeps the goose running; stopping or restarting the goose requires fresh permission before it can move the pointer again.
-- Export editable goose artwork and animation frames directly from the app's drawing code, keeping the website's character consistent with the desktop goose.
-- Prepare the test desktop's normal application registry before checking permission dialogs, and record which desktop features are actually available.
-- Stop moving a delivered window as soon as desktop integration is removed, keeping notes available to use.
-- Give the isolated permission test a fresh desktop service before opening consent.
-- Wait for desktop permission services to finish starting before testing a request.
-
-### Behind the scenes
-- Preserve useful delivery-test evidence and report each desktop check even when another check fails.
-- Explain which Linux build can request optional pointer permission.
-- Check the actual KDE setup and removal buttons while keeping unsaved settings intact.
-- Make failed desktop permission requests easier to diagnose before enabling the goose to move the pointer.
-
-### Added
-- Add optional KDE setup and removal in graphical settings and the command line. The goose remembers your choice separately from unsaved settings, stops using access when it is removed, and cleans up its own companion after stopping.
 ### Behind the scenes
 - Let the isolated Linux release test desktop start without requesting extra computer privileges.
 
@@ -67,19 +55,6 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - The goose can bring notes and pictures on Linux. Compatible desktops animate deliveries, while Wayland chooses where to place them. Settings explain the active desktop capabilities, and new guidance covers experimental Raspberry Pi desktop use.
 
 ### Behind the scenes
-- Test explicit desktop pointer permission and cancellation with the real permission dialog before enabling optional cursor control.
-- Correct a Linux build problem found while connecting optional KDE support to the running goose.
-- Fix a native Linux build issue in the optional KDE companion launcher before running its desktop checks.
-- Keep an enabled KDE companion tied to the running goose and prevent its verified code from changing while KDE opens it. Closing the connection removes only its own companion.
-- Correct older KDE desktop detection and keep temporary test windows and scripts from interfering with connection checks.
-- Check optional KDE support against desktop changes, fullscreen windows and real window dragging, including native ARM machines. The goose must leave a window alone while you are moving it.
-- Record why an optional KDE connection stops and let its test windows finish opening before checking the connection.
-- Test the real KDE connection through Rust, including rejected impostor connections, recovery and stopping when access disappears.
-- Connect optional KDE support to checks that reject stale desktop information and cancel pending movement when the connection is disabled; native runtime qualification remains in progress.
-- Account for the older KDE window-list interface after the first real KDE desktop test passed movement and protected-window checks.
-- Let the isolated KDE test wait for the desktop connection to finish starting, and retain clear diagnostics if that connection never becomes ready.
-- Adjust the isolated KDE test environment so it can start and retain useful failure evidence without requesting extra system privileges.
-- Begin testing optional KDE desktop support with real windows, including checks that protected apps stay untouched and disabling the connection stops further actions.
 - Fix the Linux delivery build before repeating checks of its packaged companion.
 - Check the packaged Linux companion on the desktop libraries it was built for, and keep deliveries tied to the program verified before launch.
 - Prepare the Linux update using checks of the actual shipped companions, while keeping the remaining release checks and real Raspberry Pi testing visible.

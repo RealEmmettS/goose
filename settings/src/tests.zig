@@ -2,6 +2,50 @@ const std = @import("std");
 const main = @import("main.zig");
 const sdk = @import("native_sdk");
 
+test "native accessibility activates an offscreen button through actual scrolling and keyboard routing" {
+    const App = struct {
+        activations: usize = 0,
+        fn app(self: *@This()) sdk.App {
+            return .{ .context = self, .name = "Honk300 accessibility regression", .source = sdk.platform.WebViewSource.html("<h1>Settings</h1>"), .event_fn = event };
+        }
+        fn event(context: *anyopaque, _: *sdk.Runtime, value: sdk.Event) !void {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            switch (value) {
+                .canvas_widget_keyboard => |keyboard| if (keyboard.target) |target| {
+                    if (target.id == 4) self.activations += 1;
+                },
+                else => {},
+            }
+        }
+    };
+    const harness = try sdk.TestHarness().create(std.testing.allocator, .{});
+    defer harness.destroy(std.testing.allocator);
+    harness.null_platform.gpu_surfaces = true;
+    var state = App{};
+    try harness.start(state.app());
+    _ = try harness.runtime.createView(.{ .window_id = 1, .label = "canvas", .kind = .gpu_surface, .frame = sdk.geometry.RectF.init(0, 0, 320, 200) });
+    const items = [_]sdk.canvas.Widget{
+        .{ .id = 3, .kind = .button, .text = "Visible", .frame = sdk.geometry.RectF.init(0, 0, 250, 32) },
+        .{ .id = 4, .kind = .button, .text = "Request pointer access", .frame = sdk.geometry.RectF.init(0, 280, 250, 32) },
+        .{ .id = 5, .kind = .button, .text = "Disabled", .frame = sdk.geometry.RectF.init(0, 350, 250, 32), .state = .{ .disabled = true } },
+    };
+    const children = [_]sdk.canvas.Widget{.{ .id = 2, .kind = .scroll_view, .frame = sdk.geometry.RectF.init(12, 12, 280, 90), .children = &items }};
+    var nodes: [8]sdk.canvas.WidgetLayoutNode = undefined;
+    const layout = try sdk.canvas.layoutWidgetTree(.{ .id = 1, .kind = .panel, .children = &children }, sdk.geometry.RectF.init(0, 0, 320, 200), &nodes);
+    _ = try harness.runtime.setCanvasWidgetLayout(1, "canvas", layout);
+    try std.testing.expect(layout.focusTargetById(4) == null);
+    _ = try harness.runtime.dispatchCanvasWidgetAccessibilityAction(state.app(), 1, "canvas", .{ .id = 4, .action = .press });
+    try std.testing.expectEqual(@as(usize, 1), state.activations);
+    const scrolled = try harness.runtime.canvasWidgetLayout(1, "canvas");
+    try std.testing.expect(scrolled.findById(2).?.widget.value > 0);
+    try std.testing.expect(scrolled.focusTargetById(4) != null);
+    const offset = scrolled.findById(2).?.widget.value;
+    try std.testing.expectError(error.InvalidCommand, harness.runtime.dispatchCanvasWidgetAccessibilityAction(state.app(), 1, "canvas", .{ .id = 5, .action = .press }));
+    const unchanged = try harness.runtime.canvasWidgetLayout(1, "canvas");
+    try std.testing.expectEqual(offset, unchanged.findById(2).?.widget.value);
+    try std.testing.expectEqual(@as(usize, 1), state.activations);
+}
+
 test "all settings pages and dialogs build against a real Rust service response" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();

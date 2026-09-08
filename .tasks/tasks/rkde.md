@@ -25,7 +25,13 @@ The requested behavior runs through its production path and the supporting evide
 - [ ] Integration and required package/release checks pass before publication.
 
 ## Status
-Queued; not implemented or qualified.
+Active. Versioned v1.6.0 metadata and readiness are prepared. Native KWin 5/6 window,
+owned-prop and setup/removal checks pass on both architectures; the KDE 6 portal premise
+also passes. Integrated pointer runtime/settings checks exposed inaccessible controls
+below the scroll viewport. A production SDK regression reproduces that failure before
+correction. Publication remains gated on the unchanged desktop tests, all existing
+platform/package lanes and same-source candidate/main qualification.
 
 ## Activity
+- 2026-09-08: Prepare the next distinct release and make exact-commit native KDE qualification a required candidate/publication dependency. Track the integrated accessibility failure without weakening the actual consent or movement checks.
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).

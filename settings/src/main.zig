@@ -34,7 +34,7 @@ const dev = @import("builtin").mode == .Debug;
 pub const Effects = native_sdk.Effects(Msg);
 pub const AppUi = canvas.Ui(Msg);
 pub const app_markup = @embedFile("app.native");
-pub const version = "1.5.0";
+pub const version = "1.6.0";
 const SettingsApp = native_sdk.UiAppWithFeatures(Model, Msg, .{ .runtime_markup = dev });
 const CompiledView = canvas.CompiledMarkupView(Model, Msg, app_markup);
 const body_font: canvas.FontId = canvas.min_registered_font_id;
@@ -269,15 +269,23 @@ pub fn update(model: *Model, msg: Msg, fx: *Effects) void {
             submit(model, .save, fx);
         },
         .refresh => submit(model, .status, fx),
-        .kde_setup => if (model.canSetupKde()) { model.kde_prompt = true; },
+        .kde_setup => if (model.canSetupKde()) {
+            model.kde_prompt = true;
+        },
         .kde_cancel => model.kde_prompt = false,
         .kde_confirm => if (model.canSetupKde()) {
             model.kde_prompt = false;
             submit(model, .kde_setup, fx);
         },
-        .kde_remove => if (model.canSetupKde()) { submit(model, .kde_remove, fx); },
-        .pointer_request => if (model.canRequestPointer()) { submit(model, .pointer_request, fx); },
-        .pointer_cancel => if (model.canCancelPointer()) { submit(model, .pointer_cancel, fx); },
+        .kde_remove => if (model.canSetupKde()) {
+            submit(model, .kde_remove, fx);
+        },
+        .pointer_request => if (model.canRequestPointer()) {
+            submit(model, .pointer_request, fx);
+        },
+        .pointer_cancel => if (model.canCancelPointer()) {
+            submit(model, .pointer_cancel, fx);
+        },
         .check_updates => submit(model, .check_updates, fx),
         .update_now => if (model.canUpdate()) {
             submit(model, .update, fx);
@@ -411,8 +419,8 @@ pub fn acceptResponse(model: *Model, bytes: []const u8) !void {
             try std.fmt.allocPrint(allocator, "Goose status unavailable\n{s}\nSettings remain editable. Refresh to try again.", .{runtime_error})
         else
             try std.fmt.allocPrint(allocator, "Goose: {s}\nDesktop: {s}\nOverlay: {s}  |  Sound: {s}\nCursor: {s}  |  Window rides: {s}\nNotes and memes: {s}  |  Manners: {s}\nAccessibility: {s}", .{
-            if (flag(runtime, "running")) "running" else "stopped", string(runtime, "platform"), string(runtime, "overlay"), string(runtime, "audio"), string(runtime, "cursor"), string(runtime, "windows"), string(runtime, "notes_and_memes"), string(runtime, "manners"), string(runtime, "accessibility"),
-        });
+                if (flag(runtime, "running")) "running" else "stopped", string(runtime, "platform"), string(runtime, "overlay"), string(runtime, "audio"), string(runtime, "cursor"), string(runtime, "windows"), string(runtime, "notes_and_memes"), string(runtime, "manners"), string(runtime, "accessibility"),
+            });
         if (runtime.object.get("session")) |session| {
             if (session == .object) {
                 model.runtime_buffer.set(try std.fmt.allocPrint(allocator, "{s}\nDisplay: {s}\nSession reports: {s}\nNote placement: {s}", .{
@@ -441,10 +449,9 @@ pub fn acceptResponse(model: *Model, bytes: []const u8) !void {
             }
             if (integrations.object.get("capabilities")) |caps| {
                 if (caps == .object) {
-                    model.integration_buffer.set(try std.fmt.allocPrint(allocator,
-                        "{s}\nWindow observation: {s} | Movement: {s}\nPointer observation: {s} | Control: {s}\nFullscreen: {s} | Do not disturb: {s}\nAnimated prop placement: {s}", .{
-                        detail, string(caps, "windows"), string(caps, "movement"), string(caps, "pointer_observation"),
-                        string(caps, "pointer_control"), string(caps, "fullscreen"), string(caps, "dnd"), string(caps, "prop_positioning"),
+                    model.integration_buffer.set(try std.fmt.allocPrint(allocator, "{s}\nWindow observation: {s} | Movement: {s}\nPointer observation: {s} | Control: {s}\nFullscreen: {s} | Do not disturb: {s}\nAnimated prop placement: {s}", .{
+                        detail,                          string(caps, "windows"),    string(caps, "movement"), string(caps, "pointer_observation"),
+                        string(caps, "pointer_control"), string(caps, "fullscreen"), string(caps, "dnd"),      string(caps, "prop_positioning"),
                     }));
                 } else model.integration_buffer.set(detail);
             } else model.integration_buffer.set(detail);
