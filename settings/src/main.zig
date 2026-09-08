@@ -367,7 +367,11 @@ pub fn acceptResponse(model: *Model, bytes: []const u8) !void {
         model.loaded = true;
     }
     if (data.object.get("runtime")) |runtime| {
-        const description = try std.fmt.allocPrint(allocator, "Goose: {s}\nDesktop: {s}\nOverlay: {s}  |  Sound: {s}\nCursor: {s}  |  Window rides: {s}\nNotes and memes: {s}  |  Manners: {s}\nAccessibility: {s}", .{
+        const runtime_error = string(runtime, "error");
+        const description = if (runtime_error.len > 0)
+            try std.fmt.allocPrint(allocator, "Goose status unavailable\n{s}\nSettings remain editable. Refresh to try again.", .{runtime_error})
+        else
+            try std.fmt.allocPrint(allocator, "Goose: {s}\nDesktop: {s}\nOverlay: {s}  |  Sound: {s}\nCursor: {s}  |  Window rides: {s}\nNotes and memes: {s}  |  Manners: {s}\nAccessibility: {s}", .{
             if (flag(runtime, "running")) "running" else "stopped", string(runtime, "platform"), string(runtime, "overlay"), string(runtime, "audio"), string(runtime, "cursor"), string(runtime, "windows"), string(runtime, "notes_and_memes"), string(runtime, "manners"), string(runtime, "accessibility"),
         });
         if (runtime.object.get("session")) |session| {

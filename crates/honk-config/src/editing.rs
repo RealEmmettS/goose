@@ -46,6 +46,17 @@ pub struct ConfigSnapshot {
 }
 
 impl ConfigSnapshot {
+    /// Reload requires an existing document; only startup/editor creation may use defaults.
+    pub fn load_existing(path: &Path) -> Result<Self, ConfigError> {
+        let snapshot = Self::load(path)?;
+        if snapshot.revision == ConfigRevision::default() {
+            return Err(
+                io::Error::new(io::ErrorKind::NotFound, "configuration file is missing").into(),
+            );
+        }
+        Ok(snapshot)
+    }
+
     pub fn load(path: &Path) -> Result<Self, ConfigError> {
         let before = ConfigRevision::read(path)?;
         let (config, warning) = match Config::load(Some(path.to_owned()))? {

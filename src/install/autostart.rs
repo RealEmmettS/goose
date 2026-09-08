@@ -47,6 +47,10 @@ pub fn prepare_config_autostart(
     config_path: &Path,
     config: &mut honk_config::Config,
 ) -> Result<(), DynError> {
+    let snapshot = honk_config::ConfigSnapshot::load(config_path)?;
+    if snapshot.config != *config {
+        return Err(honk_config::ConfigError::Conflict.into());
+    }
     let contents = match fs::read_to_string(config_path) {
         Ok(contents) => contents,
         Err(error) if error.kind() == io::ErrorKind::NotFound => String::new(),
@@ -75,7 +79,7 @@ pub fn prepare_config_autostart(
             let actual = owned_autostart_state(&identity)?;
             if config.lifecycle.autostart_on_login != actual {
                 config.lifecycle.autostart_on_login = actual;
-                config.save_atomic(config_path)?;
+                config.save_if_revision(config_path, &snapshot.revision)?;
             }
             return Ok(());
         }

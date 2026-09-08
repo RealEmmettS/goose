@@ -23,6 +23,7 @@
   - [x] Exercise close, cleanup, disconnect, invalid input, image fitting and repeated delivery.
   - [ ] Verify the actual GNU/musl release companions and oldest GTK baseline.
 - [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
+  - [ ] Resolve final PR review findings and repeat qualification before tagging.
   - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
   - [x] Correct captured Windows start and verify native GUI Start, independent settings close, and graceful Stop.
   - [x] Compare isolated native CPU/memory/IPC workloads and verify note/meme delivery after foreground denial.
