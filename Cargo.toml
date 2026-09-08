@@ -63,6 +63,7 @@ include = [
     "/crates/**",
     "/src/**",
     "/integrations/kwin/**",
+    "/integrations/gnome/**",
     "/script/**",
     "!/script/**/__pycache__/**",
     "/wix/**",

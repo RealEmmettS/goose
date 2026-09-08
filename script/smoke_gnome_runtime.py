@@ -140,6 +140,7 @@ preserve = "untouched"
             entries = [json.loads(line.split('honk300 gnome trace: ', 1)[1])
                        for line in runtime_log.read_text().splitlines(keepends=True)
                        if line.endswith('\n') and 'honk300 gnome trace: ' in line]
+            assert all(not value['pointer_present'] and not value['pointer_left_down'] for value in entries), 'Blind XWayland input reached the engine'
             return entries and entries[-1] if entries and check(entries[-1]) else None
         return wait(current, label)
 

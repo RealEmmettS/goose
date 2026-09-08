@@ -52,6 +52,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
 
 ### Fixed
+- Include everything needed to build GNOME support from source, ignore unavailable pointer input and keep transient windows from unnecessarily disabling desktop observations.
+- Keep the goose and desktop responsive while reading saved permissions, and cancel pending observations when you remove access.
 - Keep GNOME observations working while an app creates or remaps a window. End a window ride when you turn it off, close its window or remove desktop access.
 - Keep GNOME setup available according to its own desktop support, and prevent the scrollbar from covering the end of a settings description.
 

@@ -1,13 +1,11 @@
 use super::{directory, gnome_consent, Error};
 use honk_control::{CapabilityStatus, WaylandStatus};
 use honk_platform_linux::gnome::{Frame, Observer};
-use std::time::{Duration, Instant};
 
 #[derive(Default)]
 pub(crate) struct GnomeRuntime {
     observer: Option<Observer>,
     consent: Option<gnome_consent::Consent>,
-    last_check: Option<Instant>,
     failed: bool,
     observed: bool,
     identities: std::collections::HashMap<(u32, u32), honk_engine::ForeignWindowId>,
@@ -62,7 +60,6 @@ impl GnomeRuntime {
             gnome_consent::build_identity(),
         )?);
         self.consent = Some(consent);
-        self.last_check = Some(Instant::now());
         self.failed = false;
         Ok(())
     }
@@ -70,27 +67,18 @@ impl GnomeRuntime {
     pub(crate) fn disable(&mut self) {
         self.observer = None;
         self.consent = None;
-        self.last_check = None;
         self.failed = false;
         self.observed = false;
         self.identities.clear();
     }
 
     pub(crate) fn poll(&mut self) -> Option<Frame> {
-        self.observer.as_ref()?;
-        if self
-            .last_check
-            .is_none_or(|at| at.elapsed() >= Duration::from_millis(100))
-        {
-            self.last_check = Some(Instant::now());
-            let saved = directory()
-                .ok()
-                .and_then(|path| gnome_consent::read(&path).ok())
-                .flatten();
-            if saved != self.consent {
-                self.disable();
-                return None;
-            }
+        // The authenticated Shell validates private consent before and after
+        // each bounded worker request. Consume only its published result here;
+        // user-data filesystem I/O must never run in the presentation loop.
+        if self.observer.as_ref().is_some_and(Observer::revoked) {
+            self.disable();
+            return None;
         }
         let frame = self.observer.as_ref()?.snapshot();
         self.observed |= frame.is_some();

@@ -29,6 +29,14 @@ fn invalid(message: &str) -> io::Error {
 fn bus_error(error: zbus::Error) -> io::Error {
     match error {
         zbus::Error::MethodError(name, _, _)
+            if name.as_str() == "dev.emmetts.Honk300.Gnome1.Revoked" =>
+        {
+            io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "GNOME observations revoked",
+            )
+        }
+        zbus::Error::MethodError(name, _, _)
             if name.as_str() == "dev.emmetts.Honk300.Gnome1.Busy" =>
         {
             io::Error::new(
@@ -279,6 +287,9 @@ impl Observer {
     }
     pub fn failed(&self) -> bool {
         self.0.failed()
+    }
+    pub fn revoked(&self) -> bool {
+        self.0.revoked()
     }
 }
 
