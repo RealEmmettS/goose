@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Added
+- Check GNOME startup after its note and picture window helper has finished opening.
 - Keep the goose connected when GNOME refuses another program’s observation request, without giving that program access or keeping old window information.
 - Keep the GNOME connection checks compatible with the project’s strict build checks.
 - Check GNOME permissions against correctly installed application files while continuing to reject files owned by an unrelated account.

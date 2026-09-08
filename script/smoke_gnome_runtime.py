@@ -66,7 +66,7 @@ preserve = "untouched"
 
     def expect(state, label):
         result = wait(lambda: (value if ((value := status()).get('capabilities') or {}).get('windows') == state
-                              else None), label)
+                              and value['capabilities'].get('prop_positioning') == 'supported' else None), label)
         caps = result['capabilities']
         assert caps['fullscreen'] == state, caps
         assert caps['prop_positioning'] == 'supported', caps
