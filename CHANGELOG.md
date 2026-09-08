@@ -41,6 +41,7 @@ All notable changes to this project are documented here. Format based on
 - Authenticate the pinned system Shell and approved runtime executable, bound complete connection and snapshot operations, preserve exact owned files and recoverable consent, and withdraw stale or revoked observations until explicit reconnection.
 
 ### Behind the scenes
+- Start GNOME qualification gestures on GTK's native client-area WindowHandle after actual pointer entry; require the same Mutter grab, engine ride, terminal exclusion and held-action cancellation across remapping.
 - Read actual manners from the bounded GNOME post-tick trace throughout qualification, and use explicit GTK fixture title bars plus real pointer motion across remapping while retaining mandatory native grabs.
 - Prove GTK pointer entry inside the native client before a separately verified frame/title-bar drag, preserving real Mutter grabs and ride cancellation across remapped decorations.
 - Close Hyprland publication, all eight fresh-public lanes and exact website download verification; update current guidance and dashboard status while retaining GNOME and independent presence qualification gates.

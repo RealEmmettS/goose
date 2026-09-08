@@ -48,6 +48,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost, keep setup responsive when a connection stops answering, and preserve unrelated desktop settings.
 
 ### Behind the scenes
+- Start test drags on a clearly reachable native window handle, then check the same real window movement, goose ride and interruption behavior.
 - Keep long desktop checks observable and use consistent native test-window title bars without changing the required drag or cancellation behavior.
 - Check real window input and dragging correctly when the desktop redraws a test window's title bar.
 - Verify the published Hyprland update and matching website downloads, and keep the remaining desktop work clearly tracked.

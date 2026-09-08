@@ -165,10 +165,12 @@ preserve = "untouched"
         native = wait(lambda: settled(focused=True), 'settled native drag focus: ' + label)
         (directory / f'arranged-{label}.json').write_text(json.dumps(native, indent=2))
         x, y, width, height = native['rect']
-        # A previous ride can leave the naturally interactive goose above the
-        # middle of the title bar. Use its clear left portion; GTK must still
-        # prove receipt before any held gesture can qualify.
-        pointer_x, pointer_y = x + 36, y + 18
+        # Use GTK's real window-drag handle inside the client. Remapping and
+        # fullscreen restoration can change decoration input regions, while
+        # the client center stays clear of the goose's window-top ride anchor.
+        handle = target.get_child()
+        assert isinstance(handle, Gtk.WindowHandle)
+        pointer_x, pointer_y = x + width // 2, y + height // 2
         # A Shell coordinate is not proof that the native client has received
         # pointer entry. Record the actual GTK capture events without consuming
         # them, and await the target surface before beginning the gesture.
@@ -181,32 +183,25 @@ preserve = "untouched"
         controller.connect('enter', lambda _controller, x, y: record_event('enter', x, y))
         controller.connect('motion', lambda _controller, x, y: record_event('motion', x, y))
         controller.connect('leave', lambda _controller: record_event('leave'))
-        target.add_controller(controller)
+        handle.add_controller(controller)
         surface = target.get_surface()
         device = surface.get_display().get_default_seat().get_pointer()
         def event(*arguments):
             subprocess.run(['xdotool', *map(str, arguments)], env=capture_environment,
                            check=True, capture_output=True, timeout=5)
         try:
-            # The frame's title bar can belong to the compositor after a
-            # remap. First prove actual GTK delivery inside the client, then
-            # move to the native frame and require Mutter's real grab signal.
-            client_x, client_y = x + width // 2, y + height // 2
             # A newly raised surface may be under an unchanged outer pointer.
-            # Two distinct client points guarantee a real motion event.
-            event('mousemove', client_x + 20, client_y + 20)
-            wait(lambda: snapshot()['pointer'] == [client_x + 20, client_y + 20],
+            # Two distinct handle points guarantee a real motion event.
+            event('mousemove', pointer_x + 20, pointer_y + 20)
+            wait(lambda: snapshot()['pointer'] == [pointer_x + 20, pointer_y + 20],
                  'native motion enters the private client: ' + label)
-            event('mousemove', client_x, client_y)
-            wait(lambda: snapshot()['pointer'] == [client_x, client_y],
-                 'native pointer reaches the private client: ' + label)
-            wait(lambda: surface.get_device_position(device)[0],
-                 'GTK receives pointer entry on the exact native surface: ' + label)
             event('mousemove', pointer_x, pointer_y)
             wait(lambda: snapshot()['pointer'] == [pointer_x, pointer_y],
-                 'native pointer reaches the private fixture: ' + label)
-            # Drag the actual native title bar. A modifier mask alone does not
-            # prove Mutter accepted a move gesture on a Wayland client surface.
+                 'native pointer reaches the private client: ' + label)
+            wait(lambda: surface.get_device_position(device)[0] and controller.contains_pointer(),
+                 'GTK receives pointer entry on the native drag handle: ' + label)
+            # Gtk.WindowHandle asks Mutter to begin the real native gesture
+            # using the delivered button event. Never synthesize a grab signal.
             event('mousedown', 1)
             wait(lambda: snapshot()['button_pressed'], 'native held button: ' + label)
             event('mousemove', pointer_x + 12, pointer_y + 12)
@@ -242,7 +237,7 @@ preserve = "untouched"
         finally:
             event('mouseup', 1, 'keyup', 'Alt_L')
             (directory / f'input-events-{label}.json').write_text(json.dumps(native_events, indent=2))
-            target.remove_controller(controller)
+            handle.remove_controller(controller)
         wait(lambda: not (value := snapshot())['grabbed'] and not value['alt_pressed']
              and not value['button_pressed'], 'native drag and modifier release')
         observed_state(lambda value: value['drag_id'] is None and value['task'] != 'perch_ride',
@@ -346,7 +341,9 @@ preserve = "untouched"
         header = Gtk.HeaderBar()
         header.set_title_widget(Gtk.Label(label='Drag this private window'))
         transient.set_titlebar(header)
-        transient.set_child(Gtk.Label(label='Close during an actual held ride'))
+        handle = Gtk.WindowHandle()
+        handle.set_child(Gtk.Label(label='Close during an actual held ride'))
+        transient.set_child(handle)
         transient.present()
         def destroy_target(native):
             assert snapshot()['drag']['id'] == native['id']
