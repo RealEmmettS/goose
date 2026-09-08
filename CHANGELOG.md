@@ -24,6 +24,13 @@ All notable changes to this project are documented here. Format based on
 > release packaging with artifact evidence. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
+## [Unreleased]
+
+### Behind the scenes
+- Qualify the existing Mac settings AppKit Accessibility provider through an
+  independent native reader on Intel and Apple Silicon, using exact completed
+  source-CI app artifacts and isolated configuration without the SDK harness.
+
 ## [1.10.0] - 2026-09-08
 
 ### Added

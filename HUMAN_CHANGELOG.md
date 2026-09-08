@@ -31,6 +31,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ---
 
+## Mac settings accessibility acceptance — September 2026
+
+### Behind the scenes
+- Check what native assistive tools can read and operate in Mac settings,
+  including switches, text fields, dialogs and saved changes.
+
 ## Fullscreen manners and clearer status — September 2026
 
 ### Added

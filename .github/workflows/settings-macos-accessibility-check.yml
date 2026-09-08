@@ -1,0 +1,52 @@
+name: Native Mac settings Accessibility check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  native:
+    name: Native AX (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Verify the completed binary-producing source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/RealEmmettS/goose/actions/runs/34287192377 > source-run.json
+          python3 -c 'import json; r=json.load(open("source-run.json")); assert r["head_sha"]=="b993b89dc0319ece8b790dabd1fc9881b066765f" and r["conclusion"]=="success"'
+      - uses: actions/download-artifact@v6
+        with:
+          name: honk300-macos-${{ matrix.runner }}
+          run-id: 34287192377
+          github-token: ${{ github.token }}
+          path: target/qualified-app
+      - name: Exercise native Accessibility against the existing production app
+        env:
+          FIXTURE_RUNNER: ${{ matrix.runner }}
+        run: |
+          ditto -x -k "target/qualified-app/Honk300-$FIXTURE_RUNNER.zip" target/qualified-app/expanded
+          app="$PWD/target/qualified-app/expanded/Honk300.app"
+          codesign --verify --strict "$app"
+          shasum -a 256 "$app/Contents/MacOS/honk300" "$app/Contents/MacOS/honk300-settings"
+          xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework Cocoa -framework ApplicationServices script/smoke_settings_accessibility_macos.m -o target/settings-ax
+          target/settings-ax "$app/Contents/MacOS/honk300-settings" "$PWD/target/native-mac-ax-evidence"
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: settings-native-ax-${{ matrix.runner }}
+          path: |
+            source-run.json
+            target/native-mac-ax-evidence
+          if-no-files-found: warn

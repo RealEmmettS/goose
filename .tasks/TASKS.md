@@ -8,6 +8,10 @@
 
 
 ## Active
+- [ ] **Mac settings native accessibility acceptance** - query and operate the actual AppKit provider independently of the SDK harness (needs #rgui) (ms #refine) (owner codex) #rax
+  - [ ] Exercise named controls, switch state, focused text editing and isolated saves on both native Mac architectures.
+  - [ ] Correct any demonstrated provider failure and repeat the unchanged native assertions.
+  - [ ] Record final-source proof and retain future native reader qualification.
 - [ ] **Fullscreen and do-not-disturb observations** - resolve audit R05 with separately proven platform observations and honest fallback (needs #rfnd) (ms #refine) (owner codex) #prs
   - [x] Qualify macOS fullscreen and supported system do-not-disturb observation paths.
   - [ ] Correct and qualify the native Mac startup-readiness connection failure.
