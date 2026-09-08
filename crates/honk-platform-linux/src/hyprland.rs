@@ -53,6 +53,10 @@ impl Monitor {
         }
         let monitors: Vec<Self> =
             serde_json::from_slice(bytes).map_err(|_| "Invalid Hyprland monitors")?;
+        Self::validate(&monitors)?;
+        Ok(monitors)
+    }
+    fn validate(monitors: &[Self]) -> Result<(), &'static str> {
         let mut ids = HashSet::new();
         if monitors.is_empty()
             || monitors.len() > 16
@@ -68,7 +72,7 @@ impl Monitor {
         {
             return Err("No active Hyprland output is available");
         }
-        Ok(monitors)
+        Ok(())
     }
 }
 
@@ -119,6 +123,37 @@ impl Frame {
         }
         let clients: Vec<Client> =
             serde_json::from_slice(bytes).map_err(|_| "Invalid Hyprland clients")?;
+        Self::from_clients(version, monitors, clients)
+    }
+    /// The qualified compositor evaluates this fixed read-only batch in one
+    /// event-loop dispatch. Parse exactly three JSON values and reject trailing
+    /// data, incomplete replies and changes to the active output inventory.
+    pub fn decode_snapshot(version: &Version, bytes: &[u8]) -> Result<Self, &'static str> {
+        if bytes.len() > MAX_REPLY {
+            return Err("Hyprland snapshot is too large");
+        }
+        let mut decoder = serde_json::Deserializer::from_slice(bytes);
+        let before = Vec::<Monitor>::deserialize(&mut decoder)
+            .map_err(|_| "Invalid initial Hyprland monitors")?;
+        let clients = Vec::<Client>::deserialize(&mut decoder)
+            .map_err(|_| "Invalid Hyprland snapshot clients")?;
+        let after = Vec::<Monitor>::deserialize(&mut decoder)
+            .map_err(|_| "Invalid final Hyprland monitors")?;
+        decoder
+            .end()
+            .map_err(|_| "Trailing Hyprland snapshot data")?;
+        Monitor::validate(&before)?;
+        Monitor::validate(&after)?;
+        if before != after {
+            return Err("Hyprland output state changed during observation");
+        }
+        Self::from_clients(version, &before, clients)
+    }
+    fn from_clients(
+        version: &Version,
+        monitors: &[Monitor],
+        clients: Vec<Client>,
+    ) -> Result<Self, &'static str> {
         if clients.len() > 64 {
             return Err("Too many Hyprland windows");
         }
@@ -264,5 +299,28 @@ mod tests {
         )
         .is_err());
         assert!(Frame::decode(&version(), &monitors(), &vec![b' '; MAX_REPLY + 1]).is_err());
+    }
+    #[test]
+    fn snapshot_requires_exactly_three_complete_matching_inventories() {
+        let monitor = json!([{"id":1,"activeWorkspace":{"id":1},
+            "specialWorkspace":{"id":0},"dpmsStatus":true,"disabled":false}]);
+        let clients = json!([client()]);
+        let snapshot = format!("{monitor}\n\n\n{clients}\n\n\n{monitor}");
+        assert!(Frame::decode_snapshot(&version(), snapshot.as_bytes())
+            .unwrap()
+            .fullscreen());
+        for invalid in [
+            format!("{monitor}\n{clients}"),
+            format!("{snapshot} []"),
+            format!("{monitor}\n{clients}\n[]"),
+            format!(
+                "{monitor}\n{clients}\n{}",
+                monitor.to_string().replace("\"id\":1", "\"id\":2")
+            ),
+            format!("{snapshot} garbage"),
+        ] {
+            assert!(Frame::decode_snapshot(&version(), invalid.as_bytes()).is_err());
+        }
+        assert!(Frame::decode_snapshot(&version(), &vec![b' '; MAX_REPLY + 1]).is_err());
     }
 }

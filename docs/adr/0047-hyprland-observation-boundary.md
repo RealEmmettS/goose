@@ -18,7 +18,9 @@ DND remain unavailable; no general command dispatcher exists in the Rust boundar
 The transport pins the system-owned Hyprland process, its loaded executable, private
 runtime hierarchy and socket identity. Each reply must end within a single bounded
 deadline and byte limit. A complete snapshot brackets clients with matching active
-monitor/workspace observations under one total deadline. Unknown or replaced peers
+monitor/workspace observations in one fixed read-only batch under one total deadline.
+Both qualified upstream implementations separate the three JSON replies with whitespace;
+the decoder requires exactly three complete values and rejects trailing data. Unknown or replaced peers
 receive no query. Shared bounded Unix socket primitives retain Sway's own protocol
 and authentication policy; evidence from either adapter cannot qualify the other.
 

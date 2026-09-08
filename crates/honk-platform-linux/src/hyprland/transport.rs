@@ -1,4 +1,4 @@
-use super::{Frame, Monitor, Version, MAX_AGE, MAX_REPLY};
+use super::{Frame, Version, MAX_AGE, MAX_REPLY};
 pub use crate::native_socket::Peer;
 use crate::native_socket::{connect, peer, socket_identity, wait};
 use std::fs;
@@ -8,6 +8,8 @@ use std::os::unix::fs::MetadataExt;
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::time::Instant;
+
+const SNAPSHOT_QUERY: &[u8] = b"[[BATCH]]j/monitors;j/clients;j/monitors";
 
 fn invalid(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message)
@@ -86,8 +88,12 @@ impl Connection {
                 "Hyprland peer must be an unmodified system-owned compositor executable",
             ));
         }
-        let version = Version::decode(&exchange(&mut stream, b"j/version", 4096, deadline)?)
-            .map_err(invalid)?;
+        let version = Version::decode(
+            &exchange(&mut stream, b"j/version", 4096, deadline).map_err(|error| {
+                io::Error::new(error.kind(), format!("Hyprland version request: {error}"))
+            })?,
+        )
+        .map_err(invalid)?;
         Ok(Self {
             socket,
             inode,
@@ -103,7 +109,7 @@ impl Connection {
         &self.version
     }
     fn request(&self, query: &[u8], deadline: Instant) -> io::Result<Vec<u8>> {
-        if !matches!(query, b"j/monitors" | b"j/clients") {
+        if query != SNAPSHOT_QUERY {
             return Err(invalid("Unsupported Hyprland observation request"));
         }
         if location(self.peer.uid)? != self.socket
@@ -127,16 +133,13 @@ impl Connection {
         Ok(bytes)
     }
     pub fn snapshot(&self) -> io::Result<Frame> {
-        // Hyprland supplies separate replies. Check active output/workspace
-        // identity on both sides of the client read, under one total deadline.
+        // A fixed read-only batch keeps output/client reads in one compositor
+        // dispatch without spending three separate event-loop round trips.
         let deadline = Instant::now() + MAX_AGE;
-        let before = Monitor::decode(&self.request(b"j/monitors", deadline)?).map_err(invalid)?;
-        let clients = self.request(b"j/clients", deadline)?;
-        let after = Monitor::decode(&self.request(b"j/monitors", deadline)?).map_err(invalid)?;
-        if before != after {
-            return Err(invalid("Hyprland output state changed during observation"));
-        }
-        Frame::decode(&self.version, &before, &clients).map_err(invalid)
+        let bytes = self.request(SNAPSHOT_QUERY, deadline).map_err(|error| {
+            io::Error::new(error.kind(), format!("Hyprland snapshot request: {error}"))
+        })?;
+        Frame::decode_snapshot(&self.version, &bytes).map_err(invalid)
     }
 }
 

@@ -26,6 +26,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Improved
+- Read the Hyprland monitor/client inventory in one fixed read-only native batch, retaining exact peer identity, a single 250 ms deadline, bounded complete replies and matching monitor observations.
+
 ### Behind the scenes
 - Keep the GTK target's configure acknowledgements active while the independent Rust Hyprland probe runs. Native 0.55 transport and impostor refusal pass both architectures; 0.53 exposed the fixture blocking its own fullscreen client. Preserve every Rust deadline and reply bound.
 - Implement the independently authenticated read-only Hyprland transport for native-qualified 0.53.3/0.55.2, bounded coherent monitor/client observations, optional client identities and explicit unsupported actions. Share unchanged Unix socket primitives with Sway and qualify the production decoder/transport against real compositor replies and an impostor listener.

@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Improved
+- Keep Hyprland window observations together so a busy desktop has fewer separate requests to answer, while still discarding late or incomplete information.
+
 ### Behind the scenes
 - Keep private test windows responsive while the separate desktop observer runs, including fullscreen transitions.
 
