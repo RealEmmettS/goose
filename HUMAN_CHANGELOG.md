@@ -53,6 +53,7 @@ Save remains available to accessibility tools after changing settings, including
 Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
 
 ### Behind the scenes
+- Let the goose finish walking into view before asking it to wander during desktop capture checks.
 
 Start checks now wait for the command's complete output while confirming the goose is still alive. Terminal update checks use a complete terminal session and retain any failure message.
 
