@@ -41,9 +41,6 @@ All notable changes to this project are documented here. Format based on
 
 ## [1.9.0] - 2026-09-08
 
-### Behind the scenes
-- Synchronize native GNOME drag qualification with pointer entry on the actual GTK surface and retain capture-event evidence when the compositor rejects a gesture; keep the native grab and real engine ride requirements intact.
-
 ### Added
 - Add explicit GNOME Shell companion setup and removal through Rust CLI and Native SDK settings, with qualified GNOME 46.0/48.7 window, fullscreen and actual user-drag observations on native x64/ARM64. Preserve the compatible XWayland overlay and independent owned-prop positioning; foreign movement, pointer access and DND remain unsupported.
 
@@ -55,7 +52,7 @@ All notable changes to this project are documented here. Format based on
 - Authenticate the pinned system Shell and approved runtime executable, bound complete connection and snapshot operations, preserve exact owned files and recoverable consent, and withdraw stale or revoked observations until explicit reconnection.
 
 ### Behind the scenes
-- Use an actual native title-bar drag in GNOME qualification after final desktop evidence shows a held Alt/button mask can exist without a compositor grab. Keep the native grab and production response mandatory.
+- Qualify real native title-bar gestures only after the authenticated private fixture is clear of Shell panels and GTK confirms pointer entry. Capture actual motion and failed desktop state while retaining mandatory compositor grabs, terminal refusal and production engine rides.
 - Require the real GNOME runtime, native settings and owned-prop scenarios as same-source release gates, including unapproved callers, actual held input, terminal protection, saved drafts, native note text, uncropped images, helper failures and restart. Preserve private display authentication and omit private consent from evidence.
 - Record separately qualified desktop and publication evidence, including the verified Sway website handoff with the user's selected artwork.
 

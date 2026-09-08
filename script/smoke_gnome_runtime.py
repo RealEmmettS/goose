@@ -173,13 +173,14 @@ preserve = "untouched"
         # pointer entry. Record the actual GTK capture events without consuming
         # them, and await the target surface before beginning the gesture.
         native_events = []
-        controller = Gtk.EventControllerLegacy.new()
+        controller = Gtk.EventControllerMotion.new()
         controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-        def record_event(_controller, native_event):
-            native_events.append(dict(type=native_event.get_event_type().value_nick,
-                                      at=time.monotonic()))
-            return False
-        controller.connect('event', record_event)
+        def record_event(kind, *coordinates):
+            if len(native_events) < 100:
+                native_events.append(dict(type=kind, coordinates=coordinates, at=time.monotonic()))
+        controller.connect('enter', lambda _controller, x, y: record_event('enter', x, y))
+        controller.connect('motion', lambda _controller, x, y: record_event('motion', x, y))
+        controller.connect('leave', lambda _controller: record_event('leave'))
         target.add_controller(controller)
         surface = target.get_surface()
         device = surface.get_display().get_default_seat().get_pointer()
@@ -197,14 +198,8 @@ preserve = "untouched"
             event('mousedown', 1)
             wait(lambda: snapshot()['button_pressed'], 'native held button: ' + label)
             event('mousemove', pointer_x + 12, pointer_y + 12)
-            try:
-                wait(lambda: (value if (value := snapshot())['drag'] and
-                              value['drag']['id'] == native['id'] else None), 'actual native held drag: ' + label)
-            except BaseException:
-                (directory / f'failed-grab-{label}.json').write_text(json.dumps(snapshot(), indent=2))
-                subprocess.run(['import', '-display', capture_environment['DISPLAY'], '-window', 'root',
-                    str(directory / f'failed-grab-{label}.png')], env=capture_environment, check=True, timeout=8)
-                raise
+            wait(lambda: (value if (value := snapshot())['drag'] and
+                          value['drag']['id'] == native['id'] else None), 'actual native held drag: ' + label)
             if protected:
                 state = observed(lambda value: value['observed'] and value['drag_id'] is None
                                  and value['task'] != 'perch_ride', 'protected terminal is never a ride target')
@@ -225,6 +220,13 @@ preserve = "untouched"
                                          'actual held ride cancellation: ' + label)
                     (directory / f'interrupted-{label}.json').write_text(json.dumps(cancelled, indent=2))
             (directory / ('protected-drag.json' if protected else f'{label}-drag.json')).write_text(json.dumps(state, indent=2))
+        except BaseException:
+            failed = snapshot()
+            failed['gtk_surface_pointer'] = list(surface.get_device_position(device))
+            (directory / f'failed-grab-{label}.json').write_text(json.dumps(failed, indent=2))
+            subprocess.run(['import', '-display', capture_environment['DISPLAY'], '-window', 'root',
+                str(directory / f'failed-grab-{label}.png')], env=capture_environment, check=True, timeout=8)
+            raise
         finally:
             event('mouseup', 1, 'keyup', 'Alt_L')
             (directory / f'input-events-{label}.json').write_text(json.dumps(native_events, indent=2))

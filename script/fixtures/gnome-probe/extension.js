@@ -95,6 +95,14 @@ export default class Probe extends Extension {
             this._drag || global.display.is_grabbed())
             throw new Error('Stale or unrelated focus fixture');
         Main.overview.hide();
+        // A restored nested Wayland fixture may land at (0, 0), underneath
+        // Shell's top panel. Arrange only these authenticated private windows
+        // inside the usable stage before sending a real title-bar gesture.
+        const rect = window.get_frame_rect();
+        if (rect.width > global.stage.width - 48 || rect.height > global.stage.height - 96)
+            throw new Error('Private fixture does not fit the usable stage');
+        window.move_frame(false, Math.round((global.stage.width - rect.width) / 2),
+            Math.max(48, Math.round((global.stage.height - rect.height) / 2)));
         window.activate(global.get_current_time());
         return 'ok';
     }
