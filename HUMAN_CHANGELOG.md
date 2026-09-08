@@ -52,6 +52,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Let the isolated KDE test wait for the desktop connection to finish starting, and retain clear diagnostics if that connection never becomes ready.
 - Adjust the isolated KDE test environment so it can start and retain useful failure evidence without requesting extra system privileges.
 - Begin testing optional KDE desktop support with real windows, including checks that protected apps stay untouched and disabling the connection stops further actions.
+- Fix the Linux delivery build before repeating checks of its packaged companion.
 - Check the packaged Linux companion on the desktop libraries it was built for, and keep deliveries tied to the program verified before launch.
 - Prepare the Linux update using checks of the actual shipped companions, while keeping the remaining release checks and real Raspberry Pi testing visible.
 - Use the desktop compositor supplied by Alpine for its isolated note and picture checks, while keeping the same visibility requirements.

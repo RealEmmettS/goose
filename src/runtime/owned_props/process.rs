@@ -29,7 +29,7 @@ impl Controller {
         let current = std::env::current_exe()?;
         let settings = current.with_file_name("honk300-settings");
         let verified = crate::install::verify_settings_companion(&current, &settings)?;
-        let program = crate::install::verified_settings_program(&verified)?;
+        let program = crate::install::companions::verified_settings_program(&verified)?;
         let mut child = Process::new(program)
             .arg0(&settings)
             .arg("--owned-props")
