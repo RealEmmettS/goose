@@ -40,14 +40,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Refresh Windows manners availability after a temporary failure recovers, and show Linux fullscreen support according to the desktop integration that is actually connected.
 
 ### Behind the scenes
-- Let private test desktops finish starting before testing the goose, while keeping communication checks strict and recording startup timing.
-- Bring setup guidance up to date with the published Linux features and tested accessibility controls, and explain what the separate manners status labels mean.
-- Check every fullscreen transition and the private test window's final completion so a window closing during an observation cannot produce a misleading test result.
-- Check that assistive software can read fullscreen and do-not-disturb availability separately, and test the Mac goose when desktop permission is denied.
-- Keep Linux-only uninstall checks out of the Mac build so the full Mac code can pass stricter validation.
-- Check the Mac-specific implementation on a native Mac build and distinguish lost desktop permission from an app that stops answering.
-- Check each Linux desktop reports its own fullscreen support and verify the Mac manners toggle through the saved setting the goose actually uses.
-- Exercise real Mac fullscreen changes, interrupted apps, live settings and shutdown. Keep do-not-disturb unavailable where its signal has not been verified, and preserve the existing permission experience.
+- Check real Mac fullscreen changes, denied access, interrupted apps, live settings and shutdown. Verify that assistive software can read both manners status labels, and keep do-not-disturb unavailable where its signal has not been verified.
+- Check the complete Mac implementation more strictly and keep Linux-only uninstall checks out of the Mac build.
+- Wait for private test desktops and windows to be ready, then verify actual input, fullscreen changes and completion without loosening communication or behavior checks.
+- Bring Linux setup and accessibility guidance up to date, explain the separate status labels, and verify complete public downloads before announcing the update.
 
 ## GNOME desktop observations — September 2026
 

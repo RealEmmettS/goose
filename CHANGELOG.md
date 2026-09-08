@@ -33,14 +33,10 @@ All notable changes to this project are documented here. Format based on
 - Recover Windows notification-observation status after a successful poll follows an error, and expose the current Linux compositor fullscreen capability independently of unsupported DND observation.
 
 ### Behind the scenes
-- Wait for initial read-only Sway/Hyprland version readiness on private test desktops after observed cold-start timeouts; retain each transaction's original deadline, peer identity and protocol checks and never retry mutating commands.
-- Reconcile published Linux and native accessibility guidance, and document independent observation labels and older-runtime fallback in the settings companion.
-- Re-read the private Mac fixture's atomic completion record after a final AX query and require matching native/observed normal, fullscreen and restored states before accepting the API premise.
-- Check separate presence labels through real Windows UI Automation and Linux AT-SPI, and qualify denied Mac runtime observations in a private uninstalled LaunchServices bundle without granting permission.
-- Limit Debian uninstall identity helpers to Linux so the native Mac strict lint gate covers the complete workspace without unused platform code.
-- Correct native Mac binding signatures at the real target build and retain permission withdrawal separately from an observation timeout.
-- Verify independent presence status against each actual Linux compositor lifecycle, and use the real safety configuration fields for Mac live-toggle qualification.
-- Qualify Mac presence through native AppKit windows, actual engine manners, live settings, unresponsive targets and graceful shutdown. Preserve the unanswered private Focus-authorization evidence as unqualified and keep it an explicit optional experiment without production prompts.
+- Require native Mac fullscreen/restore, denied app identity, live settings, unresponsive-target recovery and graceful shutdown, plus separate Windows UI Automation and Linux AT-SPI presence labels, as release qualification. Preserve the unqualified app-specific Focus experiment without production prompts or inferred support.
+- Run strict native Mac workspace lint with correct platform bindings and Linux-only Debian uninstall helpers; retain explicit permission-loss and timeout boundaries.
+- Synchronize private compositor startup, GTK input delivery and Mac fixture completion with actual native evidence, keeping transaction deadlines, peer checks, real grabs and observed fullscreen transitions mandatory.
+- Reconcile published Linux and native accessibility guidance, document independent observation status, and require complete same-source platform, package and fresh-public verification for the remaining manners update.
 
 ## [1.9.0] - 2026-09-08
 

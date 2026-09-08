@@ -31,14 +31,15 @@ Exact desktop versions, request semantics and native behavior require direct qua
 - [ ] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Active. Run 34238317252 passes the complete actual runtime, native settings and
-owned-prop lifecycle on Hyprland 0.53.3/0.55.2, each on native x64/ARM64. Actual
-goose, settings, complete image and painted-note captures have been inspected.
-Repeated setup retains one exact worker; revocation completes its production join.
-The remaining gates are final-source candidate/main qualification, immutable
-publication and fresh-public/website verification after Sway.
+Active. The complete candidate and unchanged-main platform, settings and compositor gates
+pass at `970cdb20c2e5f75ea3784adbbc35ea2746734bbf`. The new immutable tag is building
+in publication 34249861698. Two environment failures remain: a cold private compositor
+version request before Honk300 starts, and artifact finalization after successful native
+scenarios. Preserve the tag and retry failed jobs on its unchanged source. Fresh-public
+and website verification remain required; the prepared website change is held.
 
 ## Activity
+- 2026-09-08 — Complete candidate 34241011570 (all jobs) and unchanged-main CI/settings/KDE/Sway/Hyprland gates. Create the new immutable tag only after those passes; retain publication startup/upload failures and hold website PR 11 until every public-download gate passes.
 - 2026-09-08 — Final PR Windows checks catch the fixture stopwatch declaration in the similarly shaped runtime-readiness loop. Restore that runtime loop byte for byte and put the stopwatch only beside the background-host launch, preserving every goose timing and compositor assertion before final candidate qualification.
 - 2026-09-08 — All four strengthened native lanes pass at 2868497 in run 34238317252, including completed worker joins, bounded task retirement and actual painted notes. Inspect all four final settings, goose and note captures and record the completed native gate before freezing the candidate.
 - 2026-09-08 — Stronger painted-note qualification passes three desktops; newer ARM stops earlier when proc still lists a thread after unsupported status. Keep the production join policy and require its successful completion in the actual trace before the unsupported reply, then separately bound proc retirement. Cold Windows background helpers also exceed the old five-second fixture startup without creating a surface; add a separate thirty-second setup deadline with stage timestamps and preserve all goose/compositor assertions.
