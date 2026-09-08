@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Wait for the private GNOME desktop before opening its test windows.
+
+### Behind the scenes
 - Keep the separate GNOME test desktop's settings in one private location and retain its extension diagnostics when setup fails.
 
 ### Behind the scenes

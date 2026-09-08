@@ -44,7 +44,7 @@ def main():
     os.environ.update(environment)
     import gi
     gi.require_version('Gtk', '4.0')
-    from gi.repository import Gio, GLib, Gtk
+    from gi.repository import Gio, GLib
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     windows = []
     goose = None
@@ -108,6 +108,9 @@ def main():
             (evidence / 'wayland-globals.txt').write_text(protocol.stdout)
             layer_shell = 'zwlr_layer_shell_v1' in protocol.stdout
             GLib.set_prgname('honk300-gnome-probe')
+            # PyGObject's Gtk override initializes GTK at import time. Import
+            # only after the native Shell reports its actual private display.
+            from gi.repository import Gtk
             Gtk.init()
             def find(title):
                 return next((node for node in snapshot()['windows'] if node['title'] == title), None)
