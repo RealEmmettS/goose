@@ -27,6 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Separate native API availability from permission: bound probe shutdown, reject the ineffective macOS system-presentation premise, and test the documented Focus authorization flow in a private fixture bundle.
 - Probe native macOS fullscreen and Focus observations independently from a real app's normal/fullscreen/restored transitions, without requesting permission or inferring fullscreen from geometry.
 
 ## [1.8.0] - 2026-09-08

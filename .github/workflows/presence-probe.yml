@@ -28,6 +28,21 @@ jobs:
           swiftc script/probe_macos_presence.swift -o target/presence-probe
       - name: Observe actual fullscreen transitions without requesting permission
         run: target/presence-probe observe "$PWD/target/presence-evidence"
+      - name: Probe documented Focus authorization in a private bundle
+        run: |
+          app="$PWD/target/HonkPresenceProbe.app"
+          mkdir -p "$app/Contents/MacOS"
+          cp target/presence-probe "$app/Contents/MacOS/HonkPresenceProbe"
+          python3 - "$app/Contents/Info.plist" <<'PY'
+          import plistlib,sys
+          with open(sys.argv[1], 'wb') as output:
+              plistlib.dump(dict(CFBundleIdentifier='dev.emmetts.honk300.presenceprobe',
+                  CFBundleName='Honk300 native presence probe', CFBundleExecutable='HonkPresenceProbe',
+                  CFBundlePackageType='APPL', CFBundleVersion='1',
+                  NSFocusStatusUsageDescription='This disposable qualification probe checks whether macOS supplies an authorized Focus observation.'), output)
+          PY
+          codesign --force --sign - "$app"
+          "$app/Contents/MacOS/HonkPresenceProbe" focus "$PWD/target/presence-evidence"
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}
         with:

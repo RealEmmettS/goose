@@ -26,6 +26,7 @@ independent accessory process during a private native app's fullscreen transitio
 Do not request permissions or infer availability from window size.
 
 ## Activity
+- 2026-09-08 — Run 34243557287 completes on native Intel and Apple Silicon. Accessibility reports actual fullscreen transitions; currentSystemPresentationOptions stays zero throughout and is refuted for this accessory path. Focus reports not-determined authorization despite a false value, so that value is not a DND signal. Probe the documented explicit authorization request in a separately signed private fixture bundle next.
 - 2026-09-08 — Both native architectures compile the actual API premise, but the first observer does not exit. Bound the independent process with a watchdog and record its last API stage; use explicit process completion after writing evidence instead of waiting for another accessory-app event after stopping its run loop.
 - 2026-09-08 — Start a bounded native x64/Apple Silicon API premise using documented system presentation and Focus APIs. Observe actual normal/fullscreen/restored phases from an independent process, record existing authorization without prompting, and retain unavailable APIs honestly before production wiring.
 - 2026-09-08: Made unresolved R05 independently visible while reconciling the completed first-stage audit corrections. No observation or acceptance requirement was waived.

@@ -50,8 +50,33 @@ final class Fixture: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 }
 
+final class FocusFixture: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard #available(macOS 12, *) else { exit(1) }
+        let center = INFocusStatusCenter.default
+        write(["stage": "before-request", "authorization": center.authorizationStatus.rawValue,
+               "focused": center.focusStatus.isFocused ?? NSNull()], "focus.json")
+        // This explicit request is confined to the disposable probe bundle; no
+        // production runtime or user desktop automatically requests permission.
+        center.requestAuthorization { status in
+            DispatchQueue.main.async {
+                write(["stage": "request-returned", "authorization": status.rawValue,
+                       "current_authorization": center.authorizationStatus.rawValue,
+                       "focused": center.focusStatus.isFocused ?? NSNull()], "focus.json")
+                exit(0)
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 15) { exit(2) }
+    }
+}
+
 let app = NSApplication.shared
-if mode == "fixture" {
+if mode == "focus" {
+    app.setActivationPolicy(.regular)
+    let delegate = FocusFixture()
+    app.delegate = delegate
+    withExtendedLifetime(delegate) { app.run() }
+} else if mode == "fixture" {
     app.setActivationPolicy(.regular)
     let delegate = Fixture()
     app.delegate = delegate
