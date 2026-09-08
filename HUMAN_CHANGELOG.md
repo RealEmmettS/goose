@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Fixed
+- Opening settings now respects the installer's latest start-at-login choice, so changing an unrelated preference cannot undo it.
+- Settings remain editable when the goose cannot report its status, and unusual configuration filenames no longer prevent the window from loading.
+- Reloading after a configuration file disappears keeps the goose's current choices instead of silently resetting them.
 - Linux screen readers now correctly identify unavailable settings buttons, including Update now while no update is ready.
 
 The goose can keep bringing notes and pictures when Windows leaves focus with the app you are using. Notes still receive their text without typing into another app.
@@ -53,6 +56,7 @@ Save remains available to accessibility tools after changing settings, including
 Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
 
 ### Behind the scenes
+- Add focused startup and settings checks, and refresh the project dashboard while preserving its existing settings.
 - Linux builds now receive the same strict code checks as Windows, including unused platform-specific code.
 - Update retry checks now wait for the new result before pressing Update, matching the settings screen's normal sequence.
 - Let the goose finish walking into view before asking it to wander during desktop capture checks.

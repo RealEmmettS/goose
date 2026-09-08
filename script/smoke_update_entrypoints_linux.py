@@ -254,6 +254,9 @@ exec "$@" > "$HONK300_ENTRYPOINT_EVIDENCE/helper.stdout.txt" 2> "$HONK300_ENTRYP
         directory.mkdir()
         config = directory / 'config.toml'
         config.write_text('goose_config_version = 2\n[audio]\nenabled = false\n[safety]\nno_mouse_steal = true\nno_window_ride = true\n')
+        if mode == 'gui':
+            with config.open('a') as stream:
+                stream.write('# Older preference must yield to fresh installer intent\n[lifecycle]\nautostart_on_login = true\n')
         environment = dict(os.environ, PATH=str(launcher_dir) + os.pathsep + os.environ['PATH'],
                            HONK300_ENTRYPOINT_EVIDENCE=str(directory), TERM='xterm-256color')
         runtime = editor = None
@@ -263,6 +266,27 @@ exec "$@" > "$HONK300_ENTRYPOINT_EVIDENCE/helper.stdout.txt" 2> "$HONK300_ENTRYP
             run('sudo', 'apt-get', 'install', '--yes', args.package)
             verify_receipt(args.fixture_version)
             before = RECEIPT.read_bytes()
+            if mode == 'gui':
+                assert RECEIPT.stat().st_mtime_ns > config.stat().st_mtime_ns
+
+                def settings_request(command):
+                    response = run(INSTALLED, '__settings-service', '--config', config,
+                        input=json.dumps({'protocol': 1, 'request_id': 91, 'command': command}),
+                        capture_output=True, text=True, env=environment)
+                    value = json.loads(response.stdout)
+                    assert value['ok'], value
+                    return value['data']
+
+                initial = settings_request({'op': 'read'})
+                assert next(field['value'] for field in initial['fields'] if field['key'] == 'lifecycle.autostart_on_login') is False
+                settings_request({'op': 'save', 'revision': initial['revision'],
+                                  'patch': {'appearance.expressions': False}})
+                saved = settings_request({'op': 'read'})
+                assert next(field['value'] for field in saved['fields'] if field['key'] == 'lifecycle.autostart_on_login') is False
+                assert RECEIPT.read_bytes() == before, 'GUI read/save changed the protected receipt'
+                (directory / 'autostart-intent.json').write_text(json.dumps({
+                    'older_config': True, 'fresh_installer': False, 'gui_snapshot': False,
+                    'unrelated_save_preserved_intent': True, 'receipt_unchanged': True}, indent=2) + '\n')
             latest = check_updates()
             runtime = subprocess.Popen([str(INSTALLED), 'start', '--config', str(config)],
                                        stdout=runtime_log, stderr=runtime_log, env=environment)

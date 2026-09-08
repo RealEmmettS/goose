@@ -39,6 +39,9 @@ All notable changes to this project are documented here. Format based on
 - Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
 
 ### Fixed
+- Reconcile receipt-owned autostart intent before the native settings edit snapshot, preserve its resulting revision, and reject concurrent configuration changes during reconciliation.
+- Keep native settings editable when runtime status cannot be confirmed, display an unknown state instead of stopped, and omit an unused native path field that could panic on non-Unicode filenames.
+- Reject ordinary reload when its configuration file is missing, retaining the running choices instead of silently applying defaults.
 - Capture the native Linux startup goose before issuing a Wander command that replaces its entrance task. Preserve the paired-background image oracle and later honk/mud/wander/reload checks; the ARM64 Debian fixture had repeatedly paused a partial edge pose.
 - Correct AccessKit's Linux AT-SPI Enabled/Sensitive state for disabled buttons using a pinned, licensed local patch. Test the actual state translation and native disabled-to-available Update now workflow.
 - Keep Windows owned note/meme delivery available when foreground activation is denied by normal OS focus policy. A failed `SetForegroundWindow` request no longer invents a Win32 error or permanently disables collect capability; note text still targets the owned edit control directly.
@@ -54,6 +57,7 @@ All notable changes to this project are documented here. Format based on
 - Aim cursor-seeking locomotion at the body position that brings the beak to the pointer, avoiding a stationary-pointer chase that could never reach the grab distance.
 
 ### Development
+- Verify null Windows standard handles and valid inheritance in an isolated native test; the pinned API binding already skips null handles. Refresh the task dashboard while preserving its settings and stopped state.
 - Require strict all-target workspace Clippy on both native Linux CI architectures. Limit the installer autostart glob import to its Windows and test callers; the explicit public re-exports remain unchanged.
 - Wait for the GUI's new check response before retrying an update in the native Debian fixture; queued accessibility actions must not reuse the previous enabled state. Require a new retained helper before awaiting transaction success.
 - Exercise captured Windows CLI/app starts through real process EOF and runtime readiness on x64/ARM64. Give the disposable Linux TUI update fixture its own controlling PTY and preserve failed terminal output for diagnosis.
