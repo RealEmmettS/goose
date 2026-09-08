@@ -26,6 +26,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Fixed
+- Correct the Linux runtime's pointer-distance call to the production engine vector API, as caught by the expanded native KWin build gate.
+
 ### Added
 - Add explicit KDE setup/removal through CLI and Native SDK settings, with private consent, sealed companion loading, live Rust runtime capabilities, owned-only crash recovery and immediate IPC revocation. Keep portal control, DND and native prop positioning unsupported pending separate implementation and qualification.
 

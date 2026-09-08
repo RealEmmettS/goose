@@ -49,6 +49,7 @@ expanded native x64/ARM64 probes are next. Runtime and explicit setup remain ope
 No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: The expanded native gate catches a Linux-only call to a nonexistent vector method before runtime launch. Use the engine's real magnitude operation and repeat native compilation before claiming runtime acceptance.
 - 2026-09-08: Add guided Rust-owned setup/removal, native consent UI and separate capability status. Retain a private stable registration identity for owned-only recovery after crashes. Expand the four native KWin lanes to compile and exercise the actual goose runtime, revocation, graceful cleanup, stopped removal and state preservation.
 - 2026-09-08: The sealed activation gate stops at native Rust compilation: the introspection proxy retains a borrowed path. Drop that completed proxy before moving the selected path; no native activation result is claimed yet.
 - 2026-09-08: All four KWin 5/6 x64/ARM64 lanes pass the expanded native fullscreen, other-desktop, actual user-drag and reconnect checks in 34191906181. Add retained sealed-script activation and owned-only cleanup to the production Rust bridge; its new native gate is next.

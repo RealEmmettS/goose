@@ -343,7 +343,7 @@ pub fn run(
             // KWin supplies position only. Retain a native button observation only
             // when the overlay itself observed that same point.
             pointer.left_down =
-                pointer.left_down && pointer.present && (pointer.pos - pos).length() < 1.0;
+                pointer.left_down && pointer.present && (pointer.pos - pos).magnitude() < 1.0;
             pointer.pos = pos;
             pointer.present = world.layout().region_at(pos).is_some();
         }
