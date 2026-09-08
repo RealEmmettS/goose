@@ -145,13 +145,33 @@ impl KwinRuntime {
     }
 
     pub(crate) fn enable(&mut self) -> Result<(), Error> {
+        let desired = (|| -> Result<installed::Consent, Error> {
+            let consent = installed::read(&directory()?)?
+                .ok_or("Use KDE setup before enabling its integration")?;
+            if !consent.current() {
+                return Err("Repeat KDE setup for this installed update".into());
+            }
+            Ok(consent)
+        })();
+        let consent = match desired {
+            Ok(consent) => consent,
+            Err(error) => {
+                self.disable();
+                self.failed = true;
+                return Err(error);
+            }
+        };
+        // Repeating setup for the same healthy companion is idempotent. Keep
+        // its live portal session, in-flight consent and target identities.
+        // A changed grant or expired bridge still takes the full revoke path.
+        if self.consent.as_ref() == Some(&consent)
+            && self.bridge.as_ref().and_then(Bridge::snapshot).is_some()
+        {
+            self.last_consent_check = Some(Instant::now());
+            return Ok(());
+        }
         self.disable();
         self.failed = true;
-        let consent = installed::read(&directory()?)?
-            .ok_or("Use KDE setup before enabling its integration")?;
-        if !consent.current() {
-            return Err("Repeat KDE setup for this installed update".into());
-        }
         let mut bridge = Bridge::connect()?;
         bridge.retire_owned_script(&consent.name())?;
         bridge.load_script(&consent.name(), SCRIPT)?;

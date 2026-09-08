@@ -42,6 +42,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ### Fixed
 - Recognize fullscreen groups of windows on Sway and report unavailable observations when its screens are off. Check that incomplete desktop replies cannot keep the goose waiting indefinitely.
+- Keep an existing pointer permission when you repeat KDE setup, so an unchanged setup does not send you through another permission dialog. Include the desktop companion when preparing the source package.
 - Keep exact desktop window positions when passing them to the goose, preventing a delivery from stopping after its first small movement.
 - Bring controls below the settings scroll area into view when a screen reader activates them, while keeping disabled controls inactive.
 - Let the goose recognize its own transparent drawing surface so granted pointer pranks work while other windows remain protected. Keep desktop observations running during longer sessions.

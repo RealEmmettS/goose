@@ -34,6 +34,7 @@ all architecture/package lanes and same-source candidate/main qualification rema
 required before publication.
 
 ## Activity
+- 2026-09-08 — Candidate 34214227317 passes all architecture/package/native/signing gates at 881884a. PR review identifies missing Cargo source-package inclusion and unnecessary pointer revocation on repeated healthy KDE setup. Correct both and require actual Cargo selection plus repeated CLI/native setup during a live native pointer grant before qualifying the changed source.
 - 2026-09-08: Publication-record main run 34209990490 exposes an ARM64 restart-fixture race: the output file exists before its line is written, giving zero fields. Keep the actual restart and exact PID/session/start-argument assertions; wait for the complete line within the existing deadline before readback. Carry the correction into final-source qualification.
 - 2026-09-08: Prepare the next distinct release and make exact-commit native KDE qualification a required candidate/publication dependency. Track the integrated accessibility failure without weakening the actual consent or movement checks.
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).

@@ -134,6 +134,13 @@ preserve = "untouched"
         expect('unprobed', 'settings requests fresh consent')
         desktop_action(('Share', 'Allow'), 'settings-grant')
         expect('supported', 'settings granted real pointer device')
+        original_consent = record.read_bytes()
+        control('integrations', 'kde', 'setup')
+        expect('supported', 'repeated CLI setup preserves the active pointer grant')
+        invoke('Set up KDE')
+        invoke('Enable KDE integration')
+        expect('supported', 'repeated native settings setup preserves the active pointer grant')
+        assert record.read_bytes() == original_consent, 'Idempotent setup replaced the consent identity'
         invoke('Refresh status')
         wait(lambda: find('Cancel pointer access').get_state_set().contains(Atspi.StateType.ENABLED),
              'native cancellation is available')
@@ -208,6 +215,7 @@ preserve = "untouched"
         assert config.read_text() == original and not record.exists()
         (directory / 'result.json').write_text(json.dumps(dict(ok=True, native_settings=True,
             actual_engine_pointer_motion=True, actual_desktop_denial=True, pending_cancel=True,
+            idempotent_setup_preserves_pointer_grant=True,
             draft_preserved=True, closing_settings_preserves_runtime=True, explicit_cancel=True,
             external_revocation=True, graceful_stop=True, crash_recovery=True,
             no_restored_pointer_grant=True, backend_loss=True, window_support_preserved=True,
