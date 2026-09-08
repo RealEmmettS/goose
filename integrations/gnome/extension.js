@@ -126,6 +126,8 @@ export default class Honk300Observations extends Extension {
         const generation = this._generation;
         let cancellable = null;
         let timeout = 0;
+        let expired = false;
+        let stage = 'admission';
         try {
             if (!this._active || nonce.length !== 32)
                 throw new Error('GNOME observations are unavailable');
@@ -140,19 +142,23 @@ export default class Honk300Observations extends Extension {
             this._requests.add(cancellable);
             timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 200, () => {
                 timeout = 0;
+                expired = true;
                 cancellable.cancel();
                 return GLib.SOURCE_REMOVE;
             });
+            stage = 'consent-before';
             const consent = await this._consent(cancellable);
             if (nonce !== consent.nonce)
                 throw new ConsentRevoked();
             const sender = invocation.get_sender();
+            stage = 'credentials';
             const [pid, uid] = await Promise.all([
                 this._credential(sender, 'GetConnectionUnixProcessID', cancellable),
                 this._credential(sender, 'GetConnectionUnixUser', cancellable),
             ]);
             if (uid !== new Gio.Credentials().get_unix_user())
                 throw new Error('GNOME caller belongs to another user');
+            stage = 'caller';
             const executable = Gio.File.new_for_path(`/proc/${pid}/exe`);
             const info = await ioAsync(executable, 'query_info_async', 'query_info_finish',
                 INFO, Gio.FileQueryInfoFlags.NONE, GLib.PRIORITY_DEFAULT, cancellable);
@@ -165,11 +171,13 @@ export default class Honk300Observations extends Extension {
                 info.get_size().toString() !== consent.executable.size ||
                 GLib.file_read_link(`/proc/${pid}/exe`) !== consent.executable.path)
                 throw new Error('GNOME caller is not the explicitly approved executable');
+            stage = 'consent-after';
             if (!this._active || generation !== this._generation ||
                 (await this._consent(cancellable)).nonce !== nonce)
                 throw new ConsentRevoked();
             if (cancellable.is_cancelled())
                 throw new Error('GNOME observation deadline exceeded');
+            stage = 'windows';
             const actors = global.get_window_actors();
             const workspace = global.workspace_manager.get_active_workspace();
             const grabbed = global.display.is_grabbed();
@@ -212,8 +220,8 @@ export default class Honk300Observations extends Extension {
         } catch (error) {
             // No nonce, private record, window content or executable identity is
             // included in error replies or Shell logs.
-            invocation.return_dbus_error(`${IFACE}.${error instanceof ConsentRevoked ? 'Revoked' : 'Unavailable'}`,
-                'GNOME observations unavailable; check explicit setup and extension status');
+            const reason = error instanceof ConsentRevoked ? 'Revoked' : expired ? 'Deadline' : 'Unavailable';
+            invocation.return_dbus_error(`${IFACE}.${reason}`, `GNOME observation failed during ${stage}`);
         } finally {
             if (timeout) GLib.source_remove(timeout);
             if (cancellable) this._requests.delete(cancellable);

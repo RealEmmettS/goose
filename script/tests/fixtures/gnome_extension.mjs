@@ -119,7 +119,10 @@ test('slow consent stays asynchronous, bounded and cancellable', async () => {
     await new Promise(resolve => setTimeout(resolve, 10));
     assert.equal(f.extension._requests.size, 4, 'The main loop must continue while all reads wait');
     await Promise.all(pending.map(request => request.finished));
-    for (const {result} of pending) assert.equal(result.error, 'dev.emmetts.Honk300.Gnome1.Unavailable');
+    for (const {result} of pending) {
+        assert.equal(result.error, 'dev.emmetts.Honk300.Gnome1.Deadline');
+        assert.equal(result.message, 'GNOME observation failed during consent-before');
+    }
     assert.equal(f.extension._requests.size, 0);
     assert.equal(f.timers.size, 0);
 });

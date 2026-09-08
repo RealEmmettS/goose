@@ -28,6 +28,40 @@ fn invalid(message: &str) -> io::Error {
 }
 fn bus_error(error: zbus::Error) -> io::Error {
     match error {
+        zbus::Error::MethodError(name, message, _)
+            if matches!(
+                name.as_str(),
+                "dev.emmetts.Honk300.Gnome1.Deadline" | "dev.emmetts.Honk300.Gnome1.Unavailable"
+            ) =>
+        {
+            // Only these fixed provider phases may reach logs. Never forward an
+            // arbitrary remote description, consent record or window identity.
+            let phase = match message.as_deref() {
+                Some("GNOME observation failed during admission") => "admission",
+                Some("GNOME observation failed during consent-before") => "consent before query",
+                Some("GNOME observation failed during credentials") => "caller credentials",
+                Some("GNOME observation failed during caller") => "caller executable",
+                Some("GNOME observation failed during consent-after") => "consent after query",
+                Some("GNOME observation failed during windows") => "window observation",
+                _ => "unknown phase",
+            };
+            let expired = name.as_str().ends_with(".Deadline");
+            io::Error::new(
+                if expired {
+                    io::ErrorKind::TimedOut
+                } else {
+                    io::ErrorKind::Other
+                },
+                format!(
+                    "GNOME {} during {phase}",
+                    if expired {
+                        "deadline exceeded"
+                    } else {
+                        "observation failed"
+                    }
+                ),
+            )
+        }
         zbus::Error::MethodError(name, _, _)
             if name.as_str() == "dev.emmetts.Honk300.Gnome1.Revoked" =>
         {

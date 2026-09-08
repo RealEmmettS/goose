@@ -39,6 +39,7 @@ All notable changes to this project are documented here. Format based on
 - Authenticate the pinned system Shell and approved runtime executable, bound complete connection and snapshot operations, preserve exact owned files and recoverable consent, and withdraw stale or revoked observations until explicit reconnection.
 
 ### Behind the scenes
+- Distinguish Shell request deadlines and fixed failure phases without forwarding private or arbitrary remote error content; retain the existing fail-closed observer behavior while diagnosing native qualification failures.
 - Wait for the private Sway and Hyprland compositor to answer its initial read-only version request; preserve per-transaction bounds, peer checks and non-retried mutation commands.
 - Keep native drag qualification clear of the goose's actual post-ride hit region while continuing to require input delivery to the exact GTK window and a real Mutter grab.
 - Qualify real native title-bar gestures only after the authenticated private fixture is clear of Shell panels and GTK confirms pointer entry. Capture actual motion and failed desktop state while retaining mandatory compositor grabs, terminal refusal and production engine rides.
