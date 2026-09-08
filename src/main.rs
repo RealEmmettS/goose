@@ -111,6 +111,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cli::Integration::Sway {
                     action: cli::IntegrationAction::Status,
                 } => integrations::sway_status(),
+                cli::Integration::Gnome {
+                    action: cli::IntegrationAction::Setup,
+                } => integrations::gnome_setup()?,
+                cli::Integration::Gnome {
+                    action: cli::IntegrationAction::Remove,
+                } => integrations::gnome_remove()?,
+                cli::Integration::Gnome {
+                    action: cli::IntegrationAction::Status,
+                } => integrations::gnome_status(),
                 cli::Integration::Hyprland {
                     action: cli::IntegrationAction::Setup,
                 } => integrations::hyprland_setup()?,

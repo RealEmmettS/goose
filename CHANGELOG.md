@@ -24,7 +24,21 @@ All notable changes to this project are documented here. Format based on
 > release packaging with artifact evidence. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
-## [Unreleased]
+## [1.9.0] - 2026-09-08
+
+### Added
+- Add explicit GNOME Shell companion setup and removal through Rust CLI and Native SDK settings, with qualified GNOME 46.0/48.7 window, fullscreen and actual user-drag observations on native x64/ARM64. Preserve the compatible XWayland overlay and independent owned-prop positioning; foreign movement, pointer access and DND remain unsupported.
+
+### Fixed
+- Omit destroyed and zero-area Mutter actors during mapping transitions while retaining strict validation for every reported target. Cancel held rides on configuration changes, target destruction and extension loss.
+- Gate GNOME settings actions on their own capability and keep wrapped content clear of the native scrollbar.
+
+### Security
+- Authenticate the pinned system Shell and approved runtime executable, bound complete connection and snapshot operations, preserve exact owned files and recoverable consent, and withdraw stale or revoked observations until explicit reconnection.
+
+### Behind the scenes
+- Require the real GNOME runtime, native settings and owned-prop scenarios as same-source release gates, including unapproved callers, actual held input, terminal protection, saved drafts, native note text, uncropped images, helper failures and restart. Preserve private display authentication and omit private consent from evidence.
+- Record separately qualified desktop and publication evidence, including the verified Sway website handoff with the user's selected artwork.
 
 ### Behind the scenes
 - Separate native API availability from permission: bound probe shutdown, reject the ineffective macOS system-presentation premise, and test the documented Focus authorization flow in a private fixture bundle.

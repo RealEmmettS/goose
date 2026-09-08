@@ -323,6 +323,9 @@ pub fn run(
                 | ControlCommand::SwayStatus
                 | ControlCommand::SwayEnable
                 | ControlCommand::SwayDisable
+                | ControlCommand::GnomeStatus
+                | ControlCommand::GnomeEnable
+                | ControlCommand::GnomeDisable
                 | ControlCommand::HyprlandStatus
                 | ControlCommand::HyprlandEnable
                 | ControlCommand::HyprlandDisable

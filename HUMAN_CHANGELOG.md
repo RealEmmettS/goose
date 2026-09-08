@@ -34,8 +34,27 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## Remaining manners observations — In development
 
 ### Behind the scenes
+- Keep the remaining manners checks aligned with the new desktop support and test private permission setup after its window is ready.
+
+### Behind the scenes
 - Check actual desktop permission before treating a notification value as reliable, and stop private checks cleanly when they finish.
 - Check what macOS can actually tell the goose about fullscreen apps and interrupted notifications before adding support or asking for more access.
+
+## GNOME desktop observations — September 2026
+
+### Added
+- Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
+
+### Fixed
+- Keep GNOME observations working while an app creates or remaps a window. End a window ride when you turn it off, close its window or remove desktop access.
+- Keep GNOME setup available according to its own desktop support, and prevent the scrollbar from covering the end of a settings description.
+
+### Security
+- Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost, keep setup responsive when a connection stops answering, and preserve unrelated desktop settings.
+
+### Behind the scenes
+- Check the real GNOME desktop, goose and settings together before publishing, including readable notes, complete pictures, lost access, restarts and unexpected failures. Keep private test permissions out of the evidence files.
+- Keep each desktop's support claims tied to its own checks, and keep website instructions and downloads aligned with the verified release while preserving the artwork you chose.
 
 ## Hyprland desktop observations — September 2026
 

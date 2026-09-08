@@ -15,6 +15,8 @@ mod tray;
 pub mod kwin;
 
 #[cfg(any(target_os = "linux", test))]
+pub mod gnome;
+#[cfg(any(target_os = "linux", test))]
 pub mod hyprland;
 #[cfg(any(target_os = "linux", test))]
 pub mod sway;

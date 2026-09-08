@@ -47,10 +47,22 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
-    parser.add_argument('--expected-desktop', default='labwc')
+    parser.add_argument('--expected-desktop')
+    parser.add_argument('--capture-display')
+    parser.add_argument('--capture-authority')
     args = parser.parse_args()
     binary, evidence = args.binary.resolve(), args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
+    capture_environment = dict(os.environ)
+    if args.capture_display:
+        capture_environment['DISPLAY'] = args.capture_display
+    if args.capture_authority:
+        capture_environment['XAUTHORITY'] = args.capture_authority
+    logical_size = None
+    if positioning:
+        logical_size = tuple(map(int, subprocess.check_output(
+            ['xdotool', 'getdisplaygeometry'], text=True).split()))
+        assert len(logical_size) == 2 and min(logical_size) > 0
 
     def control(*arguments, check=True):
         return subprocess.run([str(binary), *arguments], capture_output=True, text=True, timeout=10, check=check)
@@ -130,7 +142,7 @@ def main():
         prefix = ['import', '-window', 'root'] if positioning else ['grim']
 
         def visible():
-            subprocess.run([*prefix, str(path)], check=True, timeout=10)
+            subprocess.run([*prefix, str(path)], env=capture_environment, check=True, timeout=10)
             if positioning:
                 windows = owned_windows(pid)
                 assert len(windows) == 1, windows
@@ -140,7 +152,8 @@ def main():
                 (directory / 'note-geometry.json').write_text(json.dumps(geometry, indent=2) + '\n')
                 with Image.open(path).convert('RGB') as picture:
                     assert 0 <= x <= picture.width - width and 0 <= y <= picture.height - height, geometry
-                    assert width <= picture.width * 0.48 and height <= picture.height * 0.48, geometry
+                    assert 0 <= x <= logical_size[0] - width and 0 <= y <= logical_size[1] - height, geometry
+                    assert width <= logical_size[0] * 0.48 and height <= logical_size[1] * 0.48, geometry
                     # Native text readback is necessary but cannot prove a
                     # transparent overlay has not obscured the entire prop.
                     pixels = picture.crop((x, y, x + width, y + height))
@@ -204,8 +217,8 @@ autumn = false
                     assert 'collect: supported' in status
                     assert f'display backend: {"X11" if positioning else "native Wayland"}' in status, status
                     assert f'note/picture positioning: {"supported" if positioning else "unsupported"}' in status, status
-                    if not positioning:
-                        assert f'desktop (session hint): {args.expected_desktop}' in status, status
+                    if args.expected_desktop or not positioning:
+                        assert f'desktop (session hint): {args.expected_desktop or "labwc"}' in status, status
                     service = subprocess.run([str(binary), '__settings-service', '--config', str(config)],
                         input=json.dumps({'protocol': 1, 'request_id': 78, 'command': {'op': 'status'}}),
                         capture_output=True, text=True, check=True, timeout=15)

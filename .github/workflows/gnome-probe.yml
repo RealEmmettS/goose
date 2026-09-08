@@ -1,0 +1,93 @@
+name: Native GNOME adapter
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      commit:
+        required: true
+        type: string
+  pull_request:
+    paths: ['script/smoke_gnome*', 'script/smoke_owned_props_linux.py', 'script/smoke_runtime_props_linux.py', 'script/fixtures/gnome-probe/**', '.github/workflows/gnome-probe.yml', '.github/workflows/release.yml', 'integrations/gnome/**', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
+  push:
+    branches: [main, codex/goose-gnome-integration]
+    paths: ['script/smoke_gnome*', 'script/smoke_owned_props_linux.py', 'script/smoke_runtime_props_linux.py', 'script/fixtures/gnome-probe/**', '.github/workflows/gnome-probe.yml', 'integrations/gnome/**', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
+
+permissions:
+  contents: read
+
+jobs:
+  premise:
+    name: GNOME (${{ matrix.distribution }}, ${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: ['ubuntu:24.04', 'debian:trixie-slim']
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.95'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          architecture: ${{ matrix.runner == 'ubuntu-24.04-arm' && 'arm64' || 'x64' }}
+      - name: Build and test the actual GNOME runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libasound2-dev
+          cargo test --locked --bin honk300 integrations
+          cargo test --locked -p honk-platform-linux --lib
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo build --locked --release --bin honk300
+      - name: Build the production Native SDK settings companion
+        run: |
+          sudo apt-get install --no-install-recommends -y libgtk-4-dev pkg-config
+          target="$(uname -m)-unknown-linux-gnu"
+          python3 script/build_settings.py --target "$target" --output target/release --test
+      - name: Exercise the actual private Shell and extension
+        env:
+          HONK_DISTRIBUTION: ${{ matrix.distribution }}
+        run: |
+          docker run --rm -e HONK_HOST_UID="$(id -u)" -e HONK_HOST_GID="$(id -g)" \
+            -v "$PWD:/work" -w /work "$HONK_DISTRIBUTION" bash -euc '
+            mkdir -p target/gnome-evidence
+            trap '\''chown -R "$HONK_HOST_UID:$HONK_HOST_GID" /work/target/gnome-evidence'\'' EXIT
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+              gnome-shell gnome-session-bin dbus-x11 python3 python3-gi gir1.2-gtk-4.0 \
+              libgl1-mesa-dri libegl-mesa0 xvfb xauth xwayland wayland-utils imagemagick \
+              util-linux passwd libasound2t64 dconf-cli xdotool at-spi2-core gir1.2-atspi-2.0 python3-pil libglib2.0-bin
+            dpkg-query -W > target/gnome-evidence/packages.txt
+            # Package installation may create an empty seats directory even
+            # though this private container has no systemd/login session. Keep
+            # GNOME on its normal no-logind path; never substitute a fake service.
+            if test -d /run/systemd/seats; then rmdir /run/systemd/seats; fi
+            mkdir -p /run/dbus
+            dbus-daemon --system --fork
+            # Bind-mounted runner outputs retain the host UID, which is not
+            # authority for the private desktop user. Install identical bytes
+            # into a root-owned fixture release just like a managed package.
+            install -Dm0755 target/release/honk300 /opt/honk300-qualification/honk300
+            install -Dm0755 target/release/honk300-settings /opt/honk300-qualification/honk300-settings
+            cmp target/release/honk300 /opt/honk300-qualification/honk300
+            cmp target/release/honk300-settings /opt/honk300-qualification/honk300-settings
+            useradd --create-home honkprobe
+            chown -R honkprobe:honkprobe /work/target/gnome-evidence
+            runuser -u honkprobe -- env GITHUB_ACTIONS=true xvfb-run -a -s "-screen 0 1400x1000x24" \
+              dbus-run-session -- python3 script/smoke_gnome_adapter.py \
+                --evidence target/gnome-evidence --goose /opt/honk300-qualification/honk300 --settings /opt/honk300-qualification/honk300-settings
+          '
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: gnome-${{ strategy.job-index }}
+          path: |
+            target/gnome-evidence
+            !target/gnome-evidence/data/honk300/wayland/gnome.json
+          if-no-files-found: warn

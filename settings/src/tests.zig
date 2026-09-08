@@ -192,3 +192,52 @@ test "Hyprland setup and removal retain the settings draft and separate capabili
     try std.testing.expect(model.dirty());
     try std.testing.expectEqualStrings("true", model.fields[0].value());
 }
+
+test "GNOME actions use their own capability even when Hyprland differs" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const model = try arena.allocator().create(main.Model);
+    model.* = .{ .gnome_supported = true, .hyprland_supported = false };
+    const effects = try arena.allocator().create(main.Effects);
+    effects.* = main.Effects.init(arena.allocator());
+    defer effects.deinit();
+    main.update(model, .gnome_setup, effects);
+    try std.testing.expect(model.gnome_prompt);
+    main.update(model, .gnome_cancel, effects);
+    try std.testing.expect(!model.gnome_prompt);
+    model.gnome_supported = false;
+    model.hyprland_supported = true;
+    main.update(model, .gnome_setup, effects);
+    try std.testing.expect(!model.gnome_prompt);
+    main.update(model, .gnome_confirm, effects);
+    main.update(model, .gnome_remove, effects);
+    try std.testing.expect(!model.busy);
+    try std.testing.expectEqual(@as(u64, 0), model.request_id);
+}
+
+test "Gnome setup and removal retain the settings draft and separate capability limits" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const model = try arena.allocator().create(main.Model);
+    model.* = .{};
+    model.request_id = 1;
+    try main.acceptResponse(model, @embedFile("fixtures/read.json"));
+    model.fields[0].value_buffer.set("true");
+    try main.acceptResponse(model,
+        \\{"protocol":1,"request_id":1,"ok":true,"data":{"gnome":{"supported":true,"installed":true,"description":"Gnome enabled","capabilities":{"windows":"supported","fullscreen":"supported","movement":"unsupported","pointer_control":"unsupported"}}}}
+    );
+    try std.testing.expect(model.gnome_installed);
+    try std.testing.expect(model.dirty());
+    try std.testing.expect(std.mem.indexOf(u8, model.gnomeStatus(), "Movement: unsupported") != null);
+    model.page = .platform;
+    model.gnome_prompt = true;
+    const View = sdk.canvas.CompiledMarkupView(main.Model, main.Msg, main.app_markup);
+    var ui = main.AppUi.init(arena.allocator());
+    _ = try ui.finalize(View.build(&ui, model));
+    try main.acceptResponse(model,
+        \\{"protocol":1,"request_id":1,"ok":true,"data":{"gnome":{"supported":true,"installed":false,"description":"Gnome observations removed"}}}
+    );
+    try std.testing.expect(!model.gnome_installed);
+    try std.testing.expect(model.dirty());
+    try std.testing.expectEqualStrings("true", model.fields[0].value());
+}

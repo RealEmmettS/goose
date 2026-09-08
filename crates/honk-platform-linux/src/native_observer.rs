@@ -36,7 +36,9 @@ impl<S: Source> Observer<S> {
     pub fn start() -> io::Result<Self> {
         Self::spawn(S::connect)
     }
-    fn spawn(connect: impl FnOnce() -> io::Result<S> + Send + 'static) -> io::Result<Self> {
+    pub(crate) fn spawn(
+        connect: impl FnOnce() -> io::Result<S> + Send + 'static,
+    ) -> io::Result<Self> {
         let state = Arc::new(Mutex::new(State {
             frame: None,
             failed: false,

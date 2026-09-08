@@ -49,6 +49,8 @@ enum Operation {
     SwayRemove {},
     HyprlandSetup {},
     HyprlandRemove {},
+    GnomeSetup {},
+    GnomeRemove {},
     PointerRequest {},
     PointerCancel {},
 }
@@ -127,7 +129,7 @@ fn execute(operation: Operation, path: &Path) -> Result<Value, Error> {
                 .map_err(|error| error.to_string())
         }),
         Operation::Status {} => Ok(
-            json!({"runtime": runtime_json(), "integrations": crate::integrations::status(), "sway": crate::integrations::sway_status(), "hyprland": crate::integrations::hyprland_status()}),
+            json!({"runtime": runtime_json(), "integrations": crate::integrations::status(), "sway": crate::integrations::sway_status(), "hyprland": crate::integrations::hyprland_status(), "gnome": crate::integrations::gnome_status()}),
         ),
         Operation::KdeSetup {} => crate::integrations::setup(),
         Operation::KdeRemove {} => crate::integrations::remove(),
@@ -135,6 +137,8 @@ fn execute(operation: Operation, path: &Path) -> Result<Value, Error> {
         Operation::SwayRemove {} => crate::integrations::sway_remove(),
         Operation::HyprlandSetup {} => crate::integrations::hyprland_setup(),
         Operation::HyprlandRemove {} => crate::integrations::hyprland_remove(),
+        Operation::GnomeSetup {} => crate::integrations::gnome_setup(),
+        Operation::GnomeRemove {} => crate::integrations::gnome_remove(),
         Operation::PointerRequest {} => crate::integrations::pointer(true),
         Operation::PointerCancel {} => crate::integrations::pointer(false),
         Operation::Start {} => {
@@ -173,6 +177,7 @@ fn read_settings(
     value["integrations"] = crate::integrations::status();
     value["sway"] = crate::integrations::sway_status();
     value["hyprland"] = crate::integrations::hyprland_status();
+    value["gnome"] = crate::integrations::gnome_status();
     Ok(value)
 }
 
