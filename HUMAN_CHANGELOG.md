@@ -43,6 +43,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Keep GNOME setup available according to its own desktop support, independently of Hyprland.
 
 ### Behind the scenes
+- Let private windows finish resizing before testing a drag, and wait for a complete observation record before reading it.
 - Share the connection-worker checks across optional desktop integrations so they follow the same shutdown rules.
 - Check that a window ride ends when you turn it off, close its window or remove desktop access, and that removing access finishes even while settings is still updating its display.
 - Check that GNOME notes and pictures are readable, complete and correctly placed, including closing them and recovering after their helper unexpectedly exits.

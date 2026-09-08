@@ -37,6 +37,7 @@ All notable changes to this project are documented here. Format based on
 - Authenticate the pinned system Shell and approved runtime executable before returning bounded observations. Apply one total deadline through bus authentication and each complete snapshot; discard stale or revoked data and require explicit reconnection after terminal failure. Keep rejected credential lookups separate from authenticated delivery.
 
 ### Behind the scenes
+- Start native drag fixtures only after compositor geometry and GTK allocation settle, including fullscreen restoration. Parse only complete trace records while retaining malformed complete records as failures.
 - Use the same retained-worker ownership query across GNOME and Hyprland, removing the duplicate introduced while integrating their independently developed adapters.
 - Exercise configuration changes, target destruction and extension loss during actual held GNOME rides. Check completed runtime joins separately from asynchronous native companion removal, and retain cleanup even when a diagnostic accessibility node disappears.
 - Qualify owned GNOME XWayland props through actual native geometry, rendered text, uncropped image corners, capacity, user/program close, child failure and restart. Capture final Shell composition through its separate private outer display while enforcing bounds against the real inner desktop dimensions.

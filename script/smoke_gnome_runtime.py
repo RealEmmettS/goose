@@ -133,22 +133,35 @@ preserve = "untouched"
     def observed(check, label):
         def current():
             entries = [json.loads(line.split('honk300 gnome trace: ', 1)[1])
-                       for line in runtime_log.read_text().splitlines()
-                       if 'honk300 gnome trace: ' in line]
+                       for line in runtime_log.read_text().splitlines(keepends=True)
+                       if line.endswith('\n') and 'honk300 gnome trace: ' in line]
             return entries and entries[-1] if entries and check(entries[-1]) else None
         return wait(current, label)
 
     def drag(target, protected=False, interrupt=None, label='ordinary'):
         target.present()
         title = target.get_title()
-        arranged = wait(lambda: find_window(title), 'existing native drag fixture')
+        previous = None
+        stable_since = time.monotonic()
+        def settled(focused=False):
+            nonlocal previous, stable_since
+            node = find_window(title)
+            state = (node, target.get_width(), target.get_height())
+            if state != previous:
+                previous, stable_since = state, time.monotonic()
+            return node if (node and node['pid'] == os.getpid() and not node['fullscreen']
+                and node['rect'][2] >= 300 and node['rect'][3] >= 200
+                and target.get_width() > 0 and target.get_height() > 0
+                and (not focused or node['focused']) and not snapshot()['overview']
+                and time.monotonic() - stable_since >= 0.25) else None
+        arranged = wait(settled, 'settled native drag fixture: ' + label)
         bus.call_sync(shell_owner, '/dev/emmetts/Honk300/GnomeProbe1',
             'dev.emmetts.Honk300.GnomeProbe1', 'FocusFixture',
             GLib.Variant('(tus)', (arranged['id'], os.getpid(),
                 json.dumps(arranged['rect'], separators=(',', ':')))),
             GLib.VariantType.new('(s)'), Gio.DBusCallFlags.NONE, 1000, None)
-        native = wait(lambda: (node if (node := find_window(title)) and node['focused']
-                              and not snapshot()['overview'] else None), 'native drag focus')
+        native = wait(lambda: settled(focused=True), 'settled native drag focus: ' + label)
+        (directory / f'arranged-{label}.json').write_text(json.dumps(native, indent=2))
         x, y, width, height = native['rect']
         def event(*arguments):
             subprocess.run(['xdotool', *map(str, arguments)], env=capture_environment,
@@ -157,8 +170,14 @@ preserve = "untouched"
             event('mousemove', x + width // 2, y + height // 2,
                   'keydown', 'Alt_L', 'mousedown', 1)
             event('mousemove', x + width // 2 + 12, y + height // 2 + 12)
-            wait(lambda: (value if (value := snapshot())['drag'] and
-                          value['drag']['id'] == native['id'] else None), 'actual native held drag')
+            try:
+                wait(lambda: (value if (value := snapshot())['drag'] and
+                              value['drag']['id'] == native['id'] else None), 'actual native held drag: ' + label)
+            except BaseException:
+                (directory / f'failed-grab-{label}.json').write_text(json.dumps(snapshot(), indent=2))
+                subprocess.run(['import', '-display', capture_environment['DISPLAY'], '-window', 'root',
+                    str(directory / f'failed-grab-{label}.png')], env=capture_environment, check=True, timeout=8)
+                raise
             if protected:
                 state = observed(lambda value: value['observed'] and value['drag_id'] is None
                                  and value['task'] != 'perch_ride', 'protected terminal is never a ride target')
