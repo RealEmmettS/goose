@@ -36,6 +36,7 @@ All notable changes to this project are documented here. Format based on
 - Add Honk300-owned Linux note/image deliveries through the existing verified GTK companion, with X11 animated positioning and native Wayland compositor placement. Expose live session and separate positioning capability in CLI/TUI/GUI, and document experimental Pi 4/5 64-bit Desktop support with native ARM64 labwc evidence.
 
 ### Fixed
+- Keep exact musl archive qualification unprivileged by removing only the private Alpine compositor's realtime file-capability request and preserving its metadata before execution.
 - Honor the documented native Wayland opt-in on desktops without X11: a bare launch explains the existing command/config choice before creating an overlay or companion.
 - Give the native Linux prop close button the visible label Close; GTK's deferred child label had replaced the separate accessibility label with the multiplication symbol.
 - Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.

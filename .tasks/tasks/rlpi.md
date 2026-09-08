@@ -25,6 +25,10 @@ The requested behavior runs through its production path and the supporting evide
 - [ ] Integration and required package/release checks pass before publication.
 
 ## Status
+The exact Alpine archive now passes X11 visual and prop readiness checks. Candidate
+34195690566 next stopped at Sway exec because the distribution's realtime file
+capability is unavailable in the container. Drop that request only inside the private
+fixture, retain its metadata and rerun the unchanged runtime/visual assertions.
 The first complete candidate failed musl prop startup: Ubuntu lacked the musl GTK
 libraries required by the packaged companion. Exact musl archives now use a native
 Alpine desktop fixture with unchanged readiness and visual checks; the rerun is pending.
@@ -35,6 +39,7 @@ prepares v1.5.0 with the final first-stage fixes integrated. Publication remains
 behind #rr1; final-source CI, the complete candidate, main and public-byte gates are open.
 
 ## Activity
+- 2026-09-08: Candidate 34195690566 proves the exact ARM64 musl archive launches its GTK prop companion and passes X11 compositor checks. Sway then exits with EPERM before its socket exists. Preserve the container's capability metadata and remove only its unnecessary realtime request, as already qualified for private KWin tests. The Windows host CI failure was a missing interactive test desktop; only that failed job was restarted.
 - 2026-09-08: The native integration build catches an incorrect module path in the new prop descriptor launch. Use the companion module's actual exported function; the old candidate is superseded before package execution.
 - 2026-09-08: Candidate 34191310461 exposed missing musl GTK dependencies in its Ubuntu fixture (native prop child exited 127). Move exact musl package execution to Alpine on the same native architecture; retain before/after archive identity and all capability checks. Integrate the shared verified-descriptor and invalid-receipt launcher fix for owned props.
 - 2026-09-08: Banked all-eight production companion qualification, marked independent implementation complete and prepared the distinct second-stage candidate version/readiness record. Publication remains ordered after #rr1.
