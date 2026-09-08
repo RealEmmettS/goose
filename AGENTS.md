@@ -15,7 +15,8 @@ The first three stages are published: the redesigned goose and native settings, 
 props and experimental Pi guidance, and explicit KDE window/portal integration.
 Sway observations are also published. Hyprland and GNOME retain separate native
 qualification and publication gates.
-The website uses the actual renderer's editable SVGs.
+The website retains the user's restored r6 artwork; application renderer exports
+remain available separately. Preserve that explicit website choice during release handoffs.
 Native GNU/musl and ARM64 labwc proof is not physical Pi acceptance.
 
 The approved refinement is in progress under `.tasks/milestones/refine.md` and ADR 0041:

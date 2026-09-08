@@ -9,26 +9,19 @@
   - [ ] Qualify macOS fullscreen and supported system do-not-disturb observation paths.
   - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
   - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
+## Active
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
-  - [ ] Complete the separately qualified Sway implementation (needs #rsw).
+  - [x] Complete the separately qualified Sway implementation (needs #rsw).
   - [ ] Complete the separately qualified Hyprland implementation (needs #rhy).
   - [ ] Complete the versioned GNOME companion and its desktop qualification (needs #rgn).
-
-## Active
 - [ ] **GNOME desktop companion** - versioned explicit Shell integration with proven observation, placement and a compatible overlay path (needs #rkde) (ms #refine) (owner codex) #rgn
   - [x] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
   - [x] Prove live user-drag observation and automatic movement refusal through actual desktop input.
-  - [ ] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
+  - [x] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
   - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
 - [ ] **Hyprland desktop integration** - separately probe supported native IPC operations and preserve per-operation capability claims (needs #rkde) (ms #refine) (owner codex) #rhy
   - [x] Prove native socket ownership, exact window identity and supported bounded placement.
   - [x] Integrate explicit setup/removal and exercise disconnect, stale identity and terminal refusals.
-  - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
-- [ ] **Sway desktop observations** - explicit native window/fullscreen support with exact-version evidence and honest action limitations (needs #rkde) (ms #refine) (owner codex) #rsw
-  - [x] Prove the authenticated native socket, window identity and actual bounded placement premise.
-  - [x] Resolve the active-drag boundary: keep movement unsupported under ADR 0046.
-  - [x] Qualify the production read-only Rust transport and untrusted-peer refusal.
-  - [x] Integrate explicit Rust and native settings setup/removal with disconnect handling and unsupported action checks.
   - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
@@ -51,6 +44,12 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **Sway desktop observations** - explicit native window/fullscreen support with exact-version evidence and honest action limitations (needs #rkde) (ms #refine) (owner codex) (done 2026-09-08) #rsw
+  - [x] Prove the authenticated native socket, window identity and actual bounded placement premise.
+  - [x] Resolve the active-drag boundary: keep movement unsupported under ADR 0046.
+  - [x] Qualify the production read-only Rust transport and untrusted-peer refusal.
+  - [x] Integrate explicit Rust and native settings setup/removal with disconnect handling and unsupported action checks.
+  - [x] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
 - [x] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) (done 2026-09-08) #rkde
   - [x] Prepare guided setup documentation and the distinct release metadata.
   - [x] Pass integrated native pointer and settings lifecycle checks.
