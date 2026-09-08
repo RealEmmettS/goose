@@ -53,7 +53,11 @@ def main():
             if result := check():
                 return result
             time.sleep(0.02)
-        raise RuntimeError(f'Timed out waiting for {description}; latest snapshot: {latest}')
+        names = call('org.freedesktop.DBus', '/org/freedesktop/DBus',
+                     'org.freedesktop.DBus', 'ListNames').unpack()[0]
+        (evidence / 'timeout-bus-names.json').write_text(json.dumps(names, indent=2) + '\n')
+        raise RuntimeError(f'Timed out waiting for {description}; latest snapshot: {latest}; '
+                           f'compositor: {(evidence / "compositor.log").read_text()[-5000:]}')
 
     latest = None
     with (evidence / 'compositor.log').open('w') as log:
@@ -61,6 +65,12 @@ def main():
             '--no-lockscreen', '--socket', 'wayland-honk-kwin'], env=environment, stdout=log, stderr=log)
         try:
             wait(lambda: (runtime / 'wayland-honk-kwin').is_socket(), 'private Wayland socket')
+            # KWin creates its socket before registering its scripting service.
+            # Readiness requires both; a native socket is not a D-Bus owner.
+            wait(lambda: call('org.freedesktop.DBus', '/org/freedesktop/DBus',
+                              'org.freedesktop.DBus', 'NameHasOwner',
+                              GLib.Variant('(s)', ('org.kde.KWin',))).unpack()[0],
+                 'KWin D-Bus registration')
             owner = call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
                          'GetNameOwner', GLib.Variant('(s)', ('org.kde.KWin',))).unpack()[0]
             assert owner.startswith(':'), owner

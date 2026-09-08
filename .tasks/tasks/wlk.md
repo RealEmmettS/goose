@@ -35,13 +35,16 @@ this task owns the native implementation evidence and #rkde owns publication.
 - [ ] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
-Active in the isolated Wayland integration checkout. The first native container probe
-stopped before KWin execution: the distro binary's file capabilities exceed Docker's
-default capability set. Record and strip that realtime request only inside the disposable
-software-rendered container. No extra host/container privileges are added. Native API
-feasibility remains unverified; no public integration is enabled or advertised.
+Active in the isolated Wayland integration checkout. The second native probe starts both
+compositors and creates their sockets, then queries the D-Bus identity before registration.
+Wait for the actual service owner with a fixed deadline; add bus-name and compositor-log
+diagnostics for a timeout. Native API feasibility remains unverified; no public integration
+is enabled or advertised.
 
 ## Activity
+- 2026-09-07: Run 34188470703 reaches socket startup on both KWin generations, then fails
+  with NameHasNoOwner before the script is loaded. Native logs show no startup crash.
+  Require both socket and D-Bus registration, preserving a bounded timeout and its diagnostics.
 - 2026-09-07: Run 34187445365 failed at KWin exec with EPERM on both distributions,
   before any script/window assertion. Preserve the file capability metadata, drop the
   private container's realtime request and return artifact ownership to the runner after
