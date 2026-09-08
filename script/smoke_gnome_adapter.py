@@ -155,6 +155,8 @@ def main():
             wait(lambda: find(ordinary['title'])['fullscreen'], 'native fullscreen observation')
             windows[0].unfullscreen()
             wait(lambda: not find(ordinary['title'])['fullscreen'], 'native fullscreen removal')
+            assert call('ShowDesktop') == 'ok'
+            wait(lambda: not snapshot()['overview'], 'normal desktop outside overview')
             capture_environment = dict(environment)
             environment['DISPLAY'] = snapshot()['display']
             assert environment['DISPLAY'] and environment['DISPLAY'] != outer_display, environment['DISPLAY']
@@ -188,6 +190,7 @@ def main():
                 for index in range(80):
                     pump()
                     time.sleep(0.05)
+                assert not snapshot()['overview'], 'Overview hides the override-redirect overlay'
                 subprocess.run(['import', '-display', outer_display, '-window', 'root',
                     str(evidence / 'native-goose.png')], env=capture_environment, check=True, timeout=8)
                 subprocess.run([str(args.goose.resolve()), 'stop'], env=environment,
@@ -202,7 +205,7 @@ def main():
             assert windows[1].get_mapped(), 'Disabling the extension closed the unrelated window'
             result = dict(ok=True, version=initial['version'], architecture=os.uname().machine,
                 shell_pid=shell.pid, peer_credentials=True, layer_shell=layer_shell,
-                xwayland_overlay_ready=True, actual_fixture_move=True, stale_geometry_refused=True,
+                xwayland_overlay_ready=True, normal_desktop=True, actual_fixture_move=True, stale_geometry_refused=True,
                 native_fullscreen=True, extension_disable=True, initial=ordinary, moved=moved,
                 protected=protected, user_drag_qualified=False, pointer_control_qualified=False)
             (evidence / 'result.json').write_text(json.dumps(result, indent=2) + '\n')

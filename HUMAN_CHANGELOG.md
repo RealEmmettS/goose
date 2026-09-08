@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Check that the goose is actually visible on the GNOME desktop after leaving the startup overview.
+
+### Behind the scenes
 - Connect the goose to the private GNOME test desktop using its normal authenticated display connection.
 
 ### Behind the scenes

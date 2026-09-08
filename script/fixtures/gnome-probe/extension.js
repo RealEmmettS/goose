@@ -7,6 +7,7 @@ import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 
 const XML = `<node><interface name="dev.emmetts.Honk300.GnomeProbe1">
 <method name="Snapshot"><arg type="s" direction="out"/></method>
+<method name="ShowDesktop"><arg type="s" direction="out"/></method>
 <method name="MoveFixture"><arg type="t" direction="in"/><arg type="u" direction="in"/>
 <arg type="s" direction="in"/><arg type="s" direction="out"/></method>
 </interface></node>`;
@@ -48,7 +49,13 @@ export default class Probe extends Extension {
         return JSON.stringify({version: Config.PACKAGE_VERSION, pid: new Gio.Credentials().get_unix_pid(),
             display: GLib.getenv('DISPLAY'), wayland: GLib.getenv('WAYLAND_DISPLAY'),
             session_wayland: Meta.is_wayland_compositor(), drag: this._drag,
+            overview: Main.overview.visible, stage: [global.stage.width, global.stage.height],
             windows: windows.map(window => this._window(window))});
+    }
+
+    ShowDesktop() {
+        Main.overview.hide();
+        return 'ok';
     }
 
     MoveFixture(id, pid, expected) {
