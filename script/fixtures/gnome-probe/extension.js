@@ -53,11 +53,15 @@ export default class Probe extends Extension {
 
     MoveFixture(id, pid, expected) {
         const window = this._windows().find(value => value.get_stable_sequence() === id);
-        if (!window || pid !== Number(GLib.getenv('HONK300_GNOME_PROBE_PID')) ||
-            window.get_pid() !== pid || window.get_title() !== 'Honk300 ordinary GNOME probe' ||
-            window.get_wm_class() !== 'honk300-gnome-probe' ||
-            JSON.stringify(this._window(window).rect) !== expected || this._drag)
-            throw new Error('Stale or unrelated probe target');
+        const failures = [];
+        if (!window) failures.push('window identity');
+        if (pid !== Number(GLib.getenv('HONK300_GNOME_PROBE_PID'))) failures.push('fixture process');
+        if (window && window.get_pid() !== pid) failures.push('window process');
+        if (window && window.get_title() !== 'Honk300 ordinary GNOME probe') failures.push('title');
+        if (window && window.get_wm_class() !== 'honk300-gnome-probe') failures.push('application');
+        if (window && JSON.stringify(this._window(window).rect) !== expected) failures.push('stale geometry');
+        if (this._drag) failures.push('active grab');
+        if (failures.length) throw new Error('Stale or unrelated probe target: ' + failures.join(', '));
         const rect = window.get_frame_rect();
         window.move_frame(false, rect.x + 6, rect.y);
         return 'ok';

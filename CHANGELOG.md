@@ -27,6 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Wait for actual stable GNOME fixture geometry after mapping, disable animations only in the private test desktop, and retain specific native stale-target refusal reasons without relaxing the action guard.
 - Initialize PyGObject GTK only after GNOME Shell reports its real private Wayland display; all four prior Shells now load the actual extension and return native snapshots.
 - Align the private GNOME session bus activation environment with the fixture's isolated XDG paths before dconf activation; preserve native extension discovery/settings diagnostics on both success and failure.
 - Correct the native GNOME fixture's false logind detection by removing only an empty package-created seats directory in its private container, preserving the upstream no-logind path and real desktop API tests.

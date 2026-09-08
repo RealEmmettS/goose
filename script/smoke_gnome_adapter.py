@@ -41,6 +41,8 @@ def main():
                    env=environment, check=True, timeout=5)
     subprocess.run(['gsettings', 'set', 'org.gnome.shell', 'disable-user-extensions', 'false'],
                    env=environment, check=True, timeout=5)
+    subprocess.run(['gsettings', 'set', 'org.gnome.desktop.interface', 'enable-animations', 'false'],
+                   env=environment, check=True, timeout=5)
     os.environ.update(environment)
     import gi
     gi.require_version('Gtk', '4.0')
@@ -126,6 +128,17 @@ def main():
             for node in (ordinary, protected):
                 assert node['pid'] == os.getpid() and node['app'] == 'honk300-gnome-probe', node
                 assert node['showing'] and not node['minimized'], node
+            previous = None
+            stable_since = time.monotonic()
+            def settled():
+                nonlocal previous, stable_since
+                current = (find(windows[0].get_title()), find(windows[1].get_title()))
+                if current != previous:
+                    previous, stable_since = current, time.monotonic()
+                return (current if all(node and node['rect'][2] >= 300 and node['rect'][3] >= 200
+                    for node in current) and time.monotonic() - stable_since >= 0.2 else None)
+            ordinary, protected = wait(settled, 'settled native window geometry')
+            (evidence / 'fixture-windows.json').write_text(json.dumps([ordinary, protected], indent=2) + '\n')
             assert call('MoveFixture', GLib.Variant('(tus)', (ordinary['id'], os.getpid(),
                 json.dumps(ordinary['rect'], separators=(',', ':'))))) == 'ok'
             moved = wait(lambda: (node if (node := find(ordinary['title'])) and

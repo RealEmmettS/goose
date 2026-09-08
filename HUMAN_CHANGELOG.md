@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Start the GNOME movement check after its private windows finish opening, while keeping stale-window protection in place.
+
+### Behind the scenes
 - Wait for the private GNOME desktop before opening its test windows.
 
 ### Behind the scenes
