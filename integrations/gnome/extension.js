@@ -25,6 +25,18 @@ function ioAsync(object, method, finish, ...args) {
     });
 }
 
+async function together(cancellable, tasks) {
+    // Join every operation, including cancelled stream cleanup, before the
+    // request releases its bounded admission slot.
+    const results = await Promise.allSettled(tasks.map(async task => {
+        try { return await task(); }
+        catch (error) { cancellable.cancel(); throw error; }
+    }));
+    const failed = results.find(result => result.status === 'rejected');
+    if (failed) throw failed.reason;
+    return results.map(result => result.value);
+}
+
 async function privateInfo(path, cancellable, directory = false) {
     const file = Gio.File.new_for_path(path);
     const info = await ioAsync(file, 'query_info_async', 'query_info_finish',
@@ -98,14 +110,20 @@ export default class Honk300Observations extends Extension {
 
     async _consent(cancellable) {
         const root = GLib.build_filenamev([GLib.get_user_data_dir(), 'honk300', 'wayland']);
-        await privateInfo(root, cancellable, true);
-        await privateInfo(this.path, cancellable, true);
-        const consent = JSON.parse(await readPrivate(`${root}/gnome.json`, 262144, cancellable));
+        await together(cancellable, [
+            () => privateInfo(root, cancellable, true),
+            () => privateInfo(this.path, cancellable, true),
+        ]);
+        const [record, script, metadata] = await together(cancellable, [
+            () => readPrivate(`${root}/gnome.json`, 262144, cancellable),
+            () => readPrivate(`${this.path}/extension.js`, 65536, cancellable),
+            () => readPrivate(`${this.path}/metadata.json`, 4096, cancellable),
+        ]);
+        const consent = JSON.parse(record);
         if (consent.phase !== 'active' || consent.previous !== null)
             throw new ConsentRevoked();
         if (consent.boundary !== BOUNDARY || !/^[0-9a-f]{32}$/.test(consent.nonce) ||
-            consent.script !== await readPrivate(`${this.path}/extension.js`, 65536, cancellable) ||
-            consent.metadata !== await readPrivate(`${this.path}/metadata.json`, 4096, cancellable))
+            consent.script !== script || consent.metadata !== metadata)
             throw new Error('GNOME companion needs explicit setup for this update');
         return consent;
     }

@@ -129,6 +129,9 @@ def main():
             for title in ('Honk300 ordinary GNOME probe', 'ChatGPT Codex terminal probe'):
                 window = Gtk.Window(title=title)
                 window.set_default_size(300, 200)
+                header = Gtk.HeaderBar()
+                header.set_title_widget(Gtk.Label(label='Drag this private window'))
+                window.set_titlebar(header)
                 window.set_child(Gtk.Label(label=title))
                 window.present()
                 windows.append(window)

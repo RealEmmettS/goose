@@ -129,13 +129,14 @@ preserve = "untouched"
         assert node.get_action_iface().do_action(0), name
 
     def trace(fullscreen, manners, observed=True):
-        wanted = f'observed={str(observed).lower()} fullscreen={str(fullscreen).lower()} manners={str(manners).lower()}'
-        def current():
-            entries = [line for line in runtime_log.read_text().splitlines() if 'honk300 presence trace:' in line]
-            return entries and entries[-1].endswith(wanted)
-        wait(current, 'actual engine presence ' + wanted)
+        # Use the rate/size-bounded post-tick engine trace throughout the full
+        # fixture. Transition-only presence diagnostics can reach their cap
+        # during legitimate stale-data withdrawal and recovery.
+        return observed_state(lambda value: value['observed'] == observed and
+                              value['fullscreen'] == fullscreen and value['manners'] == manners,
+                              f'actual engine presence observed={observed} fullscreen={fullscreen} manners={manners}')
 
-    def observed(check, label):
+    def observed_state(check, label):
         def current():
             entries = [json.loads(line.split('honk300 gnome trace: ', 1)[1])
                        for line in runtime_log.read_text().splitlines(keepends=True)
@@ -196,6 +197,11 @@ preserve = "untouched"
             # remap. First prove actual GTK delivery inside the client, then
             # move to the native frame and require Mutter's real grab signal.
             client_x, client_y = x + width // 2, y + height // 2
+            # A newly raised surface may be under an unchanged outer pointer.
+            # Two distinct client points guarantee a real motion event.
+            event('mousemove', client_x + 20, client_y + 20)
+            wait(lambda: snapshot()['pointer'] == [client_x + 20, client_y + 20],
+                 'native motion enters the private client: ' + label)
             event('mousemove', client_x, client_y)
             wait(lambda: snapshot()['pointer'] == [client_x, client_y],
                  'native pointer reaches the private client: ' + label)
@@ -212,22 +218,22 @@ preserve = "untouched"
             wait(lambda: (value if (value := snapshot())['drag'] and
                           value['drag']['id'] == native['id'] else None), 'actual native held drag: ' + label)
             if protected:
-                state = observed(lambda value: value['observed'] and value['drag_id'] is None
+                state = observed_state(lambda value: value['observed'] and value['drag_id'] is None
                                  and value['task'] != 'perch_ride', 'protected terminal is never a ride target')
             else:
-                observed(lambda value: value['drag_id'] == native['id'] and value['drag_pid'] == os.getpid()
+                observed_state(lambda value: value['drag_id'] == native['id'] and value['drag_pid'] == os.getpid()
                          and value['task'] == 'perch_ride', 'actual goose starts native window ride')
                 def perched(value):
                     return value['anchor'] and sum((a-b)**2 for a,b in
                         zip(value['position'], value['anchor'])) < 1
-                state = observed(perched, 'goose reaches the actual window anchor')
+                state = observed_state(perched, 'goose reaches the actual window anchor')
                 event('mousemove', pointer_x + 36, pointer_y + 24)
-                moved = observed(lambda value: perched(value) and value['anchor'] != state['anchor'],
+                moved = observed_state(lambda value: perched(value) and value['anchor'] != state['anchor'],
                                  'perched goose follows the actual user drag')
                 (directory / f'native-ride-{label}.json').write_text(json.dumps(dict(before=state, moved=moved), indent=2))
                 if interrupt:
                     interrupt(native)
-                    cancelled = observed(lambda value: value['task'] != 'perch_ride',
+                    cancelled = observed_state(lambda value: value['task'] != 'perch_ride',
                                          'actual held ride cancellation: ' + label)
                     (directory / f'interrupted-{label}.json').write_text(json.dumps(cancelled, indent=2))
             (directory / ('protected-drag.json' if protected else f'{label}-drag.json')).write_text(json.dumps(state, indent=2))
@@ -244,7 +250,7 @@ preserve = "untouched"
             target.remove_controller(controller)
         wait(lambda: not (value := snapshot())['grabbed'] and not value['alt_pressed']
              and not value['button_pressed'], 'native drag and modifier release')
-        observed(lambda value: value['drag_id'] is None and value['task'] != 'perch_ride',
+        observed_state(lambda value: value['drag_id'] is None and value['task'] != 'perch_ride',
                  'actual goose leaves the released window')
 
     def close(process):
@@ -334,7 +340,7 @@ preserve = "untouched"
         def disable_rides(native):
             config.write_text(original.replace('no_window_ride = false', 'no_window_ride = true'))
             control('reload')
-            observed(lambda value: value['observed'] and value['drag_id'] == native['id']
+            observed_state(lambda value: value['observed'] and value['drag_id'] == native['id']
                      and value['task'] != 'perch_ride', 'live config ends a still-held ride')
             assert snapshot()['drag']['id'] == native['id'], 'Fixture released before config cancellation'
         drag(window, interrupt=disable_rides, label='config-disabled')
@@ -342,13 +348,16 @@ preserve = "untouched"
         control('reload')
         transient = Gtk.Window(title='Honk300 transient GNOME probe')
         transient.set_default_size(300, 200)
+        header = Gtk.HeaderBar()
+        header.set_title_widget(Gtk.Label(label='Drag this private window'))
+        transient.set_titlebar(header)
         transient.set_child(Gtk.Label(label='Close during an actual held ride'))
         transient.present()
         def destroy_target(native):
             assert snapshot()['drag']['id'] == native['id']
             transient.destroy()
             wait(lambda: find_window('Honk300 transient GNOME probe') is None, 'destroyed held native target')
-            observed(lambda value: value['observed'] and value['drag_id'] is None
+            observed_state(lambda value: value['observed'] and value['drag_id'] is None
                      and value['task'] != 'perch_ride', 'destroyed target withdraws the live ride')
         try:
             drag(transient, interrupt=destroy_target, label='destroyed-target')
@@ -386,7 +395,7 @@ preserve = "untouched"
                            check=True, capture_output=True, timeout=5)
             expect('failed', 'native extension disable withdraws observations during a held ride')
             trace(False, False, observed=False)
-            observed(lambda value: not value['observed'] and value['drag_id'] is None
+            observed_state(lambda value: not value['observed'] and value['drag_id'] is None
                      and value['task'] != 'perch_ride', 'extension loss cancels the still-held ride')
         drag(window, interrupt=disable_extension, label='extension-disabled')
         subprocess.run(['gnome-extensions', 'enable', 'honk300@emmetts.dev'],

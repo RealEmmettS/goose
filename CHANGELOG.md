@@ -46,6 +46,7 @@ All notable changes to this project are documented here. Format based on
 - Add explicit GNOME Shell companion setup and removal through Rust CLI and Native SDK settings, with qualified GNOME 46.0/48.7 window, fullscreen and actual user-drag observations on native x64/ARM64. Preserve the compatible XWayland overlay and independent owned-prop positioning; foreign movement, pointer access and DND remain unsupported.
 
 ### Fixed
+- Check independent GNOME consent files concurrently within the original deadline, retaining both full consent checks, opened identities and joined cancellation cleanup.
 - Recover bounded GNOME query timeouts through the retained authenticated connection after withdrawing stale data. Recheck live consent and the pinned Shell on every query; keep permission, owner, extension and decoding failures terminal.
 - Include both embedded GNOME files in Cargo source selection, omit blind XWayland pointer input on GNOME Wayland and enforce the window bound only on reportable native actors.
 - Consume authenticated consent revocation from the retained observation worker instead of reading user-data files on every runtime poll. Use bounded cancellable asynchronous GIO reads in Shell, retain opened-file identity checks and cancel pending requests on removal.
@@ -56,6 +57,7 @@ All notable changes to this project are documented here. Format based on
 - Authenticate the pinned system Shell and approved runtime executable, bound complete connection and snapshot operations, preserve exact owned files and recoverable consent, and withdraw stale or revoked observations until explicit reconnection.
 
 ### Behind the scenes
+- Read actual manners from the bounded GNOME post-tick trace throughout qualification, and use explicit GTK fixture title bars plus real pointer motion across remapping while retaining mandatory native grabs.
 - Prove GTK pointer entry inside the native client before a separately verified frame/title-bar drag, preserving real Mutter grabs and ride cancellation across remapped decorations.
 - Close Hyprland publication, all eight fresh-public lanes and exact website download verification; update current guidance and dashboard status while retaining GNOME and independent presence qualification gates.
 - Distinguish Shell request deadlines and fixed failure phases without forwarding private or arbitrary remote error content; retain the existing fail-closed observer behavior while diagnosing native qualification failures.

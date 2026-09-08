@@ -61,6 +61,12 @@ or obsolete generation may publish a snapshot. Discard destroyed or empty native
 actors before counting the 64 reportable windows, and reject the next live entry
 without building an oversized report. GNOME Wayland always supplies an absent
 pointer to the engine until an independent native pointer path is qualified.
+Independent directories and files are checked concurrently inside that same
+deadline. Each consent check still validates both directories, all three bounded
+files and every opened identity. Any failed parallel operation cancels the group;
+all reads and asynchronous closes are joined before releasing the request slot.
+At most three streams per admitted request can be open. The final full consent
+check remains mandatory after authenticating the caller.
 
 The production desktop fixture must exercise the actual companion, Rust runtime,
 native settings controls, ordinary and terminal user drags, fullscreen manners,

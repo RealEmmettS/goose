@@ -609,6 +609,7 @@ pub fn run(
                 serde_json::json!({
                     "observed": gnome_frame.is_some(),
                     "fullscreen": gnome_frame.as_ref().is_some_and(|frame| frame.fullscreen()),
+                    "manners": world.manners_active(),
                     "drag_id": native_drag.map(|window| window.id),
                     "drag_pid": native_drag.and_then(|window| window.pid),
                     "task": world.current_task(),
