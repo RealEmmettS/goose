@@ -11,6 +11,10 @@
   - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
 
 ## Active
+- [ ] **Mac settings native accessibility acceptance** - query and operate the actual AppKit provider independently of the SDK harness (needs #rgui) (ms #refine) (owner codex) #rax
+  - [x] Exercise named controls, switch state, focused text editing and isolated saves on both native Mac architectures.
+  - [x] Correct any demonstrated provider failure and repeat the unchanged native assertions.
+  - [ ] Record final-source proof and retain future native reader qualification.
 - [ ] **Stopping foot recovery** - withdraw stale airborne walking lead and qualify actual delivery motion (ms #refine) (owner codex) #rst
   - [x] Reproduce and correct the production gait while preserving planted contacts and timing.
   - [x] Qualify the native-height reversal regression and its actual rendered motion.
@@ -21,6 +25,7 @@
   - [x] Complete the separately qualified Hyprland implementation (needs #rhy).
   - [ ] Complete the versioned GNOME companion and its desktop qualification (needs #rgn).
 - [ ] **GNOME desktop companion** - versioned explicit Shell integration with proven observation, placement and a compatible overlay path (needs #rkde) (ms #refine) (owner codex) #rgn
+  - [ ] Qualify the shared Mac native Accessibility correction with actual provider checks.
   - [x] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
   - [x] Prove live user-drag observation and automatic movement refusal through actual desktop input.
   - [x] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.

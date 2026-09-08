@@ -30,6 +30,13 @@ All notable changes to this project are documented here. Format based on
 - Add explicit GNOME Shell companion setup and removal through Rust CLI and Native SDK settings, with qualified GNOME 46.0/48.7 window, fullscreen and actual user-drag observations on native x64/ARM64. Preserve the compatible XWayland overlay and independent owned-prop positioning; foreign movement, pointer access and DND remain unsupported.
 
 ### Fixed
+- Route the modern Mac AXValue setter through actual runtime text input and
+  separate snapshot value/focus publication from assistive input setters, after
+  the native reader exposed an edit that never reached the settings draft. Keep
+  the exact-hash patch reversible across repeated prepare/test/build invocations.
+- Bound Mac settings accessibility to the active dialog and validate cached
+  native actions against current published permissions under ADR 0051; retain
+  both actual native reader checks in the production companion matrix.
 - Retry only the startup Status probe after a broken/reset IPC connection within the existing readiness deadline. Preserve child-exit, permission and malformed-response failures; pin recovery/deadline behavior in the actual readiness loop, exercise three GUI start/stop cycles per native lifecycle lane, and retain failure status before cleanup.
 - Keep airborne landing predictions current through braking, reversal and acceleration; apply the existing travel cap within an active swing while preserving planted contacts and lift progress. Pin actual native-height World deliveries and export their approach/settling sequences. Review and update only the two affected turn goldens, retaining all comparison tolerances and gait bounds. Retain bounded CI-only foot state and capture timing for native deliveries.
 - Withdraw an airborne foot's old walking prediction when locomotion stops, preserving its current position, original step/lift phase and every planted contact. Add actual gait-phase and World delivery regressions plus abrupt-stop Rust preview sequences under ADR 0050.
@@ -45,6 +52,11 @@ All notable changes to this project are documented here. Format based on
 - Authenticate the pinned system Shell and approved runtime executable, bound complete connection and snapshot operations, preserve exact owned files and recoverable consent, and withdraw stale or revoked observations until explicit reconnection.
 
 ### Behind the scenes
+- Qualify the existing Mac settings AppKit Accessibility provider through an
+  independent native reader on Intel and Apple Silicon, using exact completed
+  source-CI app artifacts and isolated configuration without the SDK harness.
+  Record both native passes and require explicit focus transfer in final-source
+  qualification, alongside the unchanged saved-value and modal assertions.
 - Preserve the complete 6ff7611 candidate and failed main input evidence; repeat all release gates after a production status-race regression and native per-step drag acknowledgments away from the goose's return route.
 - Verify newly captured GNOME handle motion against actual widget bounds and surface ownership instead of an enter-state property that may predate controller attachment.
 - Start GNOME qualification gestures on GTK's native client-area WindowHandle after actual pointer entry; require the same Mutter grab, engine ride, terminal exclusion and held-action cancellation across remapping.

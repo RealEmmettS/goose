@@ -58,3 +58,6 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0045 — Shared Vector Preview Export](./0045-shared-vector-preview-export.md)
 - [0046 — Sway Observation Boundary](./0046-sway-observation-boundary.md)
 - [0047 — Hyprland Observation Boundary](./0047-hyprland-observation-boundary.md)
+- [0048 — GNOME Observation Boundary](./0048-gnome-shell-observation-companion.md)
+- [0050 — Stopping Foot Recovery](./0050-stopping-foot-recovery.md)
+- [0051 — Native Mac Settings Modal Accessibility](./0051-native-mac-settings-modal-accessibility.md)

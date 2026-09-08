@@ -31,6 +31,20 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ---
 
+## Mac settings accessibility acceptance — September 2026
+
+### Behind the scenes
+- Check what native assistive tools can read and operate in Mac settings,
+  including switches, text fields, dialogs and saved changes. Verify focus can
+  move away from the editor and back before editing its value.
+
+### Fixed
+- Make text changes from Mac assistive tools reach the settings draft so they
+  can be saved, and report the field's actual value and focus afterward. Keep
+  repeated build preparation consistent with the reviewed correction.
+- Keep assistive navigation inside an open settings dialog and prevent older
+  controls from acting after the page or dialog changes.
+
 ## GNOME desktop observations — September 2026
 
 ### Fixed
