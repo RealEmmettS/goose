@@ -34,6 +34,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Added
+- Keep optional GNOME setup and shutdown responsive when the desktop connection stops answering, and retain complete permission files without exposing private test permissions.
+- Add optional GNOME desktop observations with clear setup and removal. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
 - Add an optional Hyprland setup in graphical settings and the command line so the goose can notice fullscreen windows. Turning it off removes its access immediately and keeps your unsaved settings and other desktop integrations intact.
 
 ### Improved

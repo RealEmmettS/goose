@@ -31,10 +31,24 @@ function readPrivate(path, limit) {
         throw new Error('GNOME consent exceeds its bound');
     const stream = file.read(null);
     try {
-        const bytes = stream.read_bytes(limit + 1, null).get_data();
-        if (bytes.length > limit)
-            throw new Error('GNOME consent exceeds its bound');
-        return decoder.decode(bytes);
+        const chunks = [];
+        let length = 0;
+        while (true) {
+            const bytes = stream.read_bytes(Math.min(8192, limit + 1 - length), null).get_data();
+            if (bytes.length === 0)
+                break;
+            length += bytes.length;
+            if (length > limit)
+                throw new Error('GNOME consent exceeds its bound');
+            chunks.push(bytes);
+        }
+        const contents = new Uint8Array(length);
+        let offset = 0;
+        for (const chunk of chunks) {
+            contents.set(chunk, offset);
+            offset += chunk.length;
+        }
+        return decoder.decode(contents);
     } finally {
         stream.close(null);
     }

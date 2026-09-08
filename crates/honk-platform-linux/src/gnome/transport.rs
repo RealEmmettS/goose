@@ -58,12 +58,27 @@ impl Connection {
         {
             return Err(invalid("Invalid GNOME consent identity"));
         }
-        bounded(MAX_AGE, Self::connect_async(nonce, build))
+        Self::connect_using(
+            nonce,
+            build,
+            connection::Builder::session().map_err(bus_error)?,
+        )
     }
 
-    async fn connect_async(nonce: String, build: String) -> io::Result<Self> {
-        let connection = connection::Builder::session()
-            .map_err(bus_error)?
+    fn connect_using(
+        nonce: String,
+        build: String,
+        builder: connection::Builder<'_>,
+    ) -> io::Result<Self> {
+        bounded(MAX_AGE, Self::connect_async(nonce, build, builder))
+    }
+
+    async fn connect_async(
+        nonce: String,
+        build: String,
+        builder: connection::Builder<'_>,
+    ) -> io::Result<Self> {
+        let connection = builder
             .method_timeout(MAX_AGE)
             .max_queued(4)
             .build()
@@ -223,6 +238,48 @@ impl Connection {
             async_io::Timer::after(Duration::from_millis(25)).await;
         }
         Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Read;
+    use std::os::unix::net::UnixListener;
+
+    #[test]
+    fn real_bus_authentication_is_bounded_before_any_shell_query() {
+        let directory =
+            std::env::temp_dir().join(format!("honk-gnome-auth-{}", std::process::id()));
+        fs::create_dir(&directory).unwrap();
+        let socket = directory.join("bus");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut peer, _) = listener.accept().unwrap();
+            peer.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+            let mut bytes = [0_u8; 256];
+            let mut received = 0;
+            loop {
+                match peer.read(&mut bytes) {
+                    Ok(0) => break,
+                    Ok(count) => received += count,
+                    Err(error) => panic!("Cancelled authentication retained its peer: {error}"),
+                }
+            }
+            assert!(
+                received > 0,
+                "The production connection never began real bus authentication"
+            );
+        });
+        let address = format!("unix:path={}", socket.display());
+        let builder = connection::Builder::address(address.as_str()).unwrap();
+        let started = Instant::now();
+        let result = Connection::connect_using("a".repeat(32), "b".repeat(64), builder);
+        assert!(matches!(result, Err(error) if error.kind() == io::ErrorKind::TimedOut));
+        assert!(started.elapsed() < Duration::from_millis(600));
+        server.join().unwrap();
+        fs::remove_file(socket).unwrap();
+        fs::remove_dir(directory).unwrap();
     }
 }
 

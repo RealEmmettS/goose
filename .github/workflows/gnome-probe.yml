@@ -72,5 +72,7 @@ jobs:
         if: ${{ always() }}
         with:
           name: gnome-${{ strategy.job-index }}
-          path: target/gnome-evidence
+          path: |
+            target/gnome-evidence
+            !target/gnome-evidence/data/honk300/wayland/gnome.json
           if-no-files-found: warn

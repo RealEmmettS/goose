@@ -36,10 +36,12 @@ Exact supported versions and the product's native behavior remain unverified.
 - [ ] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Active. Begin the real Shell extension lifecycle, native window interface and
-compatible XWayland goose overlay premise. No GNOME production capability is enabled.
+Active. Production companion, authenticated Rust worker, compatible XWayland capability
+boundary, recoverable consent and native settings are implemented under ADR 0048.
+Run the actual integrated desktop fixture before any supported capability or publication claim.
 
 ## Activity
+- 2026-09-08 — Implement the real companion and Rust/native settings lifecycle after all four native grab premises pass in run 34226098889. Bound whole bus authentication and snapshots, preserve exact owned-file recovery, and add actual GUI, user-ride, terminal, fullscreen, revocation and restart scenarios for both Shell versions and architectures. Native qualification is pending.
 - 2026-09-08 — Run 34225100825 passes GNOME 46/48 on native x64/ARM64; inspect all four normal-desktop screenshots and confirm a complete visible goose. Qualify Mutter's actual grab state next with input confined to the private outer Xvfb desktop, exact fixture identity, automatic-move refusal while held and real release signals.
 - 2026-09-08 — All four command/extension/overlay-readiness premises pass in run 34224579271. Inspect every native screenshot: GNOME's startup overview hides the goose, so visible-overlay acceptance remains open. Explicitly leave the private overview after startup and require the actual normal-desktop state before the next screenshot.
 - 2026-09-08 — The actual extension now passes owned movement, stale refusal and fullscreen. Overlay startup correctly rejects the outer Xvfb credential on Mutter's separate XWayland display. Use only Mutter's existing private authority file in this fixture's runtime directory, without reading/copying its cookie or relaxing authentication; keep the outer capture connection separate.
