@@ -36,7 +36,9 @@ impl<S: Source> Observer<S> {
     pub fn start() -> io::Result<Self> {
         Self::spawn(S::connect)
     }
-    fn spawn(connect: impl FnOnce() -> io::Result<S> + Send + 'static) -> io::Result<Self> {
+    pub(crate) fn spawn(
+        connect: impl FnOnce() -> io::Result<S> + Send + 'static,
+    ) -> io::Result<Self> {
         let state = Arc::new(Mutex::new(State {
             frame: None,
             failed: false,
@@ -106,6 +108,11 @@ impl<S: Source> Observer<S> {
             .as_ref()
             .filter(|(at, _)| at.elapsed() < S::MAX_AGE)
             .map(|(_, frame)| frame.clone())
+    }
+    pub fn running(&self) -> bool {
+        self.worker
+            .as_ref()
+            .is_some_and(|worker| !worker.is_finished())
     }
     pub fn failed(&self) -> bool {
         self.state.lock().map_or(true, |state| state.failed)

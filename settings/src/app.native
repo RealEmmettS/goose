@@ -54,6 +54,15 @@
             </row>
             <separator/>
           </if>
+          <if test="{gnome_supported}">
+            <text size="lg"><span weight="bold">Optional GNOME observations</span></text>
+            <text wrap="true">{gnomeStatus}</text>
+            <row gap="8">
+              <button disabled="{not canSetupGnome}" on-press="gnome_setup">Set up GNOME</button>
+              <if test="{gnome_installed}"><button disabled="{busy}" on-press="gnome_remove">Remove GNOME observations</button></if>
+            </row>
+            <separator/>
+          </if>
           <text wrap="true">{updateStatus}</text>
           <row gap="8">
             <button disabled="{busy}" on-press="check_updates">Check for updates</button>
@@ -137,6 +146,18 @@
           <text wrap="true">Allow window observation and fullscreen awareness on qualified Hyprland desktops. Movement, window rides and pointer control remain unavailable. Notes use normal desktop placement.</text>
           <text wrap="true">Use native Wayland to connect. Remove these observations here at any time.</text>
           <row gap="8"><button on-press="hyprland_cancel">Cancel</button><button variant="primary" on-press="hyprland_confirm">Enable Hyprland observations</button></row>
+        </column>
+      </dialog>
+    </column>
+  </if>
+  <if test="{gnome_prompt}">
+    <column main="center" cross="center">
+      <dialog on-dismiss="gnome_cancel" label="Enable GNOME observations" width="520" height="380">
+        <column gap="16" padding="24">
+          <text size="lg"><span weight="bold">Connect the goose to GNOME</span></text>
+          <text wrap="true">Allow the goose to notice fullscreen windows and follow ordinary windows while you drag them. Foreign-window movement and pointer control stay unavailable.</text>
+          <text wrap="true">GNOME uses the XWayland overlay. First setup or a companion update may require signing out and back in. Remove this integration here at any time.</text>
+          <row gap="8"><button on-press="gnome_cancel">Cancel</button><button variant="primary" on-press="gnome_confirm">Enable GNOME observations</button></row>
         </column>
       </dialog>
     </column>

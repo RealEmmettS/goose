@@ -1,0 +1,8 @@
+{
+  "uuid": "honk300@emmetts.dev",
+  "name": "Honk300 desktop observations",
+  "description": "Explicit window, fullscreen and user-drag observations for Honk300. No window or pointer commands.",
+  "shell-version": ["46", "48"],
+  "version": 1,
+  "url": "https://thegoose.app"
+}

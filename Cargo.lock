@@ -1259,6 +1259,8 @@ dependencies = [
 name = "honk-platform-linux"
 version = "0.0.0"
 dependencies = [
+ "async-io",
+ "futures-lite",
  "honk-control",
  "honk-engine",
  "ksni",

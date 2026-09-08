@@ -14,6 +14,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--goose', type=Path, required=True)
+    parser.add_argument('--settings', type=Path, required=True)
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -26,6 +27,12 @@ def main():
         MUTTER_DEBUG_DUMMY_MODE_SPECS='1280x900', HONK300_GNOME_PROBE_PID=str(os.getpid()))
     for key in ('XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME'):
         Path(environment[key]).mkdir(mode=0o700)
+    # Installation precedes Shell startup, matching real first-setup discovery
+    # after the user's next login. Only our exact companion is installed.
+    installed = subprocess.run([str(args.goose.resolve()), 'integrations', 'gnome', 'setup'],
+        env=environment, capture_output=True, text=True, timeout=10)
+    assert installed.returncode == 0, installed.stderr
+    (evidence / 'first-setup.json').write_text(installed.stdout)
     outer_display = environment['DISPLAY']
     for key in ('WAYLAND_DISPLAY', 'SWAYSOCK', 'HYPRLAND_INSTANCE_SIGNATURE'):
         environment.pop(key, None)
@@ -231,6 +238,10 @@ def main():
                 goose.wait(timeout=30)
                 assert goose.returncode == 0
                 goose = None
+            from smoke_gnome_runtime import qualify
+            qualify(args.goose.resolve(), args.settings.resolve(), evidence, wait,
+                    windows[0], windows[1], find, snapshot, owner_name,
+                    environment, capture_environment, GLib)
             windows[0].destroy()
             wait(lambda: find(ordinary['title']) is None, 'vanished native target')
             subprocess.run(['gnome-extensions', 'disable', uuid], env=environment, check=True, timeout=5)
@@ -238,7 +249,7 @@ def main():
             assert windows[1].get_mapped(), 'Disabling the extension closed the unrelated window'
             result = dict(ok=True, version=initial['version'], architecture=os.uname().machine,
                 shell_pid=shell.pid, peer_credentials=True, layer_shell=layer_shell,
-                xwayland_overlay_ready=True, normal_desktop=True, actual_fixture_move=True, stale_geometry_refused=True,
+                production_runtime=True, xwayland_overlay_ready=True, normal_desktop=True, actual_fixture_move=True, stale_geometry_refused=True,
                 native_fullscreen=True, extension_disable=True, initial=ordinary, moved=moved,
                 protected=protected, user_drag_qualified=True, pointer_control_qualified=False)
             (evidence / 'result.json').write_text(json.dumps(result, indent=2) + '\n')

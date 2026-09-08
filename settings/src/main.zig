@@ -45,7 +45,7 @@ const fonts = [_]SettingsApp.FontRegistration{
 };
 const Buffer = canvas.TextBuffer;
 const Page = enum { general, appearance, behavior, sound, platform };
-const Action = enum { read, save, validate, status, start, stop, check_updates, update, kde_setup, kde_remove, sway_setup, sway_remove, hyprland_setup, hyprland_remove, pointer_request, pointer_cancel };
+const Action = enum { read, save, validate, status, start, stop, check_updates, update, kde_setup, kde_remove, sway_setup, sway_remove, hyprland_setup, hyprland_remove, gnome_setup, gnome_remove, pointer_request, pointer_cancel };
 
 pub const Field = struct {
     index: usize = 0,
@@ -115,6 +115,10 @@ pub const Msg = union(enum) {
     hyprland_confirm,
     hyprland_cancel,
     hyprland_remove,
+    gnome_setup,
+    gnome_confirm,
+    gnome_cancel,
+    gnome_remove,
     pointer_request,
     pointer_cancel,
     completed: native_sdk.EffectExit,
@@ -124,7 +128,7 @@ pub const Msg = union(enum) {
 
 pub const Model = struct {
     // Used by derived view methods or the stdio lifecycle, never bound directly.
-    pub const view_unbound = .{ "fields", "field_count", "page", "service", "config_path", "revision", "version", "status_buffer", "runtime_buffer", "update_buffer", "integration_buffer", "sway_buffer", "hyprland_buffer", "pointer_buffer", "pointer_request_available", "pointer_cancel_available", "loaded", "request_id", "editing", "edit_buffer", "update_available", "update_managed", "system_appearance" };
+    pub const view_unbound = .{ "fields", "field_count", "page", "service", "config_path", "revision", "version", "status_buffer", "runtime_buffer", "update_buffer", "integration_buffer", "sway_buffer", "hyprland_buffer", "gnome_buffer", "pointer_buffer", "pointer_request_available", "pointer_cancel_available", "loaded", "request_id", "editing", "edit_buffer", "update_available", "update_managed", "system_appearance" };
     system_appearance: native_sdk.Appearance = .{},
     fields: [64]Field = @splat(.{}),
     field_count: usize = 0,
@@ -156,6 +160,10 @@ pub const Model = struct {
     hyprland_supported: bool = false,
     hyprland_installed: bool = false,
     hyprland_prompt: bool = false,
+    gnome_buffer: Buffer(2048) = .{},
+    gnome_supported: bool = false,
+    gnome_installed: bool = false,
+    gnome_prompt: bool = false,
     pointer_buffer: Buffer(1024) = .{},
     pointer_request_available: bool = false,
     pointer_cancel_available: bool = false,
@@ -184,6 +192,12 @@ pub const Model = struct {
     }
     pub fn canSetupHyprland(m: *const Model) bool {
         return m.hyprland_supported and !m.busy;
+    }
+    pub fn gnomeStatus(m: *const Model) []const u8 {
+        return m.gnome_buffer.text();
+    }
+    pub fn canSetupGnome(m: *const Model) bool {
+        return m.gnome_supported and !m.busy;
     }
     pub fn canSetupKde(m: *const Model) bool {
         return m.integration_supported and !m.busy;
@@ -329,6 +343,17 @@ pub fn update(model: *Model, msg: Msg, fx: *Effects) void {
         },
         .hyprland_remove => if (model.canSetupHyprland()) {
             submit(model, .hyprland_remove, fx);
+        },
+        .gnome_setup => if (model.canSetupHyprland()) {
+            model.gnome_prompt = true;
+        },
+        .gnome_cancel => model.gnome_prompt = false,
+        .gnome_confirm => if (model.canSetupHyprland()) {
+            model.gnome_prompt = false;
+            submit(model, .gnome_setup, fx);
+        },
+        .gnome_remove => if (model.canSetupHyprland()) {
+            submit(model, .gnome_remove, fx);
         },
         .pointer_request => if (model.canRequestPointer()) {
             submit(model, .pointer_request, fx);
@@ -532,6 +557,21 @@ pub fn acceptResponse(model: *Model, bytes: []const u8) !void {
                 if (caps == .object) {
                     model.hyprland_buffer.set(try std.fmt.allocPrint(allocator, "{s}\nWindow observation: {s} | Fullscreen: {s}\nMovement: {s} | Pointer control: {s}\nOwned notes use normal desktop placement.", .{
                         detail, string(caps, "windows"), string(caps, "fullscreen"), string(caps, "movement"), string(caps, "pointer_control"),
+                    }));
+                }
+            }
+        }
+    }
+    if (data.object.get("gnome")) |gnome| {
+        model.gnome_supported = flag(gnome, "supported");
+        model.gnome_installed = flag(gnome, "installed");
+        const detail = string(gnome, "description");
+        model.gnome_buffer.set(detail);
+        if (gnome == .object) {
+            if (gnome.object.get("capabilities")) |caps| {
+                if (caps == .object) {
+                    model.gnome_buffer.set(try std.fmt.allocPrint(allocator, "{s}\nWindow and user-drag observations: {s} | Fullscreen: {s}\nMovement: {s} | Pointer control: {s}\nOwned-note positioning: {s}.", .{
+                        detail, string(caps, "windows"), string(caps, "fullscreen"), string(caps, "movement"), string(caps, "pointer_control"), string(caps, "prop_positioning"),
                     }));
                 }
             }

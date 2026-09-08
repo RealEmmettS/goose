@@ -22,6 +22,9 @@ pub enum ControlCommand {
     SwayStatus,
     SwayEnable,
     SwayDisable,
+    GnomeStatus,
+    GnomeEnable,
+    GnomeDisable,
     HyprlandStatus,
     HyprlandEnable,
     HyprlandDisable,
@@ -130,6 +133,9 @@ impl ControlCommand {
             Self::SwayStatus => format!("{VERSION} SWAY\n"),
             Self::SwayEnable => format!("{VERSION} SWAY_ENABLE\n"),
             Self::SwayDisable => format!("{VERSION} SWAY_DISABLE\n"),
+            Self::GnomeStatus => format!("{VERSION} GNOME\n"),
+            Self::GnomeEnable => format!("{VERSION} GNOME_ENABLE\n"),
+            Self::GnomeDisable => format!("{VERSION} GNOME_DISABLE\n"),
             Self::HyprlandStatus => format!("{VERSION} HYPRLAND\n"),
             Self::HyprlandEnable => format!("{VERSION} HYPRLAND_ENABLE\n"),
             Self::HyprlandDisable => format!("{VERSION} HYPRLAND_DISABLE\n"),
@@ -156,8 +162,8 @@ impl ControlCommand {
         };
         match command {
             "WAYLAND" | "KWIN_ENABLE" | "KWIN_DISABLE" | "SWAY" | "SWAY_ENABLE"
-            | "SWAY_DISABLE" | "HYPRLAND" | "HYPRLAND_ENABLE" | "HYPRLAND_DISABLE"
-            | "POINTER_REQUEST" | "POINTER_CANCEL" => {
+            | "SWAY_DISABLE" | "HYPRLAND" | "HYPRLAND_ENABLE" | "HYPRLAND_DISABLE" | "GNOME"
+            | "GNOME_ENABLE" | "GNOME_DISABLE" | "POINTER_REQUEST" | "POINTER_CANCEL" => {
                 ensure_end(parts)?;
                 Ok(match command {
                     "WAYLAND" => Self::WaylandStatus,
@@ -166,6 +172,9 @@ impl ControlCommand {
                     "SWAY" => Self::SwayStatus,
                     "SWAY_ENABLE" => Self::SwayEnable,
                     "SWAY_DISABLE" => Self::SwayDisable,
+                    "GNOME" => Self::GnomeStatus,
+                    "GNOME_ENABLE" => Self::GnomeEnable,
+                    "GNOME_DISABLE" => Self::GnomeDisable,
                     "HYPRLAND" => Self::HyprlandStatus,
                     "HYPRLAND_ENABLE" => Self::HyprlandEnable,
                     "HYPRLAND_DISABLE" => Self::HyprlandDisable,

@@ -133,6 +133,11 @@ pub enum Integration {
         #[arg(value_enum, default_value = "status")]
         action: IntegrationAction,
     },
+    /// Optional GNOME Shell window, fullscreen and user-drag observations.
+    Gnome {
+        #[arg(value_enum, default_value = "status")]
+        action: IntegrationAction,
+    },
     /// Optional read-only Hyprland window and fullscreen observations.
     Hyprland {
         #[arg(value_enum, default_value = "status")]

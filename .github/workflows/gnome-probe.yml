@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [codex/goose-gnome-integration]
-    paths: ['script/smoke_gnome*', 'script/fixtures/gnome-probe/**', '.github/workflows/gnome-probe.yml']
+    paths: ['script/smoke_gnome*', 'script/fixtures/gnome-probe/**', '.github/workflows/gnome-probe.yml', 'integrations/gnome/**', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
 
 permissions:
   contents: read
@@ -25,11 +25,23 @@ jobs:
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
           toolchain: '1.95'
-      - name: Build the actual goose for the overlay premise
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          architecture: ${{ matrix.runner == 'ubuntu-24.04-arm' && 'arm64' || 'x64' }}
+      - name: Build and test the actual GNOME runtime
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y libasound2-dev
+          cargo test --locked --bin honk300 integrations
+          cargo test --locked -p honk-platform-linux --lib
+          cargo clippy --locked --workspace --all-targets -- -D warnings
           cargo build --locked --release --bin honk300
+      - name: Build the production Native SDK settings companion
+        run: |
+          sudo apt-get install --no-install-recommends -y libgtk-4-dev pkg-config
+          target="$(uname -m)-unknown-linux-gnu"
+          python3 script/build_settings.py --target "$target" --output target/release --test
       - name: Exercise the actual private Shell and extension
         env:
           HONK_DISTRIBUTION: ${{ matrix.distribution }}
@@ -42,7 +54,7 @@ jobs:
             DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
               gnome-shell gnome-session-bin dbus-x11 python3 python3-gi gir1.2-gtk-4.0 \
               libgl1-mesa-dri libegl-mesa0 xvfb xauth xwayland wayland-utils imagemagick \
-              util-linux passwd libasound2t64 dconf-cli xdotool
+              util-linux passwd libasound2t64 dconf-cli xdotool at-spi2-core gir1.2-atspi-2.0
             dpkg-query -W > target/gnome-evidence/packages.txt
             # Package installation may create an empty seats directory even
             # though this private container has no systemd/login session. Keep
@@ -54,7 +66,7 @@ jobs:
             chown -R honkprobe:honkprobe /work/target/gnome-evidence
             runuser -u honkprobe -- env GITHUB_ACTIONS=true xvfb-run -a -s "-screen 0 1400x1000x24" \
               dbus-run-session -- python3 script/smoke_gnome_adapter.py \
-                --evidence target/gnome-evidence --goose target/release/honk300
+                --evidence target/gnome-evidence --goose target/release/honk300 --settings target/release/honk300-settings
           '
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}

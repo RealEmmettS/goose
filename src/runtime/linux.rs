@@ -46,6 +46,20 @@ pub fn run(
     };
     let overlay_mode = overlay.mode();
     let display_server = overlay.display_server();
+    // GNOME Wayland exposes native windows through its explicit companion.
+    // Its XWayland overlay alone cannot inspect all protected desktop surfaces.
+    let gnome_wayland = session.desktop == honk_control::DesktopEnvironment::Gnome
+        && session.xdg_session_type.as_deref() == Some("wayland");
+    let capability_session = if gnome_wayland {
+        DisplayServer::Wayland
+    } else {
+        display_server
+    };
+    let mut gnome = if overlay_mode == OverlayMode::X11 {
+        crate::integrations::GnomeRuntime::start()
+    } else {
+        crate::integrations::GnomeRuntime::default()
+    };
     let mut sway = if overlay_mode == OverlayMode::Wayland {
         crate::integrations::SwayRuntime::start()
     } else {
@@ -67,8 +81,8 @@ pub fn run(
         overlay_mode
     );
 
-    let mut cursor_warp = cursor_capability(overlay_mode, display_server);
-    let mut window_watch = window_capability(overlay_mode, display_server);
+    let mut cursor_warp = cursor_capability(overlay_mode, capability_session);
+    let mut window_watch = window_capability(overlay_mode, capability_session);
     let mut collect_window = BackendCapability::Unsupported;
     let mut props = if overlay_mode == OverlayMode::Headless {
         None
@@ -142,6 +156,11 @@ pub fn run(
         && std::env::var("HONK300_TRACE_COLLECTION").as_deref() == Ok("1");
     let mut next_collection_trace = 0.0;
     let mut collection_trace_count = 0;
+    let trace_gnome = std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true")
+        && std::env::var("HONK300_TRACE_GNOME").as_deref() == Ok("1");
+    let mut next_gnome_trace = 0.0;
+    let mut gnome_trace_count = 0;
+
     let trace_presence = std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true")
         && std::env::var("HONK300_TRACE_PRESENCE").as_deref() == Ok("1");
     let mut last_presence_trace = None;
@@ -234,6 +253,35 @@ pub fn run(
                 }
                 ControlCommand::SwayDisable => {
                     sway.disable();
+                    request.respond(ControlResponse::Ok);
+                }
+                ControlCommand::GnomeStatus => {
+                    let mut status = gnome.status();
+                    if overlay_mode == OverlayMode::X11
+                        && collect_window == BackendCapability::Supported
+                    {
+                        status.prop_positioning = CapabilityStatus::Supported;
+                    }
+                    request.respond(ControlResponse::Wayland(status));
+                }
+                ControlCommand::GnomeEnable => {
+                    let response = if overlay_mode != OverlayMode::X11
+                        || world.graceful_exit_requested()
+                    {
+                        ControlResponse::Err("UNSUPPORTED".into())
+                    } else {
+                        match gnome.enable() {
+                            Ok(()) => ControlResponse::Ok,
+                            Err(error) => {
+                                eprintln!("honk300: Gnome observation activation failed ({error})");
+                                ControlResponse::Err("ADAPTER_FAILED".into())
+                            }
+                        }
+                    };
+                    request.respond(response);
+                }
+                ControlCommand::GnomeDisable => {
+                    gnome.disable();
                     request.respond(ControlResponse::Ok);
                 }
                 ControlCommand::HyprlandStatus => {
@@ -342,8 +390,8 @@ pub fn run(
                         }
                         Ok(next_config) => {
                             config = next_config;
-                            cursor_warp = cursor_capability(overlay_mode, display_server);
-                            window_watch = window_capability(overlay_mode, display_server);
+                            cursor_warp = cursor_capability(overlay_mode, capability_session);
+                            window_watch = window_capability(overlay_mode, capability_session);
                             effective = effective_options(
                                 &config,
                                 &options,
@@ -435,6 +483,7 @@ pub fn run(
         let kwin_frame = kwin.poll();
         let sway_frame = sway.poll();
         let hyprland_frame = hyprland.poll();
+        let gnome_frame = gnome.poll();
         if world.graceful_exit_requested() {
             kwin.cancel_pointer();
         }
@@ -459,14 +508,18 @@ pub fn run(
             collect_window == BackendCapability::Supported
                 && (overlay_mode == OverlayMode::X11 || kwin_frame.is_some()),
         );
-        window_watch = if kwin_frame.is_some() {
+        window_watch = if kwin_frame.is_some() || gnome_frame.is_some() {
             BackendCapability::Supported
         } else {
-            window_capability(overlay_mode, display_server)
+            window_capability(overlay_mode, capability_session)
         };
         world.set_foreign_window_watch_supported(window_watch.active());
-        let observed = kwin_frame.is_some() || sway_frame.is_some() || hyprland_frame.is_some();
-        let fullscreen = kwin_frame.as_ref().is_some_and(|frame| frame.fullscreen())
+        let observed = kwin_frame.is_some()
+            || sway_frame.is_some()
+            || hyprland_frame.is_some()
+            || gnome_frame.is_some();
+        let fullscreen = gnome_frame.as_ref().is_some_and(|frame| frame.fullscreen())
+            || kwin_frame.as_ref().is_some_and(|frame| frame.fullscreen())
             || sway_frame.as_ref().is_some_and(|frame| frame.fullscreen())
             || hyprland_frame
                 .as_ref()
@@ -500,11 +553,17 @@ pub fn run(
             pointer.present = world.layout().region_at(pos).is_some();
         }
         world.set_pointer(pointer);
+        let gnome_drag = gnome_frame.as_ref().and_then(|frame| gnome.dragged(frame));
         world.set_foreign_window_drag(
             kwin_frame
                 .as_ref()
                 .and_then(|frame| kwin.dragged(frame))
-                .or_else(|| overlay.foreign_window_drag()),
+                .or(gnome_drag)
+                .or_else(|| {
+                    (!gnome_wayland)
+                        .then(|| overlay.foreign_window_drag())
+                        .flatten()
+                }),
         );
         let collect_snapshot = props
             .as_mut()
@@ -515,6 +574,26 @@ pub fn run(
         let now = frame.now();
         let task_before_tick = world.current_task();
         core.tick(&mut world, frame);
+        if trace_gnome && now >= next_gnome_trace && gnome_trace_count < 1200 {
+            next_gnome_trace = now + 0.1;
+            gnome_trace_count += 1;
+            let native_drag = gnome_frame
+                .as_ref()
+                .and_then(|frame| frame.dragged_window());
+            eprintln!(
+                "honk300 gnome trace: {}",
+                serde_json::json!({
+                    "observed": gnome_frame.is_some(),
+                    "fullscreen": gnome_frame.as_ref().is_some_and(|frame| frame.fullscreen()),
+                    "drag_id": native_drag.map(|window| window.id),
+                    "drag_pid": native_drag.and_then(|window| window.pid),
+                    "task": world.current_task(),
+                    "position": [world.goose.position.x, world.goose.position.y],
+                    "anchor": gnome_drag.map(|window| [window.ride_anchor.x, window.ride_anchor.y]),
+                })
+            );
+        }
+
         if trace_collection && now >= next_collection_trace && collection_trace_count < 600 {
             next_collection_trace = now + 0.1;
             collection_trace_count += 1;
