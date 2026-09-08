@@ -26,6 +26,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Behind the scenes
+- Reconcile v1.4.0 final-source publication and fresh-public evidence, current guidance and completed foundation/settings/art tasks; retain the separate website and next-stage gates.
+
 ## [1.5.0] - Unreleased candidate
 
 ### Behind the scenes
@@ -65,7 +68,7 @@ All notable changes to this project are documented here. Format based on
 - Build a bounded private Linux prop mode into the existing GTK settings companion. Preserve Unicode note text, premultiplied full-image rendering, opaque identity, close origin, connection-owned cleanup and a native capacity/geometry fixture; runtime integration and Wayland qualification remain pending.
 - Add placement-only collect behavior for a native host that can create its own props but cannot position them globally. Pin the behavior and admission recovery in production engine tests; Linux native host implementation remains pending under ADR 0043.
 
-## [1.4.0] - Unreleased candidate
+## [1.4.0] - 2026-09-08
 
 ### Added
 - Add the Native SDK/Zig settings application, exact-sibling `settings` launcher and tray Configure routing, and a bounded versioned Rust service covering all 53 editable fields. Keep the terminal editor and add GUI/TUI update controls plus read-only `update --check`.

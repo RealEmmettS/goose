@@ -3,26 +3,25 @@
 `honk300` is a clean-room, procedural desktop goose for Windows, macOS, and Linux. It walks
 across real monitor layouts, honks, leaves muddy footprints, reacts to the pointer, and performs
 bounded desktop pranks. Configuration and control stay local through a command-line interface
-and terminal settings screen.
+and native graphical and terminal settings screens.
 
-**v1.5.0 candidate in development:** this branch adds owned Linux notes and pictures,
+**Next release, v1.5.0:** the qualified source adds owned Linux notes and pictures,
 live desktop-session reporting, and experimental Pi 4/5 64-bit Desktop guidance. X11 can
 animate owned deliveries; native Wayland uses normal compositor placement. These changes
 follow the v1.4.0 goose redesign, runtime reliability work and native graphical settings.
 `honk300 settings` and tray Configure open the GUI; `honk300 config` retains the TUI.
-Both edit the same Rust-owned configuration. Neither candidate is published yet; the
-stable release below remains authoritative. See [stage-two readiness](docs/readiness/v1.5.0-readiness.md),
+Both edit the same Rust-owned configuration. The new immutable tag is building; public
+availability follows complete publication and fresh-download checks. See [stage-two readiness](docs/readiness/v1.5.0-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.3.7](https://github.com/RealEmmettS/goose/releases/tag/v1.3.7),
-published from exact commit `7174688b50c70c2eab560ab5eaed30550c9f6731`. It retains v1.3.6's
-calmer mud defaults—natural puddle trips every 3–5 minutes, automatic tracking for 10–30 seconds,
-and a 10-second fresh/direct default without replacing an existing saved preference—and repairs
-the Windows self-update PowerShell archive-path handoff exposed during v1.3.6 installed
-acceptance. Published v1.3.6 assets remain immutable.
+**Current stable release:** [v1.4.0](https://github.com/RealEmmettS/goose/releases/tag/v1.4.0),
+published from exact commit `85c9d426f7409800198ee5e89bca7d6042034082`. It brings the
+continuous goose redesign, expressive motion, bounded rendering resources, and native
+graphical settings with the existing configuration and updater. All eight managed
+installation checks passed against fresh public downloads. See [release evidence](docs/readiness/v1.4.0-readiness.md).
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published

@@ -16,26 +16,11 @@
 
 ## Active
 - [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
-  - [ ] Resolve final PR review findings and repeat qualification before tagging.
-  - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
+  - [ ] Deliver editable renderer SVGs and verify the website against the published release.
+  - [x] Resolve final PR review findings and repeat qualification before tagging.
+  - [x] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
   - [x] Correct captured Windows start and verify native GUI Start, independent settings close, and graceful Stop.
   - [x] Compare isolated native CPU/memory/IPC workloads and verify note/meme delivery after foreground denial.
-- [ ] **Native SDK graphical settings** - ship a separate Zig settings app backed by Rust validation and retain the TUI (needs #rfnd) (ms #refine) (owner codex) #rgui
-  - [x] Implement revision-aware shared settings persistence and bounded stdio service.
-  - [ ] Build and exercise all five native settings pages.
-  - [x] Add Check for updates and Update now through the verified existing updater.
-  - [ ] Integrate launch, package identity, signing, update, and uninstall paths.
-  - [ ] Qualify actual Windows UI Automation and Linux AT-SPI controls, modal focus, and native package payloads.
-- [ ] **Continuous goose rig and expressive behavior** - replace silhouette crossfades, refine motion, and verify actual render sequences (ms #refine) (owner codex) #rart
-  - [x] Implement continuous projected geometry and meaningful interaction anchors.
-  - [x] Add bounded task-driven expressions and reduced motion.
-  - [x] Review motion exports and update independently checked visual fixtures.
-- [ ] **Refinement audit and reliability foundation** - evidence-backed corrections, production-path tests, shared bounded rendering resources, and maintainable lifecycle modules (ms #refine) (owner codex) #rfnd
-  - [x] Record the audit register and baseline measurements.
-  - [x] Share bounded canvas reuse and accumulator-aware runtime pacing.
-  - [x] Replace tests disconnected from production behavior.
-  - [x] Separate lifecycle responsibilities and shorten current guidance.
-  - [ ] Pass focused regressions and complete local checks.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
@@ -57,6 +42,22 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **Refinement audit and reliability foundation** - evidence-backed corrections, production-path tests, shared bounded rendering resources, and maintainable lifecycle modules (ms #refine) (owner codex) (done 2026-09-08) #rfnd
+  - [x] Record the audit register and baseline measurements.
+  - [x] Share bounded canvas reuse and accumulator-aware runtime pacing.
+  - [x] Replace tests disconnected from production behavior.
+  - [x] Separate lifecycle responsibilities and shorten current guidance.
+  - [x] Pass focused regressions and complete local checks.
+- [x] **Continuous goose rig and expressive behavior** - replace silhouette crossfades, refine motion, and verify actual render sequences (ms #refine) (owner codex) (done 2026-09-08) #rart
+  - [x] Implement continuous projected geometry and meaningful interaction anchors.
+  - [x] Add bounded task-driven expressions and reduced motion.
+  - [x] Review motion exports and update independently checked visual fixtures.
+- [x] **Native SDK graphical settings** - ship a separate Zig settings app backed by Rust validation and retain the TUI (needs #rfnd) (ms #refine) (owner codex) (done 2026-09-08) #rgui
+  - [x] Implement revision-aware shared settings persistence and bounded stdio service.
+  - [x] Build and exercise all five native settings pages.
+  - [x] Add Check for updates and Update now through the verified existing updater.
+  - [x] Integrate launch, package identity, signing, update, and uninstall paths.
+  - [x] Qualify actual Windows UI Automation and Linux AT-SPI controls, modal focus, and native package payloads.
 - [x] **Linux owned prop implementation** - bounded native note/image windows and honest compositor placement in an isolated follow-on checkout (ms #refine) (owner codex) (done 2026-09-08) #lpr
   - [x] Bound owned prop admission and preserve existing notes when the capacity is full.
   - [x] Implement the companion protocol and native GTK note/image host.
