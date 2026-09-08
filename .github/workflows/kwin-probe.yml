@@ -25,13 +25,22 @@ jobs:
         env:
           HONK_DISTRIBUTION: ${{ matrix.distribution }}
         run: |
-          docker run --rm -e GITHUB_ACTIONS -v "$PWD:/work" -w /work "$HONK_DISTRIBUTION" bash -euc '
+          docker run --rm -e GITHUB_ACTIONS -e HONK_HOST_UID="$(id -u)" -e HONK_HOST_GID="$(id -g)" \
+            -v "$PWD:/work" -w /work "$HONK_DISTRIBUTION" bash -euc '
+            mkdir -p target/kwin-evidence
+            trap '\''chown -R "$HONK_HOST_UID:$HONK_HOST_GID" /work/target/kwin-evidence'\'' EXIT
             apt-get update
             DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
               kwin-wayland dbus-x11 python3 python3-gi gir1.2-gtk-4.0 libgtk-4-1 \
-              libgl1-mesa-dri mesa-utils wayland-utils
-            mkdir -p target/kwin-evidence
+              libgl1-mesa-dri mesa-utils wayland-utils libcap2-bin
             dpkg-query -W > target/kwin-evidence/packages.txt
+            compositor="$(command -v kwin_wayland)"
+            capabilities="$(getcap "$compositor")"
+            printf "%s\n" "$capabilities" > target/kwin-evidence/container-file-capabilities.txt
+            # The distro requests realtime scheduling through file capabilities.
+            # Drop that request for this private software-rendered container;
+            # do not grant extra container/host privileges just to launch it.
+            if test -n "$capabilities"; then setcap -r "$compositor"; fi
             dbus-run-session -- python3 script/smoke_kwin_companion.py --evidence target/kwin-evidence
           '
       - uses: actions/upload-artifact@v6

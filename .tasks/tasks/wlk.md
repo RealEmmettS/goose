@@ -35,9 +35,16 @@ this task owns the native implementation evidence and #rkde owns publication.
 - [ ] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
-Active in the isolated Wayland integration checkout. Native API feasibility probe first;
-no integration is enabled or advertised in a public package.
+Active in the isolated Wayland integration checkout. The first native container probe
+stopped before KWin execution: the distro binary's file capabilities exceed Docker's
+default capability set. Record and strip that realtime request only inside the disposable
+software-rendered container. No extra host/container privileges are added. Native API
+feasibility remains unverified; no public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-07: Run 34187445365 failed at KWin exec with EPERM on both distributions,
+  before any script/window assertion. Preserve the file capability metadata, drop the
+  private container's realtime request and return artifact ownership to the runner after
+  teardown so failure evidence remains readable.
 - 2026-09-07: Recovered the historical board-only implementation card, linked it to the
   staged publication task, and started the earliest real KWin API falsifier.

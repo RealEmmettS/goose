@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Adjust the isolated KDE test environment so it can start and retain useful failure evidence without requesting extra system privileges.
 - Begin testing optional KDE desktop support with real windows, including checks that protected apps stay untouched and disabling the connection stops further actions.
 - Add Raspberry Pi desktop setup guidance and explain exactly what has been tested and what still needs a real device.
 - Linux delivery checks now cover the older desktop libraries used for official packages, with stronger evidence that notes remain visible.
