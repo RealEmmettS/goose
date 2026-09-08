@@ -24,10 +24,11 @@ Active. The retained Mac fullscreen worker and separate CLI/TUI/native settings
 status are implemented. Native Intel and Apple Silicon pass actual fullscreen,
 frozen-target expiry/recovery, live settings, unavailable windows, graceful stop
 and the private denied app. Mac/Linux DND stays explicitly unsupported. Integrate
-the GNOME review fixes, then complete final-source candidate, main, publication,
-fresh-public and website gates.
+the shared stopping correction from #rst after the final integrated art finding,
+then repeat native, candidate, main, publication, fresh-public and website gates.
 
 ## Activity
+- 2026-09-08 — All four 420dc31 GNOME suites and both native Mac presence suites pass in 34271715326 and 34271715256. Actual newer-ARM delivered-note review exposes a shared stopping-art defect. Cancel candidate 34271817809 and integrate ADR 0050's reproducing engine correction from 2b050ac. Repeat native visual review and complete final-source gates; Mac capability behavior is unchanged.
 - 2026-09-08 — All four e1cfaa7 desktops receive the corrected native drag input; three complete suites pass. The older ARM64 trace cancels its held ride correctly but exposes a production status race: extension disable can be misclassified as durable consent revocation. Integrate c2827ff, whose production regression reproduces and corrects that race, and repeat complete final-source qualification. Mac observation code remains unchanged.
 - 2026-09-08 — Both ARM64 suites pass 34268128789. Both x64 failures occur before the held gesture: no preparatory motion on the older desktop, and no final motion on the newer one, with GTK reporting no pointer over its surface. Keep the private input point off the goose's centered return route, ensure the first point differs from the current pointer and capture Mutter's actual picked surface. Every GTK/Mutter/engine oracle stays required; no product behavior changes.
 - 2026-09-08 — Run 34267024884 delivers both separately acknowledged native motions on all four desktops, then exposes a null raw GdkEvent in the installed Python bindings. Use the typed GTK pressed signal with the gesture left unclaimed; retain the strict button acknowledgment and every actual Mutter/runtime assertion. Preserve all four binding failures and repeat native qualification.

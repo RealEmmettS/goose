@@ -30,6 +30,7 @@ All notable changes to this project are documented here. Format based on
 - Add a retained, bounded macOS Accessibility fullscreen observer with live target identity, permission withdrawal and stale-sample expiry. Add independent fullscreen/DND capabilities through an additive bounded IPC frame, CLI, TUI and Native SDK settings; older runtimes remain unprobed.
 
 ### Fixed
+- Include ADR 0050's stopping-foot correction in the integrated release, with actual gait and World delivery regressions and unchanged planted contacts and visual goldens.
 - Recover Windows notification-observation status after a successful poll follows an error, and expose the current Linux compositor fullscreen capability independently of unsupported DND observation.
 - Report an expired Mac fullscreen sample as failed while its replacement is blocked; reserve unprobed for a new target, preserve the original freshness limit and recover on a fresh result.
 
@@ -52,6 +53,7 @@ All notable changes to this project are documented here. Format based on
 - Add explicit GNOME Shell companion setup and removal through Rust CLI and Native SDK settings, with qualified GNOME 46.0/48.7 window, fullscreen and actual user-drag observations on native x64/ARM64. Preserve the compatible XWayland overlay and independent owned-prop positioning; foreign movement, pointer access and DND remain unsupported.
 
 ### Fixed
+- Withdraw an airborne foot's old walking prediction when locomotion stops, preserving its current position, original step/lift phase and every planted contact. Add actual gait-phase and World delivery regressions plus abrupt-stop Rust preview sequences under ADR 0050.
 - Keep GNOME extension loss distinct from durable consent revocation when an in-flight native query completes during disable; withdraw observations and report failed consistently until explicit reconnection.
 - Check independent GNOME consent files concurrently within the original deadline, retaining both full consent checks, opened identities and joined cancellation cleanup.
 - Recover bounded GNOME query timeouts through the retained authenticated connection after withdrawing stale data. Recheck live consent and the pinned Shell on every query; keep permission, owner, extension and decoding failures terminal.

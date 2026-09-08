@@ -11,11 +11,14 @@ const CELL: u32 = 128;
 const COLS: u32 = 12;
 const COUNT: u32 = 120;
 const ANCHOR: Vec2 = Vec2 { x: 60.0, y: 93.0 };
-const SEQUENCES: [&str; 10] = [
+const SEQUENCES: [&str; 13] = [
     "walk",
     "walk-front",
     "walk-away",
     "run-stop",
+    "stop-front",
+    "stop-away",
+    "stop-charge",
     "turn",
     "reversal",
     "pet",
@@ -54,6 +57,18 @@ pub fn export(out: &str) {
                         200.0
                     } else {
                         (3.0 - t).max(0.0) * 400.0
+                    }
+                }
+                "stop-front" | "stop-away" | "stop-charge" => {
+                    heading = if *name == "stop-away" { 270.0 } else { 90.0 };
+                    if t < 2.0 {
+                        if *name == "stop-charge" {
+                            400.0
+                        } else {
+                            120.0
+                        }
+                    } else {
+                        0.0
                     }
                 }
                 "turn" => {

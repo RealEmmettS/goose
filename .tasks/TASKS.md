@@ -13,6 +13,10 @@
   - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
   - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
   - [ ] Qualify the complete candidate, unchanged main, fresh public distribution and website guidance.
+- [ ] **Stopping foot recovery** - withdraw stale airborne walking lead and qualify actual delivery motion (ms #refine) (owner codex) #rst
+  - [x] Reproduce and correct the production gait while preserving planted contacts and timing.
+  - [ ] Inspect actual Rust motion and repeat native delivered-note captures.
+  - [ ] Pass complete same-source release and fresh-public verification (needs #rgn).
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
   - [x] Complete the separately qualified Sway implementation (needs #rsw).
   - [x] Complete the separately qualified Hyprland implementation (needs #rhy).
