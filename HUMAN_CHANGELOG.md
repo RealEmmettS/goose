@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Give the isolated Hyprland test desktop the virtual graphics device it needs to start, and preserve its failure details before repeating qualification.
+
+### Behind the scenes
 - Test optional Hyprland support in isolated desktops before offering it, checking that desktop observations are trustworthy and unrelated windows remain untouched.
 
 ### Added

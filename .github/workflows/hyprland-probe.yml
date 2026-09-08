@@ -22,11 +22,23 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Prepare a disposable virtual graphics device
+        run: |
+          mkdir -p target/hyprland-evidence
+          uname -a > target/hyprland-evidence/host-kernel.txt
+          if ! modinfo vkms > target/hyprland-evidence/vkms.txt 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y "linux-modules-extra-$(uname -r)"
+            modinfo vkms > target/hyprland-evidence/vkms.txt
+          fi
+          sudo modprobe vkms
+          test -d /dev/dri
+          ls -l /dev/dri > target/hyprland-evidence/drm-devices.txt
       - name: Exercise the actual private compositor
         env:
           HONK_DISTRIBUTION: ${{ matrix.distribution }}
         run: |
-          docker run --rm -e HONK_HOST_UID="$(id -u)" -e HONK_HOST_GID="$(id -g)" \
+          docker run --rm --device /dev/dri -e HONK_HOST_UID="$(id -u)" -e HONK_HOST_GID="$(id -g)" \
             -v "$PWD:/work" -w /work "$HONK_DISTRIBUTION" bash -euc '
             mkdir -p target/hyprland-evidence
             trap '\''chown -R "$HONK_HOST_UID:$HONK_HOST_GID" /work/target/hyprland-evidence'\'' EXIT
@@ -39,7 +51,7 @@ jobs:
             apt-get update
             DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
               dbus-x11 python3 python3-gi gir1.2-gtk-4.0 libgtk-4-1 \
-              libgl1-mesa-dri libegl-mesa0 mesa-utils util-linux passwd
+              libgl1-mesa-dri libegl-mesa0 mesa-utils util-linux passwd seatd
             if test "$generation" = lua; then
               DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y -t trixie-backports hyprland
             else
@@ -48,6 +60,14 @@ jobs:
             dpkg-query -W > target/hyprland-evidence/packages.txt
             useradd --create-home honkprobe
             chown -R honkprobe:honkprobe /work/target/hyprland-evidence
+            SEATD_VTBOUND=0 seatd -u honkprobe > target/hyprland-evidence/seatd.log 2>&1 &
+            seat_pid=$!
+            for attempt in $(seq 1 100); do
+              test -S /run/seatd.sock && break
+              kill -0 "$seat_pid"
+              sleep 0.05
+            done
+            test -S /run/seatd.sock
             runuser -u honkprobe -- env GITHUB_ACTIONS=true dbus-run-session -- \
               python3 script/smoke_hyprland_adapter.py --evidence target/hyprland-evidence \
                 --generation "$generation"

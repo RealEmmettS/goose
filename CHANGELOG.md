@@ -27,6 +27,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Correct the Hyprland qualification host prerequisites exposed by the first native attempt: provide a disposable virtual DRM device with the standard seat service and keep the private socket path within the operating-system limit.
+
+### Behind the scenes
 - Begin separate Hyprland native interface qualification across x64/ARM64 and legacy/Lua generations, checking private socket peers, actual window identity, bounded owned-fixture movement and fullscreen before runtime integration.
 
 ### Fixed

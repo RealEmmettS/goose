@@ -34,6 +34,10 @@ Active. Begin native socket/window qualification on separately packaged Hyprland
 generations, with private configuration and no production runtime claims yet.
 
 ## Activity
+- 2026-09-08 — Inspect the first four-lane failure before repeating: the compositor
+  lacks a DRM allocator and the Lua generation exceeds the native socket path bound.
+  Add an actual disposable virtual graphics device and normal seat service, shorten
+  the private runtime path, and preserve backend diagnostics before the second premise.
 - 2026-09-08 — Exercise the native headless interface on Ubuntu and Debian x64/ARM64.
   Use each generation's actual configuration and dispatcher syntax, bound each socket
   transaction, attest the launched peer, and touch only exact fixture-owned windows.

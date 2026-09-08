@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import socket
 import struct
 import subprocess
@@ -19,7 +20,9 @@ def main():
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
-    runtime = evidence / 'runtime'
+    # The compositor adds its long build signature below this path. Keep the
+    # private runtime short enough for Linux's 108-byte Unix socket pathname.
+    runtime = Path('/tmp') / f'hy-{os.getpid()}'
     runtime.mkdir(mode=0o700)
     lua = args.generation == 'lua'
     config = evidence / ('hyprland.lua' if lua else 'hyprland.conf')
@@ -35,7 +38,9 @@ def main():
     environment = dict(os.environ, XDG_RUNTIME_DIR=str(runtime),
         XDG_DATA_HOME=str(evidence / 'user-data'), XDG_CONFIG_HOME=str(evidence / 'user-config'),
         XDG_CURRENT_DESKTOP='Hyprland', XDG_SESSION_TYPE='wayland',
-        HYPRLAND_HEADLESS_ONLY='1', LIBGL_ALWAYS_SOFTWARE='1', GDK_BACKEND='wayland')
+        LIBGL_ALWAYS_SOFTWARE='1', GDK_BACKEND='wayland', LIBSEAT_BACKEND='seatd')
+    for key in ('XDG_DATA_HOME', 'XDG_CONFIG_HOME'):
+        Path(environment[key]).mkdir(mode=0o700)
     for key in ('DISPLAY', 'WAYLAND_DISPLAY', 'HYPRLAND_INSTANCE_SIGNATURE'):
         environment.pop(key, None)
     windows = []
@@ -162,6 +167,10 @@ def main():
             except subprocess.TimeoutExpired:
                 compositor.kill()
                 compositor.wait(timeout=5)
+            # Preserve flushed compositor diagnostics, never sockets or other
+            # user state from outside this fixture-owned runtime.
+            for source in runtime.glob('hypr/*/hyprland.log'):
+                shutil.copyfile(source, evidence / 'backend.log')
 
 
 if __name__ == '__main__':
