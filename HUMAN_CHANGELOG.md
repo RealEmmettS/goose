@@ -34,6 +34,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Fixed
+- Give delivered notes their own desktop identity once their window appears, so optional KDE support can recognize and move the correct note.
+
+### Behind the scenes
+- Prepare the test desktop's normal application registry before checking permission dialogs, and record which desktop features are actually available.
 - Stop moving a delivered window as soon as desktop integration is removed, keeping notes available to use.
 - Give the isolated permission test a fresh desktop service before opening consent.
 - Wait for desktop permission services to finish starting before testing a request.

@@ -34,6 +34,7 @@ All notable changes to this project are documented here. Format based on
 - Begin native portal/libei qualification using an ephemeral pointer-only session, bounded device ownership, compositor-confirmed terminal exclusions and no runtime enablement before the real grant/motion/cancellation probe passes.
 
 ### Fixed
+- Set each owned Wayland prop's application identity after GTK maps its xdg_toplevel; pre-map setters are ignored by GDK. Refresh the isolated KDE service cache and capture compositor plugins when qualifying native portal permissions.
 - Cancel queued prop movement and restore owned-window input when positioning permission disappears; match native KDE prop geometry to an unreaped child and per-window identity before bounded placement.
 - Bind the private portal qualifier to its replacement frontend's actual D-Bus owner before requesting permission.
 - Wait for the native KDE portal backend and exported RemoteDesktop interface instead of accepting only the frontend bus name; initialize activation with the private compositor environment before GUI startup.

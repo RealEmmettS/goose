@@ -62,6 +62,9 @@ jobs:
                 at-spi2-core gir1.2-atspi-2.0 pipewire qt6-wayland
             fi
             dpkg-query -W > target/kwin-evidence/packages.txt
+            if test "$HONK_DISTRIBUTION" = "debian:trixie-slim"; then
+              dpkg-query -L xdg-desktop-portal-kde > target/kwin-evidence/backend-files.txt
+            fi
             compositor="$(command -v kwin_wayland)"
             capabilities="$(getcap "$compositor")"
             printf "%s\n" "$capabilities" > target/kwin-evidence/container-file-capabilities.txt

@@ -221,14 +221,6 @@ static int spawn_prop(Prop *prop, const HonkPropCommand *command) {
     }
     gtk_window_set_child(prop->window, box);
     gtk_widget_realize(GTK_WIDGET(prop->window));
-    if (!positioning) {
-        GdkSurface *surface = surface_for(prop);
-        if (!surface || !GDK_IS_WAYLAND_TOPLEVEL(surface)) return 0;
-        char application_id[80];
-        g_snprintf(application_id, sizeof(application_id), "honk300.prop.%" G_GUINT64_FORMAT,
-                   (guint64)prop->id);
-        gdk_wayland_toplevel_set_application_id(GDK_TOPLEVEL(surface), application_id);
-    }
     int scale = positioning ? gtk_widget_get_scale_factor(GTK_WIDGET(prop->window)) : 1;
     gtk_window_set_default_size(prop->window, MAX(1, (int)command->width / scale),
                                MAX(1, (int)command->height / scale));
@@ -244,6 +236,16 @@ static int spawn_prop(Prop *prop, const HonkPropCommand *command) {
     }
     // Showing an owned delivery must not focus a terminal or synthesize input.
     gtk_widget_set_visible(GTK_WIDGET(prop->window), TRUE);
+    if (!positioning) {
+        GdkSurface *surface = surface_for(prop);
+        if (!surface || !GDK_IS_WAYLAND_TOPLEVEL(surface)) return 0;
+        char application_id[80];
+        g_snprintf(application_id, sizeof(application_id), "honk300.prop.%" G_GUINT64_FORMAT,
+                   (guint64)prop->id);
+        // GTK creates the xdg_toplevel while mapping. Its Wayland setter does
+        // nothing before that point and does not retain a pending application id.
+        gdk_wayland_toplevel_set_application_id(GDK_TOPLEVEL(surface), application_id);
+    }
     return !failed;
 }
 

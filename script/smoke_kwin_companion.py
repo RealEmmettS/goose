@@ -73,11 +73,19 @@ def main():
     environment = dict(os.environ, XDG_RUNTIME_DIR=str(runtime), XDG_CONFIG_HOME=str(config),
         XDG_DATA_HOME=str(evidence / 'data'),
         XDG_CURRENT_DESKTOP='KDE', XDG_SESSION_TYPE='wayland', QT_QPA_PLATFORM='offscreen',
-        KWIN_COMPOSE='Q', LIBGL_ALWAYS_SOFTWARE='true', GDK_BACKEND='wayland')
+        KWIN_COMPOSE='Q', LIBGL_ALWAYS_SOFTWARE='true', GDK_BACKEND='wayland',
+        QT_LOGGING_RULES='kwin_core.debug=true')
     environment.pop('DISPLAY', None)
     environment.pop('WAYLAND_DISPLAY', None)
     version = subprocess.check_output(['kwin_wayland', '--version'], env=environment, text=True).strip()
     (evidence / 'version.txt').write_text(version)
+    if args.portal and 'kwin 6.' in version.lower():
+        # A bare container lacks the desktop login's service-cache refresh.
+        # Discover the installed backend's own desktop-file permissions through
+        # KService; retain the normal compositor interface authorization checks.
+        with (evidence / 'service-cache.log').open('w') as service_log:
+            subprocess.run(['kbuildsycoca6', '--noincremental'], env=environment,
+                           stdout=service_log, stderr=service_log, check=True, timeout=30)
     import gi
     gi.require_version('Gio', '2.0')
     from gi.repository import Gio, GLib
@@ -126,6 +134,11 @@ def main():
             assert owner.startswith(':'), owner
             os.environ.update(environment)
             os.environ['WAYLAND_DISPLAY'] = 'wayland-honk-kwin'
+            if args.portal and 'kwin 6.' in version.lower():
+                for property_name in ('AvailablePlugins', 'LoadedPlugins'):
+                    value = call('org.kde.KWin', '/Plugins', 'org.freedesktop.DBus.Properties',
+                                 'Get', GLib.Variant('(ss)', ('org.kde.KWin.Plugins', property_name))).unpack()[0]
+                    (evidence / f'{property_name}.json').write_text(json.dumps(value, indent=2) + '\n')
             # GTK and the settings service may activate portals before the input
             # qualifier. Give those services the actual private compositor first.
             activation = {key: value for key, value in os.environ.items()

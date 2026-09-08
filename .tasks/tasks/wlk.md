@@ -35,6 +35,10 @@ this task owns the native implementation evidence and #rkde owns publication.
 - [ ] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
+Current owned-prop qualification is blocked by the native application identity in
+34198830686: both KDE versions report the exact runtime-owned note as GTK Application.
+The GDK setter returns before an xdg_toplevel exists, so apply the token after mapping
+and repeat all four native lanes. The existing movement and ownership oracle is unchanged.
 The full production runtime and setup path passed all four KWin 5/6 x64/ARM64 lanes
 in 34195263902. Evidence includes default-off state, separate capabilities, native Rust
 settings-service status, live and external removal, crash recovery, graceful cleanup,
@@ -54,6 +58,7 @@ expanded native x64/ARM64 probes are next. Runtime and explicit setup remain ope
 No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: Native observer evidence identifies the actual child-owned note but its app id remains GTK Application. Upstream GDK confirms the setter ignores pre-map calls. Move the exact per-prop identity assignment after GTK mapping and repeat the actual movement/revocation check.
 - 2026-09-08: Native movement run 34198076323 compiles and starts the actual prop host but cannot identify the note. Retain bounded native observer frames, assert the actual note's application token and owned parent process, and use a monotonic frame counter for revocation timing. Independent runtime/UI/portal results remain failures unless every required qualifier passes.
 - 2026-09-08: All four native settings lanes pass real AT-SPI consent/cancel/remove/draft preservation in 34196877360. Add KWin placement for actual process-owned props using a per-window application token, unreaped child identity, matching geometry and existing bounded movement checks. A new native observer must prove engine-driven movement and retained-note stability after revocation. Local production-helper ownership and engine cancellation regressions pass.
 - 2026-09-08: Extend all four KDE lanes with the production Native SDK binary and real AT-SPI actions for consent, cancellation, removal, modal isolation and a saved draft that retains comments and unknown fields. This is additional native UI qualification, pending its first run.
