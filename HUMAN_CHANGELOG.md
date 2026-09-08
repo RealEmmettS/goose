@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Account for the older KDE window-list interface after the first real KDE desktop test passed movement and protected-window checks.
 - Let the isolated KDE test wait for the desktop connection to finish starting, and retain clear diagnostics if that connection never becomes ready.
 - Adjust the isolated KDE test environment so it can start and retain useful failure evidence without requesting extra system privileges.
 - Begin testing optional KDE desktop support with real windows, including checks that protected apps stay untouched and disabling the connection stops further actions.

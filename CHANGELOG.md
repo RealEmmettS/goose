@@ -32,6 +32,7 @@ All notable changes to this project are documented here. Format based on
 - Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.
 
 ### Development
+- Use Plasma 5's documented managed-client list when Plasma 6's stacking-order property is unavailable; retain live identity checks without inferring occlusion order from the older API. The first native KDE 6 probe passes real bounded movement and refusals.
 - Wait for KWin's actual D-Bus registration after its earlier Wayland socket creation; capture bus ownership and compositor diagnostics on a bounded timeout before testing the script API.
 - Remove the distro KWin binary's realtime file-capability request only inside its disposable software-rendered CI container; preserve capability diagnostics and readable native-probe artifacts without granting host privileges.
 - Begin the explicitly enabled KDE companion with a native KWin 5/6 premise probe for real window identity, bounded geometry changes, terminal/stale-target refusal and disable; no production capability is enabled before runtime qualification.

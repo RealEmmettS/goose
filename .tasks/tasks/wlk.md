@@ -35,13 +35,17 @@ this task owns the native implementation evidence and #rkde owns publication.
 - [ ] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
-Active in the isolated Wayland integration checkout. The second native probe starts both
-compositors and creates their sockets, then queries the D-Bus identity before registration.
-Wait for the actual service owner with a fixed deadline; add bus-name and compositor-log
-diagnostics for a timeout. Native API feasibility remains unverified; no public integration
-is enabled or advertised.
+Active in the isolated Wayland integration checkout. KWin 6.3.6 now passes the actual script
+exchange, native identity, bounded movement, terminal/stale/excessive movement refusals and
+disable. KWin 5.27 lacks the newer stacking-order property; use its documented clientList
+without claiming occlusion order. The repeat native probe remains open, followed by the
+Rust bridge and setup. No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: Run 34188879003 passes the entire earliest KWin 6.3.6 native premise.
+  KWin 5.27.11 reaches the script but sends no frame because stackingOrder is unavailable.
+  Upstream Plasma/5.27 workspace_wrapper.h exposes clientList instead. Add that compatibility
+  source while explicitly withholding any stacking-order inference from the older list.
 - 2026-09-07: Run 34188470703 reaches socket startup on both KWin generations, then fails
   with NameHasNoOwner before the script is loaded. Native logs show no startup crash.
   Require both socket and D-Bus registration, preserving a bounded timeout and its diagnostics.

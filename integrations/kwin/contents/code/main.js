@@ -17,6 +17,13 @@
         var text = String(value === undefined || value === null ? "" : value);
         return text.length <= 256 ? text : "";
     }
+    function windowList() {
+        // Plasma 5 exposes the managed client list; Plasma 6 exposes stackingOrder.
+        // The older list conveys identity, not top-to-bottom occlusion authority.
+        if (workspace.stackingOrder !== undefined) return workspace.stackingOrder;
+        if (typeof workspace.clientList === "function") return workspace.clientList();
+        return null;
+    }
     function protectedTarget(window) {
         var identity = [window.resourceClass, window.resourceName, window.desktopFileName, window.caption];
         if (!boundedText(window.resourceClass) || !boundedText(window.caption)) return true;
@@ -60,7 +67,7 @@
     function apply(command, frame) {
         if (!command || command.kind !== "move" || !Array.isArray(command.from) ||
             !Array.isArray(command.to) || command.to.length !== 2 || !command.to.every(finite)) return "invalid";
-        var windows = workspace.stackingOrder;
+        var windows = windowList();
         if (!windows || windows.length > 64) return "unavailable";
         for (var i = 0; i < windows.length; i++) {
             var window = windows[i];
@@ -90,7 +97,7 @@
     }
     function exchange() {
         if (stopped || pending) return;
-        var windows = workspace.stackingOrder;
+        var windows = windowList();
         if (!windows || windows.length > 64) { stopped = true; timer.stop(); return; }
         var frame = {protocol: 1, sequence: ++sequence, windows: [],
             pointer: [Number(workspace.cursorPos.x), Number(workspace.cursorPos.y)], result: lastResult};
