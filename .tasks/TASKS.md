@@ -15,7 +15,7 @@
 
 ## Active
 - [ ] **KDE native Wayland companion** - implement the explicitly enabled KWin bridge and prove exact identities, bounded movement, terminal exclusions and revocation (needs #a6e) (ms #refine) (owner codex) #wlk
-  - [ ] Prove the real KWin script API and owned test-window movement on KDE 5/6.
+  - [x] Prove the real KWin script API and owned test-window movement on KDE 5/6.
   - [ ] Connect the authenticated bounded Rust bridge and live runtime capabilities.
   - [ ] Add explicit setup/removal and failure/revocation tests.
 - [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1

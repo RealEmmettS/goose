@@ -30,18 +30,21 @@ The user requires native desktop and every platform/package/public release gates
 this task owns the native implementation evidence and #rkde owns publication.
 
 ## Verification
-- [ ] Native KDE 5/6 probes exercise actual window data, movement and protected targets.
+- [x] Native KDE 5/6 probes exercise actual window data, movement and protected targets.
 - [ ] The real Rust runtime handles opt-in, identity, capability loss and graceful cleanup.
 - [ ] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
-Active in the isolated Wayland integration checkout. KWin 6.3.6 now passes the actual script
-exchange, native identity, bounded movement, terminal/stale/excessive movement refusals and
-disable. KWin 5.27 lacks the newer stacking-order property; use its documented clientList
-without claiming occlusion order. The repeat native probe remains open, followed by the
-Rust bridge and setup. No public integration is enabled or advertised.
+The actual Rust transport and KWin 5.27/6.3 pass in 34190701777: exact identity,
+bounded native movement, terminal/stale/excessive refusal, untrusted peer rejection,
+expiry after disconnect, explicit reconnect and stop. The source includes the qualified
+Linux implementation and final first-stage review corrections. Current desktop/activity,
+fullscreen and actual user-drag boundaries are now implemented with focused Rust tests;
+expanded native x64/ARM64 probes are next. Runtime and explicit setup remain open.
+No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: Both KWin generations pass the actual Rust transport in 34190701777. Add current-desktop/activity eligibility, separate fullscreen and user-drag observation, and refusal to move a window the user is dragging. Expand the real compositor probe to those states and native ARM64 before runtime integration.
 - 2026-09-08: Run 34190444045 passes actual Rust/KWin 5.27 identity, real movement,
   untrusted sender refusal, protected/stale/excessive refusal, expiry, reconnect and stop.
   KWin 6.3's first scripted frame is empty and then stops before fixture window mapping;

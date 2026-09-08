@@ -27,6 +27,9 @@ pub struct Window {
     pub active: bool,
     pub moveable: bool,
     pub dragging: bool,
+    pub drag_known: bool,
+    pub on_desktop: bool,
+    pub on_activity: bool,
     pub protected: bool,
 }
 
@@ -54,6 +57,8 @@ impl Window {
             && !self.deleted
             && !self.minimized
             && !self.fullscreen
+            && self.on_desktop
+            && self.on_activity
             && self.moveable
             && !self.protected
             && !self.app.trim().is_empty()
@@ -65,6 +70,7 @@ impl Window {
         let [x, y, width, height] = self.geometry;
         let [left, top, area_width, area_height] = self.area;
         self.eligible()
+            && !self.dragging
             && to.into_iter().all(finite)
             && (to[0] - x).powi(2) + (to[1] - y).powi(2) <= 24.0 * 24.0
             && to[0] >= left
@@ -80,11 +86,33 @@ pub struct Frame {
     pub protocol: u8,
     pub sequence: u64,
     pub windows: Vec<Window>,
+    pub stacking_order: bool,
     pub pointer: [f64; 2],
     pub result: String,
 }
 
 impl Frame {
+    /// Fullscreen observation does not imply do-not-disturb observation.
+    pub fn fullscreen(&self) -> bool {
+        self.windows.iter().any(|window| {
+            window.on_desktop
+                && window.on_activity
+                && !window.deleted
+                && !window.minimized
+                && window.fullscreen
+        })
+    }
+
+    /// A single live user drag can supply a ride anchor without pointer injection.
+    pub fn dragged_window(&self) -> Option<&Window> {
+        let mut targets = self
+            .windows
+            .iter()
+            .filter(|window| window.eligible() && window.drag_known && window.dragging);
+        let target = targets.next()?;
+        targets.next().is_none().then_some(target)
+    }
+
     fn decode(raw: &str) -> Result<Self, &'static str> {
         if raw.len() > MAX_FRAME {
             return Err("oversized KWin frame");
@@ -245,11 +273,35 @@ mod tests {
     use super::*;
 
     fn fixture() -> Frame {
-        serde_json::from_str(r#"{"protocol":1,"sequence":1,"windows":[{"id":"{45316fac-9956-4bd3-adcd-fe8c1ecdf5cc}","pid":4307,"app":"honk300-native-probe","title":"Honk300 ordinary probe","geometry":[100,100,300,200],"area":[0,0,1280,900],"normal":true,"deleted":false,"minimized":false,"fullscreen":false,"active":true,"moveable":true,"dragging":false,"protected":false}],"pointer":[639,449],"result":"none"}"#).unwrap()
+        serde_json::from_str(r#"{"protocol":1,"sequence":1,"windows":[{"id":"{45316fac-9956-4bd3-adcd-fe8c1ecdf5cc}","pid":4307,"app":"honk300-native-probe","title":"Honk300 ordinary probe","geometry":[100,100,300,200],"area":[0,0,1280,900],"normal":true,"deleted":false,"minimized":false,"fullscreen":false,"active":true,"moveable":true,"dragging":false,"drag_known":true,"on_desktop":true,"on_activity":true,"protected":false}],"stacking_order":true,"pointer":[639,449],"result":"none"}"#).unwrap()
     }
     fn raw(frame: &Frame) -> String {
         serde_json::to_string(frame).unwrap()
     }
+    #[test]
+    fn live_desktop_presence_and_user_drag_remain_separate_from_movement() {
+        let mut frame = fixture();
+        frame.windows[0].dragging = true;
+        assert_eq!(frame.dragged_window(), Some(&frame.windows[0]));
+        assert!(!frame.windows[0].permits_move([110.0, 100.0]));
+        frame.windows[0].drag_known = false;
+        assert!(frame.dragged_window().is_none());
+        frame.windows[0].drag_known = true;
+        frame.windows[0].on_desktop = false;
+        assert!(frame.dragged_window().is_none());
+        frame.windows[0].fullscreen = true;
+        assert!(!frame.fullscreen());
+        frame.windows[0].on_desktop = true;
+        assert!(frame.fullscreen());
+        assert!(frame.dragged_window().is_none());
+        frame.windows[0].on_activity = false;
+        assert!(!frame.fullscreen());
+        frame.windows[0].on_activity = true;
+        frame.windows[0].fullscreen = false;
+        frame.windows[0].title = "ChatGPT".into();
+        assert!(frame.dragged_window().is_none());
+    }
+
     fn receive(state: &mut State, frame: &Frame, now: Instant) -> serde_json::Value {
         serde_json::from_str(&state.exchange(":1.10", ":1.10", &raw(frame), now).unwrap()).unwrap()
     }
@@ -279,7 +331,7 @@ mod tests {
 
     #[test]
     fn expiry_and_changed_identity_discard_queued_actions() {
-        for mode in 0..6 {
+        for mode in 0..10 {
             let now = Instant::now();
             let mut state = State::new(":1.10".into());
             let mut frame = fixture();
@@ -294,6 +346,10 @@ mod tests {
                 3 => frame.windows[0].geometry[0] += 1.0,
                 4 => frame.windows.clear(),
                 5 => frame.windows[0].area[2] = 50.0,
+                6 => frame.windows[0].on_desktop = false,
+                7 => frame.windows[0].on_activity = false,
+                8 => frame.windows[0].dragging = true,
+                9 => frame.windows[0].fullscreen = true,
                 _ => {}
             }
             let later = now

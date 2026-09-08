@@ -174,6 +174,30 @@ def main():
             (evidence / 'initial.json').write_text(json.dumps(latest, indent=2) + '\n')
             assert not ordinary['protected'] and denied['protected'], (ordinary, denied)
             assert ordinary['pid'] == os.getpid() and denied['pid'] == os.getpid(), latest
+            assert ordinary['on_desktop'] and ordinary['on_activity'] and ordinary['drag_known'], ordinary
+            assert latest['stacking_order'] == (major >= 6), latest
+
+            def fixture_action(name, action):
+                # This script is fixture-only and never packaged. The test owns the
+                # private compositor and selects only its exact native window/PID.
+                helper = evidence / f'fixture-{name}.js'
+                helper.write_text('''(function () {
+                    var windows = workspace.stackingOrder !== undefined ? workspace.stackingOrder : workspace.clientList();
+                    for (var i = 0; i < windows.length; i++) {
+                        var window = windows[i];
+                        if (Number(window.pid) === ''' + str(os.getpid()) + ''' &&
+                            String(window.caption) === "Honk300 ordinary probe") {
+                            ''' + action + '''
+                            return;
+                        }
+                    }
+                    throw new Error("Fixture-owned window unavailable");
+                }());''')
+                identifier = call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'loadScript',
+                    GLib.Variant('(ss)', (str(helper), f'honk300-fixture-{name}'))).unpack()[0]
+                assert identifier >= 0
+                address = f'/Scripting/Script{identifier}' if major >= 6 else f'/{identifier}'
+                call('org.kde.KWin', address, 'org.kde.kwin.Script', 'run')
 
             def move(item, dx, dy):
                 return dict(kind='move', id=item['id'], pid=item['pid'], app=item['app'],
@@ -245,6 +269,22 @@ def main():
                     else:
                         raise AssertionError('Untrusted D-Bus peer injected a compositor frame')
                     assert rust_window('Honk300 ordinary probe'), 'Untrusted peer revoked the valid observer'
+                    normal.fullscreen()
+                    fullscreen = wait(lambda: (item if (item := rust_window('Honk300 ordinary probe')) and
+                        item['fullscreen'] else None), 'native fullscreen observation')
+                    assert not bridge.request('move', window=fullscreen,
+                        to=[fullscreen['geometry'][0] + 5, fullscreen['geometry'][1]])['ok']
+                    normal.unfullscreen()
+                    wait(lambda: (item if (item := rust_window('Honk300 ordinary probe')) and
+                        not item['fullscreen'] else None), 'fullscreen exit')
+                    fixture_action('desktop', 'workspace.createDesktop(1, "Honk300 private desktop"); workspace.slotSwitchDesktopNext();')
+                    hidden = wait(lambda: (item if (item := rust_window('Honk300 ordinary probe')) and
+                        not item['on_desktop'] else None), 'window on another native desktop')
+                    assert not bridge.request('move', window=hidden,
+                        to=[hidden['geometry'][0] + 5, hidden['geometry'][1]])['ok']
+                    fixture_action('return', 'workspace.slotSwitchDesktopPrevious();')
+                    wait(lambda: (item if (item := rust_window('Honk300 ordinary probe')) and
+                        item['on_desktop'] else None), 'return to native desktop')
                     (evidence / 'rust-native-snapshot.json').write_text(json.dumps(bridge.request('snapshot'), indent=2) + '\n')
                     unload_rust_script()
                     wait(lambda: bridge.request('snapshot')['snapshot'] is None, 'Rust expiry after companion loss')
@@ -257,6 +297,12 @@ def main():
                 try:
                     load_rust_script()
                     recovered = wait(lambda: rust_window('Honk300 ordinary probe'), 'new Rust connection')
+                    fixture_action('drag', '''if (workspace.activeWindow !== undefined) workspace.activeWindow = window;
+                        else workspace.activeClient = window; workspace.slotWindowMove();''')
+                    dragging = wait(lambda: (item if (item := rust_window('Honk300 ordinary probe')) and
+                        item['drag_known'] and item['dragging'] else None), 'actual native interactive move')
+                    assert not bridge.request('move', window=dragging,
+                        to=[dragging['geometry'][0] + 5, dragging['geometry'][1]])['ok']
                     assert bridge.request('stop')['ok']
                     assert bridge.request('snapshot')['snapshot'] is None
                     assert not bridge.request('move', window=recovered,
@@ -267,7 +313,9 @@ def main():
                 (evidence / 'rust-result.json').write_text(json.dumps(dict(ok=True,
                     native_identity=True, bounded_move=True, untrusted_peer_refused=True,
                     protected_stale_excessive_refused=True, connection_loss_expires=True,
-                    explicit_reconnect=True, stop=True, goose_runtime_connected=False), indent=2) + '\n')
+                    explicit_reconnect=True, stop=True, fullscreen_refused=True,
+                    other_desktop_refused=True, actual_user_drag_observed=True,
+                    goose_runtime_connected=False), indent=2) + '\n')
             normal.destroy()
             protected.destroy()
             (evidence / 'result.json').write_text(json.dumps(dict(ok=True, kwin=version,

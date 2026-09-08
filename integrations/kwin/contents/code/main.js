@@ -54,6 +54,26 @@
     function goodRect(value) {
         return value.length === 4 && value.every(finite) && value[2] > 0 && value[3] > 0;
     }
+    function onDesktop(window) {
+        var current = workspace.currentVirtualDesktop || workspace.currentDesktop;
+        var desktops = window.desktops;
+        if (!current || !desktops || typeof desktops.length !== "number") return false;
+        if (desktops.length === 0) return true;
+        for (var i = 0; i < desktops.length; i++) {
+            if (desktops[i] === current || (boundedText(current.id) &&
+                boundedText(desktops[i].id) === boundedText(current.id))) return true;
+        }
+        return false;
+    }
+    function onActivity(window) {
+        var activities = window.activities;
+        if (!activities || typeof activities.length !== "number") return false;
+        if (activities.length === 0) return true;
+        var current = boundedText(workspace.currentActivity);
+        if (!current) return false;
+        for (var i = 0; i < activities.length; i++) if (activities[i] === current) return true;
+        return false;
+    }
     function snapshot(window) {
         return {
             id: boundedText(window.internalId),
@@ -68,7 +88,10 @@
             fullscreen: Boolean(window.fullScreen),
             active: Boolean(window.active),
             moveable: Boolean(window.moveable),
-            dragging: Boolean(window.interactiveMove || window.move),
+            dragging: window.move === true,
+            drag_known: typeof window.move === "boolean",
+            on_desktop: onDesktop(window),
+            on_activity: onActivity(window),
             protected: protectedTarget(window)
         };
     }
@@ -82,7 +105,8 @@
             if (boundedText(window.internalId) !== command.id) continue;
             var current = snapshot(window);
             if (current.protected) return "protected";
-            if (!current.normal || current.deleted || current.minimized || current.fullscreen || !current.moveable) return "ineligible";
+            if (!current.normal || current.deleted || current.minimized || current.fullscreen ||
+                !current.moveable || current.dragging || !current.on_desktop || !current.on_activity) return "ineligible";
             if (current.pid !== command.pid || current.app !== command.app ||
                 JSON.stringify(current.geometry) !== JSON.stringify(command.from)) return "stale";
             var observed = frame.windows.filter(function (item) { return item.id === current.id; });
@@ -114,6 +138,7 @@
         var windows = windowList();
         if (!windows || windows.length > 64) { stop("window inventory unavailable or oversized"); return; }
         var frame = {protocol: 1, sequence: ++sequence, windows: [],
+            stacking_order: workspace.stackingOrder !== undefined,
             pointer: [Number(workspace.cursorPos.x), Number(workspace.cursorPos.y)], result: lastResult};
         for (var i = 0; i < windows.length; i++) frame.windows.push(snapshot(windows[i]));
         var bytes = JSON.stringify(frame);
