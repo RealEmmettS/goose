@@ -13,7 +13,7 @@ def qualify(binary, settings, evidence, wait, window, protected_window, find_win
     os.environ.update(environment)
     import gi
     gi.require_version('Atspi', '2.0')
-    from gi.repository import Atspi, Gio, Gtk
+    from gi.repository import Atspi, Gdk, Gio, Gtk
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     bus.call_sync('org.a11y.Bus', '/org/a11y/bus', 'org.freedesktop.DBus.Properties', 'Set',
         GLib.Variant('(ssv)', ('org.a11y.Status', 'IsEnabled', GLib.Variant('b', True))),
@@ -189,37 +189,60 @@ preserve = "untouched"
         controller.connect('motion', lambda _controller, x, y: record_event('motion', x, y))
         controller.connect('leave', lambda _controller: record_event('leave'))
         handle.add_controller(controller)
+        buttons = Gtk.EventControllerLegacy.new()
+        buttons.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        def record_button(_controller, native_event):
+            kind = native_event.get_event_type()
+            if kind in (Gdk.EventType.BUTTON_PRESS, Gdk.EventType.BUTTON_RELEASE):
+                record_event('press' if kind == Gdk.EventType.BUTTON_PRESS else 'release',
+                             native_event.get_button())
+            return False
+        buttons.connect('event', record_button)
+        handle.add_controller(buttons)
         surface = target.get_surface()
         device = surface.get_display().get_default_seat().get_pointer()
         def event(*arguments):
             subprocess.run(['xdotool', *map(str, arguments)], env=capture_environment,
                            check=True, capture_output=True, timeout=5)
         try:
+            def delivered_to_handle(after, expected=None):
+                if not surface.get_device_position(device)[0] or len(native_events) <= after:
+                    return False
+                current = native_events[-1]
+                if current['type'] not in ('enter', 'motion'):
+                    return False
+                local_x, local_y = current['coordinates']
+                inside = 0 <= local_x < handle.get_width() and 0 <= local_y < handle.get_height()
+                matches = expected is None or all(abs(a-b) < 0.01 for a, b in
+                                                  zip(current['coordinates'], expected))
+                return current if inside and matches else False
             # A newly raised surface may be under an unchanged outer pointer.
             # Two distinct handle points guarantee a real motion event.
             event('mousemove', pointer_x + 20, pointer_y + 20)
             wait(lambda: snapshot()['pointer'] == [pointer_x + 20, pointer_y + 20],
                  'native motion enters the private client: ' + label)
+            first = wait(lambda: delivered_to_handle(0),
+                         'GTK acknowledges preparatory handle motion: ' + label)
+            first_count = len(native_events)
+            expected = [coordinate - 20 for coordinate in first['coordinates']]
             event('mousemove', pointer_x, pointer_y)
             wait(lambda: snapshot()['pointer'] == [pointer_x, pointer_y],
                  'native pointer reaches the private client: ' + label)
             # Adding a controller while the pointer is already over its widget
             # need not replay enter or initialize contains_pointer. The actual
             # newly delivered capture event proves this gesture's target.
-            def delivered_to_handle():
-                if not surface.get_device_position(device)[0] or not native_events:
-                    return False
-                current = native_events[-1]
-                if current['type'] not in ('enter', 'motion'):
-                    return False
-                local_x, local_y = current['coordinates']
-                return 0 <= local_x < handle.get_width() and 0 <= local_y < handle.get_height()
-            wait(delivered_to_handle,
-                 'GTK delivers native motion inside the actual drag handle: ' + label)
+            # Require this second motion, not the preparatory event still in
+            # the client queue. Relative coordinates include real decorations.
+            wait(lambda: delivered_to_handle(first_count, expected),
+                 'GTK acknowledges final handle motion: ' + label)
             # Gtk.WindowHandle asks Mutter to begin the real native gesture
             # using the delivered button event. Never synthesize a grab signal.
+            before_press = len(native_events)
             event('mousedown', 1)
             wait(lambda: snapshot()['button_pressed'], 'native held button: ' + label)
+            wait(lambda: any(value['type'] == 'press' and value['coordinates'] == (1,)
+                             for value in native_events[before_press:]),
+                 'GTK acknowledges the actual held button: ' + label)
             event('mousemove', pointer_x + 12, pointer_y + 12)
             wait(lambda: (value if (value := snapshot())['drag'] and
                           value['drag']['id'] == native['id'] else None), 'actual native held drag: ' + label)
@@ -254,6 +277,7 @@ preserve = "untouched"
             event('mouseup', 1, 'keyup', 'Alt_L')
             (directory / f'input-events-{label}.json').write_text(json.dumps(native_events, indent=2))
             handle.remove_controller(controller)
+            handle.remove_controller(buttons)
         wait(lambda: not (value := snapshot())['grabbed'] and not value['alt_pressed']
              and not value['button_pressed'], 'native drag and modifier release')
         observed_state(lambda value: value['drag_id'] is None and value['task'] != 'perch_ride',

@@ -28,6 +28,7 @@ the GNOME review fixes, then complete final-source candidate, main, publication,
 fresh-public and website gates.
 
 ## Activity
+- 2026-09-08 — Both native Mac lanes pass again in 34264286000. The integrated GNOME run passes three desktops; the newer x64 failure records only preparatory motion, with no final GTK motion or button event. Sequence both motions and the real button press using passive native acknowledgments before the existing Mutter/engine oracles. Preserve failed captures and repeat the full final-source qualification.
 - 2026-09-08 — Cancel incomplete candidate 34261907400 after the GNOME stage's native input failure repeats in the integrated PR. Incorporate actual client-area GTK drag handles while preserving real Mutter grabs and every ride interruption assertion; production Mac and Linux observations remain unchanged. Repeat native and complete release gates before publication.
 - 2026-09-08 — Integrate the final GNOME source after all four corrected native suites pass in 34260153471. Preserve the independently qualified Mac implementation and freeze the combined source for complete candidate, main, public distribution and website qualification.
 - 2026-09-08 — Final merged Mac repeat 34255297607 passes both architectures and denied-identity scenarios at a9d8a89; inspect both native fullscreen captures. Integrate GNOME's diagnosed timeout recovery and remapped-frame input qualification while retaining strict deadlines, terminal failures and ordered public releases. Hyprland publication and website records are complete.
