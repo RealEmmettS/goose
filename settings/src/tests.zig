@@ -45,3 +45,18 @@ test "invalid reply cannot replace unsaved fields" {
     ));
     try std.testing.expect(!model.loaded);
 }
+
+test "unknown runtime status preserves editable settings without claiming the goose stopped" {
+    var model = main.Model{};
+    model.request_id = 1;
+    try main.acceptResponse(&model, @embedFile("fixtures/read.json"));
+    model.fields[0].value_buffer.set("true");
+    try main.acceptResponse(&model,
+        \\{"protocol":1,"request_id":1,"ok":true,"data":{"runtime":{"available":false,"running":null,"error":"Runtime status could not be confirmed"}}}
+    );
+    try std.testing.expect(model.loaded);
+    try std.testing.expect(model.dirty());
+    try std.testing.expectEqual(@as(usize, 53), model.field_count);
+    try std.testing.expect(std.mem.indexOf(u8, model.runtime(), "status unavailable") != null);
+    try std.testing.expect(std.mem.indexOf(u8, model.runtime(), "stopped") == null);
+}

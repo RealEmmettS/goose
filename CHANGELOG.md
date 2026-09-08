@@ -35,6 +35,7 @@ All notable changes to this project are documented here. Format based on
 - Wait for KWin's actual D-Bus registration after its earlier Wayland socket creation; capture bus ownership and compositor diagnostics on a bounded timeout before testing the script API.
 - Remove the distro KWin binary's realtime file-capability request only inside its disposable software-rendered CI container; preserve capability diagnostics and readable native-probe artifacts without granting host privileges.
 - Begin the explicitly enabled KDE companion with a native KWin 5/6 premise probe for real window identity, bounded geometry changes, terminal/stale-target refusal and disable; no production capability is enabled before runtime qualification.
+- Exercise the exact production musl companions with real X11 notes, complete-image pixels, user closes, runtime delivery and child-loss cleanup on native x64/ARM64 Alpine; share the isolated compositor runner with the GNU baseline gate.
 - Document experimental Pi 4/5 64-bit Raspberry Pi OS Desktop setup, actual labwc 0.7.1 x64/ARM64 qualification and the remaining physical-device boundary; index the refinement ADRs.
 - Exercise actual production GNU companions on the Ubuntu 22.04 GTK baseline after identity verification. Record successful native x64/ARM64 X11/labwc delivery, scale, close and failure evidence; require light note-body pixels so a gray test desktop cannot satisfy visibility.
 - Make the shared Linux release smoke expect a ready prop companion when the actual runtime payload includes one, and explicit unsupported capability for a bare Rust binary; failed companions cannot satisfy either case.
@@ -68,6 +69,9 @@ All notable changes to this project are documented here. Format based on
 - Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
 
 ### Fixed
+- Reconcile receipt-owned autostart intent before the native settings edit snapshot, preserve its resulting revision, and reject concurrent configuration changes during reconciliation.
+- Keep native settings editable when runtime status cannot be confirmed, display an unknown state instead of stopped, and omit an unused native path field that could panic on non-Unicode filenames.
+- Reject ordinary reload when its configuration file is missing, retaining the running choices instead of silently applying defaults.
 - Capture the native Linux startup goose before issuing a Wander command that replaces its entrance task. Preserve the paired-background image oracle and later honk/mud/wander/reload checks; the ARM64 Debian fixture had repeatedly paused a partial edge pose.
 - Correct AccessKit's Linux AT-SPI Enabled/Sensitive state for disabled buttons using a pinned, licensed local patch. Test the actual state translation and native disabled-to-available Update now workflow.
 - Keep Windows owned note/meme delivery available when foreground activation is denied by normal OS focus policy. A failed `SetForegroundWindow` request no longer invents a Win32 error or permanently disables collect capability; note text still targets the owned edit control directly.
@@ -83,6 +87,8 @@ All notable changes to this project are documented here. Format based on
 - Aim cursor-seeking locomotion at the body position that brings the beak to the pointer, avoiding a stationary-pointer chase that could never reach the grab distance.
 
 ### Development
+- Qualify non-Unicode configuration filenames on Linux and Windows, where the files are valid; retain macOS APFS's native EILSEQ rejection instead of treating an uncreatable filename as a service failure.
+- Verify null Windows standard handles and valid inheritance in an isolated native test; the pinned API binding already skips null handles. Refresh the task dashboard while preserving its settings and stopped state.
 - Require strict all-target workspace Clippy on both native Linux CI architectures. Limit the installer autostart glob import to its Windows and test callers; the explicit public re-exports remain unchanged.
 - Wait for the GUI's new check response before retrying an update in the native Debian fixture; queued accessibility actions must not reuse the previous enabled state. Require a new retained helper before awaiting transaction success.
 - Exercise captured Windows CLI/app starts through real process EOF and runtime readiness on x64/ARM64. Give the disposable Linux TUI update fixture its own controlling PTY and preserve failed terminal output for diagnosis.

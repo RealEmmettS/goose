@@ -165,7 +165,7 @@ impl RuntimeCore {
         command: ControlCommand,
         path: &std::path::Path,
     ) -> Result<Config, ConfigError> {
-        let snapshot = ConfigSnapshot::load(path)?;
+        let snapshot = ConfigSnapshot::load_existing(path)?;
         if let ControlCommand::ReloadIf(expected) = command {
             if snapshot.revision.reload_token(path)? != expected {
                 return Err(ConfigError::Conflict);
@@ -208,6 +208,19 @@ mod tests {
             Err(ConfigError::Conflict)
         ));
         assert!(RuntimeCore::load_reload_config(ControlCommand::Reload, &path).is_ok());
+    }
+
+    #[test]
+    fn ordinary_reload_rejects_a_removed_config_instead_of_applying_defaults() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        let mut config = Config::default();
+        config.audio.enabled = false;
+        config.save_atomic(&path).unwrap();
+        let reloaded = RuntimeCore::load_reload_config(ControlCommand::Reload, &path).unwrap();
+        assert!(!reloaded.audio.enabled);
+        std::fs::remove_file(&path).unwrap();
+        assert!(RuntimeCore::load_reload_config(ControlCommand::Reload, &path).is_err());
     }
 
     #[test]

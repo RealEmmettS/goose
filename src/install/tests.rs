@@ -600,6 +600,26 @@ fn owned_text_integrations_never_replace_or_remove_foreign_files() {
 }
 
 #[test]
+fn autostart_preparation_rejects_a_stale_config_without_overwriting_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("config.toml");
+    let mut old = honk_config::Config::default();
+    old.save_atomic(&path).unwrap();
+    let mut current = old.clone();
+    current.audio.enabled = false;
+    current.save_atomic(&path).unwrap();
+    let bytes = fs::read(&path).unwrap();
+    let result = prepare_config_autostart(&path, &mut old);
+    assert!(matches!(
+        result
+            .unwrap_err()
+            .downcast_ref::<honk_config::ConfigError>(),
+        Some(honk_config::ConfigError::Conflict)
+    ));
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+}
+
+#[test]
 fn managed_path_blocks_are_removed_without_touching_profile_content() {
     let profile = "export EDITOR=vim\n\n# >>> honk300 managed PATH >>>\nexport PATH=\"$HOME/.local/bin:$PATH\"\n# <<< honk300 managed PATH <<<\nalias ll='ls -l'\n";
     let (updated, changed) = strip_managed_path_blocks(profile);

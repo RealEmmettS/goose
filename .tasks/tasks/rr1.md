@@ -25,9 +25,16 @@ The requested behavior runs through its production path and the supporting evide
 - [ ] Integration and required package/release checks pass before publication.
 
 ## Status
-Active: v1.4.0 candidate selected and stamped across Rust/settings metadata; no tag or release created. CLI, real TUI and native GUI update discovery passed against public v1.3.7, correctly identifying the development copy as unmanaged. Exact native settings and full CI are running; final candidate/main/package/public-byte gates remain open in docs/readiness/v1.4.0-readiness.md.
+PR #7 merged by fast-forward at qualified source 972e6b4 after complete CI, all eight
+settings lanes and candidate 34184304491 passed. Final review identified four confirmed
+edge cases in settings intent/status/path handling and missing-file reload; corrected
+source is on codex/refinement-review-fixes and must repeat all release gates. The alleged
+null-handle launcher defect was refuted against the pinned binding and an actual isolated
+Windows process test. No v1.4.0 tag/public bytes exist; user installation is unchanged.
 
 ## Activity
+- 2026-09-07: Native Mac tests rejected the raw-byte fixture filename with APFS EILSEQ before any service call. Limit that filesystem-specific regression to Linux/Windows, where actual valid non-Unicode files reproduce the original panic. Production fixes are unchanged; repeat final-source qualification.
+- 2026-09-07: Reproduced and corrected missing-file reload and native non-Unicode path failures; added installer-intent snapshot ordering, degraded-status and concurrent-autostart regressions plus a real Debian GUI read/save intent probe. Full local Rust/GUI/Python checks pass. Preserve the merged candidate as evidence and qualify the new source before tagging.
 - 2026-09-07: Complete candidate 34181368273 passed at e51b76f, and 6ed7666 passed the corrected genuine GUI retry plus CLI/TUI transactions. The separate Linux work exposed a harmless but strict-Clippy-failing import from the installer extraction; correct its cfg and add native Linux strict checks before merging. All public/install state remains unchanged.
 - 2026-09-07: All eight Native settings lanes passed again at e51b76f. The genuine CLI/TUI updates passed; GUI offline failure preserved state, but its retry test queued Update before Check had changed the previous enabled button. Await the actual new Ready response and a fresh retained helper before the unchanged transaction assertions.
 - 2026-09-07: Source 35c4f48 passes the real Debian CLI/TUI/GUI update, GUI offline failure/retry, receipt, relaunch and no-op gate; all GNU/musl accessibility lanes pass. The prior complete candidate reached final ARM64 Debian qualification but its capture repeatedly froze a partial edge pose after Wander replaced entry. Moved command exercises after startup capture while preserving every pixel oracle; a fresh final-source repeat is required.
