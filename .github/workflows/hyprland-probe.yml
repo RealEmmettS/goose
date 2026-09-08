@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [codex/goose-hyprland-integration]
-    paths: ['script/smoke_hyprland*', 'script/select_vkms_device.py', '.github/workflows/hyprland-probe.yml', 'crates/**']
+    paths: ['script/smoke_hyprland*', 'script/select_vkms_device.py', '.github/workflows/hyprland-probe.yml', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
 
 permissions:
   contents: read
@@ -25,11 +25,24 @@ jobs:
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
           toolchain: '1.95'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          architecture: ${{ matrix.runner == 'ubuntu-24.04-arm' && 'arm64' || 'x64' }}
       - name: Build and test the actual observation transport
         run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libasound2-dev
+          cargo test --locked --bin honk300 integrations
           cargo test --locked -p honk-platform-linux --lib
-          cargo clippy --locked -p honk-platform-linux --all-targets -- -D warnings
+          cargo clippy --locked --workspace --all-targets -- -D warnings
           cargo build --locked --release -p honk-platform-linux --example hyprland_bridge_probe
+          cargo build --locked --release --bin honk300
+      - name: Build the production Native SDK settings companion
+        run: |
+          sudo apt-get install --no-install-recommends -y libgtk-4-dev pkg-config
+          target="$(uname -m)-unknown-linux-gnu"
+          python3 script/build_settings.py --target "$target" --output target/release --test
       - name: Prepare a disposable virtual graphics device
         id: graphics
         run: |
@@ -66,7 +79,8 @@ jobs:
             apt-get update
             DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
               dbus-x11 python3 python3-gi gir1.2-gtk-4.0 libgtk-4-1 \
-              libgl1-mesa-dri libegl-mesa0 mesa-utils util-linux passwd seatd
+              libgl1-mesa-dri libegl-mesa0 mesa-utils util-linux passwd seatd libasound2t64 \
+              at-spi2-core gir1.2-atspi-2.0
             if test "$generation" = lua; then
               DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y -t trixie-backports hyprland
             else
@@ -86,7 +100,8 @@ jobs:
             test -S /run/seatd.sock
             runuser -u honkprobe -- env GITHUB_ACTIONS=true dbus-run-session -- \
               python3 script/smoke_hyprland_adapter.py --evidence target/hyprland-evidence \
-                --generation "$generation" --bridge target/release/examples/hyprland_bridge_probe
+                --generation "$generation" --bridge target/release/examples/hyprland_bridge_probe \
+                --goose target/release/honk300 --settings target/release/honk300-settings
           '
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}

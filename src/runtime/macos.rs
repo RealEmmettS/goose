@@ -262,6 +262,9 @@ pub fn run(
                 | ControlCommand::SwayStatus
                 | ControlCommand::SwayEnable
                 | ControlCommand::SwayDisable
+                | ControlCommand::HyprlandStatus
+                | ControlCommand::HyprlandEnable
+                | ControlCommand::HyprlandDisable
                 | ControlCommand::PointerRequest
                 | ControlCommand::PointerCancel => {
                     request.respond(ControlResponse::Err("UNSUPPORTED".into()))

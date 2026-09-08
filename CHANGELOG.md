@@ -26,6 +26,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- Connect explicit Hyprland setup/removal across Rust CLI, versioned IPC, the native Wayland runtime and Native SDK consent dialogs. Keep independent private consent, immediate revocation, unsaved drafts, unsupported action boundaries and engine fullscreen manners; qualify the actual binaries in both native compositor generations.
+
 ### Improved
 - Recover late read-only Hyprland snapshots through one retained authenticated worker while immediately withdrawing expired data; keep identity changes, permission loss and disconnects terminal. Share bounded worker ownership with Sway without changing Sway's error policy.
 - Read the Hyprland monitor/client inventory in one fixed read-only native batch, retaining exact peer identity, a single 250 ms deadline, bounded complete replies and matching monitor observations.

@@ -51,6 +51,11 @@ pub fn run(
     } else {
         crate::integrations::SwayRuntime::default()
     };
+    let mut hyprland = if overlay_mode == OverlayMode::Wayland {
+        crate::integrations::HyprlandRuntime::start()
+    } else {
+        crate::integrations::HyprlandRuntime::default()
+    };
     let mut kwin = if overlay_mode == OverlayMode::Wayland {
         crate::integrations::KwinRuntime::start()
     } else {
@@ -231,6 +236,31 @@ pub fn run(
                     sway.disable();
                     request.respond(ControlResponse::Ok);
                 }
+                ControlCommand::HyprlandStatus => {
+                    request.respond(ControlResponse::Wayland(hyprland.status()));
+                }
+                ControlCommand::HyprlandEnable => {
+                    let response = if overlay_mode != OverlayMode::Wayland
+                        || world.graceful_exit_requested()
+                    {
+                        ControlResponse::Err("UNSUPPORTED".into())
+                    } else {
+                        match hyprland.enable() {
+                            Ok(()) => ControlResponse::Ok,
+                            Err(error) => {
+                                eprintln!(
+                                    "honk300: Hyprland observation activation failed ({error})"
+                                );
+                                ControlResponse::Err("ADAPTER_FAILED".into())
+                            }
+                        }
+                    };
+                    request.respond(response);
+                }
+                ControlCommand::HyprlandDisable => {
+                    hyprland.disable();
+                    request.respond(ControlResponse::Ok);
+                }
                 ControlCommand::WaylandStatus => {
                     let mut status = kwin.status();
                     if collect_window == BackendCapability::Supported {
@@ -404,6 +434,7 @@ pub fn run(
         world.set_local_time(local_time());
         let kwin_frame = kwin.poll();
         let sway_frame = sway.poll();
+        let hyprland_frame = hyprland.poll();
         if world.graceful_exit_requested() {
             kwin.cancel_pointer();
         }
@@ -434,22 +465,21 @@ pub fn run(
             window_capability(overlay_mode, display_server)
         };
         world.set_foreign_window_watch_supported(window_watch.active());
-        world.set_presence(match kwin_frame.as_ref() {
-            Some(frame) if frame.fullscreen() => PresenceSnapshot::fullscreen(),
-            Some(_) => PresenceSnapshot::available(),
-            None => match sway_frame.as_ref() {
-                Some(frame) if frame.fullscreen() => PresenceSnapshot::fullscreen(),
-                Some(_) => PresenceSnapshot::available(),
-                None => PresenceSnapshot::unsupported(),
-            },
+        let observed = kwin_frame.is_some() || sway_frame.is_some() || hyprland_frame.is_some();
+        let fullscreen = kwin_frame.as_ref().is_some_and(|frame| frame.fullscreen())
+            || sway_frame.as_ref().is_some_and(|frame| frame.fullscreen())
+            || hyprland_frame
+                .as_ref()
+                .is_some_and(|frame| frame.fullscreen());
+        world.set_presence(if !observed {
+            PresenceSnapshot::unsupported()
+        } else if fullscreen {
+            PresenceSnapshot::fullscreen()
+        } else {
+            PresenceSnapshot::available()
         });
         if trace_presence && presence_trace_count < 64 {
-            let state = (
-                kwin_frame.is_some() || sway_frame.is_some(),
-                kwin_frame.as_ref().is_some_and(|frame| frame.fullscreen())
-                    || sway_frame.as_ref().is_some_and(|frame| frame.fullscreen()),
-                world.manners_active(),
-            );
+            let state = (observed, fullscreen, world.manners_active());
             if last_presence_trace != Some(state) {
                 last_presence_trace = Some(state);
                 presence_trace_count += 1;

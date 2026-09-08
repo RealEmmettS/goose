@@ -19,6 +19,8 @@ def main():
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--generation', choices=('legacy', 'lua'), required=True)
     parser.add_argument('--bridge', type=Path)
+    parser.add_argument('--goose', type=Path)
+    parser.add_argument('--settings', type=Path)
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -285,6 +287,15 @@ def main():
             if watcher:
                 wait(lambda: (state if (state := watch_current()) and state['observed']
                     and not state['fullscreen'] else None), 'fresh fullscreen removal')
+            if watcher is not None:
+                watcher.terminate()
+                watcher.wait(timeout=3)
+                watcher = None
+            if args.goose is not None:
+                assert args.settings is not None, 'Native settings are required with the real goose'
+                from smoke_hyprland_runtime import qualify
+                qualify(args.goose.resolve(), args.settings.resolve(), evidence, wait,
+                        windows[0], find, ipc_path, GLib)
             windows[0].destroy()
             wait(lambda: find(ordinary['title']) is None, 'vanished target')
             assert find(protected['title'])['at'] == protected['at'], 'Protected fixture changed'
@@ -293,7 +304,8 @@ def main():
                 initial=ordinary, moved=moved, protected=protected, fullscreen=fullscreen,
                 vanished=True, pointer_control_qualified=False, user_drag_observation_qualified=False,
                 production_rust_observation=args.bridge is not None, untrusted_peer_refused=args.bridge is not None,
-                retained_worker_fullscreen_recovery=watcher is not None,
+                retained_worker_fullscreen_recovery=args.bridge is not None,
+                production_runtime=args.goose is not None,
                 expired_observation_samples=sum(not state['observed'] for state in watch_events))
             (evidence / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result))

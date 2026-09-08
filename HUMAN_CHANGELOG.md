@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Added
+- Add an optional Hyprland setup in graphical settings and the command line so the goose can notice fullscreen windows. Turning it off removes its access immediately and keeps your unsaved settings and other desktop integrations intact.
+
 ### Improved
 - Let a busy Hyprland desktop resume fresh window observations after a slow transition, without using old information or connecting to a replacement desktop behind your back.
 - Keep Hyprland window observations together so a busy desktop has fewer separate requests to answer, while still discarding late or incomplete information.

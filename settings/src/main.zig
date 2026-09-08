@@ -45,7 +45,7 @@ const fonts = [_]SettingsApp.FontRegistration{
 };
 const Buffer = canvas.TextBuffer;
 const Page = enum { general, appearance, behavior, sound, platform };
-const Action = enum { read, save, validate, status, start, stop, check_updates, update, kde_setup, kde_remove, sway_setup, sway_remove, pointer_request, pointer_cancel };
+const Action = enum { read, save, validate, status, start, stop, check_updates, update, kde_setup, kde_remove, sway_setup, sway_remove, hyprland_setup, hyprland_remove, pointer_request, pointer_cancel };
 
 pub const Field = struct {
     index: usize = 0,
@@ -111,6 +111,10 @@ pub const Msg = union(enum) {
     sway_confirm,
     sway_cancel,
     sway_remove,
+    hyprland_setup,
+    hyprland_confirm,
+    hyprland_cancel,
+    hyprland_remove,
     pointer_request,
     pointer_cancel,
     completed: native_sdk.EffectExit,
@@ -120,7 +124,7 @@ pub const Msg = union(enum) {
 
 pub const Model = struct {
     // Used by derived view methods or the stdio lifecycle, never bound directly.
-    pub const view_unbound = .{ "fields", "field_count", "page", "service", "config_path", "revision", "version", "status_buffer", "runtime_buffer", "update_buffer", "integration_buffer", "sway_buffer", "pointer_buffer", "pointer_request_available", "pointer_cancel_available", "loaded", "request_id", "editing", "edit_buffer", "update_available", "update_managed", "system_appearance" };
+    pub const view_unbound = .{ "fields", "field_count", "page", "service", "config_path", "revision", "version", "status_buffer", "runtime_buffer", "update_buffer", "integration_buffer", "sway_buffer", "hyprland_buffer", "pointer_buffer", "pointer_request_available", "pointer_cancel_available", "loaded", "request_id", "editing", "edit_buffer", "update_available", "update_managed", "system_appearance" };
     system_appearance: native_sdk.Appearance = .{},
     fields: [64]Field = @splat(.{}),
     field_count: usize = 0,
@@ -148,6 +152,10 @@ pub const Model = struct {
     sway_supported: bool = false,
     sway_installed: bool = false,
     sway_prompt: bool = false,
+    hyprland_buffer: Buffer(2048) = .{},
+    hyprland_supported: bool = false,
+    hyprland_installed: bool = false,
+    hyprland_prompt: bool = false,
     pointer_buffer: Buffer(1024) = .{},
     pointer_request_available: bool = false,
     pointer_cancel_available: bool = false,
@@ -170,6 +178,12 @@ pub const Model = struct {
     }
     pub fn canSetupSway(m: *const Model) bool {
         return m.sway_supported and !m.busy;
+    }
+    pub fn hyprlandStatus(m: *const Model) []const u8 {
+        return m.hyprland_buffer.text();
+    }
+    pub fn canSetupHyprland(m: *const Model) bool {
+        return m.hyprland_supported and !m.busy;
     }
     pub fn canSetupKde(m: *const Model) bool {
         return m.integration_supported and !m.busy;
@@ -304,6 +318,17 @@ pub fn update(model: *Model, msg: Msg, fx: *Effects) void {
         },
         .sway_remove => if (model.canSetupSway()) {
             submit(model, .sway_remove, fx);
+        },
+        .hyprland_setup => if (model.canSetupHyprland()) {
+            model.hyprland_prompt = true;
+        },
+        .hyprland_cancel => model.hyprland_prompt = false,
+        .hyprland_confirm => if (model.canSetupHyprland()) {
+            model.hyprland_prompt = false;
+            submit(model, .hyprland_setup, fx);
+        },
+        .hyprland_remove => if (model.canSetupHyprland()) {
+            submit(model, .hyprland_remove, fx);
         },
         .pointer_request => if (model.canRequestPointer()) {
             submit(model, .pointer_request, fx);
@@ -491,6 +516,21 @@ pub fn acceptResponse(model: *Model, bytes: []const u8) !void {
             if (sway.object.get("capabilities")) |caps| {
                 if (caps == .object) {
                     model.sway_buffer.set(try std.fmt.allocPrint(allocator, "{s}\nWindow observation: {s} | Fullscreen: {s}\nMovement: {s} | Pointer control: {s}\nOwned notes use normal desktop placement.", .{
+                        detail, string(caps, "windows"), string(caps, "fullscreen"), string(caps, "movement"), string(caps, "pointer_control"),
+                    }));
+                }
+            }
+        }
+    }
+    if (data.object.get("hyprland")) |hyprland| {
+        model.hyprland_supported = flag(hyprland, "supported");
+        model.hyprland_installed = flag(hyprland, "installed");
+        const detail = string(hyprland, "description");
+        model.hyprland_buffer.set(detail);
+        if (hyprland == .object) {
+            if (hyprland.object.get("capabilities")) |caps| {
+                if (caps == .object) {
+                    model.hyprland_buffer.set(try std.fmt.allocPrint(allocator, "{s}\nWindow observation: {s} | Fullscreen: {s}\nMovement: {s} | Pointer control: {s}\nOwned notes use normal desktop placement.", .{
                         detail, string(caps, "windows"), string(caps, "fullscreen"), string(caps, "movement"), string(caps, "pointer_control"),
                     }));
                 }

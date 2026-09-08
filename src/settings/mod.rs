@@ -47,6 +47,8 @@ enum Operation {
     KdeRemove {},
     SwaySetup {},
     SwayRemove {},
+    HyprlandSetup {},
+    HyprlandRemove {},
     PointerRequest {},
     PointerCancel {},
 }
@@ -125,12 +127,14 @@ fn execute(operation: Operation, path: &Path) -> Result<Value, Error> {
                 .map_err(|error| error.to_string())
         }),
         Operation::Status {} => Ok(
-            json!({"runtime": runtime_json(), "integrations": crate::integrations::status(), "sway": crate::integrations::sway_status()}),
+            json!({"runtime": runtime_json(), "integrations": crate::integrations::status(), "sway": crate::integrations::sway_status(), "hyprland": crate::integrations::hyprland_status()}),
         ),
         Operation::KdeSetup {} => crate::integrations::setup(),
         Operation::KdeRemove {} => crate::integrations::remove(),
         Operation::SwaySetup {} => crate::integrations::sway_setup(),
         Operation::SwayRemove {} => crate::integrations::sway_remove(),
+        Operation::HyprlandSetup {} => crate::integrations::hyprland_setup(),
+        Operation::HyprlandRemove {} => crate::integrations::hyprland_remove(),
         Operation::PointerRequest {} => crate::integrations::pointer(true),
         Operation::PointerCancel {} => crate::integrations::pointer(false),
         Operation::Start {} => {
@@ -168,6 +172,7 @@ fn read_settings(
     value["runtime"] = runtime();
     value["integrations"] = crate::integrations::status();
     value["sway"] = crate::integrations::sway_status();
+    value["hyprland"] = crate::integrations::hyprland_status();
     Ok(value)
 }
 

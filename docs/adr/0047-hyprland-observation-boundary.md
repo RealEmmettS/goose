@@ -37,6 +37,9 @@ malformed data ends the worker. The presentation loop does not wait for recovery
 and no stale frame or pending action is retained. Shared worker ownership preserves
 Sway's existing terminal-error policy; Hyprland's timeout recovery has separate native evidence.
 
+The retained production worker passes all four native lanes in run 34227542105;
+Sway separately passes all four shared-worker regression lanes in run 34227540869.
+
 Production setup/removal, retained worker ownership, configuration and GUI drafts,
 lost authority, lifecycle recovery and every architecture/package gate still need
 actual native qualification before a new immutable public release can claim support.

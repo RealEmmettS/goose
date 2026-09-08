@@ -31,11 +31,16 @@ Exact desktop versions, request semantics and native behavior require direct qua
 - [ ] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Active. All four native premise lanes pass at source 38d1f23 in run 34222607423.
-Qualify the actual bounded Rust observation transport next. Runtime/settings and
-public support remain pending; native movement does not prove active-drag safety.
+Active. All four production observation lanes pass at source 617e644 in run 34227542105
+on Hyprland 0.53.3 and 0.55.2, including retained-worker fullscreen recovery and
+untrusted-peer refusal. The shared worker also passes Sway's four independent lanes
+in run 34227540869. Rust CLI/runtime and Native SDK consent, revocation and draft
+handling pass local workspace tests, strict lint, release build and real SDK build.
+Qualify that complete runtime/settings lifecycle on both native architectures next;
+public qualification and website claims remain open.
 
 ## Activity
+- 2026-09-08 — Connect explicit Hyprland setup/removal to its own private consent record, versioned control protocol, native Wayland runtime and real Native SDK dialogs. Preserve drafts, unknown configuration and unrelated compositor consent. Add native lifecycle qualification for the actual runtime and GUI: default-off behavior, fullscreen/config manners, identical worker ownership after repeated setup, external removal, replaced socket refusal, explicit reconnection and graceful/crash recovery.
 - 2026-09-08 — Native diagnostics show all older-compositor queries stall during fullscreen configure while GTK still has its old allocation. Add a retained observation worker that withdraws expired data and retries only timeouts against the same pinned owner; every identity, permission, disconnect or decoding failure stays terminal. Exercise the actual worker across native fullscreen entry/exit and test that expired frames clear, recovery uses one source and permission loss ends it.
 - 2026-09-08 — Fixed-batch run 34225958368 passes both newer desktops and still fails the older pair specifically in the fullscreen snapshot. Keep the failed gate and collect individual native client/monitor/version/batch timings plus actual configured GTK geometry before deciding the compatibility boundary.
 - 2026-09-08 — Pumping GTK did not resolve the older compositor's fullscreen timeout; the earlier cause attribution was unproven. Replace three socket round trips with the fixed read-only batch supported by both actual upstream versions, retain the 250 ms total bound and exact identity checks, and distinguish version versus snapshot failures. Add incomplete, changed-inventory and trailing-data regressions before repeating native qualification.

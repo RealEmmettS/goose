@@ -22,6 +22,9 @@ pub enum ControlCommand {
     SwayStatus,
     SwayEnable,
     SwayDisable,
+    HyprlandStatus,
+    HyprlandEnable,
+    HyprlandDisable,
     PointerRequest,
     PointerCancel,
     Do(PokeAction),
@@ -127,6 +130,9 @@ impl ControlCommand {
             Self::SwayStatus => format!("{VERSION} SWAY\n"),
             Self::SwayEnable => format!("{VERSION} SWAY_ENABLE\n"),
             Self::SwayDisable => format!("{VERSION} SWAY_DISABLE\n"),
+            Self::HyprlandStatus => format!("{VERSION} HYPRLAND\n"),
+            Self::HyprlandEnable => format!("{VERSION} HYPRLAND_ENABLE\n"),
+            Self::HyprlandDisable => format!("{VERSION} HYPRLAND_DISABLE\n"),
             Self::PointerRequest => format!("{VERSION} POINTER_REQUEST\n"),
             Self::PointerCancel => format!("{VERSION} POINTER_CANCEL\n"),
             Self::Do(action) => format!("{VERSION} DO {}\n", encode_action(action)),
@@ -150,7 +156,8 @@ impl ControlCommand {
         };
         match command {
             "WAYLAND" | "KWIN_ENABLE" | "KWIN_DISABLE" | "SWAY" | "SWAY_ENABLE"
-            | "SWAY_DISABLE" | "POINTER_REQUEST" | "POINTER_CANCEL" => {
+            | "SWAY_DISABLE" | "HYPRLAND" | "HYPRLAND_ENABLE" | "HYPRLAND_DISABLE"
+            | "POINTER_REQUEST" | "POINTER_CANCEL" => {
                 ensure_end(parts)?;
                 Ok(match command {
                     "WAYLAND" => Self::WaylandStatus,
@@ -159,6 +166,9 @@ impl ControlCommand {
                     "SWAY" => Self::SwayStatus,
                     "SWAY_ENABLE" => Self::SwayEnable,
                     "SWAY_DISABLE" => Self::SwayDisable,
+                    "HYPRLAND" => Self::HyprlandStatus,
+                    "HYPRLAND_ENABLE" => Self::HyprlandEnable,
+                    "HYPRLAND_DISABLE" => Self::HyprlandDisable,
                     "POINTER_REQUEST" => Self::PointerRequest,
                     _ => Self::PointerCancel,
                 })
