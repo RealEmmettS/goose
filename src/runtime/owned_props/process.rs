@@ -87,6 +87,7 @@ impl Controller {
                 [snapshot.rect.width() as f64, snapshot.rect.height() as f64],
             ) else {
                 if let Some(id) = self.positioned_id.take() {
+                    eprintln!("honk300: KDE owned prop no longer matches its live window identity and geometry; ending animated placement");
                     if let Err(error) = self.outbox.enqueue(Command::Passthrough {
                         id: id.0,
                         passthrough: false,
@@ -112,7 +113,7 @@ impl Controller {
         &self,
         id: CollectWindowId,
         target: Vec2,
-        kwin: &crate::integrations::KwinRuntime,
+        kwin: &mut crate::integrations::KwinRuntime,
     ) {
         if self.registry.expected_positioning {
             return;

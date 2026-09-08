@@ -23,20 +23,21 @@ reaches the private compositor and stops after cancellation. The production Rust
 uses this exact path, and settings clearly distinguish grant, readiness and unsupported states.
 
 ## Verification
-- [ ] Actual portal consent, granted libei devices, motion and cancellation are observed.
+- [x] Actual portal consent, granted libei devices, motion and cancellation are observed.
 - [ ] Runtime and native settings use the qualified path without changing saved drafts.
 - [ ] Fresh target/terminal checks, device pause/removal and disconnects fail closed.
 
 ## Status
-Run 34201107432 now loads the real screencast/EIS plugins, but KService still denies
-the installed backend's declared interface because the private container lacks Plasma's
-application menu. Install the real plasma-workspace package, set its normal menu prefix,
-retain the backend desktop-file evidence, and start PipeWire before the compositor.
-The next native run must reach genuine consent with the normal permission checks intact.
+Run 34202408579 passes the real KDE 6 portal on both x64 and ARM64: native consent
+was explicitly accepted, the granted libei device moved the pointer, protected/excessive
+motion was refused and cancellation ended permission. Runtime and native settings wiring
+can now use that qualified path. The complete KDE release remains blocked by the separate
+ARM owned-note movement check and subsequent production/package qualification.
 Active: checking the real library and KDE 6 grant before enabling a runtime capability.
 KDE 5 has separate window evidence; no EIS or portal control is claimed for it.
 
 ## Activity
+- 2026-09-08: Both KDE 6 architectures pass portal/result.json with real native consent, libei readiness, compositor pointer readback, terminal/excessive refusal and explicit cancellation. Preserve the accepted dialog tree instead of overwriting it after dismissal; proceed to runtime and native controls.
 - 2026-09-08: Native evidence now separates loaded plugins from failed service authorization. Debian's plasma-workspace file list identifies the missing menu; restore normal service discovery and PipeWire startup order in the private fixture before repeating the actual grant and motion oracle.
 - 2026-09-08: Run 34199983732 records empty AvailablePlugins and LoadedPlugins on both KDE 6 desktops. Debian puts screencast/EIS plugins in the separately recommended kwin-common package; include that actual desktop package in the isolated fixture while retaining normal consent and protocol permissions.
 - 2026-09-08: The corrected frontend ownership reaches CreateSession. Native KDE reports zkde_screencast_unstable_v1 unavailable. Add the normal isolated KService cache refresh, backend package inventory and compositor plugin/permission diagnostics before repeating the real grant premise; do not disable compositor permission checks.

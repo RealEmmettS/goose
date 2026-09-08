@@ -27,6 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Preserve bounded first-loss diagnostics for KDE frame expiry and refused owned-window binding/movement; retain native observer timing and the accepted portal dialog tree during qualification.
 - Qualify the actual optimized runtime in private KDE desktops with the distribution's Plasma service menu, normal KService registration, and PipeWire ready before compositor startup.
 - Wait for the completed native UI save response before opening the Windows fixture's config file for readback; this prevents the test reader from denying atomic replacement.
 - Include KDE's packaged compositor plugins in the private portal fixture, and establish a nonzero owned-note delivery distance before measuring engine-driven motion.

@@ -114,8 +114,8 @@ def qualify(binary, evidence, wait, call, GLib, Gtk, RustBridge):
                 return True
             current = nodes(backend_pid)
             last_tree = [dict(name=node.get_name(), role=node.get_role_name()) for node in current]
-            (directory / 'native-consent-tree.json').write_text(json.dumps(last_tree, indent=2) + '\n')
             if not approved:
+                (directory / 'native-consent-tree.json').write_text(json.dumps(last_tree, indent=2) + '\n')
                 candidates = [node for node in current if node.get_role() == Atspi.Role.PUSH_BUTTON
                               and node.get_name() in ('Share', 'Allow')]
                 if len(candidates) == 1:

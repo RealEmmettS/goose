@@ -16,10 +16,12 @@ pub(crate) struct KwinRuntime {
     last_consent_check: Option<Instant>,
     failed: bool,
     observed: bool,
+    warned_frame_loss: bool,
+    warned_move_rejection: bool,
 }
 
 impl KwinRuntime {
-    pub(crate) fn move_owned_prop(&self, pid: u32, id: u64, size: [f64; 2], target: Vec2) {
+    pub(crate) fn move_owned_prop(&mut self, pid: u32, id: u64, size: [f64; 2], target: Vec2) {
         let Some(bridge) = self.bridge.as_ref() else {
             return;
         };
@@ -48,7 +50,12 @@ impl KwinRuntime {
         };
         // The same live identity/geometry and script-side bounds checks apply.
         // A rejected or superseded move is never retried with stale authority.
-        let _ = bridge.queue_move(window, [x + dx * scale, y + dy * scale]);
+        if let Err(error) = bridge.queue_move(window, [x + dx * scale, y + dy * scale]) {
+            if !self.warned_move_rejection {
+                self.warned_move_rejection = true;
+                eprintln!("honk300: KDE owned-window movement was refused ({error})");
+            }
+        }
     }
 
     pub(crate) fn start() -> Self {
@@ -95,6 +102,8 @@ impl KwinRuntime {
         self.failed = false;
         self.observed = false;
         self.last_consent_check = None;
+        self.warned_frame_loss = false;
+        self.warned_move_rejection = false;
     }
 
     pub(crate) fn poll(&mut self) -> Option<Frame> {
@@ -117,6 +126,10 @@ impl KwinRuntime {
         self.observed |= frame.is_some();
         if frame.is_none() {
             self.identities.clear();
+            if self.observed && !self.warned_frame_loss {
+                self.warned_frame_loss = true;
+                eprintln!("honk300: KDE observations expired; optional actions are cancelled until fresh observations return");
+            }
         }
         frame
     }

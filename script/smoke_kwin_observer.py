@@ -2,6 +2,7 @@
 import json
 import os
 import threading
+import time
 
 
 class NativeObserver:
@@ -16,6 +17,7 @@ class NativeObserver:
         self.frames = []
         self.count = 0
         self.latest = []
+        self.times = []
         self.owner = call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
             'GetNameOwner', GLib.Variant('(s)', ('org.kde.KWin',))).unpack()[0]
         self.context = GLib.MainContext.new()
@@ -39,7 +41,9 @@ class NativeObserver:
                 for (var i = 0; i < windows.length; i++) {
                     var window = windows[i], rect = window.frameGeometry;
                     result.push({id:String(window.internalId),pid:Number(window.pid),app:String(window.resourceClass),
-                        title:String(window.caption),geometry:[rect.x,rect.y,rect.width,rect.height]});
+                        title:String(window.caption),geometry:[rect.x,rect.y,rect.width,rect.height],
+                        normal:window.normalWindow,dragging:window.move,deleted:window.deleted,
+                        minimized:window.minimized,fullscreen:window.fullScreen,moveable:window.moveable});
                 }
                 pending = true;
                 callDBus(''' + json.dumps(self.bus.get_unique_name()) + ''', '/org/emmetts/Honk300/NativeObserver',
@@ -75,13 +79,15 @@ class NativeObserver:
             self.count += 1
             self.frames.append(frame)
             self.frames = self.frames[-256:]
+            self.times.append(time.monotonic())
+            self.times = self.times[-256:]
             invocation.return_value(None)
         except Exception as error:
             invocation.return_dbus_error('org.emmetts.Honk300.Invalid', str(error))
 
     def close(self):
         (self.evidence / 'native-observer-frames.json').write_text(json.dumps(
-            dict(count=self.count, frames=self.frames), indent=2) + '\n')
+            dict(count=self.count, frames=self.frames, times=self.times), indent=2) + '\n')
         self.call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'unloadScript',
             self.GLib.Variant('(s)', ('honk300-fixture-observer',)))
         self.loop.quit()

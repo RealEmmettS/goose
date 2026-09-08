@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Explain when optional KDE observations become unavailable or a delivered window no longer matches, while keeping repeated diagnostic messages limited.
 - Check optional KDE support with the same optimized app people install and the desktop services it expects, so incomplete test desktops do not obscure real failures.
 
 ### Fixed

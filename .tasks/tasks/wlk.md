@@ -35,11 +35,11 @@ this task owns the native implementation evidence and #rkde owns publication.
 - [ ] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
-Run 34201107432 proves actual owned-note movement on both x64 KDE generations, but
-both ARM lanes stop after less than the required four pixels despite correct identity.
-The observer also reports sparse frames under the unoptimized runtime. Qualify the real
-release build next to distinguish debug rendering load from a production cancellation
-defect; preserve the 250 ms expiry and actual movement/revocation requirements.
+Run 34202408579 passes the actual optimized runtime on both KDE 5 architectures and
+KDE 6 x64. KDE 6 ARM still stops after less than four pixels; its correct identity and
+dimensions are observed. Add bounded first-loss/refusal diagnostics and native frame
+timing to distinguish expiry, binding failure and completed delivery before another fix.
+The 250 ms expiry and actual movement/revocation requirements remain unchanged.
 The full production runtime and setup path passed all four KWin 5/6 x64/ARM64 lanes
 in 34195263902. Evidence includes default-off state, separate capabilities, native Rust
 settings-service status, live and external removal, crash recovery, graceful cleanup,
@@ -59,6 +59,7 @@ expanded native x64/ARM64 probes are next. Runtime and explicit setup remain ope
 No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: The optimized native gate passes three full runtime lanes. Both KDE 6 portal grant/movement/cancel checks now pass independently; the remaining ARM note-motion failure gets first-loss/refusal diagnostics and timestamped compositor observations before the next correction.
 - 2026-09-08: Correct note identity and off-center placement are now observed in all lanes. Both x64 movement checks pass; both ARM checks remain failures. Switch the native runtime and bridge to release builds before repeating, without increasing any freshness deadline or lowering the movement threshold.
 - 2026-09-08: Run 34199983732 proves the application-id correction and actual owned movement/revocation on KDE 5 x64. Other approaches can pick up the compositor-centered note already at the engine's center release point, giving no required drag distance. Establish and observe an off-center initial fixture placement before measuring only subsequent engine-driven movement; keep all ownership and revocation assertions.
 - 2026-09-08: Native observer evidence identifies the actual child-owned note but its app id remains GTK Application. Upstream GDK confirms the setter ignores pre-map calls. Move the exact per-prop identity assignment after GTK mapping and repeat the actual movement/revocation check.

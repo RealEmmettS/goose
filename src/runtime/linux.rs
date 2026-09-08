@@ -384,7 +384,7 @@ pub fn run(
             if let Some(controller) = props.as_mut() {
                 if overlay_mode == OverlayMode::Wayland {
                     if let CollectWindowCommand::Move { id, top_left } = command {
-                        controller.move_with_kwin(id, top_left, &kwin);
+                        controller.move_with_kwin(id, top_left, &mut kwin);
                         continue;
                     }
                 }
