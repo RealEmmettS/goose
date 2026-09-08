@@ -49,6 +49,9 @@ All notable changes to this project are documented here. Format based on
 
 ### Behind the scenes
 - Begin separate Hyprland native interface qualification across x64/ARM64 and legacy/Lua generations, checking private socket peers, actual window identity, bounded owned-fixture movement and fullscreen before runtime integration.
+- Complete the KDE website handoff with deployed setup/capability readback, all 22 verified downloads and matching public manifest hashes, closing the third staged publication record.
+
+### Behind the scenes
 - Record the immutable KDE publication, unchanged-source candidate/main qualification, all eight fresh-public installation lanes and the independent audit of every public artifact.
 
 ### Behind the scenes

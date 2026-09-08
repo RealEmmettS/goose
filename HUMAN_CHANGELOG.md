@@ -65,6 +65,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ### Behind the scenes
 - Test optional Hyprland support in isolated desktops before offering it, checking that desktop observations are trustworthy and unrelated windows remain untouched.
 ### Behind the scenes
+- Keep the website's KDE setup guidance and download choices aligned with the freshly verified desktop release.
+
+### Behind the scenes
 - Keep the release guidance aligned with the published KDE update and freshly checked downloads across every supported platform.
 
 ### Behind the scenes
