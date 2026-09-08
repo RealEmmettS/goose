@@ -32,6 +32,11 @@ def main():
     uuid = 'honk300-probe@emmetts.dev'
     extension = Path(environment['XDG_DATA_HOME']) / 'gnome-shell' / 'extensions' / uuid
     shutil.copytree(Path(__file__).parent / 'fixtures' / 'gnome-probe', extension)
+    # The private session bus predates these private XDG paths. Its activated
+    # dconf writer must use the same configuration root as gsettings and Shell.
+    subprocess.run(['dbus-update-activation-environment', 'XDG_CONFIG_HOME',
+        'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_RUNTIME_DIR'],
+        env=environment, check=True, timeout=5)
     subprocess.run(['gsettings', 'set', 'org.gnome.shell', 'enabled-extensions', f"['{uuid}']"],
                    env=environment, check=True, timeout=5)
     subprocess.run(['gsettings', 'set', 'org.gnome.shell', 'disable-user-extensions', 'false'],
@@ -177,6 +182,17 @@ def main():
             (evidence / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result))
         finally:
+            for name, command in (
+                ('extension-list', ['gnome-extensions', 'list']),
+                ('extension-info', ['gnome-extensions', 'info', uuid]),
+                ('enabled-extensions', ['gsettings', 'get', 'org.gnome.shell', 'enabled-extensions']),
+            ):
+                try:
+                    diagnostic = subprocess.run(command, env=environment, capture_output=True,
+                                                text=True, timeout=3)
+                    (evidence / (name + '.txt')).write_text(diagnostic.stdout + diagnostic.stderr)
+                except subprocess.TimeoutExpired:
+                    (evidence / (name + '.txt')).write_text('Diagnostic timed out\n')
             for window in windows:
                 window.destroy()
             if goose is not None and goose.poll() is None:

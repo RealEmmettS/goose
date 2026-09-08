@@ -40,6 +40,7 @@ Active. Begin the real Shell extension lifecycle, native window interface and
 compatible XWayland goose overlay premise. No GNOME production capability is enabled.
 
 ## Activity
+- 2026-09-08 — All four real Shells now start but extension enable times out. Correct the private bus activation environment so dconf and Shell share the isolated settings root; collect actual extension discovery and enabled-settings diagnostics before the next native attempt.
 - 2026-09-08 — Inspect the first failure: GNOME initializes real rendering but
   mistakes an empty package-created seats directory for a running logind session.
   Remove only that empty marker in the disposable container so upstream selects
