@@ -37,6 +37,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
 
 ### Fixed
+- Reduce delays while checking GNOME permissions, while keeping the same ownership checks and finishing cancelled work safely.
 - Recover from a briefly slow GNOME permission check without using old desktop information or restoring access that you removed.
 - Include everything needed to build GNOME support from source, ignore unavailable pointer input and keep transient windows from unnecessarily disabling desktop observations.
 - Keep the goose and desktop responsive while reading saved permissions, and cancel pending observations when you remove access.
@@ -47,6 +48,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost, keep setup responsive when a connection stops answering, and preserve unrelated desktop settings.
 
 ### Behind the scenes
+- Keep long desktop checks observable and use consistent native test-window title bars without changing the required drag or cancellation behavior.
 - Check real window input and dragging correctly when the desktop redraws a test window's title bar.
 - Verify the published Hyprland update and matching website downloads, and keep the remaining desktop work clearly tracked.
 - Make desktop connection failures easier to diagnose without recording private information or changing permission checks.

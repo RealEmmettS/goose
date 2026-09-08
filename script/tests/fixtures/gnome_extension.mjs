@@ -87,6 +87,121 @@ function actor(id, width = 300) {
     };
 }
 
+function privateFiles(f, {changedIdentity = false, holdCleanup = false} = {}) {
+    const root = '/private/honk300/wayland';
+    const extensionPath = '/private/extension';
+    const metadata = '{"uuid":"honk300@emmetts.dev"}';
+    const script = 'the explicitly approved companion';
+    const consent = {phase: 'active', previous: null, boundary: 'gnome-observe-1', nonce,
+        script, metadata, executable: {device: '1', inode: '2', size: '100', path: '/approved/honk300'}};
+    const entries = new Map([
+        [root, null], [extensionPath, null],
+        [`${root}/gnome.json`, JSON.stringify(consent)],
+        [`${extensionPath}/extension.js`, script], [`${extensionPath}/metadata.json`, metadata],
+    ]);
+    f.context.GLib.get_user_data_dir = () => '/private';
+    f.context.GLib.build_filenamev = parts => parts.join('/');
+    f.extension.path = extensionPath;
+    f.extension._consent = f.context.api.Honk300Observations.prototype._consent.bind(f.extension);
+    const state = {open: 0, peak: 0, batches: 0, releaseCleanup: null};
+    let cleanupStarted;
+    state.cleanupStarted = new Promise(resolve => { cleanupStarted = resolve; });
+    let pending = [];
+    const finish = result => { if (result instanceof Error) throw result; return result; };
+    f.context.Gio.File.new_for_path = path => {
+        if (path.startsWith('/proc/')) return f.file;
+        assert(entries.has(path), path);
+        const content = entries.get(path);
+        const bytes = new TextEncoder().encode(content ?? '');
+        const directory = content === null;
+        const attributes = {'unix::device': '1', 'unix::inode': String([...entries.keys()].indexOf(path) + 10),
+            'unix::uid': '1000', 'unix::mode': directory ? '448' : '384'};
+        const info = {...f.info, get_file_type: () => directory ? 2 : 1, get_size: () => bytes.length,
+            get_attribute_uint32: name => Number(attributes[name]),
+            get_attribute_as_string: name => attributes[name]};
+        const callback = (source, result, cancellable, done) => queueMicrotask(() =>
+            done(source, cancellable?.is_cancelled() ? new Error('Cancelled') : result));
+        const file = {
+            query_info_async(_attrs, _flags, _priority, cancellable, done) { callback(file, info, cancellable, done); },
+            query_info_finish: finish,
+            read_async(_priority, cancellable, done) {
+                let offset = 0;
+                const openedInfo = changedIdentity && path.endsWith('/extension.js') ? {...info,
+                    get_attribute_as_string: name => name === 'unix::inode' ? 'unrelated' : attributes[name]} : info;
+                const stream = {
+                    query_info_async(_attrs, _priority, cancel, complete) { callback(stream, openedInfo, cancel, complete); },
+                    query_info_finish: finish,
+                    read_bytes_async(size, _priority, cancel, complete) {
+                        const chunk = bytes.slice(offset, offset + size);
+                        offset += chunk.length;
+                        callback(stream, {get_data: () => chunk}, cancel, complete);
+                    },
+                    read_bytes_finish: finish,
+                    close_async(_priority, _cancel, complete) {
+                        const close = () => queueMicrotask(() => complete(stream, true));
+                        if (holdCleanup && path.endsWith('/metadata.json')) {
+                            state.releaseCleanup = close;
+                            cleanupStarted();
+                        } else close();
+                    },
+                    close_finish(result) { state.open--; return result; },
+                };
+                let completed = false;
+                const deliver = () => {
+                    if (completed) return;
+                    completed = true;
+                    callback(file, stream, cancellable, done);
+                };
+                cancellable.listeners.push(deliver);
+                pending.push(deliver);
+                // The real _consent must issue all three independent reads;
+                // a serial implementation cannot pass this native-I/O barrier.
+                if (pending.length === 3) {
+                    state.batches++;
+                    const batch = pending;
+                    pending = [];
+                    batch.forEach(deliver => deliver());
+                }
+            },
+            read_finish(result) {
+                const stream = finish(result);
+                state.peak = Math.max(state.peak, ++state.open);
+                return stream;
+            },
+        };
+        return file;
+    };
+    return state;
+}
+
+test('production consent reads independent files together and verifies them twice', async () => {
+    const f = fixture();
+    const files = privateFiles(f);
+    const request = f.request();
+    await request.finished;
+    assert.equal(request.result.error, undefined);
+    assert.equal(request.result.frame.windows.length, 0);
+    assert.equal(files.batches, 2);
+    assert.equal(files.peak, 3);
+    assert.equal(files.open, 0);
+    assert.equal(f.extension._requests.size, 0);
+});
+
+test('changed opened identity cancels and joins other consent reads before releasing admission', async () => {
+    const f = fixture();
+    const files = privateFiles(f, {changedIdentity: true, holdCleanup: true});
+    const request = f.request();
+    await files.cleanupStarted;
+    assert.equal(f.extension._requests.size, 1, 'Pending cleanup must retain the request slot');
+    assert.equal(request.result.frame, undefined);
+    files.releaseCleanup();
+    await request.finished;
+    assert.equal(request.result.error, 'dev.emmetts.Honk300.Gnome1.Unavailable');
+    assert.equal(files.open, 0);
+    assert.equal(f.extension._requests.size, 0);
+    assert(!request.result.message.includes(nonce));
+});
+
 test('discard transient actors before enforcing the 64 reported-window bound', async () => {
     const actors = Array.from({length: 64}, (_, i) => actor(i + 1));
     actors.push({is_destroyed: () => true}, {is_destroyed: () => false, meta_window: null}, actor(65, 0));
