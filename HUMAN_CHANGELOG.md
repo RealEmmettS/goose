@@ -48,6 +48,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## GNOME desktop observations — September 2026
 
+### Behind the scenes
+- Wait for the test window to receive the pointer before dragging it, and record the real input events when a desktop rejects the gesture.
+
 ### Added
 - Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
 
