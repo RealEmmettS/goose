@@ -109,11 +109,6 @@ impl<S: Source> Observer<S> {
             .filter(|(at, _)| at.elapsed() < S::MAX_AGE)
             .map(|(_, frame)| frame.clone())
     }
-    pub fn running(&self) -> bool {
-        self.worker
-            .as_ref()
-            .is_some_and(|worker| !worker.is_finished())
-    }
     pub fn failed(&self) -> bool {
         self.state.lock().map_or(true, |state| state.failed)
     }
