@@ -154,6 +154,12 @@ jobs:
     with:
       commit: ${{ needs.plan.outputs.commit }}
 
+  native-hyprland:
+    needs: plan
+    uses: ./.github/workflows/hyprland-probe.yml
+    with:
+      commit: ${{ needs.plan.outputs.commit }}
+
   build-portable-artifacts:
     name: portable (${{ join(matrix.targets, ', ') }})
     needs: [plan, native-settings]
@@ -660,6 +666,7 @@ jobs:
       - native-settings
       - native-kwin
       - native-sway
+      - native-hyprland
       - build-portable-artifacts
       - build-debian-packages
       - qualify-debian-packages

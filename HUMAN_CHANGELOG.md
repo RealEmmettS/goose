@@ -31,7 +31,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ---
 
-## In development — September 2026
+## Hyprland desktop observations — September 2026
 
 ### Behind the scenes
 - Check fullscreen changes through the goose's existing Hyprland connection and verify the actual window it sees, matching how the running companion follows your desktop.

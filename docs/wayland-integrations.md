@@ -1,7 +1,7 @@
 # Optional Wayland integrations
 
-KDE support is the preceding release stage. The next candidate adds separately
-qualified Sway observations; publication remains ordered after the KDE stage.
+KDE and Sway have separate release stages. The next candidate adds independently
+qualified Hyprland observations; publication remains ordered after Sway.
 Native owned notes and pictures use normal compositor placement unless the enabled
 desktop adapter supplies safe placement.
 
@@ -60,8 +60,7 @@ The equivalent commands are `honk300 integrations pointer request`,
 
 Window observation, placement, pointer observation, pointer control and fullscreen
 awareness are reported separately. Fullscreen awareness does not establish do-not-disturb
-support. GNOME and Hyprland adapters have separate implementation and desktop
-qualification tasks. Experimental Raspberry Pi guidance does not establish physical
+support. GNOME retains its separate implementation and desktop qualification task. Experimental Raspberry Pi guidance does not establish physical
 Pi performance or extend the KDE test results to another compositor.
 
 ## Sway window and fullscreen observations
@@ -98,3 +97,36 @@ output withdraws observations. After restoring the desktop, repeat setup to reco
 A normal goose restart may use its saved read-only permission; it never grants pointer
 access. Closing settings leaves the goose running, and stopping the goose preserves
 unsaved settings in its independent window.
+
+## Hyprland window and fullscreen observations
+
+The Hyprland candidate qualifies **0.53.3** and **0.55.2**, each on x64 and ARM64.
+Start the native Wayland goose from your desktop session, open **Platform & status**,
+choose **Set up Hyprland**, and confirm **Enable Hyprland observations**. A version
+outside that qualified set reports unavailable observations.
+
+The adapter reads current visible windows and fullscreen presence for the existing
+**Pause on fullscreen** preference. Notes and pictures use normal compositor
+placement. Hyprland's public interface does not report authoritative current user
+drags, so animated placement, foreign-window movement and window rides remain
+unavailable. Pointer observation/control and do-not-disturb are also unavailable.
+
+Choose **Remove Hyprland observations** for immediate revocation, or use:
+
+```sh
+honk300 integrations hyprland setup
+honk300 integrations hyprland status
+honk300 integrations hyprland remove
+```
+
+Setup writes Honk300's own private permission record and leaves your Hyprland
+configuration and bindings intact. Repeating setup keeps the same live worker.
+The worker verifies the actual system compositor and private socket, with bounded
+replies and waiting time. A late reply immediately withdraws observations; another
+bounded read may recover only against that same authenticated owner. A replaced
+socket, malformed reply or disconnected compositor ends the worker. Restore the
+desktop and repeat setup to reconnect.
+
+Removing permission also works while the goose is stopped. Normal restarts may
+reuse saved observation permission. Closing settings keeps the goose running;
+setup, removal and stopping the goose preserve the independent settings draft.

@@ -26,6 +26,8 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-09-08
+
 ### Behind the scenes
 - Qualify Hyprland fullscreen transitions through the same retained production observer, requiring fresh native window identity, PID and geometry. Preserve direct startup transport and impostor checks; avoid a test-only second version handshake during fullscreen that the runtime never performs.
 

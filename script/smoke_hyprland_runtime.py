@@ -151,6 +151,9 @@ preserve = "untouched"
         foreign = record.parent / 'foreign.txt'
         foreign.write_text('Keep unrelated integration data')
         trace(False, False)
+        invoke('Refresh status')
+        wait(lambda: any('Window observation: supported | Fullscreen: supported' in node.get_name()
+                         for node in nodes()), 'native Hyprland status readback')
         subprocess.run(['grim', str(directory / 'native-settings-goose.png')], check=True, timeout=8)
         control('do', 'nab', success=False)
         window.fullscreen()
@@ -221,6 +224,10 @@ preserve = "untouched"
         close(ui)
         ui = None
         expect('supported', 'closing settings preserves the runtime owner')
+        for index in range(4):
+            captured_after = time.monotonic() + 1
+            wait(lambda: time.monotonic() >= captured_after, 'native entry animation')
+            subprocess.run(['grim', str(directory / f'native-goose-{index}.png')], check=True, timeout=8)
         runtime.kill()
         runtime.wait(timeout=5)
         runtime = None
