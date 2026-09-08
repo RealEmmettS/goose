@@ -2,7 +2,6 @@
 
 ## Backlog
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
-- [ ] **Portable Wayland observation and portal spike** - probe staging toplevel identity plus explicit XDG Remote Desktop/libei cursor capability without claiming geometry/move parity; terminal protection and revocation are hard gates (needs #a6e) #wlp
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## To-Do
@@ -14,10 +13,15 @@
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
 
 ## Active
+- [ ] **Explicit portal pointer integration** - request only pointer access through the native portal, validate granted EIS devices and cancel on revocation; terminal exclusion requires independently proven window observation (needs #a6e) (ms #refine) (owner codex) #wlp
+  - [ ] Prove native portal grant, libei device readiness, cancellation and bounded movement on KDE 6.
+  - [ ] Connect ephemeral pointer permission to Rust controls and native settings.
+  - [ ] Qualify terminal exclusions, disconnects and unsupported desktop behavior.
 - [ ] **KDE native Wayland companion** - implement the explicitly enabled KWin bridge and prove exact identities, bounded movement, terminal exclusions and revocation (needs #a6e) (ms #refine) (owner codex) #wlk
   - [x] Prove the real KWin script API and owned test-window movement on KDE 5/6.
-  - [ ] Connect the authenticated bounded Rust bridge and live runtime capabilities.
-  - [ ] Add explicit setup/removal and failure/revocation tests.
+  - [x] Connect the authenticated bounded Rust bridge and live runtime capabilities.
+  - [x] Add explicit setup/removal and failure/revocation tests.
+  - [ ] Exercise the guided native settings controls and qualifying package integrations.
 - [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
   - [ ] Resolve final PR review findings and repeat qualification before tagging.
   - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.

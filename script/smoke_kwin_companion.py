@@ -60,6 +60,7 @@ def main():
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--bridge', type=Path)
     parser.add_argument('--goose', type=Path)
+    parser.add_argument('--portal', action='store_true')
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -376,6 +377,10 @@ def main():
                 qualify(args.goose.resolve(), evidence, wait, call, GLib)
             normal.destroy()
             protected.destroy()
+            pump()
+            if args.portal and major >= 6:
+                from smoke_kwin_portal import qualify
+                qualify(args.bridge.resolve(), evidence, wait, call, GLib, Gtk, RustBridge)
             (evidence / 'result.json').write_text(json.dumps(dict(ok=True, kwin=version,
                 architecture=os.uname().machine, native_identity=True, bounded_move=True,
                 terminal_refused=True, excessive_move_refused=True, stale_refused=True,

@@ -7,6 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("Use only the disposable native CI fixture".into());
     }
     let mut bridge = Bridge::connect()?;
+    let mut portal: Option<honk_platform_linux::portal::Session> = None;
     let stdin = std::io::stdin();
     let mut input = stdin.lock();
     let mut output = std::io::stdout().lock();
@@ -23,6 +24,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         let command: serde_json::Value = serde_json::from_slice(&bytes)?;
         let response = match command["op"].as_str() {
+            Some("portal_request") => {
+                if portal.is_some() {
+                    return Err("duplicate portal fixture request".into());
+                }
+                portal = Some(honk_platform_linux::portal::Session::request()?);
+                serde_json::json!({"ok": true})
+            }
+            Some("portal_poll") => {
+                if let Some(session) = &mut portal {
+                    match session.poll() {
+                        Ok(()) => serde_json::json!({"ok": true, "ready": session.ready()}),
+                        Err(error) => {
+                            portal = None;
+                            serde_json::json!({"ok": false, "error": error.to_string()})
+                        }
+                    }
+                } else {
+                    serde_json::json!({"ok": false, "error": "No active portal"})
+                }
+            }
+            Some("portal_warp") => {
+                let to: [f64; 2] = serde_json::from_value(command["to"].clone())?;
+                match portal.as_mut().ok_or("No active portal")?.warp(&bridge, to) {
+                    Ok(()) => serde_json::json!({"ok": true}),
+                    Err(error) => serde_json::json!({"ok": false, "error": error.to_string()}),
+                }
+            }
+            Some("portal_cancel") => {
+                portal = None;
+                serde_json::json!({"ok": true})
+            }
             Some("activate") => match bridge.load_script(
                 "honk300-native-owned-probe",
                 include_bytes!("../../../integrations/kwin/contents/code/main.js"),

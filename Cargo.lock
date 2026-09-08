@@ -1263,6 +1263,7 @@ dependencies = [
  "honk-engine",
  "ksni",
  "libc",
+ "libloading",
  "serde",
  "serde_json",
  "smithay-client-toolkit",

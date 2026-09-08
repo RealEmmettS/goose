@@ -31,10 +31,15 @@ this task owns the native implementation evidence and #rkde owns publication.
 
 ## Verification
 - [x] Native KDE 5/6 probes exercise actual window data, movement and protected targets.
-- [ ] The real Rust runtime handles opt-in, identity, capability loss and graceful cleanup.
+- [x] The real Rust runtime handles opt-in, identity, capability loss and graceful cleanup.
 - [ ] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
+The full production runtime and setup path passed all four KWin 5/6 x64/ARM64 lanes
+in 34195263902. Evidence includes default-off state, separate capabilities, native Rust
+settings-service status, live and external removal, crash recovery, graceful cleanup,
+stopped removal and unchanged configuration/foreign files. Guided native UI and package
+integration remain open. Pointer control is a separate #wlp gate.
 Sealed activation and cleanup passed all four native KWin lanes in 34192401152.
 The real runtime now consumes explicit private consent, reports distinct live capabilities,
 and clears engine observations on removal or lost frames. CLI/native-settings setup and
@@ -49,6 +54,7 @@ expanded native x64/ARM64 probes are next. Runtime and explicit setup remain ope
 No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: Banked all-four actual-runtime acceptance from 34195263902. Each lane produced goose/result.json with runtime-connected, revocation, crash recovery and state-preservation proof. Keep native UI/package checks visible and portal access off.
 - 2026-09-08: The expanded native gate catches a Linux-only call to a nonexistent vector method before runtime launch. Use the engine's real magnitude operation and repeat native compilation before claiming runtime acceptance.
 - 2026-09-08: Add guided Rust-owned setup/removal, native consent UI and separate capability status. Retain a private stable registration identity for owned-only recovery after crashes. Expand the four native KWin lanes to compile and exercise the actual goose runtime, revocation, graceful cleanup, stopped removal and state preservation.
 - 2026-09-08: The sealed activation gate stops at native Rust compilation: the introspection proxy retains a borrowed path. Drop that completed proxy before moving the selected path; no native activation result is claimed yet.

@@ -11,6 +11,9 @@ mod tray;
 pub mod kwin;
 
 #[cfg(target_os = "linux")]
+pub mod portal;
+
+#[cfg(target_os = "linux")]
 pub use tray::StatusTray;
 
 use honk_control::DesktopEnvironment;

@@ -92,6 +92,39 @@ pub struct Frame {
 }
 
 impl Frame {
+    /// Conservative pointer exclusion requires a complete compositor ordering.
+    /// Even an occluded protected window rejects an intersecting movement path.
+    pub fn permits_pointer_motion(&self, target: [f64; 2]) -> bool {
+        if !self.stacking_order
+            || !self.pointer.into_iter().all(finite)
+            || !target.into_iter().all(finite)
+            || (self.pointer[0] - target[0]).powi(2) + (self.pointer[1] - target[1]).powi(2)
+                > 24.0 * 24.0
+        {
+            return false;
+        }
+        let left = self.pointer[0].min(target[0]);
+        let right = self.pointer[0].max(target[0]);
+        let top = self.pointer[1].min(target[1]);
+        let bottom = self.pointer[1].max(target[1]);
+        self.windows.iter().all(|window| {
+            if window.deleted || window.minimized || !window.on_desktop || !window.on_activity {
+                return true;
+            }
+            if !window.valid() || window.dragging || !window.drag_known {
+                return false;
+            }
+            let [x, y, width, height] = window.geometry;
+            let intersects = right >= x && left <= x + width && bottom >= y && top <= y + height;
+            !intersects
+                || (!window.fullscreen
+                    && !window.protected
+                    && !window.app.trim().is_empty()
+                    && !window.title.trim().is_empty()
+                    && !super::is_protected_terminal_app(Some(&window.app), Some(&window.title)))
+        })
+    }
+
     /// Fullscreen observation does not imply do-not-disturb observation.
     pub fn fullscreen(&self) -> bool {
         self.windows.iter().any(|window| {
@@ -278,6 +311,28 @@ mod tests {
     fn raw(frame: &Frame) -> String {
         serde_json::to_string(frame).unwrap()
     }
+    #[test]
+    fn pointer_motion_requires_bounded_complete_safe_observations() {
+        let mut frame = fixture();
+        frame.pointer = [110.0, 110.0];
+        assert!(frame.permits_pointer_motion([116.0, 110.0]));
+        assert!(!frame.permits_pointer_motion([140.0, 110.0]));
+        assert!(!frame.permits_pointer_motion([f64::NAN, 110.0]));
+        frame.stacking_order = false;
+        assert!(!frame.permits_pointer_motion([116.0, 110.0]));
+        frame.stacking_order = true;
+        for title in ["ChatGPT", "Konsole", "Terminal", ""] {
+            frame.windows[0].title = title.into();
+            assert!(!frame.permits_pointer_motion([116.0, 110.0]));
+        }
+        frame.windows[0].title = "Ordinary document".into();
+        frame.windows[0].dragging = true;
+        assert!(!frame.permits_pointer_motion([116.0, 110.0]));
+        frame.windows[0].dragging = false;
+        frame.windows[0].fullscreen = true;
+        assert!(!frame.permits_pointer_motion([116.0, 110.0]));
+    }
+
     #[test]
     fn live_desktop_presence_and_user_drag_remain_separate_from_movement() {
         let mut frame = fixture();

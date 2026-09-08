@@ -41,6 +41,17 @@ implementation of the Rust boundary, not a public capability claim.
 
 ## Qualification
 
+The pointer premise uses optional system `liboeffis.so.1` for the native RemoteDesktop
+grant and `libei.so.1` for the granted sender. Rust retains both contexts and bounded
+device references. Only absolute pointer motion is bound; no keyboard/button/touch API
+is exposed. Missing libraries or unsupported loading remains unsupported. Devices must
+resume, provide an unambiguous virtual region and pass a newly authenticated KWin frame
+for every bounded movement. Paused/removed devices end the session and need a new grant.
+Native grant and motion acceptance is required before wiring this into runtime controls.
+The [liboeffis API](https://libinput.pages.freedesktop.org/libei/api/group__liboeffis.html)
+and [libei sender API](https://libinput.pages.freedesktop.org/libei/api/group__libei-sender.html)
+define the context, descriptor and device ownership used at this boundary.
+
 Explicit setup stores the exact companion bytes and a random registration identity in a
 bounded private user record beside the existing configuration. Permission state is separate
 from an unsaved settings draft. Updated script bytes require explicit setup again; the
