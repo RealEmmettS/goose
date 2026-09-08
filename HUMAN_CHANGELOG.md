@@ -37,6 +37,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - The goose can bring notes and pictures on Linux. Compatible desktops animate deliveries, while Wayland chooses where to place them. Settings explain the active desktop capabilities, and new guidance covers experimental Raspberry Pi desktop use.
 
 ### Behind the scenes
+- Fix a native Linux build issue in the optional KDE companion launcher before running its desktop checks.
 - Keep an enabled KDE companion tied to the running goose and prevent its verified code from changing while KDE opens it. Closing the connection removes only its own companion.
 - Correct older KDE desktop detection and keep temporary test windows and scripts from interfering with connection checks.
 - Check optional KDE support against desktop changes, fullscreen windows and real window dragging, including native ARM machines. The goose must leave a window alone while you are moving it.

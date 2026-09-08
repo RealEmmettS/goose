@@ -161,6 +161,7 @@ impl Bridge {
             "org.freedesktop.DBus.Introspectable",
         )?;
         let modern_result: Result<String, _> = modern.call("Introspect", &());
+        drop(modern);
         let script_path = match modern_result {
             Ok(xml) if xml.contains("org.kde.kwin.Script") => modern_path,
             _ => format!("/{id}"),
