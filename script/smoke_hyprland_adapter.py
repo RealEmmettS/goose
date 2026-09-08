@@ -27,14 +27,15 @@ def main():
     lua = args.generation == 'lua'
     config = evidence / ('hyprland.lua' if lua else 'hyprland.conf')
     config.write_text(
-        'hl.monitor({output="HEADLESS-1",mode="1280x900@60",position="0x0",scale="1"})\n'
+        'hl.monitor({output="HONK-PROBE",mode="1280x900@60",position="0x0",scale="1"})\n'
+        'hl.monitor({output="",disabled=true})\n'
         'hl.config({animations={enabled=false},input={follow_mouse=0},'
         'misc={disable_hyprland_logo=true,disable_splash_rendering=true},'
-        'debug={disable_logs=false}})\n' if lua else
-        'monitor = HEADLESS-1,1280x900@60,0x0,1\n'
+        'debug={disable_logs=false,enable_stdout_logs=true}})\n' if lua else
+        'monitor = HONK-PROBE,1280x900@60,0x0,1\nmonitor = ,disable\n'
         'animations {\n enabled = false\n}\ninput {\n follow_mouse = 0\n}\n'
         'misc {\n disable_hyprland_logo = true\n disable_splash_rendering = true\n}\n'
-        'debug {\n disable_logs = false\n}\n')
+        'debug {\n disable_logs = false\n enable_stdout_logs = true\n}\n')
     environment = dict(os.environ, XDG_RUNTIME_DIR=str(runtime),
         XDG_DATA_HOME=str(evidence / 'user-data'), XDG_CONFIG_HOME=str(evidence / 'user-config'),
         XDG_CURRENT_DESKTOP='Hyprland', XDG_SESSION_TYPE='wayland',
@@ -102,9 +103,9 @@ def main():
 
             version = ipc('j/version')
             (evidence / 'version.json').write_text(json.dumps(version, indent=2) + '\n')
-            command('/output create headless')
+            command('/output create headless HONK-PROBE')
             monitors = wait(lambda: ipc('j/monitors'), 'headless output')
-            assert len(monitors) == 1 and monitors[0]['name'] == 'HEADLESS-1', monitors
+            assert len(monitors) == 1 and monitors[0]['name'] == 'HONK-PROBE', monitors
             (evidence / 'monitors.json').write_text(json.dumps(monitors, indent=2) + '\n')
             (evidence / 'devices.json').write_text(json.dumps(ipc('j/devices'), indent=2) + '\n')
             assert ipc('/configerrors', False).strip() == '', 'Private compositor config has errors'

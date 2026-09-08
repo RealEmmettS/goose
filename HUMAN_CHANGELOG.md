@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Select the intended virtual graphics device for Hyprland tests after the desktop chose a different, incompatible one.
+
+### Behind the scenes
 - Give the isolated Hyprland test desktop the virtual graphics device it needs to start, and preserve its failure details before repeating qualification.
 
 ### Behind the scenes

@@ -34,6 +34,10 @@ Active. Begin native socket/window qualification on separately packaged Hyprland
 generations, with private configuration and no production runtime claims yet.
 
 ## Activity
+- 2026-09-08 — The second attempt creates the virtual DRM device successfully, but
+  Aquamarine chooses the runner's unrelated Hyper-V adapter as its primary allocator.
+  Pass only the system-identified vkms device to the private container, select it
+  explicitly, and use a named headless output with full backend logging.
 - 2026-09-08 — Inspect the first four-lane failure before repeating: the compositor
   lacks a DRM allocator and the Lua generation exceeds the native socket path bound.
   Add an actual disposable virtual graphics device and normal seat service, shorten

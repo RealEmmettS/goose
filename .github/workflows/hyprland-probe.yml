@@ -23,6 +23,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Prepare a disposable virtual graphics device
+        id: graphics
         run: |
           mkdir -p target/hyprland-evidence
           uname -a > target/hyprland-evidence/host-kernel.txt
@@ -34,11 +35,25 @@ jobs:
           sudo modprobe vkms
           test -d /dev/dri
           ls -l /dev/dri > target/hyprland-evidence/drm-devices.txt
+          selected=
+          for device in /sys/class/drm/card[0-9]*; do
+            case "$(readlink -f "$device/device/driver")" in
+              */vkms)
+                test -z "$selected"
+                selected="/dev/dri/$(basename "$device")"
+                ;;
+            esac
+          done
+          test -c "$selected"
+          echo "node=$selected" >> "$GITHUB_OUTPUT"
+          echo "$selected" > target/hyprland-evidence/selected-vkms.txt
       - name: Exercise the actual private compositor
         env:
           HONK_DISTRIBUTION: ${{ matrix.distribution }}
+          HONK_DRM_NODE: ${{ steps.graphics.outputs.node }}
         run: |
-          docker run --rm --device /dev/dri -e HONK_HOST_UID="$(id -u)" -e HONK_HOST_GID="$(id -g)" \
+          docker run --rm --device "$HONK_DRM_NODE" -e AQ_DRM_DEVICES="$HONK_DRM_NODE" \
+            -e HONK_HOST_UID="$(id -u)" -e HONK_HOST_GID="$(id -g)" \
             -v "$PWD:/work" -w /work "$HONK_DISTRIBUTION" bash -euc '
             mkdir -p target/hyprland-evidence
             trap '\''chown -R "$HONK_HOST_UID:$HONK_HOST_GID" /work/target/hyprland-evidence'\'' EXIT
@@ -59,6 +74,7 @@ jobs:
             fi
             dpkg-query -W > target/hyprland-evidence/packages.txt
             useradd --create-home honkprobe
+            chown honkprobe:honkprobe "$AQ_DRM_DEVICES"
             chown -R honkprobe:honkprobe /work/target/hyprland-evidence
             SEATD_VTBOUND=0 seatd -u honkprobe > target/hyprland-evidence/seatd.log 2>&1 &
             seat_pid=$!

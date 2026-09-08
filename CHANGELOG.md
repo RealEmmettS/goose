@@ -27,6 +27,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Restrict the isolated Hyprland host to its system-identified vkms device after native logs show the unrelated Hyper-V GPU being selected as the primary allocator; preserve the real compositor and exact movement oracles.
+
+### Behind the scenes
 - Correct the Hyprland qualification host prerequisites exposed by the first native attempt: provide a disposable virtual DRM device with the standard seat service and keep the private socket path within the operating-system limit.
 
 ### Behind the scenes
