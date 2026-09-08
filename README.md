@@ -5,7 +5,7 @@ across real monitor layouts, honks, leaves muddy footprints, reacts to the point
 bounded desktop pranks. Configuration and control stay local through a command-line interface
 and native graphical and terminal settings screens.
 
-**New in v1.7.0:** optional Sway window and fullscreen observations on separately
+**New in v1.8.0:** optional Hyprland window and fullscreen observations on separately
 qualified desktops, with explicit setup and immediate revocation. KDE keeps its
 animated owned deliveries and separately requested temporary pointer permission.
 Setup and removal are available through native settings and the command line.
@@ -15,17 +15,17 @@ pictures, and experimental Pi 4/5 64-bit Desktop guidance.
 Both edit the same Rust-owned configuration. Public download identities are independently
 verified; native installation qualification is tracked in the release record.
 See [desktop setup](docs/wayland-integrations.md),
-[current release readiness](docs/readiness/v1.7.0-readiness.md),
+[current release readiness](docs/readiness/v1.8.0-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.7.0](https://github.com/RealEmmettS/goose/releases/tag/v1.7.0),
-published from exact commit `40bafeba4a08f0c0074c3cd16c0e0e12ec26a452`. It includes the
+**Current stable release:** [v1.8.0](https://github.com/RealEmmettS/goose/releases/tag/v1.8.0),
+published from exact commit `970cdb20c2e5f75ea3784adbbc35ea2746734bbf`. It includes the
 continuous goose redesign, expressive motion, bounded rendering resources, native
-graphical settings, Linux deliveries, opt-in KDE integration and Sway observations.
-See [release evidence](docs/readiness/v1.7.0-readiness.md).
+graphical settings, Linux deliveries, opt-in KDE integration and Sway/Hyprland observations.
+See [release evidence](docs/readiness/v1.8.0-readiness.md).
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published

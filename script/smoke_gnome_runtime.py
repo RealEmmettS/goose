@@ -187,11 +187,18 @@ preserve = "untouched"
             subprocess.run(['xdotool', *map(str, arguments)], env=capture_environment,
                            check=True, capture_output=True, timeout=5)
         try:
+            # The frame's title bar can belong to the compositor after a
+            # remap. First prove actual GTK delivery inside the client, then
+            # move to the native frame and require Mutter's real grab signal.
+            client_x, client_y = x + width // 2, y + height // 2
+            event('mousemove', client_x, client_y)
+            wait(lambda: snapshot()['pointer'] == [client_x, client_y],
+                 'native pointer reaches the private client: ' + label)
+            wait(lambda: surface.get_device_position(device)[0],
+                 'GTK receives pointer entry on the exact native surface: ' + label)
             event('mousemove', pointer_x, pointer_y)
             wait(lambda: snapshot()['pointer'] == [pointer_x, pointer_y],
                  'native pointer reaches the private fixture: ' + label)
-            wait(lambda: surface.get_device_position(device)[0],
-                 'GTK receives pointer entry on the exact native surface: ' + label)
             # Drag the actual native title bar. A modifier mask alone does not
             # prove Mutter accepted a move gesture on a Wayland client surface.
             event('mousedown', 1)

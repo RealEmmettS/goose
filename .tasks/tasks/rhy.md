@@ -28,17 +28,17 @@ Exact desktop versions, request semantics and native behavior require direct qua
 ## Verification
 - [x] Actual supported Hyprland versions on x64/ARM64 pass native movement and refusal scenarios.
 - [x] Rust controls and native settings preserve drafts, ownership and live cancellation.
-- [ ] Required source, architecture, package, immutable-publication and website checks pass.
+- [x] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Active. Run 34238317252 passes the complete actual runtime, native settings and
-owned-prop lifecycle on Hyprland 0.53.3/0.55.2, each on native x64/ARM64. Actual
-goose, settings, complete image and painted-note captures have been inspected.
-Repeated setup retains one exact worker; revocation completes its production join.
-The remaining gates are final-source candidate/main qualification, immutable
-publication and fresh-public/website verification after Sway.
+Done. Immutable v1.8.0 is public from 970cdb20c2e5f75ea3784adbbc35ea2746734bbf
+after complete candidate and unchanged-source main qualification. All 39 publication
+jobs and eight fresh-public native lanes passed. The independent audit verifies
+47 assets and all 22 payloads; the deployed website matches them and retains the
+selected artwork. Native 0.53.3/0.55.2 x64/ARM64 evidence remains distinct from physical acceptance.
 
 ## Activity
+- 2026-09-08 — Close publication 34249861698, fresh-public 34255173155 and the 47-asset exact-tag audit. Website PR 11 deploys as 9599a85 after all four CI jobs, live visual review and all 22 download/hash pairs pass. Record the unchanged-source transient publication failures and successful retry in readiness; preserve every immutable asset and the user's installation.
 - 2026-09-08 — Final PR Windows checks catch the fixture stopwatch declaration in the similarly shaped runtime-readiness loop. Restore that runtime loop byte for byte and put the stopwatch only beside the background-host launch, preserving every goose timing and compositor assertion before final candidate qualification.
 - 2026-09-08 — All four strengthened native lanes pass at 2868497 in run 34238317252, including completed worker joins, bounded task retirement and actual painted notes. Inspect all four final settings, goose and note captures and record the completed native gate before freezing the candidate.
 - 2026-09-08 — Stronger painted-note qualification passes three desktops; newer ARM stops earlier when proc still lists a thread after unsupported status. Keep the production join policy and require its successful completion in the actual trace before the unsupported reply, then separately bound proc retirement. Cold Windows background helpers also exceed the old five-second fixture startup without creating a surface; add a separate thirty-second setup deadline with stage timestamps and preserve all goose/compositor assertions.

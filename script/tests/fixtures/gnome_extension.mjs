@@ -109,6 +109,7 @@ test('65 actual reportable windows still fail closed', async () => {
 
 test('slow consent stays asynchronous, bounded and cancellable', async () => {
     const f = fixture();
+    const healthyConsent = f.extension._consent;
     f.extension._consent = cancellable => new Promise((_resolve, reject) => {
         cancellable.listeners.push(() => reject(new Error('Cancelled')));
     });
@@ -125,6 +126,14 @@ test('slow consent stays asynchronous, bounded and cancellable', async () => {
     }
     assert.equal(f.extension._requests.size, 0);
     assert.equal(f.timers.size, 0);
+    // A timed-out request publishes nothing and releases its slot. A new
+    // request must perform live consent again before it can report a frame.
+    f.extension._consent = healthyConsent;
+    const recovered = f.request();
+    await recovered.finished;
+    assert.equal(recovered.result.error, undefined);
+    assert.equal(recovered.result.frame.windows.length, 0);
+    assert.equal(f.extension._requests.size, 0);
 });
 
 test('explicit revocation remains distinct from a failed observation', async () => {

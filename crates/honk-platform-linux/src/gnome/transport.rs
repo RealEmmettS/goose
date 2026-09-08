@@ -302,9 +302,13 @@ impl Source for Connection {
         self.snapshot()
     }
     fn retryable(error: &io::Error) -> bool {
-        // A bounded busy response from the pinned Shell may retry that same
-        // owner. Stale frames are withdrawn; every authority/error change ends it.
-        error.kind() == io::ErrorKind::WouldBlock
+        // A late/busy read may retry only this retained connection. Each retry
+        // rechecks the pinned Shell owner and full live consent; the worker
+        // withdraws stale frames first. Every other error remains terminal.
+        matches!(
+            error.kind(),
+            io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+        )
     }
 }
 
