@@ -131,6 +131,7 @@ def main():
                 window.set_default_size(300, 200)
                 window.set_child(Gtk.Label(label='Fixture-owned native KWin window'))
                 window.present()
+            wait(lambda: normal.get_mapped() and protected.get_mapped(), 'mapped native fixture windows')
             state = {'command': None, 'stop': False, 'count': 0}
             interface = Gio.DBusNodeInfo.new_for_xml('''<node><interface name="org.emmetts.Honk300.KWin1">
               <method name="Exchange"><arg type="s" direction="in"/><arg type="s" direction="out"/></method>

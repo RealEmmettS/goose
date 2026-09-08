@@ -42,6 +42,11 @@ without claiming occlusion order. The repeat native probe remains open, followed
 Rust bridge and setup. No public integration is enabled or advertised.
 
 ## Activity
+- 2026-09-08: Run 34190444045 passes actual Rust/KWin 5.27 identity, real movement,
+  untrusted sender refusal, protected/stale/excessive refusal, expiry, reconnect and stop.
+  KWin 6.3's first scripted frame is empty and then stops before fixture window mapping;
+  no Rust connection is reached. Add a mapped-window precondition and exact stop-reason
+  diagnostics, retaining the existing 250 ms action/revocation deadline.
 - 2026-09-08: The new Rust endpoint compiles and passes strict native Linux checks.
   Extend the actual compositor probe through that endpoint: real movement, untrusted
   peer refusal, expired observation, explicit reconnect and stop. Pin the script to

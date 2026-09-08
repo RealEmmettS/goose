@@ -13,6 +13,12 @@
     var bridgeOwner = null;
     var stopped = false;
     var lastResult = "none";
+    function stop(reason) {
+        stopped = true;
+        pending = false;
+        timer.stop();
+        print("Honk300 KWin connection stopped: " + reason + "; sequence=" + sequence);
+    }
     var protectedTokens = /^(terminal|console|xterm|uxterm|rxvt|urxvt|alacritty|kitty|foot|ghostty|wezterm|konsole|kgx|tilix|terminator|lxterminal|qterminal|blackbox|ptyxis|rio|code|codex|chatgpt|contour|tabby|warp|zellij|st|terminology|guake|yakuake|tilda|extraterm)$/;
 
     function boundedText(value) {
@@ -101,17 +107,17 @@
         if (stopped) return;
         if (pending) {
             if (Date.now() - pendingSince >= 250 || Date.now() < pendingSince) {
-                stopped = true; timer.stop();
+                stop("exchange deadline");
             }
             return;
         }
         var windows = windowList();
-        if (!windows || windows.length > 64) { stopped = true; timer.stop(); return; }
+        if (!windows || windows.length > 64) { stop("window inventory unavailable or oversized"); return; }
         var frame = {protocol: 1, sequence: ++sequence, windows: [],
             pointer: [Number(workspace.cursorPos.x), Number(workspace.cursorPos.y)], result: lastResult};
         for (var i = 0; i < windows.length; i++) frame.windows.push(snapshot(windows[i]));
         var bytes = JSON.stringify(frame);
-        if (bytes.length > 65536) { stopped = true; timer.stop(); return; }
+        if (bytes.length > 65536) { stop("snapshot too large"); return; }
         pending = true;
         var started = Date.now();
         pendingSince = started;
@@ -120,7 +126,7 @@
             if (typeof owner !== "string" || owner.charAt(0) !== ":" ||
                 (bridgeOwner !== null && bridgeOwner !== owner) ||
                 Date.now() - started >= 250 || Date.now() < started) {
-                stopped = true; timer.stop(); return;
+                stop("bridge owner missing, replaced or late"); return;
             }
             bridgeOwner = owner;
             // Address the pinned unique owner, never a replacement claiming its name.
@@ -128,15 +134,15 @@
             pending = false;
             if (stopped) return;
             if (Date.now() - started >= 250 || Date.now() < started || typeof reply !== "string" || reply.length > 4096) {
-                stopped = true; timer.stop(); return;
+                stop("bridge reply invalid or late"); return;
             }
             try {
                 var message = JSON.parse(reply);
                 if (message.protocol !== 1 || message.sequence !== frame.sequence ||
-                    !Array.isArray(message.commands) || message.commands.length > 1) return;
-                if (message.stop === true) { stopped = true; timer.stop(); return; }
+                    !Array.isArray(message.commands) || message.commands.length > 1) { stop("invalid response schema"); return; }
+                if (message.stop === true) { stop("explicit revoke"); return; }
                 lastResult = message.commands.length ? apply(message.commands[0], frame) : "none";
-            } catch (error) { stopped = true; timer.stop(); }
+            } catch (error) { stop("response decoding failed"); }
             });
         });
     }
