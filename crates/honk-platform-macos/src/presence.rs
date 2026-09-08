@@ -155,7 +155,7 @@ mod native {
         }
 
         fn observe(&mut self) -> Observation {
-            if !AXIsProcessTrusted() {
+            if !unsafe { AXIsProcessTrusted() } {
                 self.application = None;
                 self.worker.poll(None).ok();
                 return Err(CapabilityStatus::Denied);
@@ -170,10 +170,9 @@ mod native {
                 self.worker.poll(None).ok();
                 return Err(CapabilityStatus::Unprobed);
             };
-            let unchanged = self
-                .application
-                .as_ref()
-                .is_some_and(|previous| !previous.isTerminated() && previous.isEqual(&current));
+            let unchanged = self.application.as_ref().is_some_and(|previous| {
+                !previous.isTerminated() && previous.isEqual(Some(&current))
+            });
             if !unchanged {
                 self.generation = self.generation.wrapping_add(1);
             }
@@ -223,7 +222,7 @@ mod native {
     }
 
     fn query(target: Target) -> Observation {
-        if !AXIsProcessTrusted() {
+        if !unsafe { AXIsProcessTrusted() } {
             return Err(CapabilityStatus::Denied);
         }
         let deadline = Instant::now() + QUERY_TIMEOUT;
@@ -242,7 +241,10 @@ mod native {
             return Err(CapabilityStatus::Failed);
         }
         let value = attribute(window, "AXFullScreen", deadline)?;
-        if Instant::now() > deadline || !AXIsProcessTrusted() {
+        if !unsafe { AXIsProcessTrusted() } {
+            return Err(CapabilityStatus::Denied);
+        }
+        if Instant::now() > deadline {
             return Err(CapabilityStatus::Failed);
         }
         value

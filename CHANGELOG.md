@@ -33,6 +33,7 @@ All notable changes to this project are documented here. Format based on
 - Recover Windows notification-observation status after a successful poll follows an error, and expose the current Linux compositor fullscreen capability independently of unsupported DND observation.
 
 ### Behind the scenes
+- Correct native Mac binding signatures at the real target build and retain permission withdrawal separately from an observation timeout.
 - Verify independent presence status against each actual Linux compositor lifecycle, and use the real safety configuration fields for Mac live-toggle qualification.
 - Qualify Mac presence through native AppKit windows, actual engine manners, live settings, unresponsive targets and graceful shutdown. Preserve the unanswered private Focus-authorization evidence as unqualified and keep it an explicit optional experiment without production prompts.
 
