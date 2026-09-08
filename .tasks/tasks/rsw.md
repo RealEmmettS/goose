@@ -55,6 +55,7 @@ and pointer authority remain unsupported.
 Publication remains ordered after the qualified KDE release.
 
 ## Activity
+- 2026-09-08 — The reviewed source passes Linux decoder/contention tests on all four native lanes. Actual XWayland maps the intentionally untitled client with a null name but recovers its real PID through XRes, so the fixture's null-PID expectation was false. Require that exact real PID and native null title; retain the separate nullable-PID decoder regression without claiming it was reproduced by this desktop.
 - 2026-09-08 — Reproduce both reviewed decoder failures with production tests, then accept null titles and retain unknown-PID fullscreen windows. Replace observation try-lock failure with the short publication lock and add a contention regression. Extend the real native desktop fixture with a minimal untitled XWayland client omitting its PID; keep all authority and bounds checks.
 - 2026-09-08 — Hold the candidate after the Windows host capture fails its old 80% empty-area assumption. Inspect the complete native image and all twelve reports; only that assumption fails after entry. Require every DWM pixel to match the exact presented surface over both controlled backgrounds, retain clipping/color/anatomy checks, and cover bounded poses and injected damage before rerunning native qualification.
 - 2026-09-08 — Inspect all four complete native runtime results: real fullscreen manners,

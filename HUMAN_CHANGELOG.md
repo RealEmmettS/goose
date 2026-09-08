@@ -61,6 +61,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ### Behind the scenes
 - Test optional Hyprland support in isolated desktops before offering it, checking that desktop observations are trustworthy and unrelated windows remain untouched.
+### Behind the scenes
+- Keep the release guidance aligned with the published KDE update and freshly checked downloads across every supported platform.
+
+### Behind the scenes
+- Verify the process identity actually reported by the desktop when checking an untitled application, and distinguish that native result from the missing-identity regression.
+
 ### Fixed
 - Keep fullscreen quiet behavior working when an application has no title or does not report its process identity, and avoid briefly losing desktop observations while a fresh view is being recorded.
 

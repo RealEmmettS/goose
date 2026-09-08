@@ -46,6 +46,9 @@ All notable changes to this project are documented here. Format based on
 
 ### Behind the scenes
 - Begin separate Hyprland native interface qualification across x64/ARM64 and legacy/Lua generations, checking private socket peers, actual window identity, bounded owned-fixture movement and fullscreen before runtime integration.
+- Record the immutable KDE publication, unchanged-source candidate/main qualification, all eight fresh-public installation lanes and the independent audit of every public artifact.
+
+### Behind the scenes
 - Record v1.5.0 immutable publication, all-eight fresh-public qualification and independent verification of all 47 assets. Close both website handoffs against the actual renderer SVG deployment and verified Linux/Pi guidance with all 22 download mappings.
 
 ### Behind the scenes
@@ -54,6 +57,7 @@ All notable changes to this project are documented here. Format based on
 ## [1.7.0] - Unreleased candidate
 
 ### Fixed
+- Retain XRes-derived process identity in the native untitled-client fixture: both qualified XWayland generations report the real PID despite an absent `_NET_WM_PID`. Qualify the actual null title natively and keep nullable-PID behavior covered by its separate production decoder regression.
 - Preserve healthy Sway observations during frame-publication contention. Accept legitimate null titles and retain visible fullscreen clients whose process identity is unavailable; regression tests reproduce both decoder failures, and native qualification includes an untitled XWayland client without an advertised PID.
 - Replace the Windows smoke's obsolete full-canvas transparency assumption for bounded captures with exact DIB-to-DWM comparison of every pixel over both backgrounds and a complete clear perimeter. Preserve semantic, clipping, channel, premultiplication and black-surface checks; add regressions for bounded poses, opaque slabs, incorrect alpha and stale frames.
 - Preserve a healthy Sway observation worker through repeated CLI or native settings setup. Verify the actual worker identity and unchanged consent while fullscreen manners remain enabled.

@@ -20,20 +20,19 @@ Guided opt-in KWin and portal/libei capability adapters; deny terminal targets a
 The requested behavior runs through its production path and the supporting evidence matches the claimed platform and installation.
 
 ## Verification
-- [ ] Relevant production-path regression tests pass.
-- [ ] Actual behavior or rendered output is inspected in its supported environment.
-- [ ] Integration and required package/release checks pass before publication.
+- [x] Relevant production-path regression tests pass.
+- [x] Actual behavior or rendered output is inspected in its supported environment.
+- [x] Integration and required package/release checks pass before publication.
 
 ## Status
-Active. Versioned v1.6.0 metadata and readiness are prepared. The complete KDE 6
-pointer runtime/settings lifecycle passes both native architectures. Repeated window
-qualification exposed an exact-number decoding error that caused valid fractional
-geometry to fail KWin's stale-position guard. A captured production regression fails
-before the decoder correction and passes after it. Final-source native repetition,
-all architecture/package lanes and same-source candidate/main qualification remain
-required before publication.
+Active for the final website readback. Immutable v1.6.0 is public at d38e4845,
+after the complete candidate, unchanged-source main and publication gates.
+All eight fresh-public installation lanes and the independent 47-asset audit pass.
+Native window, settings and pointer lifecycle regressions pass on final source.
+See docs/readiness/v1.6.0-readiness.md for exact source and run identities.
 
 ## Activity
+- 2026-09-08 — Publish v1.6.0 after candidate 34217330049 and unchanged main qualification. Publication 34222242693 and fresh-public 34225303741 pass; independently verify every public asset and send the authorized website update for final live readback.
 - 2026-09-08 — Candidate 34214227317 passes all architecture/package/native/signing gates at 881884a. PR review identifies missing Cargo source-package inclusion and unnecessary pointer revocation on repeated healthy KDE setup. Correct both and require actual Cargo selection plus repeated CLI/native setup during a live native pointer grant before qualifying the changed source.
 - 2026-09-08: Publication-record main run 34209990490 exposes an ARM64 restart-fixture race: the output file exists before its line is written, giving zero fields. Keep the actual restart and exact PID/session/start-argument assertions; wait for the complete line within the existing deadline before readback. Carry the correction into final-source qualification.
 - 2026-09-08: Prepare the next distinct release and make exact-commit native KDE qualification a required candidate/publication dependency. Track the integrated accessibility failure without weakening the actual consent or movement checks.

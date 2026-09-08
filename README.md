@@ -5,22 +5,24 @@ across real monitor layouts, honks, leaves muddy footprints, reacts to the point
 bounded desktop pranks. Configuration and control stay local through a command-line interface
 and native graphical and terminal settings screens.
 
-**New in v1.5.0:** owned Linux notes and pictures,
-live desktop-session reporting, and experimental Pi 4/5 64-bit Desktop guidance. X11 can
-animate owned deliveries; native Wayland uses normal compositor placement. These changes
-follow the v1.4.0 goose redesign, runtime reliability work and native graphical settings.
+**New in v1.6.0:** explicit KDE window observations and animated owned deliveries,
+with separately requested temporary pointer permission on qualified KDE 6 GNU desktops.
+Setup and removal are available through native settings and the command line.
+These changes follow the goose redesign, native graphical settings, Linux notes and
+pictures, and experimental Pi 4/5 64-bit Desktop guidance.
 `honk300 settings` and tray Configure open the GUI; `honk300 config` retains the TUI.
 Both edit the same Rust-owned configuration. All eight managed installation checks passed
-against fresh public downloads. See [stage-two readiness](docs/readiness/v1.5.0-readiness.md),
+against fresh public downloads. See [KDE setup](docs/wayland-integrations.md),
+[stage-three readiness](docs/readiness/v1.6.0-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.5.0](https://github.com/RealEmmettS/goose/releases/tag/v1.5.0),
-published from exact commit `af0bec1394361902dca350d5d900d5c56f391046`. It includes the
+**Current stable release:** [v1.6.0](https://github.com/RealEmmettS/goose/releases/tag/v1.6.0),
+published from exact commit `d38e4845dd049c25d4719a8abec0c6304f44f013`. It includes the
 continuous goose redesign, expressive motion, bounded rendering resources, native
-graphical settings, and the new Linux deliveries. See [release evidence](docs/readiness/v1.5.0-readiness.md).
+graphical settings, Linux deliveries and opt-in KDE integration. See [release evidence](docs/readiness/v1.6.0-readiness.md).
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
