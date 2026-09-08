@@ -34,8 +34,9 @@ Rust workspace, strict Clippy, release build, 130 Python checks (three host skip
 settings tests/check/build pass. Workflow 34186038608 passed both GNU architectures,
 including visible X11 delivery, actual labwc 0.7.1 placement and scales one/two, input
 rejection, child loss and standalone controls. ARM64 note and complete-image captures
-were visually reviewed. The exact official GNU companion on GTK 4.6 and musl/full-platform
-release integration remain open. Nothing is published.
+were visually reviewed. The exact official GNU companions passed on GTK 4.6 in the full
+native settings matrix. Add those same real prop checks to the shipped musl companions;
+their native results and complete release integration remain open. Nothing is published.
 
 ## Evidence
 | Criterion | Oracle / invocation | Raw result or pointer | Interpretation | Limitation | Status |
@@ -44,9 +45,13 @@ release integration remain open. Nothing is published.
 | Native host text, pixels, moves, closes, invalid input and EOF | smoke_owned_props_linux.py, scales one and two | 34185456570 GNU x64/ARM64 artifacts | Both cycles and complete-picture pixel checks pass | X11 native host; no Pi hardware | PASS |
 | Runtime delivery, failure and shared status | smoke_runtime_props_linux.py | 34186038608 runtime-props-evidence/result.json and session-status.json | Real visible native text, child loss, failure latch, caller-independent status and standalone controls pass | Disposable GNU desktop | PASS |
 | Visible runtime note and labwc | strengthened capture and native placement probes | 34186038608 props-labwc/result.json and engine/result.json | Both native architectures pass labwc 0.7.1, scales one/two, normal placement and opt-in enforcement; ARM64 images inspected | Headless pixman, no physical Pi | PASS |
-| Oldest GTK and exact release companions | Native settings production-payload prop checks | next complete settings matrix | New GNU baseline gate added after production identity verification | GNU baseline and musl results pending | NOT RUN |
+| Oldest GTK and exact GNU release companions | Native settings production-payload prop checks | 34186768042 all eight settings lanes pass | GNU x64/ARM64 prop checks pass with GTK 4.6 after production identity verification | Disposable desktops, no physical Pi | PASS |
+| Exact musl release companions | Shared production-payload prop checks | next complete settings matrix | Require real host and runtime behavior under Alpine on both native architectures | Native result pending | NOT RUN |
 
 ## Activity
+- 2026-09-07: The entire native settings matrix passed, including real production GNU
+  prop delivery on the older GTK baseline. Add the same host/runtime/pixel/failure checks
+  for native x64/ARM64 musl payloads, retaining independently verified production identity.
 - 2026-09-07: Both GNU architecture jobs passed native X11 and labwc with visible real-runtime notes, scaled complete pictures, owned-only movement, user/program closes, malformed input, child failure and cleanup. Reviewed ARM64 captures. Add the same checks to the official Ubuntu 22.04 production companion gate; tighten the pixel oracle so gray desktop pixels cannot substitute for the note.
 - 2026-09-07: Real x64 X11 engine delivery, text, companion failure latching, graceful cleanup, caller-independent session readback and standalone controls pass at eafa11c. Screenshot review found the test compositor's debug mode flattened the transparent overlay over the note; use the existing production-like client-composition mode and require visible note pixels/geometry. Labwc then stopped on the older wlr-randr lacking --json; read its actual text output. Visual and Wayland gates remain open.
 - 2026-09-07: Reconciled the independent implementation and dependent publication tasks, preserving release order. Refreshed the versioned task dashboard from the installed skill bundle while retaining its title, settings and stopped server state.
