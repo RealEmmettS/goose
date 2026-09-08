@@ -172,14 +172,18 @@ def main():
             anonymous = wait(identity_node, 'actual anonymous native identity')
             assert anonymous['shell'] == 'xwayland'
             assert anonymous['window_properties']['class'] == 'honk300-sway-identity-probe'
-            assert anonymous['name'] in (None, '') and anonymous['pid'] is None, anonymous
+            assert anonymous['name'] is None, anonymous
+            # Both qualified XWayland versions recover the real process through
+            # XRes even without _NET_WM_PID. Keep that native identity intact;
+            # nullable-PID handling has its separate production decoder regression.
+            assert anonymous['pid'] == identity['pid'], anonymous
             command(f'[con_id={anonymous["id"]}] fullscreen enable')
             wait(lambda: identity_node()['fullscreen_mode'] > 0, 'anonymous native fullscreen')
             rust = rust_snapshot('anonymous-fullscreen')
             if rust:
-                assert rust['fullscreen'], 'A real fullscreen client without a PID was ignored'
+                assert rust['fullscreen'], 'A real untitled fullscreen client was ignored'
                 observed = next(node for node in rust['windows'] if node['id'] == anonymous['id'])
-                assert observed['title'] == '' and observed['pid'] is None
+                assert observed['title'] == '' and observed['pid'] == identity['pid']
             (evidence / 'anonymous-window.json').write_text(json.dumps(anonymous, indent=2) + '\n')
             (evidence / 'identity.stop').write_text('stop\n')
             wait(lambda: (evidence / 'identity.done').exists() and identity_node() is None,

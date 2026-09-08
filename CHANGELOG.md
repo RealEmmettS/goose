@@ -35,6 +35,7 @@ All notable changes to this project are documented here. Format based on
 ## [1.7.0] - Unreleased candidate
 
 ### Fixed
+- Retain XRes-derived process identity in the native untitled-client fixture: both qualified XWayland generations report the real PID despite an absent `_NET_WM_PID`. Qualify the actual null title natively and keep nullable-PID behavior covered by its separate production decoder regression.
 - Preserve healthy Sway observations during frame-publication contention. Accept legitimate null titles and retain visible fullscreen clients whose process identity is unavailable; regression tests reproduce both decoder failures, and native qualification includes an untitled XWayland client without an advertised PID.
 - Replace the Windows smoke's obsolete full-canvas transparency assumption for bounded captures with exact DIB-to-DWM comparison of every pixel over both backgrounds and a complete clear perimeter. Preserve semantic, clipping, channel, premultiplication and black-surface checks; add regressions for bounded poses, opaque slabs, incorrect alpha and stale frames.
 - Preserve a healthy Sway observation worker through repeated CLI or native settings setup. Verify the actual worker identity and unchanged consent while fullscreen manners remain enabled.

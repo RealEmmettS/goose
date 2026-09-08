@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Behind the scenes
+- Verify the process identity actually reported by the desktop when checking an untitled application, and distinguish that native result from the missing-identity regression.
+
 ### Fixed
 - Keep fullscreen quiet behavior working when an application has no title or does not report its process identity, and avoid briefly losing desktop observations while a fresh view is being recorded.
 
