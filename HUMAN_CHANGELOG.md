@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Check that GNOME can tell when you are dragging a window and keeps automatic movements out of your way, alongside the now-visible goose desktop checks.
+
+### Behind the scenes
 - Check that the goose is actually visible on the GNOME desktop after leaving the startup overview.
 
 ### Behind the scenes

@@ -42,7 +42,7 @@ jobs:
             DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
               gnome-shell gnome-session-bin dbus-x11 python3 python3-gi gir1.2-gtk-4.0 \
               libgl1-mesa-dri libegl-mesa0 xvfb xauth xwayland wayland-utils imagemagick \
-              util-linux passwd libasound2t64 dconf-cli
+              util-linux passwd libasound2t64 dconf-cli xdotool
             dpkg-query -W > target/gnome-evidence/packages.txt
             # Package installation may create an empty seats directory even
             # though this private container has no systemd/login session. Keep

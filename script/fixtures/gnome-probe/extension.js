@@ -39,6 +39,7 @@ export default class Probe extends Extension {
             gtk_app: window.get_gtk_application_id(), type: window.get_window_type(),
             client: window.get_client_type(), rect: [rect.x, rect.y, rect.width, rect.height],
             fullscreen: window.is_fullscreen(), minimized: window.minimized,
+            focused: window.has_focus(),
             showing: window.showing_on_its_workspace(), monitor: window.get_monitor()};
     }
 
@@ -49,6 +50,7 @@ export default class Probe extends Extension {
         return JSON.stringify({version: Config.PACKAGE_VERSION, pid: new Gio.Credentials().get_unix_pid(),
             display: GLib.getenv('DISPLAY'), wayland: GLib.getenv('WAYLAND_DISPLAY'),
             session_wayland: Meta.is_wayland_compositor(), drag: this._drag,
+            grabbed: global.display.is_grabbed(),
             overview: Main.overview.visible, stage: [global.stage.width, global.stage.height],
             windows: windows.map(window => this._window(window))});
     }
@@ -67,7 +69,7 @@ export default class Probe extends Extension {
         if (window && window.get_title() !== 'Honk300 ordinary GNOME probe') failures.push('title');
         if (window && window.get_wm_class() !== 'honk300-gnome-probe') failures.push('application');
         if (window && JSON.stringify(this._window(window).rect) !== expected) failures.push('stale geometry');
-        if (this._drag) failures.push('active grab');
+        if (this._drag || global.display.is_grabbed()) failures.push('active grab');
         if (failures.length) throw new Error('Stale or unrelated probe target: ' + failures.join(', '));
         const rect = window.get_frame_rect();
         window.move_frame(false, rect.x + 6, rect.y);

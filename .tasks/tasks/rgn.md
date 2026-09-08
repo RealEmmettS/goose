@@ -40,6 +40,7 @@ Active. Begin the real Shell extension lifecycle, native window interface and
 compatible XWayland goose overlay premise. No GNOME production capability is enabled.
 
 ## Activity
+- 2026-09-08 — Run 34225100825 passes GNOME 46/48 on native x64/ARM64; inspect all four normal-desktop screenshots and confirm a complete visible goose. Qualify Mutter's actual grab state next with input confined to the private outer Xvfb desktop, exact fixture identity, automatic-move refusal while held and real release signals.
 - 2026-09-08 — All four command/extension/overlay-readiness premises pass in run 34224579271. Inspect every native screenshot: GNOME's startup overview hides the goose, so visible-overlay acceptance remains open. Explicitly leave the private overview after startup and require the actual normal-desktop state before the next screenshot.
 - 2026-09-08 — The actual extension now passes owned movement, stale refusal and fullscreen. Overlay startup correctly rejects the outer Xvfb credential on Mutter's separate XWayland display. Use only Mutter's existing private authority file in this fixture's runtime directory, without reading/copying its cookie or relaxing authentication; keep the outer capture connection separate.
 - 2026-09-08 — All four native desktops reach real GTK window identities. The first movement is correctly refused by the exact target guard; retain its individual refusal reasons and wait for stable mapped geometry before testing a move. Disable decorative animations only through the private desktop's own settings.

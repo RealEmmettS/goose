@@ -43,6 +43,8 @@ def main():
                    env=environment, check=True, timeout=5)
     subprocess.run(['gsettings', 'set', 'org.gnome.desktop.interface', 'enable-animations', 'false'],
                    env=environment, check=True, timeout=5)
+    subprocess.run(['gsettings', 'set', 'org.gnome.desktop.wm.preferences',
+        'mouse-button-modifier', '<Alt>'], env=environment, check=True, timeout=5)
     os.environ.update(environment)
     import gi
     gi.require_version('Gtk', '4.0')
@@ -151,6 +153,37 @@ def main():
                 pass
             else:
                 raise AssertionError('Stale geometry was accepted')
+            # Exercise actual Mutter input/grab signals through this fixture's
+            # private outer Xvfb display. No production input API is introduced.
+            assert call('ShowDesktop') == 'ok'
+            windows[0].present()
+            ordinary_for_drag = wait(lambda: (node if (node := find(ordinary['title']))
+                and node['focused'] and not snapshot()['overview'] else None), 'focused drag fixture')
+            x, y, width, height = ordinary_for_drag['rect']
+            def input_event(*arguments):
+                subprocess.run(['xdotool', *map(str, arguments)], env=environment,
+                    check=True, capture_output=True, timeout=5)
+            try:
+                input_event('mousemove', x + width // 2, y + height // 2,
+                            'keydown', 'Alt_L', 'mousedown', 1)
+                input_event('mousemove', x + width // 2 + 12, y + height // 2 + 12)
+                grabbed = wait(lambda: (state if (state := snapshot())['grabbed'] and
+                    state['drag'] and state['drag']['id'] == ordinary['id'] else None),
+                    'actual native user drag')
+                (evidence / 'user-drag.json').write_text(json.dumps(grabbed, indent=2) + '\n')
+                during = find(ordinary['title'])
+                try:
+                    call('MoveFixture', GLib.Variant('(tus)', (ordinary['id'], os.getpid(),
+                        json.dumps(during['rect'], separators=(',', ':')))))
+                except GLib.Error as error:
+                    assert 'active grab' in str(error), error
+                else:
+                    raise AssertionError('Active user drag accepted an automatic move')
+                assert find(protected['title'])['rect'] == protected['rect']
+            finally:
+                input_event('mouseup', 1, 'keyup', 'Alt_L')
+            wait(lambda: not (state := snapshot())['grabbed'] and not state['drag'],
+                 'actual native grab release')
             windows[0].fullscreen()
             wait(lambda: find(ordinary['title'])['fullscreen'], 'native fullscreen observation')
             windows[0].unfullscreen()
@@ -207,7 +240,7 @@ def main():
                 shell_pid=shell.pid, peer_credentials=True, layer_shell=layer_shell,
                 xwayland_overlay_ready=True, normal_desktop=True, actual_fixture_move=True, stale_geometry_refused=True,
                 native_fullscreen=True, extension_disable=True, initial=ordinary, moved=moved,
-                protected=protected, user_drag_qualified=False, pointer_control_qualified=False)
+                protected=protected, user_drag_qualified=True, pointer_control_qualified=False)
             (evidence / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result))
         finally:

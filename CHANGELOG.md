@@ -27,6 +27,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Qualify actual GNOME user-grab begin/end and automatic movement refusal through the isolated native desktop after all four normal-desktop goose captures pass visual inspection.
+
+### Behind the scenes
 - Hold GNOME visible-overlay qualification after reviewing all four passing command-run screenshots: Shell remained in its startup overview, which hides the overlay. Require the actual normal desktop before capture and retain overview/stage diagnostics.
 - Connect the GNOME overlay probe with Mutter's existing private XWayland authority file while retaining Xvfb's separate capture authority; preserve authenticated X11 access without reading or copying its cookie.
 - Wait for actual stable GNOME fixture geometry after mapping, disable animations only in the private test desktop, and retain specific native stale-target refusal reasons without relaxing the action guard.

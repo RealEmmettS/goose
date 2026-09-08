@@ -20,7 +20,8 @@
 
 ## Active
 - [ ] **GNOME desktop companion** - versioned explicit Shell integration with proven observation, placement and a compatible overlay path (needs #rkde) (ms #refine) (owner codex) #rgn
-  - [ ] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
+  - [x] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
+  - [ ] Prove live user-drag observation and automatic movement refusal through actual desktop input.
   - [ ] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
   - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
 - [ ] **Sway desktop observations** - explicit native window/fullscreen support with exact-version evidence and honest action limitations (needs #rkde) (ms #refine) (owner codex) #rsw
