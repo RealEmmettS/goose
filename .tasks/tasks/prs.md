@@ -15,8 +15,8 @@ First exercise the platform's actual observation API on a disposable native desk
 The functional bar is honest independent fullscreen/DND status and correct manners behavior when observations are available or lost. The evidence bar is real native state changes and production-path failure tests; advertised support requires the normal platform/package release gates. The user-approved plan owns those gates. Unsupported APIs may be recorded as refuted with explicit fallback, never as inferred support.
 
 ## Verification
-- [ ] Native fullscreen state changes affect the real engine manners path and revert on exit/loss.
-- [ ] Any advertised DND support is established by an actual platform signal; unavailable paths remain clearly unsupported.
+- [x] Native fullscreen state changes affect the real engine manners path and revert on exit/loss.
+- [x] Any advertised DND support is established by an actual platform signal; unavailable paths remain clearly unsupported.
 - [ ] Settings and runtime status agree after permission loss, reload and unsupported-session selection.
 
 ## Status
@@ -28,6 +28,7 @@ the GNOME review fixes, then complete final-source candidate, main, publication,
 fresh-public and website gates.
 
 ## Activity
+- 2026-09-08 — Final merged Mac repeat 34255297607 passes both architectures and denied-identity scenarios at a9d8a89; inspect both native fullscreen captures. Integrate GNOME's diagnosed timeout recovery and remapped-frame input qualification while retaining strict deadlines, terminal failures and ordered public releases. Hyprland publication and website records are complete.
 - 2026-09-08 — Run 34253150265 passes both native Mac architectures on the corrected expiry implementation, including independent denied-identity scenarios. Inspect both fullscreen captures; status and graceful-stop bounds pass. Integrate the four GNOME review corrections before final-source release qualification; earlier candidates remain cancelled and unpublished.
 - 2026-09-08 — Apple Silicon repeat 34251439574 withdraws fullscreen correctly but exposes expired results flickering back to unprobed during the actual frozen-target check. Report completed-but-expired observations as Failed, retaining the exact freshness deadline; add actual worker expiry/recovery coverage and repeat the unchanged native oracle. Intel passes both runtime and private denied-identity scenarios.
 - 2026-09-08 — Preserve the immutable Hyprland publication's cold-start failure and earlier main Sway startup failure. In future source, bound initial read-only version readiness separately from each original transaction; keep exact peer/protocol checks, record timing/attempts and never retry mutating commands. Published-source retry remains unchanged.

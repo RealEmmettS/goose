@@ -41,6 +41,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Show a clear temporary failure when a Mac app stops answering, and restore its fullscreen status when it responds again.
 
 ### Behind the scenes
+- Repeat Mac permission and fullscreen checks with the integrated desktop changes, and retain the verified publication order.
 - Check real Mac fullscreen changes, denied access, interrupted apps, live settings and shutdown. Verify that assistive software can read both manners status labels, and keep do-not-disturb unavailable where its signal has not been verified.
 - Check the complete Mac implementation more strictly and keep Linux-only uninstall checks out of the Mac build.
 - Wait for private test desktops and windows to be ready, then verify actual input, fullscreen changes and completion without loosening communication or behavior checks.

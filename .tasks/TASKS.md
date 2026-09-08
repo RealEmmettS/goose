@@ -9,7 +9,7 @@
 
 ## Active
 - [ ] **Fullscreen and do-not-disturb observations** - resolve audit R05 with separately proven platform observations and honest fallback (needs #rfnd) (ms #refine) (owner codex) #prs
-  - [ ] Qualify macOS fullscreen and supported system do-not-disturb observation paths.
+  - [x] Qualify macOS fullscreen and supported system do-not-disturb observation paths.
   - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
   - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
   - [ ] Qualify the complete candidate, unchanged main, fresh public distribution and website guidance.
