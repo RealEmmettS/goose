@@ -32,6 +32,7 @@ All notable changes to this project are documented here. Format based on
 - Begin native portal/libei qualification using an ephemeral pointer-only session, bounded device ownership, compositor-confirmed terminal exclusions and no runtime enablement before the real grant/motion/cancellation probe passes.
 
 ### Fixed
+- Wait for the native KDE portal backend and exported RemoteDesktop interface instead of accepting only the frontend bus name; initialize activation with the private compositor environment before GUI startup.
 - Correct the Linux runtime's pointer-distance call to the production engine vector API, as caught by the expanded native KWin build gate.
 
 ### Added

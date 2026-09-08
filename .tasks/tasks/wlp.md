@@ -32,5 +32,6 @@ Active: checking the real library and KDE 6 grant before enabling a runtime capa
 KDE 5 has separate window evidence; no EIS or portal control is claimed for it.
 
 ## Activity
+- 2026-09-08: Run 34196518648 proves the fixture checked service ownership before the KDE backend registered. Require both portal owners and the actual RemoteDesktop interface, and initialize D-Bus activation with the private Wayland environment before GTK can auto-start a backend.
 - 2026-09-08: Native library compilation and strict checks passed on both architectures, but KDE 6 run 34196079474 disconnected before native consent. Added the library's bounded error detail and exact portal service ownership evidence to identify the failing setup premise; pointer control remains disabled in the runtime.
 - 2026-09-08: Recovered the historical board-only spike as the approved implementation task and began the native portal/libei premise. The release gate remains #rkde.

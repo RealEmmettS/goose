@@ -63,6 +63,19 @@ def qualify(binary, evidence, wait, call, GLib, Gtk, RustBridge):
         launch(program('xdg-desktop-portal', 'xdg-desktop-portal'), 'desktop', '--verbose')
         wait(lambda: call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
             'NameHasOwner', GLib.Variant('(s)', ('org.freedesktop.portal.Desktop',))).unpack()[0], 'native portal service')
+        wait(lambda: call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+            'NameHasOwner', GLib.Variant('(s)', ('org.freedesktop.impl.portal.desktop.kde',))).unpack()[0],
+            'native KDE portal backend')
+
+        def remote_desktop_ready():
+            try:
+                return call('org.freedesktop.portal.Desktop', '/org/freedesktop/portal/desktop',
+                    'org.freedesktop.DBus.Properties', 'Get',
+                    GLib.Variant('(ss)', ('org.freedesktop.portal.RemoteDesktop', 'version'))).unpack()[0]
+            except GLib.Error:
+                return False
+
+        wait(remote_desktop_ready, 'exported RemoteDesktop interface')
         owner_pids = {name: call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
             'GetConnectionUnixProcessID', GLib.Variant('(s)', (name,))).unpack()[0]
             for name in ('org.freedesktop.portal.Desktop', 'org.freedesktop.impl.portal.desktop.kde')}

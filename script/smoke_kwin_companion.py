@@ -125,6 +125,15 @@ def main():
             assert owner.startswith(':'), owner
             os.environ.update(environment)
             os.environ['WAYLAND_DISPLAY'] = 'wayland-honk-kwin'
+            # GTK and the settings service may activate portals before the input
+            # qualifier. Give those services the actual private compositor first.
+            activation = {key: value for key, value in os.environ.items()
+                if key in ('WAYLAND_DISPLAY', 'XDG_RUNTIME_DIR', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME',
+                           'XDG_CURRENT_DESKTOP', 'XDG_SESSION_TYPE', 'LANG')}
+            activation.update(QT_QPA_PLATFORM='wayland', QT_ACCESSIBILITY='1',
+                              QT_LINUX_ACCESSIBILITY_ALWAYS_ON='1')
+            call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+                 'UpdateActivationEnvironment', GLib.Variant('(a{ss})', (activation,)))
             gi.require_version('Gtk', '4.0')
             from gi.repository import Gtk
             GLib.set_prgname('honk300-native-probe')

@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Fixed
+- Wait for desktop permission services to finish starting before testing a request.
+
 ### Behind the scenes
 - Check the actual KDE setup and removal buttons while keeping unsaved settings intact.
 - Make failed desktop permission requests easier to diagnose before enabling the goose to move the pointer.
