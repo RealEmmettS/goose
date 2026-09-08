@@ -118,16 +118,25 @@ class TerminalEditor:
         self.directory = directory
         self.process = subprocess.Popen([str(INSTALLED), 'config', '--config', str(config)],
                                         stdin=slave, stdout=slave, stderr=slave,
-                                        env=environment, start_new_session=True)
+                                        env=environment, start_new_session=True,
+                                        # This fixture is single-threaded here. A
+                                        # new session needs a controlling terminal
+                                        # for crossterm's /dev/tty event reader.
+                                        preexec_fn=lambda: fcntl.ioctl(0, termios.TIOCSCTTY, 0))
         os.close(slave)
-        self.until('honk300 config')
+        try:
+            self.until('honk300 config')
+        except BaseException:
+            self.close()
+            raise
 
     def until(self, needle):
         def observed():
             if select.select([self.master], [], [], 0)[0]:
                 self.output += os.read(self.master, 65536).decode(errors='replace')
+                (self.directory / 'terminal.txt').write_text(self.output)
             if self.process.poll() is not None:
-                raise RuntimeError('Terminal editor exited before the update handoff')
+                raise RuntimeError(f'Terminal editor exited before the update handoff: {self.output[-2000:]}')
             return needle in self.output
         wait(observed, f'terminal text {needle}')
         (self.directory / 'terminal.txt').write_text(self.output)

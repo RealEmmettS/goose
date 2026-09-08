@@ -12,6 +12,8 @@ mod install;
 mod runtime;
 mod settings;
 mod update;
+#[cfg(windows)]
+mod windows_stdio;
 
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 mod assets;
@@ -42,6 +44,9 @@ const WINDOWS_APP_RUNTIME_EXITED: i32 = 11;
 const WINDOWS_APP_READINESS_TIMEOUT: i32 = 12;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(windows)]
+    windows_stdio::prevent_inheritance()?;
+
     #[cfg(windows)]
     if install::run_windows_config_autostart_protocol()? {
         return Ok(());

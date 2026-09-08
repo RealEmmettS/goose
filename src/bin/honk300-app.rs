@@ -8,6 +8,10 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 #[cfg(windows)]
+#[path = "../windows_stdio.rs"]
+mod windows_stdio;
+
+#[cfg(windows)]
 const LAUNCH_FAILURE: i32 = 10;
 #[cfg(windows)]
 const RUNTIME_EXITED: i32 = 11;
@@ -29,6 +33,8 @@ fn main() {
 
 #[cfg(windows)]
 fn run() -> Result<i32, i32> {
+    windows_stdio::prevent_inheritance().map_err(|_| LAUNCH_FAILURE)?;
+
     if probe_runtime() == RuntimeProbe::Ready {
         return Ok(0);
     }

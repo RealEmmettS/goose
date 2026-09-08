@@ -138,8 +138,13 @@ def main() -> None:
             for label in ("Honk on the hour", "Travel across monitors", "Allow cursor nabs",
                           "Random cursor nabs", "Prevent all cursor nabs", "Prevent window rides",
                           "Ride supported windows", "Bring notes and memes"):
-                # Exercise the semantic action even when a smaller host viewport
-                # puts the eighth control below the scroll area's visible edge.
+                if label == "Bring notes and memes":
+                    # macOS ARM runners expose a shorter viewport. Native actions
+                    # still reject fully clipped controls, so scroll the real pane.
+                    scroll = re.search(r'widget @w1/main-canvas#(\d+) .*? scroll=\[offset=0,', snapshot())
+                    assert scroll, "missing initial settings scroll area"
+                    automate("widget-action", "main-canvas", scroll[1], "increment")
+                    wait(r'#' + scroll[1] + r' .*? scroll=\[offset=[1-9]')
                 identifier = widget(label, "switch")
                 before = re.search(r'#' + identifier + r' role=switch .*? value=([01]) ', snapshot())
                 assert before, f"missing switch value: {label}"

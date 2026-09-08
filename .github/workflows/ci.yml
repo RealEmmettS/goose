@@ -99,6 +99,15 @@ jobs:
           python script/verify_binary_architecture.py --format pe --machine 0x8664 --subsystem 3 target/release/honk300.exe
           python script/verify_binary_architecture.py --format pe --machine 0x8664 --subsystem 2 target/release/honk300-app.exe
           if ($LASTEXITCODE -ne 0) { throw 'x64 PE identity check failed' }
+      - name: Captured Windows start returns before runtime exit
+        run: python script/smoke_windows_captured_start.py --binary target/release/honk300.exe --evidence target/windows-captured-start-evidence
+      - name: Upload captured Windows start evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: honk300-windows-captured-start-ci
+          path: target/windows-captured-start-evidence
+          if-no-files-found: error
       - name: Windows layered-overlay compositor and lifecycle smoke
         shell: pwsh
         run: >-
@@ -150,6 +159,15 @@ jobs:
           python-version: '3.12'
       - name: Build native settings companion
         run: python script/build_settings.py --target aarch64-pc-windows-msvc --output target/aarch64-pc-windows-msvc/release
+      - name: Captured ARM64 start returns before runtime exit
+        run: python script/smoke_windows_captured_start.py --binary target/aarch64-pc-windows-msvc/release/honk300.exe --evidence target/windows-captured-start-evidence-arm64
+      - name: Upload captured ARM64 start evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: honk300-windows-captured-start-arm64-ci
+          path: target/windows-captured-start-evidence-arm64
+          if-no-files-found: error
       - name: ARM64 layered-overlay compositor and lifecycle smoke
         shell: pwsh
         run: |

@@ -39,6 +39,7 @@ All notable changes to this project are documented here. Format based on
 - Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
 
 ### Fixed
+- Clear the inherited standard-handle flags at both Windows process entry points before child creation. Captured CLI, app and settings launches now receive EOF while the detached runtime remains alive; the native settings Start action finishes instead of retaining its service output pipe.
 - Give each Native SDK license file its own WiX component and key path, satisfying automatic component identity rules in both Windows MSI editions.
 - Preserve the complete native accessibility tree after settings become dirty; the pinned toolkit and bridge now accept 256 bounded widgets. Keep test modules separate from platform link inputs even when optimization modes match, and restore the original macOS lifecycle cfg boundaries after module extraction.
 - Forward native settings semantics to Windows UI Automation and Linux AT-SPI through bounded AccessKit adapters (ADR 0042). Bind the Windows bridge DLL to archive/slot/receipt identities and retain both file leases until GUI initialization. Pin the Zig compiler bootstrap and repair native CI toolchain selection.
@@ -48,7 +49,8 @@ All notable changes to this project are documented here. Format based on
 - Aim cursor-seeking locomotion at the body position that brings the beak to the pointer, avoiding a stationary-pointer chase that could never reach the grab distance.
 
 ### Development
-- Use semantic toggle actions for the largest dirty settings page across host viewport sizes, checking every changed switch and all eight saved values while retaining the zero-dispatch-error gate.
+- Exercise captured Windows CLI/app starts through real process EOF and runtime readiness on x64/ARM64. Give the disposable Linux TUI update fixture its own controlling PTY and preserve failed terminal output for diagnosis.
+- Scroll the real settings pane before toggling controls below smaller host viewports, checking every changed switch and all eight saved values while retaining the zero-dispatch-error gate.
 - Keep disposable settings lifecycle checks scoped to their CI environment and use Linux's explicit headless fallback where the fixture has no compositor; the independent Linux overlay gate continues to require visible pixels.
 - Qualify CLI, real terminal-editor keys and native GTK update actions with genuine Debian installation transactions. Exercise GUI download failure, unchanged receipt/runtime, retry, helper relaunch and public no-op results using an isolated terminal-output adapter. Exercise settings Start/Stop through the real runtime on disposable native desktops.
 - Scope the goose's antialiased edge-color oracle to its actual silhouette so independently colored seasonal props do not contaminate the sample. Preserve global alpha, crop, black-rectangle, and channel checks; add paired-compositor and raw-DIB regressions for a separate translucent prop.

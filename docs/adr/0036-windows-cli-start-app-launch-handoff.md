@@ -92,6 +92,24 @@ stop keep the shared graceful walk-off, while force stop remains immediate.
 - Public grammar, start flags, configuration, IPC, receipts, update provenance, and installer
   schemas do not change.
 
+### September 2026 captured-output correction
+
+The published Windows build returned its controller exit code while retaining the caller's
+original stdout/stderr pipe handles in the detached runtime. `Stdio::null()` selects new child
+standard streams; it does not clear ambient inheritable handles in Rust's Windows spawn.
+Both Rust executable entry points now clear `HANDLE_FLAG_INHERIT` on their own valid standard
+handles before creating threads or children. The current streams remain open and explicit
+`Stdio::inherit()` continues to use Rust's own inheritable duplicates. Explorer launches without
+standard streams are valid. Breakaway, hidden launch flags and readiness ownership are unchanged.
+
+The same captured-start regression times out against exact public v1.3.7 and passes against the
+correction, including the direct GUI launcher. The actual native settings Start action, closing
+settings with the same runtime still alive, reopening settings and graceful Stop also passed
+against an isolated Windows config. Both Windows CI architecture lanes repeat the EOF test.
+
+- [Pinned Rust Windows process implementation](https://github.com/rust-lang/rust/blob/1.95.0/library/std/src/sys/process/windows.rs)
+- [Windows handle inheritance](https://learn.microsoft.com/en-us/windows/win32/procthread/inheritance)
+
 ## References
 
 - [Cargo build-script linker arguments](https://doc.rust-lang.org/cargo/reference/build-scripts.html)

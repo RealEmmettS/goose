@@ -35,6 +35,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ### Improved
 
+Starting the goose from graphical settings now finishes promptly, and tools that capture a start command's output can finish while the goose keeps running. Closing settings leaves the goose running independently.
+
 Update checks explain when to use the official installer to enable automatic updates, using the same clear message in both settings screens.
 
 Save remains available to accessibility tools after changing settings, including pages with many controls.
@@ -42,6 +44,8 @@ Save remains available to accessibility tools after changing settings, including
 Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
 
 ### Behind the scenes
+
+Start checks now wait for the command's complete output while confirming the goose is still alive. Terminal update checks use a complete terminal session and retain any failure message.
 
 Windows installer builds now package each supporting license correctly. Settings checks verify every changed switch even on smaller windows, then confirm all changes were saved.
 
