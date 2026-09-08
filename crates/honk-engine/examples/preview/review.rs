@@ -5,13 +5,15 @@ use honk_engine::{
     rig::{Rig, RigAnim, RigInput},
     time::DT,
     tiny_skia::{Pixmap, PixmapPaint, Transform},
+    CollectWindowCapabilities, CollectWindowCommand, CollectWindowId, CollectWindowKind,
+    CollectWindowOptions, CollectWindowSnapshot, Rect, World, WorldOptions,
 };
 use std::{fs, path::Path};
 const CELL: u32 = 128;
 const COLS: u32 = 12;
 const COUNT: u32 = 120;
 const ANCHOR: Vec2 = Vec2 { x: 60.0, y: 93.0 };
-const SEQUENCES: [&str; 13] = [
+const SEQUENCES: [&str; 15] = [
     "walk",
     "walk-front",
     "walk-away",
@@ -21,6 +23,8 @@ const SEQUENCES: [&str; 13] = [
     "stop-charge",
     "turn",
     "reversal",
+    "delivery-reversal",
+    "delivery-short-return",
     "pet",
     "honk",
     "anticipation",
@@ -33,6 +37,11 @@ pub fn export(out: &str) {
     fs::create_dir_all(out.join("svg")).unwrap();
     let mut manifest = String::from("{\"developmentPreview\":true,\"fps\":30,\"cell\":128,\"scale\":2,\"columns\":12,\"count\":120,\"sequences\":{");
     for (index, name) in SEQUENCES.iter().enumerate() {
+        let delivery = match *name {
+            "delivery-reversal" => Some(delivery_frames(320.0, 40)),
+            "delivery-short-return" => Some(delivery_frames(312.0, 600)),
+            _ => None,
+        };
         let mut sheet = Pixmap::new(CELL * 2 * COLS, CELL * 2 * (COUNT / COLS)).unwrap();
         let mut anim = RigAnim::new(Vec2::ZERO, 0.0);
         let mut center = Vec2::ZERO;
@@ -98,21 +107,26 @@ pub fn export(out: &str) {
             anim.set_expression_options(true, *name == "reduced-motion");
             let velocity = Vec2::from_angle_degrees(heading) * speed;
             let mut rig = Rig::default();
-            for tick in 0..4 {
-                center = center + velocity * DT;
-                rig = anim
-                    .update(&RigInput {
-                        center,
-                        direction_deg: heading,
-                        neck_target: 0.45,
-                        speed,
-                        velocity,
-                        step_time: 0.2,
-                        now: f64::from(t) + f64::from(tick) * f64::from(DT),
-                        dt: DT,
-                    })
-                    .primary;
-                anim.feet.drain_plants(|_| {});
+            if let Some(frames) = &delivery {
+                rig = frames[frame as usize];
+                center = rig.ground;
+            } else {
+                for tick in 0..4 {
+                    center = center + velocity * DT;
+                    rig = anim
+                        .update(&RigInput {
+                            center,
+                            direction_deg: heading,
+                            neck_target: 0.45,
+                            speed,
+                            velocity,
+                            step_time: 0.2,
+                            now: f64::from(t) + f64::from(tick) * f64::from(DT),
+                            dt: DT,
+                        })
+                        .primary;
+                    anim.feet.drain_plants(|_| {});
+                }
             }
             let cell = render_rig_scaled(
                 &rig,
@@ -198,4 +212,72 @@ pub fn export(out: &str) {
     .unwrap();
     fs::write(out.join("README.md"), "# Actual renderer development preview\n\nOpen index.html to play, pause, scrub, and inspect at 100/150/200 percent on light/dark backgrounds. PNG sheets: 120 frames, 30fps, 12 columns, 256px cells displayed at 128 CSS pixels. Heading PNGs: 512px cells displayed at 128 CSS pixels. Ground anchor: 60,93 world units in every cell. manifest.json records travel for the contact ruler.\n\nEvery named pose and heading also has an editable SVG. Individual motion frames are svg/<sequence>-000.svg through -119.svg. These are the same paths, colors, opacity, strokes and drawing order emitted by the production projected renderer; they contain no embedded raster, fonts, scripts or external resources. The shared rig and geometry remain authoritative. These are development exports, not public release or native desktop acceptance.\n").unwrap();
     println!("wrote actual renderer motion review to {}", out.display());
+}
+
+/// Native-height delivery witnesses use the actual task, locomotion and rig.
+/// A bounded in-memory prop supplies only the same native geometry/command feedback
+/// as the World regression. Frames span two seconds before and after note typing.
+fn delivery_frames(initial_y: f32, delay: usize) -> Vec<Rig> {
+    let mut options = WorldOptions::default();
+    options.timing.first_wander_time = 600.0;
+    options.mood.dynamic_moods = true;
+    options.schedule.seasonal = false;
+    options.collect_window = CollectWindowOptions::with_backend_support(
+        CollectWindowCapabilities {
+            spawn_note: true,
+            spawn_image: true,
+            move_window: true,
+            set_passthrough: true,
+            synthesize_text: true,
+        },
+        12,
+        15,
+    );
+    let mut world = World::with_options(
+        Rect::new(Vec2::ZERO, Vec2::new(1280.0, 900.0)),
+        1_788_900_900_000_000_000,
+        options,
+    );
+    for _ in 0..delay {
+        world.tick();
+    }
+    world.force_collect_window(CollectWindowKind::Note);
+    let mut native = None;
+    let mut typed_at = None;
+    let mut frames = Vec::new();
+    let initial = Vec2::new(430.0, initial_y);
+    let size = Vec2::new(420.0, 288.0);
+    for tick in 0..1800 {
+        world.tick();
+        for command in world.take_collect_window_commands() {
+            match command {
+                CollectWindowCommand::Spawn { request, payload } => {
+                    native = Some(CollectWindowSnapshot {
+                        id: CollectWindowId(1),
+                        request,
+                        kind: payload.kind(),
+                        rect: Rect::new(initial, initial + size),
+                        alive: true,
+                        close_origin: None,
+                    });
+                }
+                CollectWindowCommand::Move { top_left, .. } => {
+                    native.as_mut().unwrap().rect = Rect::new(top_left, top_left + size);
+                }
+                CollectWindowCommand::TypeNote { .. } => typed_at = Some(tick),
+                _ => {}
+            }
+        }
+        if tick > 60 {
+            world.set_collect_window_snapshot(native);
+        }
+        frames.push(world.goose.rig);
+        if typed_at.is_some_and(|typed| tick >= typed + COUNT as usize * 2) {
+            break;
+        }
+    }
+    let start = typed_at.expect("native-height delivery did not complete") - COUNT as usize * 2;
+    (0..COUNT as usize)
+        .map(|frame| frames[start + frame * 4])
+        .collect()
 }

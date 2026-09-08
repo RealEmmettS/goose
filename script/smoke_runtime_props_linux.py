@@ -142,7 +142,10 @@ def main():
         prefix = ['import', '-window', 'root'] if positioning else ['grim']
 
         def visible():
+            capture_started = time.time_ns()
             subprocess.run([*prefix, str(path)], env=capture_environment, check=True, timeout=10)
+            (directory / 'capture-time.json').write_text(json.dumps({
+                'started_ns': capture_started, 'finished_ns': time.time_ns()}, indent=2) + '\n')
             if positioning:
                 windows = owned_windows(pid)
                 assert len(windows) == 1, windows
@@ -192,7 +195,8 @@ autumn = false
             directory.mkdir()
             with (directory / 'runtime.log').open('w') as log:
                 runtime = subprocess.Popen([str(binary), 'start', '--config', str(config),
-                                            *([] if positioning else ['--wayland'])], stdout=log, stderr=log)
+                                            *([] if positioning else ['--wayland'])], stdout=log, stderr=log,
+                                           env=dict(os.environ, HONK300_TRACE_COLLECTION='1'))
                 host_pid = None
                 try:
                     def ready():

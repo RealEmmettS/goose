@@ -144,7 +144,8 @@ pub fn run(
         overlay.monitor_bounds(),
         overlay.bounds(),
     )?;
-    let mut world = World::with_layout_and_options(layout, seed_from_clock(), effective.world);
+    let seed = seed_from_clock();
+    let mut world = World::with_layout_and_options(layout, seed, effective.world);
     let mut core = RuntimeCore::new();
     let mut damage_canvas = DamageCanvas::default();
     const AUDIO_RETRY_INTERVAL: f64 = 5.0;
@@ -603,12 +604,17 @@ pub fn run(
             );
         }
 
-        if trace_collection && now >= next_collection_trace && collection_trace_count < 600 {
-            next_collection_trace = now + 0.1;
+        if trace_collection
+            && world.is_collect_window_active()
+            && now >= next_collection_trace
+            && collection_trace_count < 7200
+        {
+            next_collection_trace = now + 1.0 / 120.0;
             collection_trace_count += 1;
             eprintln!(
-                "honk300 collection trace: time={now:.3} task={task_before_tick}->{} position={:?} target={:?} beak={:?} snapshot={collect_snapshot:?} kwin_sequence={:?}",
-                world.current_task(), world.goose.position, world.goose.target_pos,
+                "honk300 collection trace: time={now:.6} sim={:.6} seed={seed} task={task_before_tick}->{} position={:?} target={:?} velocity={:?} forward={:?} feet={:?} beak={:?} snapshot={collect_snapshot:?} kwin_sequence={:?}",
+                world.now(), world.current_task(), world.goose.position, world.goose.target_pos,
+                world.goose.velocity, world.goose.rig.forward, world.goose.rig.feet_pose,
                 world.goose.rig.beak_tip, kwin_frame.as_ref().map(|frame| frame.sequence)
             );
         }

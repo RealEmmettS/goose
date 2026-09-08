@@ -3080,9 +3080,15 @@ mod tests {
 
     #[test]
     fn delivered_note_recovery_withdraws_the_airborne_walking_prediction() {
-        for (delay, initial) in [(0, Vec2::new(500.0, 150.0)), (10, Vec2::new(500.0, 300.0))] {
+        for (seed, delay, initial) in [
+            (3, 0, Vec2::new(500.0, 150.0)),
+            (3, 10, Vec2::new(500.0, 300.0)),
+            (1_788_900_900_000_000_000, 40, Vec2::new(430.0, 320.0)),
+            (1_788_900_900_000_000_000, 600, Vec2::new(430.0, 312.0)),
+        ] {
             let mut options = WorldOptions::default();
             options.timing.first_wander_time = 600.0;
+            options.mood.dynamic_moods = true;
             options.schedule.seasonal = false;
             options.collect_window = CollectWindowOptions::with_backend_support(
                 CollectWindowCapabilities {
@@ -3095,8 +3101,11 @@ mod tests {
                 12,
                 15,
             );
-            let mut world =
-                World::with_options(Rect::new(Vec2::ZERO, Vec2::new(1280.0, 900.0)), 3, options);
+            let mut world = World::with_options(
+                Rect::new(Vec2::ZERO, Vec2::new(1280.0, 900.0)),
+                seed,
+                options,
+            );
             for _ in 0..delay {
                 world.tick();
             }
@@ -3107,7 +3116,13 @@ mod tests {
             let mut settled = false;
             let size = Vec2::new(420.0, 288.0);
             for tick in 0..1800 {
+                let before_feet = world.goose.rig.feet_pose;
                 world.tick();
+                for (before, after) in before_feet.into_iter().zip(world.goose.rig.feet_pose) {
+                    if !before.swinging && !after.swinging {
+                        assert_eq!(before.pos, after.pos, "delivery moved a planted contact");
+                    }
+                }
                 for command in world.take_collect_window_commands() {
                     match command {
                         CollectWindowCommand::Spawn { request, payload } => {
@@ -3146,6 +3161,13 @@ mod tests {
                     .poses();
                     for (index, foot) in world.goose.rig.feet_pose.iter().enumerate() {
                         let arrival_distance = Vec2::distance(feet[index].pos, stance[index].pos);
+                        // The native-height witness reverses during pickup without
+                        // a zero-speed tick. A stale swing must not starve the other
+                        // planted foot beyond the existing Run/Charge gait bound.
+                        assert!(
+                            arrival_distance <= 26.0,
+                            "delivery seed {seed} leaves foot {index} {arrival_distance:.3}px from its stopped home"
+                        );
                         assert!(
                             Vec2::distance(foot.pos, stance[index].pos)
                                 <= arrival_distance.max(8.0) + 0.001,

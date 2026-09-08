@@ -30,6 +30,7 @@ All notable changes to this project are documented here. Format based on
 - Add explicit GNOME Shell companion setup and removal through Rust CLI and Native SDK settings, with qualified GNOME 46.0/48.7 window, fullscreen and actual user-drag observations on native x64/ARM64. Preserve the compatible XWayland overlay and independent owned-prop positioning; foreign movement, pointer access and DND remain unsupported.
 
 ### Fixed
+- Keep airborne landing predictions current through braking, reversal and acceleration; apply the existing travel cap within an active swing while preserving planted contacts and lift progress. Pin actual native-height World deliveries and export their approach/settling sequences. Review and update only the two affected turn goldens, retaining all comparison tolerances and gait bounds. Retain bounded CI-only foot state and capture timing for native deliveries.
 - Withdraw an airborne foot's old walking prediction when locomotion stops, preserving its current position, original step/lift phase and every planted contact. Add actual gait-phase and World delivery regressions plus abrupt-stop Rust preview sequences under ADR 0050.
 - Keep GNOME extension loss distinct from durable consent revocation when an in-flight native query completes during disable; withdraw observations and report failed consistently until explicit reconnection.
 - Check independent GNOME consent files concurrently within the original deadline, retaining both full consent checks, opened identities and joined cancellation cleanup.

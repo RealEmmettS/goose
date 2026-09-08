@@ -1,4 +1,4 @@
-TT;DR: Correct the airborne foot's stale walking target during delivery stops.
+TT;DR: Correct stale airborne predictions during delivery stops and reversals.
 
 ## Why
 Final native delivered-note review exposed a stretched leg after arrival. The
@@ -44,6 +44,31 @@ Active. Production correction and reproducing regressions are implemented.
 Native review and both affected releases remain held.
 
 ## Activity
+- 2026-09-08 — Final local formatting, strict workspace clippy, complete Rust
+  tests, release build, 138 Python checks (three platform skips), eight production
+  JavaScript checks and separate Native SDK test/check/build pass. Review final
+  stopping/reversal output and freeze the correction for same-source native gates.
+- 2026-09-08 — The expanded native diagnostic 34280092759 independently captures
+  the same stale-prediction failure on both Debian architectures, reaching
+  43.600 pixels below the stopped body. Keep bounded opt-in foot/capture timing
+  in the normal two-cycle fixture. Inspect the exact old/new turn images before
+  updating those two fixtures; standing/straight-walking fixtures, tolerances and
+  gait bounds remain unchanged. Same-source native qualification remains open.
+- 2026-09-08 — Keep the airborne landing current through changing velocity and
+  retain the existing travel cap during acceleration. All four actual World
+  delivery cases and existing gait/contact/timing checks pass. Review twenty-four
+  successive frames in each of eight affected motion sequences, including the
+  two native-height World witnesses. The wider 156,672-delivery diagnostic changes
+  its largest below-ground foot displacement from 37.240 to 20.323 pixels; the
+  original long-leg witness changes to 2.700 pixels. These measurements do not
+  replace native visual qualification. Full checks and fresh captures are next.
+- 2026-09-08 — Expand the native-height World probe and reproduce the visible
+  long rear leg with seed 1788900900000000000, delay forty ticks and note origin
+  (430, 320). Reversal skips a zero-speed tick; the old swing lands behind and
+  steps twice, delaying the opposite planted contact. The added actual delivery
+  regression fails the existing twenty-six-pixel gait bound on the first fix.
+  Withdraw the stale prediction on reversed velocity too, preserving contacts
+  and lift timing. Native and public qualification remain held.
 - 2026-09-08 — Inspect sixteen sequential frames around each front, rear and
   fast abrupt stop plus the existing gradual run-stop sequence. Settling feet
   retract without extending the old lead; no visual golden was changed. Full

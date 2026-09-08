@@ -33,6 +33,10 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## GNOME desktop observations — September 2026
 
+### Fixed
+- Keep quick turns near a delivered note from leaving one leg stretched behind the goose.
+- Make private desktop checks show how the goose was moving when a picture was captured, so movement problems are easier to reproduce.
+
 ### Added
 - Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
 
