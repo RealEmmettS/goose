@@ -13,10 +13,6 @@
   - [ ] Complete the separately qualified Sway implementation (needs #rsw).
   - [ ] Complete the separately qualified Hyprland implementation (needs #rhy).
   - [ ] Complete the versioned GNOME companion and its desktop qualification (needs #rgn).
-- [ ] **Sway desktop integration** - explicit native window support with bounded owned-prop placement and exact-version evidence (needs #rkde) (ms #refine) (owner codex) #rsw
-  - [ ] Prove the authenticated native socket, window identity and actual bounded placement premise.
-  - [ ] Integrate explicit Rust and native settings setup/removal with cancellation and terminal protection.
-  - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
 - [ ] **Hyprland desktop integration** - separately probe supported native IPC operations and preserve per-operation capability claims (needs #rkde) (ms #refine) (owner codex) #rhy
   - [ ] Prove native socket ownership, exact window identity and supported bounded placement.
   - [ ] Integrate explicit setup/removal and exercise disconnect, stale identity and terminal refusals.
@@ -27,6 +23,10 @@
   - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
 
 ## Active
+- [ ] **Sway desktop integration** - explicit native window support with bounded owned-prop placement and exact-version evidence (needs #rkde) (ms #refine) (owner codex) #rsw
+  - [ ] Prove the authenticated native socket, window identity and actual bounded placement premise.
+  - [ ] Integrate explicit Rust and native settings setup/removal with cancellation and terminal protection.
+  - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
 - [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) #rkde
   - [x] Prepare guided setup documentation and the distinct release metadata.
   - [ ] Pass integrated native pointer and settings lifecycle checks.

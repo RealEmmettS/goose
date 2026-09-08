@@ -47,6 +47,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Keep a delivery or permitted pointer prank running when the desktop repeats an unchanged display notice. Actual display changes still stop those actions safely.
 
 ### Behind the scenes
+- Test Sway's actual window and desktop operations in an isolated desktop before adding optional support to the goose.
 - Require actual desktop permission, movement, settings and recovery checks before publishing optional KDE support. Keep useful failure evidence and use the desktop's normal services without granting extra computer privileges.
 - Check that pointer motion really stops when the desktop permission service closes during a prank, and keep the observed recovery results available if a later check fails.
 - Avoid duplicate desktop builds while retaining the required release checks.

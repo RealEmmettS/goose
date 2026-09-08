@@ -1,0 +1,51 @@
+name: Native Sway adapter
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/goose-sway-integration]
+    paths: ['script/smoke_sway*', '.github/workflows/sway-probe.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  premise:
+    name: Sway (${{ matrix.distribution }}, ${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: ['ubuntu:24.04', 'debian:trixie-slim']
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Exercise the actual private compositor
+        env:
+          HONK_DISTRIBUTION: ${{ matrix.distribution }}
+        run: |
+          docker run --rm -e HONK_HOST_UID="$(id -u)" -e HONK_HOST_GID="$(id -g)" \
+            -v "$PWD:/work" -w /work "$HONK_DISTRIBUTION" bash -euc '
+            mkdir -p target/sway-evidence
+            trap '\''chown -R "$HONK_HOST_UID:$HONK_HOST_GID" /work/target/sway-evidence'\'' EXIT
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+              sway dbus-x11 python3 python3-gi gir1.2-gtk-4.0 libgtk-4-1 \
+              libgl1-mesa-dri libcap2-bin util-linux passwd
+            dpkg-query -W > target/sway-evidence/packages.txt
+            compositor="$(command -v sway)"
+            getcap "$compositor" > target/sway-evidence/container-file-capabilities.txt
+            if test -s target/sway-evidence/container-file-capabilities.txt; then setcap -r "$compositor"; fi
+            useradd --create-home honkprobe
+            chown -R honkprobe:honkprobe /work/target/sway-evidence
+            runuser -u honkprobe -- env GITHUB_ACTIONS=true dbus-run-session -- \
+              python3 script/smoke_sway_adapter.py --evidence target/sway-evidence
+          '
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: sway-${{ strategy.job-index }}
+          path: target/sway-evidence
+          if-no-files-found: warn

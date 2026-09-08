@@ -33,7 +33,13 @@ and command responses. Exact installed compositor versions and native behavior r
 - [ ] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Queued. Upstream protocol reviewed; implementation and native acceptance have not begun.
+Active native premise. A disposable unprivileged Sway process on both Linux architectures
+and two distributions must expose its actual socket credentials, own-window PID and
+application identity, bounded six-pixel movement, fullscreen state and disappearance.
+The production adapter, live user-drag evidence and pointer authority remain unimplemented.
+Publication remains ordered after the qualified KDE release.
 
 ## Activity
+- 2026-09-08 — Begin the isolated native socket/window premise with fixed reply bounds,
+  native peer credentials and no modification of the user's compositor configuration.
 - 2026-09-08 — Split the approved follow-on scope into a separately verifiable adapter task.
