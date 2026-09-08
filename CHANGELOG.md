@@ -27,6 +27,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Identify the disposable vkms device through the actual DRM version ioctl after the host exposes no normal driver symlink; reject missing or ambiguous device identities before launching Hyprland.
+
+### Behind the scenes
 - Restrict the isolated Hyprland host to its system-identified vkms device after native logs show the unrelated Hyper-V GPU being selected as the primary allocator; preserve the real compositor and exact movement oracles.
 
 ### Behind the scenes

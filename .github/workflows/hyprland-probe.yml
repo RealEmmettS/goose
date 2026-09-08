@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [codex/goose-hyprland-integration]
-    paths: ['script/smoke_hyprland*', '.github/workflows/hyprland-probe.yml']
+    paths: ['script/smoke_hyprland*', 'script/select_vkms_device.py', '.github/workflows/hyprland-probe.yml']
 
 permissions:
   contents: read
@@ -35,15 +35,7 @@ jobs:
           sudo modprobe vkms
           test -d /dev/dri
           ls -l /dev/dri > target/hyprland-evidence/drm-devices.txt
-          selected=
-          for device in /sys/class/drm/card[0-9]*; do
-            case "$(readlink -f "$device/device/driver")" in
-              */vkms)
-                test -z "$selected"
-                selected="/dev/dri/$(basename "$device")"
-                ;;
-            esac
-          done
+          selected="$(sudo env GITHUB_ACTIONS=true python3 script/select_vkms_device.py target/hyprland-evidence/drm-drivers.json)"
           test -c "$selected"
           echo "node=$selected" >> "$GITHUB_OUTPUT"
           echo "$selected" > target/hyprland-evidence/selected-vkms.txt

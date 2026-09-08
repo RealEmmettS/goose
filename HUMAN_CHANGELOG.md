@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Ask the operating system which virtual graphics device is present instead of assuming how its device folders are arranged.
+
+### Behind the scenes
 - Select the intended virtual graphics device for Hyprland tests after the desktop chose a different, incompatible one.
 
 ### Behind the scenes
