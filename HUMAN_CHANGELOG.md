@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Fixed
+- Keep graphical settings tied to the program that was checked before launch, and stop when its installation record is damaged instead of treating it as an unmanaged copy.
 - Keep login-start changes consistent with the saved preference when two settings windows are editing at once, and report conflicting external edits.
 - Refuse to delete a task after someone else updates its details, and require saved task details before marking it complete.
 - Opening settings now respects the installer's latest start-at-login choice, so changing an unrelated preference cannot undo it.

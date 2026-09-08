@@ -33,6 +33,7 @@ null-handle launcher defect was refuted against the pinned binding and an actual
 Windows process test. No v1.4.0 tag/public bytes exist; user installation is unchanged.
 
 ## Activity
+- 2026-09-08: The stage-two review found two shared companion-launch defects also affecting stage one: pathname re-resolution on Linux and invalid receipt evidence falling through to unmanaged launch. Hold publication, bind exec to the retained descriptor and reject invalid evidence while preserving valid separate installations; add real pathname-replacement and malformed-receipt regressions before new candidate/main gates.
 - 2026-09-08: Final PR #9 review exposed a second autostart race and two vendored-board
   transaction gaps. Hold the existing OS config lock through reconciliation and add
   production guard tests. Real disposable HTTP requests reproduced both board failures;
