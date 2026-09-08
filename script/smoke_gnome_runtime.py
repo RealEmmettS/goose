@@ -168,7 +168,10 @@ preserve = "untouched"
         native = wait(lambda: settled(focused=True), 'settled native drag focus: ' + label)
         (directory / f'arranged-{label}.json').write_text(json.dumps(native, indent=2))
         x, y, width, height = native['rect']
-        pointer_x, pointer_y = x + width // 2, y + 18
+        # A previous ride can leave the naturally interactive goose above the
+        # middle of the title bar. Use its clear left portion; GTK must still
+        # prove receipt before any held gesture can qualify.
+        pointer_x, pointer_y = x + 36, y + 18
         # A Shell coordinate is not proof that the native client has received
         # pointer entry. Record the actual GTK capture events without consuming
         # them, and await the target surface before beginning the gesture.
