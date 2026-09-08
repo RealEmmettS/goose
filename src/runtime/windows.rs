@@ -442,7 +442,10 @@ pub fn run(
                 CollectWindowCommand::SetPassthrough { id, passthrough } => {
                     collect_controller.set_passthrough(id, passthrough)
                 }
-                CollectWindowCommand::Focus { id } => collect_controller.focus(id),
+                CollectWindowCommand::Focus { id } => {
+                    collect_controller.focus(id);
+                    Ok(())
+                }
                 CollectWindowCommand::TypeNote { id, note_index } => {
                     if let Some(text) = smoke_note
                         .as_deref()

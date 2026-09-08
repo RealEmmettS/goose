@@ -115,6 +115,7 @@ class TerminalEditor:
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 35, 120, 0, 0))
         self.master = master
         self.output = ''
+        self.cursor_reports = 0
         self.directory = directory
         self.process = subprocess.Popen([str(INSTALLED), 'config', '--config', str(config)],
                                         stdin=slave, stdout=slave, stderr=slave,
@@ -134,6 +135,13 @@ class TerminalEditor:
         def observed():
             if select.select([self.master], [], [], 0)[0]:
                 self.output += os.read(self.master, 65536).decode(errors='replace')
+                # Crossterm asks for the initial cursor position after opening
+                # the alternate screen. Supply the terminal's origin response;
+                # a PTY transports bytes but does not interpret VT queries.
+                requests = self.output.count('\x1b[6n')
+                while self.cursor_reports < requests:
+                    os.write(self.master, b'\x1b[1;1R')
+                    self.cursor_reports += 1
                 (self.directory / 'terminal.txt').write_text(self.output)
             if self.process.poll() is not None:
                 raise RuntimeError(f'Terminal editor exited before the update handoff: {self.output[-2000:]}')

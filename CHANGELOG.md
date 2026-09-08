@@ -39,8 +39,10 @@ All notable changes to this project are documented here. Format based on
 - Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
 
 ### Fixed
+- Keep Windows owned note/meme delivery available when foreground activation is denied by normal OS focus policy. A failed `SetForegroundWindow` request no longer invents a Win32 error or permanently disables collect capability; note text still targets the owned edit control directly.
 - Clear the inherited standard-handle flags at both Windows process entry points before child creation. Captured CLI, app and settings launches now receive EOF while the detached runtime remains alive; the native settings Start action finishes instead of retaining its service output pipe.
 - Give each Native SDK license file its own WiX component and key path, satisfying automatic component identity rules in both Windows MSI editions.
+- Stage the exact settings executable and accessibility DLL with the ARM64 installer qualification payload. Make GUI fixtures wait for semantic state after queued commands and reject partially rewritten SDK snapshots; answer the real TUI's initial cursor-position query in the disposable PTY fixture.
 - Preserve the complete native accessibility tree after settings become dirty; the pinned toolkit and bridge now accept 256 bounded widgets. Keep test modules separate from platform link inputs even when optimization modes match, and restore the original macOS lifecycle cfg boundaries after module extraction.
 - Forward native settings semantics to Windows UI Automation and Linux AT-SPI through bounded AccessKit adapters (ADR 0042). Bind the Windows bridge DLL to archive/slot/receipt identities and retain both file leases until GUI initialization. Pin the Zig compiler bootstrap and repair native CI toolchain selection.
 - Keep forward steps planted ahead until the body passes over them, and give the rounded belly enough clearance for visible front/rear feet. Preserve the gait cadence and real ground contacts.

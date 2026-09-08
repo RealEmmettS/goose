@@ -16,6 +16,7 @@
 - [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
   - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
   - [x] Correct captured Windows start and verify native GUI Start, independent settings close, and graceful Stop.
+  - [ ] Compare isolated native CPU/memory/IPC workloads and verify note/meme delivery after foreground denial.
 - [ ] **Native SDK graphical settings** - ship a separate Zig settings app backed by Rust validation and retain the TUI (needs #rfnd) (ms #refine) (owner codex) #rgui
   - [x] Implement revision-aware shared settings persistence and bounded stdio service.
   - [ ] Build and exercise all five native settings pages.

@@ -15,6 +15,7 @@ Source baseline: `599d6fc`. Started 2026-09-07. Entries distinguish source findi
 | R09 | Medium | Existing ARM64 builds are not Pi desktop acceptance. Native SDK's Linux native-only host requires GTK4. | Package/runtime dependency checks and native ARM64 labwc smoke; Pi claims remain experimental without hardware. | Open |
 | R10 | Medium | Rodio playback detaches sinks with no common voice bound, unlike the musl child pool. Repeated control requests can accumulate concurrent playback. | Both backends retain and cap active voices and reap completion through the same bounded admission policy. Real child-process exhaustion/recovery and the full audio regressions pass. | Corrected; release qualification pending |
 | R11 | Medium | Captured Windows start returns its exit code but the detached runtime keeps the caller's output pipes alive. The new native settings Start then remains Working because its service output never reaches EOF. Reproduced with exact public v1.3.7 and the real GUI fixture. | Both Rust entry points clear inheritance on their original standard handles before spawning. The same captured CLI/app test now gets EOF with the runtime alive; actual GUI Start, independent settings close and graceful Stop pass. | Corrected; release qualification pending |
+| R12 | Medium | Two physical Windows baseline probes delivered a note then permanently lost collect capability. The retained log reported a zero Win32 error because normal foreground denial was converted into a fatal backend error. | Owned-window focus is best effort; direct note editing and delivery do not depend on activation. Preserve OS focus policy and all unrelated backend error handling. The corrected native workload probe remains required. | Corrected; runtime verification pending |
 
 ## Preservation contracts
 
@@ -27,6 +28,12 @@ No existing release tag or asset changes. Preserve saved configuration, personal
 - Physical macOS/Pi acceptance is unavailable by the user's 2026-09-07 hardware statement; it is not inferred from cross-compilation or hosted tests.
 
 ## Additional demonstrated interaction defect
+
+The exact public Windows baseline repeated R12 under the startup/wander/mud/note workload;
+`target/runtime-profile-v137-direct/runtime.stderr.txt` retained the failure. Microsoft's
+[SetForegroundWindow contract](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow)
+documents a zero return for denied activation, including otherwise valid requests; it does
+not specify a last-error value. The fix makes no attempt to bypass foreground policy.
 
 Cursor seeking aimed the body at the pointer while acquisition tested beak distance. A fixed-tick world regression failed for a left/down approach after the rig redraw. Use the existing beak-offset locomotion target, as collected props already do. The real approach and permission-revocation regression now passes for three directions.
 

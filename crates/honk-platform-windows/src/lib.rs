@@ -687,15 +687,16 @@ impl CollectWindowController {
         Ok(())
     }
 
-    pub fn focus(&self, id: CollectWindowId) -> Result<()> {
+    pub fn focus(&self, id: CollectWindowId) {
         if let Some(Some(hwnd)) = self.windows.get(&id).map(ControlledWindow::hwnd) {
             unsafe {
-                if !SetForegroundWindow(hwnd).as_bool() {
-                    return Err(Error::from_win32());
-                }
+                // Foreground policy can deny activation even for a healthy
+                // owned window. This API does not promise a GetLastError value.
+                // Leave focus with the user; delivery and direct note editing
+                // do not require activation and must remain available.
+                let _ = SetForegroundWindow(hwnd);
             }
         }
-        Ok(())
     }
 
     pub fn type_text(&mut self, id: CollectWindowId, text: &str) -> Result<()> {

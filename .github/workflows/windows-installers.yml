@@ -472,6 +472,10 @@ jobs:
             -Destination (Join-Path $stage 'honk300.exe')
           Copy-Item -LiteralPath 'target/${{ matrix.triple }}/release/honk300-app.exe' `
             -Destination (Join-Path $stage 'honk300-app.exe')
+          Copy-Item -LiteralPath 'target/${{ matrix.triple }}/release/honk300-settings.exe' `
+            -Destination (Join-Path $stage 'honk300-settings.exe')
+          Copy-Item -LiteralPath 'target/${{ matrix.triple }}/release/honk_settings_accessibility.dll' `
+            -Destination (Join-Path $stage 'honk_settings_accessibility.dll')
           Copy-Item -LiteralPath 'target/wix/honk300-${{ matrix.triple }}.msi' `
             -Destination (Join-Path $stage 'honk300-${{ matrix.triple }}.msi')
           Copy-Item -LiteralPath 'target/wix/honk300-${{ matrix.triple }}-corporate.msi' `

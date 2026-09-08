@@ -33,9 +33,15 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Fixed
+
+The goose can keep bringing notes and pictures when Windows leaves focus with the app you are using. Notes still receive their text without typing into another app.
+
 ### Improved
 
 Starting the goose from graphical settings now finishes promptly, and tools that capture a start command's output can finish while the goose keeps running. Closing settings leaves the goose running independently.
+
+Release checks now include every supporting settings file and wait for screens to finish responding before testing the next action.
 
 Update checks explain when to use the official installer to enable automatic updates, using the same clear message in both settings screens.
 

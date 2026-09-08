@@ -59,13 +59,29 @@ def main() -> None:
                                   timeout=20, creationflags=hidden)
 
         def snapshot() -> str:
-            return snapshot_path.read_text(encoding="utf-8") if snapshot_path.exists() else ""
+            # The pinned SDK truncates and rewrites this file each frame. Its
+            # command-file deletion acknowledges consumption, before dispatch
+            # and the next layout snapshot. Reject in-flight file reads; callers
+            # below wait for the actual semantic result of each input.
+            try:
+                before = snapshot_path.stat()
+                current = snapshot_path.read_text(encoding="utf-8")
+                after = snapshot_path.stat()
+            except (FileNotFoundError, PermissionError):
+                return ""
+            if (before.st_mtime_ns, before.st_size) != (after.st_mtime_ns, after.st_size):
+                return ""
+            if not re.match(r'ready=true [^\n]+\n', current) or not current.endswith("\n"):
+                return ""
+            return current
 
         def wait(pattern: str, timeout: int = 30) -> str:
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline:
                 assert process.poll() is None, "settings process exited"
                 current = snapshot()
+                errors = re.match(r'ready=true .*? dispatch_errors=(\d+) ', current)
+                assert not errors or errors[1] == "0", current[-6000:]
                 if re.search(pattern, current):
                     return current
                 time.sleep(0.1)
@@ -77,9 +93,10 @@ def main() -> None:
                            creationflags=hidden)
 
         def widget(label: str, role: str = "button") -> str:
-            match = re.search(r'widget @w1/main-canvas#(\d+) role=' + role +
-                              ' name="' + re.escape(label) + r'" .*? enabled=true', snapshot())
-            assert match, f"missing enabled {role}: {label}"
+            pattern = (r'widget @w1/main-canvas#(\d+) role=' + role +
+                       ' name="' + re.escape(label) + r'" .*? enabled=true')
+            match = re.search(pattern, wait(pattern))
+            assert match
             return match[1]
 
         def click(label: str, role: str = "button") -> None:
@@ -141,12 +158,14 @@ def main() -> None:
                 if label == "Bring notes and memes":
                     # macOS ARM runners expose a shorter viewport. Native actions
                     # still reject fully clipped controls, so scroll the real pane.
-                    scroll = re.search(r'widget @w1/main-canvas#(\d+) .*? scroll=\[offset=0,', snapshot())
-                    assert scroll, "missing initial settings scroll area"
+                    scroll_pattern = r'widget @w1/main-canvas#(\d+) .*? scroll=\[offset=([^,]+),'
+                    scroll = re.search(scroll_pattern, wait(scroll_pattern))
+                    assert scroll, "missing settings scroll area"
                     automate("widget-action", "main-canvas", scroll[1], "increment")
-                    wait(r'#' + scroll[1] + r' .*? scroll=\[offset=[1-9]')
+                    wait(r'#' + scroll[1] + r' .*? scroll=\[offset=(?!' + re.escape(scroll[2]) + r',)[^,]+,')
                 identifier = widget(label, "switch")
-                before = re.search(r'#' + identifier + r' role=switch .*? value=([01]) ', snapshot())
+                value_pattern = r'#' + identifier + r' role=switch .*? value=([01]) '
+                before = re.search(value_pattern, wait(value_pattern))
                 assert before, f"missing switch value: {label}"
                 automate("widget-action", "main-canvas", identifier, "toggle")
                 wait(r'#' + identifier + r' role=switch .*? value=' + str(1 - int(before[1])) + ' ')
@@ -181,7 +200,7 @@ def main() -> None:
                 click("Check for updates")
                 wait("Latest release:", 40)
                 capture("update-discovery")
-            assert "dispatch_errors=0 " in snapshot(), snapshot()[-6000:]
+            wait(r'^ready=true .*? dispatch_errors=0 ')
             (evidence / "result.json").write_text(json.dumps({
                 "ok": True, "binary": str(binary), "network": args.network,
                 "lifecycle": args.lifecycle,
