@@ -26,6 +26,13 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- Connect explicit Hyprland setup/removal across Rust CLI, versioned IPC, the native Wayland runtime and Native SDK consent dialogs. Keep independent private consent, immediate revocation, unsaved drafts, unsupported action boundaries and engine fullscreen manners; qualify the actual binaries in both native compositor generations.
+
+### Improved
+- Recover late read-only Hyprland snapshots through one retained authenticated worker while immediately withdrawing expired data; keep identity changes, permission loss and disconnects terminal. Share bounded worker ownership with Sway without changing Sway's error policy.
+- Read the Hyprland monitor/client inventory in one fixed read-only native batch, retaining exact peer identity, a single 250 ms deadline, bounded complete replies and matching monitor observations.
+
 ### Behind the scenes
 - Qualify actual GNOME user-grab begin/end and automatic movement refusal through the isolated native desktop after all four normal-desktop goose captures pass visual inspection.
 
@@ -42,6 +49,21 @@ All notable changes to this project are documented here. Format based on
 
 ### Behind the scenes
 - Begin independent GNOME Shell 46/48 desktop qualification: actual extension lifecycle and Meta.Window identities, bounded owned-fixture movement, stale geometry refusal, fullscreen, protocol inventory and the existing XWayland goose overlay on native x64/ARM64.
+- Retain individual bounded native query timings and actual GTK/fullscreen geometry when older Hyprland fails the production snapshot, without accepting or retrying the failed Rust gate.
+- Keep the GTK target's configure acknowledgements active while the independent Rust Hyprland probe runs. Native 0.55 transport and impostor refusal pass both architectures; 0.53 exposed the fixture blocking its own fullscreen client. Preserve every Rust deadline and reply bound.
+- Implement the independently authenticated read-only Hyprland transport for native-qualified 0.53.3/0.55.2, bounded coherent monitor/client observations, optional client identities and explicit unsupported actions. Share unchanged Unix socket primitives with Sway and qualify the production decoder/transport against real compositor replies and an impostor listener.
+- Create native fixed-size Hyprland fixture windows that float before mapping, avoiding an unrelated layout-mode snapshot while retaining actual placement, observation and response deadline checks.
+- Keep native GTK fixture configure acknowledgements flowing during Hyprland IPC and retain bounded transaction timing/byte evidence. Retry only read-side startup observations while retaining the original 250 ms per-exchange deadline and EOF requirement.
+- Identify the disposable vkms device through the actual DRM version ioctl after the host exposes no normal driver symlink; reject missing or ambiguous device identities before launching Hyprland.
+
+### Behind the scenes
+- Restrict the isolated Hyprland host to its system-identified vkms device after native logs show the unrelated Hyper-V GPU being selected as the primary allocator; preserve the real compositor and exact movement oracles.
+
+### Behind the scenes
+- Correct the Hyprland qualification host prerequisites exposed by the first native attempt: provide a disposable virtual DRM device with the standard seat service and keep the private socket path within the operating-system limit.
+
+### Behind the scenes
+- Begin separate Hyprland native interface qualification across x64/ARM64 and legacy/Lua generations, checking private socket peers, actual window identity, bounded owned-fixture movement and fullscreen before runtime integration.
 - Complete the KDE website handoff with deployed setup/capability readback, all 22 verified downloads and matching public manifest hashes, closing the third staged publication record.
 
 ### Behind the scenes

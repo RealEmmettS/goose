@@ -9,6 +9,14 @@ pub(crate) use sway::{sway_remove, sway_setup, sway_status};
 mod sway_runtime;
 #[cfg(target_os = "linux")]
 pub(crate) use sway_runtime::SwayRuntime;
+mod hyprland;
+#[cfg(any(target_os = "linux", test))]
+mod hyprland_consent;
+pub(crate) use hyprland::{hyprland_remove, hyprland_setup, hyprland_status};
+#[cfg(target_os = "linux")]
+mod hyprland_runtime;
+#[cfg(target_os = "linux")]
+pub(crate) use hyprland_runtime::HyprlandRuntime;
 #[cfg(target_os = "linux")]
 mod runtime;
 #[cfg(target_os = "linux")]

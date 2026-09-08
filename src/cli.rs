@@ -133,6 +133,11 @@ pub enum Integration {
         #[arg(value_enum, default_value = "status")]
         action: IntegrationAction,
     },
+    /// Optional read-only Hyprland window and fullscreen observations.
+    Hyprland {
+        #[arg(value_enum, default_value = "status")]
+        action: IntegrationAction,
+    },
     /// Optional KDE window support. Pointer permission is separate.
     Kde {
         #[arg(value_enum, default_value = "status")]

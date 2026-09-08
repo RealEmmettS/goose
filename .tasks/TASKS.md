@@ -13,17 +13,17 @@
   - [ ] Complete the separately qualified Sway implementation (needs #rsw).
   - [ ] Complete the separately qualified Hyprland implementation (needs #rhy).
   - [ ] Complete the versioned GNOME companion and its desktop qualification (needs #rgn).
-- [ ] **Hyprland desktop integration** - separately probe supported native IPC operations and preserve per-operation capability claims (needs #rkde) (ms #refine) (owner codex) #rhy
-  - [ ] Prove native socket ownership, exact window identity and supported bounded placement.
-  - [ ] Integrate explicit setup/removal and exercise disconnect, stale identity and terminal refusals.
-  - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
 
 ## Active
 - [ ] **GNOME desktop companion** - versioned explicit Shell integration with proven observation, placement and a compatible overlay path (needs #rkde) (ms #refine) (owner codex) #rgn
   - [x] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
-  - [ ] Prove live user-drag observation and automatic movement refusal through actual desktop input.
+  - [x] Prove live user-drag observation and automatic movement refusal through actual desktop input.
   - [ ] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
   - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
+- [ ] **Hyprland desktop integration** - separately probe supported native IPC operations and preserve per-operation capability claims (needs #rkde) (ms #refine) (owner codex) #rhy
+  - [x] Prove native socket ownership, exact window identity and supported bounded placement.
+  - [ ] Integrate explicit setup/removal and exercise disconnect, stale identity and terminal refusals.
+  - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
 - [ ] **Sway desktop observations** - explicit native window/fullscreen support with exact-version evidence and honest action limitations (needs #rkde) (ms #refine) (owner codex) #rsw
   - [x] Prove the authenticated native socket, window identity and actual bounded placement premise.
   - [x] Resolve the active-drag boundary: keep movement unsupported under ADR 0046.

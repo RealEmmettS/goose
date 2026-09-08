@@ -1,0 +1,111 @@
+name: Native Hyprland adapter
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/goose-hyprland-integration]
+    paths: ['script/smoke_hyprland*', 'script/select_vkms_device.py', '.github/workflows/hyprland-probe.yml', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
+
+permissions:
+  contents: read
+
+jobs:
+  premise:
+    name: Hyprland (${{ matrix.distribution }}, ${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: ['ubuntu:26.04', 'debian:trixie-slim']
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.95'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          architecture: ${{ matrix.runner == 'ubuntu-24.04-arm' && 'arm64' || 'x64' }}
+      - name: Build and test the actual observation transport
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libasound2-dev
+          cargo test --locked --bin honk300 integrations
+          cargo test --locked -p honk-platform-linux --lib
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo build --locked --release -p honk-platform-linux --example hyprland_bridge_probe
+          cargo build --locked --release --bin honk300
+      - name: Build the production Native SDK settings companion
+        run: |
+          sudo apt-get install --no-install-recommends -y libgtk-4-dev pkg-config
+          target="$(uname -m)-unknown-linux-gnu"
+          python3 script/build_settings.py --target "$target" --output target/release --test
+      - name: Prepare a disposable virtual graphics device
+        id: graphics
+        run: |
+          mkdir -p target/hyprland-evidence
+          uname -a > target/hyprland-evidence/host-kernel.txt
+          if ! modinfo vkms > target/hyprland-evidence/vkms.txt 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y "linux-modules-extra-$(uname -r)"
+            modinfo vkms > target/hyprland-evidence/vkms.txt
+          fi
+          sudo modprobe vkms
+          test -d /dev/dri
+          ls -l /dev/dri > target/hyprland-evidence/drm-devices.txt
+          selected="$(sudo env GITHUB_ACTIONS=true python3 script/select_vkms_device.py target/hyprland-evidence/drm-drivers.json)"
+          test -c "$selected"
+          echo "node=$selected" >> "$GITHUB_OUTPUT"
+          echo "$selected" > target/hyprland-evidence/selected-vkms.txt
+      - name: Exercise the actual private compositor
+        env:
+          HONK_DISTRIBUTION: ${{ matrix.distribution }}
+          HONK_DRM_NODE: ${{ steps.graphics.outputs.node }}
+        run: |
+          docker run --rm --device "$HONK_DRM_NODE" -e AQ_DRM_DEVICES="$HONK_DRM_NODE" \
+            -e HONK_HOST_UID="$(id -u)" -e HONK_HOST_GID="$(id -g)" \
+            -v "$PWD:/work" -w /work "$HONK_DISTRIBUTION" bash -euc '
+            mkdir -p target/hyprland-evidence
+            trap '\''chown -R "$HONK_HOST_UID:$HONK_HOST_GID" /work/target/hyprland-evidence'\'' EXIT
+            generation=legacy
+            . /etc/os-release
+            if test "$ID" = debian; then
+              echo "deb http://deb.debian.org/debian trixie-backports main" > /etc/apt/sources.list.d/honk-probe-backports.list
+              generation=lua
+            fi
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+              dbus-x11 python3 python3-gi gir1.2-gtk-4.0 libgtk-4-1 \
+              libgl1-mesa-dri libegl-mesa0 mesa-utils util-linux passwd seatd libasound2t64 \
+              at-spi2-core gir1.2-atspi-2.0
+            if test "$generation" = lua; then
+              DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y -t trixie-backports hyprland
+            else
+              DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y hyprland
+            fi
+            dpkg-query -W > target/hyprland-evidence/packages.txt
+            useradd --create-home honkprobe
+            chown honkprobe:honkprobe "$AQ_DRM_DEVICES"
+            chown -R honkprobe:honkprobe /work/target/hyprland-evidence
+            SEATD_VTBOUND=0 seatd -u honkprobe > target/hyprland-evidence/seatd.log 2>&1 &
+            seat_pid=$!
+            for attempt in $(seq 1 100); do
+              test -S /run/seatd.sock && break
+              kill -0 "$seat_pid"
+              sleep 0.05
+            done
+            test -S /run/seatd.sock
+            runuser -u honkprobe -- env GITHUB_ACTIONS=true dbus-run-session -- \
+              python3 script/smoke_hyprland_adapter.py --evidence target/hyprland-evidence \
+                --generation "$generation" --bridge target/release/examples/hyprland_bridge_probe \
+                --goose target/release/honk300 --settings target/release/honk300-settings
+          '
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: hyprland-${{ strategy.job-index }}
+          path: target/hyprland-evidence
+          if-no-files-found: warn

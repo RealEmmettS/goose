@@ -56,3 +56,5 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0043 — Owned Linux Prop Companion](./0043-owned-linux-prop-companion.md)
 - [0044 — Explicit KWin and Portal Adapters](./0044-explicit-kwin-and-portal-adapters.md)
 - [0045 — Shared Vector Preview Export](./0045-shared-vector-preview-export.md)
+- [0046 — Sway Observation Boundary](./0046-sway-observation-boundary.md)
+- [0047 — Hyprland Observation Boundary](./0047-hyprland-observation-boundary.md)

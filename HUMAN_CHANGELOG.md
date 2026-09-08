@@ -33,6 +33,37 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Added
+- Add an optional Hyprland setup in graphical settings and the command line so the goose can notice fullscreen windows. Turning it off removes its access immediately and keeps your unsaved settings and other desktop integrations intact.
+
+### Improved
+- Let a busy Hyprland desktop resume fresh window observations after a slow transition, without using old information or connecting to a replacement desktop behind your back.
+- Keep Hyprland window observations together so a busy desktop has fewer separate requests to answer, while still discarding late or incomplete information.
+
+### Behind the scenes
+- Preserve more detail when an older Hyprland desktop replies too slowly, so the cause can be identified while that support remains unqualified.
+- Keep private test windows responsive while the separate desktop observer runs, including fullscreen transitions.
+
+### Behind the scenes
+- Begin connecting Hyprland desktop observations to the goose, with strict ownership checks and separate fullscreen awareness. Window movement remains unavailable until the desktop can reliably identify an active user drag.
+
+### Behind the scenes
+- Open the private desktop test windows at a fixed size so the placement check starts from a settled layout.
+
+### Behind the scenes
+- Let the private test windows respond normally while Hyprland processes their placement, and record the replies needed to diagnose a stalled desktop check.
+
+### Behind the scenes
+- Ask the operating system which virtual graphics device is present instead of assuming how its device folders are arranged.
+
+### Behind the scenes
+- Select the intended virtual graphics device for Hyprland tests after the desktop chose a different, incompatible one.
+
+### Behind the scenes
+- Give the isolated Hyprland test desktop the virtual graphics device it needs to start, and preserve its failure details before repeating qualification.
+
+### Behind the scenes
+- Test optional Hyprland support in isolated desktops before offering it, checking that desktop observations are trustworthy and unrelated windows remain untouched.
 ### Behind the scenes
 - Check that GNOME can tell when you are dragging a window and keeps automatic movements out of your way, alongside the now-visible goose desktop checks.
 
