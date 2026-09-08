@@ -37,6 +37,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - The goose can bring notes and pictures on Linux. Compatible desktops animate deliveries, while Wayland chooses where to place them. Settings explain the active desktop capabilities, and new guidance covers experimental Raspberry Pi desktop use.
 
 ### Behind the scenes
+- Fix the Linux delivery build before repeating checks of its packaged companion.
 - Check the packaged Linux companion on the desktop libraries it was built for, and keep deliveries tied to the program verified before launch.
 - Prepare the Linux update using checks of the actual shipped companions, while keeping the remaining release checks and real Raspberry Pi testing visible.
 - Use the desktop compositor supplied by Alpine for its isolated note and picture checks, while keeping the same visibility requirements.

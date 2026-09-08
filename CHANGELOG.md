@@ -29,6 +29,7 @@ All notable changes to this project are documented here. Format based on
 ## [1.5.0] - Unreleased candidate
 
 ### Behind the scenes
+- Correct the owned-prop launch's module path after native Linux compilation, before qualification of the updated packages.
 - Qualify the exact musl archive on native-architecture Alpine with its required GTK libraries and the unchanged compositor/prop readiness checks. Bind the Linux prop launch to the retained verified file descriptor and preserve invalid-receipt failures.
 
 ### Added
