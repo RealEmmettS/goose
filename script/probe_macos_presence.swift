@@ -66,6 +66,12 @@ final class FocusFixture: NSObject, NSApplicationDelegate {
                 exit(0)
             }
         }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+            let capture = Process()
+            capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            capture.arguments = ["-x", evidence.appendingPathComponent("focus-permission.png").path]
+            do { try capture.run(); capture.waitUntilExit() } catch {}
+        }
         DispatchQueue.global().asyncAfter(deadline: .now() + 15) { exit(2) }
     }
 }
