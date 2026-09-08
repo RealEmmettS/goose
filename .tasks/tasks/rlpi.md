@@ -25,11 +25,14 @@ The requested behavior runs through its production path and the supporting evide
 - [ ] Integration and required package/release checks pass before publication.
 
 ## Status
-Queued behind #rr1 and #lpr. Shared runtime session/placement reporting is implemented under
-the independent #lpr task and undergoing native tests; real delivery and labwc gates remain
-open. Package/publication work begins after its prerequisites qualify.
+Publication remains queued behind #rr1 and #lpr. Native GNU x64/ARM64 X11 and labwc
+delivery, scaling, session/placement readback and standalone behavior pass in run
+34186038608. Experimental Pi guidance records the precise hosted environment and
+remaining physical acceptance. The qualified first-stage source is integrated;
+full-platform CI and official GTK-baseline/musl checks are running before release.
 
 ## Activity
+- 2026-09-07: Recorded successful native labwc 0.7.1 x64/ARM64 proof, inspected ARM64 captures and added Pi 4/5 64-bit Desktop installation/acceptance guidance with current Raspberry Pi primary documentation. Integrated the qualified first-stage source without publishing either stage early.
 - 2026-09-07: Session inspection found a pure Wayland socket could silently select native mode despite the documented opt-in. Enforce the existing command/config choice before native initialization and add a real labwc refusal/readback probe.
 - 2026-09-07: Added an optional finite SESSION response without changing existing STATUS bytes. CLI, TUI and the Rust GUI service show live runtime details; untrusted desktop names are reduced to known labels and cannot enable capabilities. Native readback and packaging remain pending.
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).

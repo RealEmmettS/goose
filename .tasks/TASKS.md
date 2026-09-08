@@ -8,8 +8,8 @@
 
 ## To-Do
 - [ ] **Linux props and experimental Raspberry Pi support** - integrate and publish owned props, session reporting, and ARM64 labwc packages after the first refinement release (needs #rr1, #lpr) (ms #refine) (owner codex) #rlpi
-  - [ ] Qualify native ARM64 labwc placement, scaling and dependency/standalone behavior.
-  - [ ] Document experimental Pi 4/5 setup and the physical acceptance boundary.
+  - [x] Qualify native ARM64 labwc placement, scaling and dependency/standalone behavior.
+  - [x] Document experimental Pi 4/5 setup and the physical acceptance boundary.
   - [ ] Integrate the first release and complete every platform/package/public-byte gate.
 - [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi) (ms #refine) (owner codex) #rkde
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl

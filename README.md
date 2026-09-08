@@ -150,6 +150,10 @@ the newest complete release; each tag and its DMG bytes remain immutable.
 
 ### Linux
 
+The Linux expansion branch includes [experimental Raspberry Pi 4/5 desktop
+guidance](docs/raspberry-pi.md) and native ARM64 labwc evidence. Its owned-prop
+features remain pending staged publication.
+
 The recommended Linux install is the no-sudo official versionless bootstrap:
 
 ```sh

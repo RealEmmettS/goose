@@ -51,3 +51,6 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0038 — Cross-Platform Tray Update Helper](./0038-cross-platform-tray-update-helper.md)
 - [0039 — Calmer Default Mud Cadence](./0039-calmer-default-mud-cadence.md)
 - [0040 — Windows Updater PowerShell Archive-Path Transport](./0040-windows-updater-powershell-archive-path-transport.md)
+- [0041 — Refinement, Native Settings, and Continuous Goose](./0041-refinement-native-settings-and-continuous-goose.md)
+- [0042 — Native Settings Accessibility Bridge](./0042-native-settings-accessibility-bridge.md)
+- [0043 — Owned Linux Prop Companion](./0043-owned-linux-prop-companion.md)

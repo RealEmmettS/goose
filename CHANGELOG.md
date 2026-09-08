@@ -32,6 +32,7 @@ All notable changes to this project are documented here. Format based on
 - Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.
 
 ### Development
+- Document experimental Pi 4/5 64-bit Raspberry Pi OS Desktop setup, actual labwc 0.7.1 x64/ARM64 qualification and the remaining physical-device boundary; index the refinement ADRs.
 - Exercise actual production GNU companions on the Ubuntu 22.04 GTK baseline after identity verification. Record successful native x64/ARM64 X11/labwc delivery, scale, close and failure evidence; require light note-body pixels so a gray test desktop cannot satisfy visibility.
 - Make the shared Linux release smoke expect a ready prop companion when the actual runtime payload includes one, and explicit unsupported capability for a bare Rust binary; failed companions cannot satisfy either case.
 - Use client-side X11 composition in the native-delivery fixture and require actual note pixels plus owned geometry, not only AT-SPI text. Read labwc's real private output using the installed wlr-randr text interface instead of its unavailable JSON option.

@@ -1,7 +1,7 @@
 # ADR 0043: bounded owned Linux props through the existing companion
 
 Date: 2026-09-07
-Status: accepted; implementation and native qualification pending
+Status: accepted; native X11/labwc implementation qualified, release integration pending
 
 ## Context
 
@@ -70,6 +70,13 @@ Full-screen/DND observations remain explicitly unsupported until a qualified obs
 supplies them; a saved manners toggle is not evidence of desktop observation.
 
 ## Qualification evidence
+
+Native GNU x64/ARM64 run [34186038608](https://github.com/RealEmmettS/goose/actions/runs/34186038608)
+passes real X11 engine delivery and labwc 0.7.1 normal placement, scaled complete
+image pixels, native text/actions, malformed-input cleanup, capacity recovery,
+retained child failure and graceful shutdown. ARM64 captures were visually reviewed.
+Official GTK-baseline/musl payload gates remain part of release qualification.
+[Pi guidance](../raspberry-pi.md) retains the physical acceptance boundary.
 
 Exercise actual child protocol, note/image fit, user and program closes, capacity
 exhaustion/recovery, disconnect, stale ids, display change and graceful shutdown.
