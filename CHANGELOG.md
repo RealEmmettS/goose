@@ -27,6 +27,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Begin independent GNOME Shell 46/48 desktop qualification: actual extension lifecycle and Meta.Window identities, bounded owned-fixture movement, stale geometry refusal, fullscreen, protocol inventory and the existing XWayland goose overlay on native x64/ARM64.
+
+### Behind the scenes
 - Record v1.5.0 immutable publication, all-eight fresh-public qualification and independent verification of all 47 assets. Close both website handoffs against the actual renderer SVG deployment and verified Linux/Pi guidance with all 22 download mappings.
 
 ### Behind the scenes

@@ -36,7 +36,11 @@ Exact supported versions and the product's native behavior remain unverified.
 - [ ] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Queued. Upstream extension and window APIs reviewed; implementation and native acceptance have not begun.
+Active. Begin the real Shell extension lifecycle, native window interface and
+compatible XWayland goose overlay premise. No GNOME production capability is enabled.
 
 ## Activity
+- 2026-09-08 — Prepare private GNOME 46/48 x64/ARM64 desktop qualification. Record
+  actual Wayland globals, exact native target identities, bounded fixture movement,
+  stale refusal, fullscreen, extension disable and the real goose overlay capture.
 - 2026-09-08 — Split the approved follow-on scope into a separately verifiable adapter task.

@@ -1,0 +1,7 @@
+{
+  "uuid": "honk300-probe@emmetts.dev",
+  "name": "Honk300 disposable desktop probe",
+  "description": "Native API qualification restricted to a disposable CI desktop.",
+  "shell-version": ["46", "48"],
+  "version": 1
+}
