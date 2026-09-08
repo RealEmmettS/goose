@@ -10,7 +10,7 @@ on:
   pull_request:
     paths: ['integrations/kwin/**', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock', 'script/smoke_kwin*', '.github/workflows/kwin-probe.yml', '.github/workflows/release.yml']
   push:
-    branches: [main, codex/goose-wayland-integrations]
+    branches: [main]
     paths: ['integrations/kwin/**', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock', 'script/smoke_kwin*', '.github/workflows/kwin-probe.yml']
 
 permissions:

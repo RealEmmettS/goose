@@ -154,6 +154,7 @@ pub fn run(
         }
 
         if overlay.take_topology_changed() {
+            eprintln!("honk300: desktop layout or scale changed; optional actions are cancelled");
             kwin.cancel_pointer();
             if overlay_mode == OverlayMode::Wayland {
                 world.set_cursor_warp_supported(false);

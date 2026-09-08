@@ -45,9 +45,12 @@ All notable changes to this project are documented here. Format based on
 - Recognize only the current process's click-through Wayland layer when guarding pointer motion, retaining terminal and unknown-window checks beneath it. Retain KWin observation timers at script scope and qualify their continued native updates beyond garbage collection.
 - Clear queued engine cursor movement on capability loss; cancel portal sessions on adapter expiry, device pause/removal, explicit revocation and shutdown. A restart never restores a pointer grant.
 - Apply owned Wayland prop identities after GTK maps the native surface, and match geometry to an unreaped child and per-window token before positioning. Revocation cancels motion and preserves delivered notes.
+- Ignore unchanged Wayland layer configuration and effective-scale notifications when reporting topology changes; actual output or scale changes retain immediate action cancellation and a diagnostic.
 
 ### Behind the scenes
 - Require exact-commit KDE 5/6 x64/ARM64 qualification in candidate and public release orchestration, alongside all existing architecture, native package and signing gates.
+- Verify KDE's native device-removal outcome when a portal backend exits during active cursor motion, including stationary readback and rejection of subsequent pranks; preserve intermediate lifecycle evidence on later failures.
+- Run native KDE PR qualification without a duplicate development-branch run; exact-commit main, candidate and public gates remain required.
 - Qualify real consent, bounded motion, protected targets, native settings drafts and recovery in disposable desktops with normal Plasma service registration and PipeWire. Retain bounded failure/observer evidence without granting container or compositor privileges.
 - Await the completed native settings save response before Windows test readback, so the fixture does not deny atomic replacement.
 

@@ -182,10 +182,27 @@ preserve = "untouched"
         runtime = launch(binary, 'runtime', 'start', '--config', str(config), '--wayland')
         expect('denied', 'crash recovery does not restore pointer grant')
         request_and_grant('service-loss')
+        (directory / 'native-observer-frames.json').rename(directory / 'initial-pointer-frames.json')
+        observer = NativeObserver(directory, call, GLib)
+        wait(lambda: observer.pointer, 'native pointer before active backend loss')
+        initial = observer.pointer[:]
+        control('do', 'nab')
+        wait(lambda: sum((observer.pointer[i] - initial[i]) ** 2 for i in (0, 1)) > 4,
+             'active pointer motion before backend loss', timeout=35)
         close(backend)
-        expect('failed', 'portal backend loss revokes live pointer device')
+        # KDE sends DEVICE_REMOVED before the EIS disconnect. Production treats
+        # removal as permission ending, even when backend shutdown caused it.
+        expect('denied', 'backend loss removes the native granted pointer device')
         assert status()['capabilities']['windows'] == 'supported'
+        count = observer.count
+        wait(lambda: observer.count >= count + 2, 'removed-device delivery settles')
+        stopped = observer.pointer[:]
         control('do', 'nab', success=False)
+        count = observer.count
+        wait(lambda: observer.count >= count + 10, 'removed pointer stays stationary')
+        assert observer.pointer == stopped, (stopped, observer.pointer)
+        observer.close()
+        observer = None
         control('integrations', 'kde', 'remove')
         expect('unsupported', 'explicit removal after backend failure')
         assert config.read_text() == original and not record.exists()
@@ -201,6 +218,7 @@ preserve = "untouched"
                 dict(name=node.get_name(), role=node.get_role_name()) for node in nodes()], indent=2) + '\n')
         raise
     finally:
+        (directory / 'observed-states.json').write_text(json.dumps(states, indent=2) + '\n')
         if observer:
             observer.close()
         close(ui)

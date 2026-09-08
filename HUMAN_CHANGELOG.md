@@ -44,9 +44,12 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Let the goose recognize its own transparent drawing surface so granted pointer pranks work while other windows remain protected. Keep desktop observations running during longer sessions.
 - Stop pending pointer and delivery movement when permission disappears, preserving already delivered notes and requiring fresh consent after a restart.
 - Give delivered notes their own desktop identity once their window appears, so optional KDE support can recognize and move the correct note.
+- Keep a delivery or permitted pointer prank running when the desktop repeats an unchanged display notice. Actual display changes still stop those actions safely.
 
 ### Behind the scenes
 - Require actual desktop permission, movement, settings and recovery checks before publishing optional KDE support. Keep useful failure evidence and use the desktop's normal services without granting extra computer privileges.
+- Check that pointer motion really stops when the desktop permission service closes during a prank, and keep the observed recovery results available if a later check fails.
+- Avoid duplicate desktop builds while retaining the required release checks.
 - Wait until settings reports a completed save before checking its file, so the test itself cannot block saving.
 
 ### Behind the scenes

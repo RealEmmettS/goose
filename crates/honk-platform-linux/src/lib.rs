@@ -1733,9 +1733,10 @@ mod platform {
                     .iter_mut()
                     .find(|output| output.layer.wl_surface() == surface)
                 {
+                    let previous = output.effective_scale_120();
                     output.integer_scale = new_factor.max(1);
                     output.apply_surface_scale();
-                    self.topology_changed = true;
+                    self.topology_changed |= previous != output.effective_scale_120();
                 }
             }
 
@@ -1827,8 +1828,8 @@ mod platform {
                     .iter_mut()
                     .find(|surface| &surface.layer == layer)
                 {
+                    self.topology_changed |= !surface.closed;
                     surface.closed = true;
-                    self.topology_changed = true;
                 }
             }
 
@@ -1845,6 +1846,12 @@ mod platform {
                     .iter_mut()
                     .find(|surface| &surface.layer == layer)
                 {
+                    let previous = (
+                        surface.width,
+                        surface.height,
+                        surface.configured,
+                        surface.closed,
+                    );
                     if configure.new_size.0 > 0 {
                         surface.width = configure.new_size.0;
                     }
@@ -1854,7 +1861,13 @@ mod platform {
                     surface.apply_surface_scale();
                     surface.configured = true;
                     surface.closed = false;
-                    self.topology_changed = true;
+                    self.topology_changed |= previous
+                        != (
+                            surface.width,
+                            surface.height,
+                            surface.configured,
+                            surface.closed,
+                        );
                 }
             }
         }
@@ -1880,9 +1893,10 @@ mod platform {
                         .iter_mut()
                         .find(|surface| surface.output == data.output)
                     {
+                        let previous = surface.effective_scale_120();
                         surface.preferred_scale_120 = Some(scale.max(1));
                         surface.apply_surface_scale();
-                        state.topology_changed = true;
+                        state.topology_changed |= previous != surface.effective_scale_120();
                     }
                 }
             }
