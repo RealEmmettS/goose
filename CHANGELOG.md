@@ -47,6 +47,7 @@ All notable changes to this project are documented here. Format based on
 - Aim cursor-seeking locomotion at the body position that brings the beak to the pointer, avoiding a stationary-pointer chase that could never reach the grab distance.
 
 ### Development
+- Keep disposable settings lifecycle checks scoped to their CI environment and use Linux's explicit headless fallback where the fixture has no compositor; the independent Linux overlay gate continues to require visible pixels.
 - Qualify CLI, real terminal-editor keys and native GTK update actions with genuine Debian installation transactions. Exercise GUI download failure, unchanged receipt/runtime, retry, helper relaunch and public no-op results using an isolated terminal-output adapter. Exercise settings Start/Stop through the real runtime on disposable native desktops.
 - Scope the goose's antialiased edge-color oracle to its actual silhouette so independently colored seasonal props do not contaminate the sample. Preserve global alpha, crop, black-rectangle, and channel checks; add paired-compositor and raw-DIB regressions for a separate translucent prop.
 - Exercise Linux controls, text, focus and save through native AT-SPI; expose bounded UTF-8 text runs to assistive readers. Use the pinned x64 Zig build host and native ARM64 ReleaseSafe tests on Windows ARM, and install Alpine's separate virtual-display runner.

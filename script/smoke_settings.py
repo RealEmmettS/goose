@@ -38,6 +38,11 @@ def main() -> None:
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     if args.lifecycle and os.environ.get("GITHUB_ACTIONS") != "true":
         raise RuntimeError("Lifecycle fixture runs only on a disposable GitHub desktop")
+    environment = dict(os.environ)
+    if args.lifecycle and os.name != "nt" and os.uname().sysname == "Linux":
+        # These GUI fixtures use Xvfb without a compositing manager. The separate
+        # Linux overlay gate owns pixels; this probe owns the GUI/control handoff.
+        environment["HONK300_ALLOW_HEADLESS"] = "1"
     # Unique cwd isolates the SDK's file protocol from other development windows.
     with tempfile.TemporaryDirectory(prefix="honk300-settings-") as temporary:
         work = Path(temporary)
@@ -45,7 +50,7 @@ def main() -> None:
         config.write_text("# Preserved by the real shared editor\ngoose_config_version = 2\n", encoding="utf-8")
         process = subprocess.Popen([str(binary), "--config", str(config)], cwd=work,
                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL)
+                                   stderr=subprocess.DEVNULL, env=environment)
         snapshot_path = work / ".zig-cache/native-sdk-automation/snapshot.txt"
         started_runtime = False
 

@@ -144,7 +144,7 @@ jobs:
           cargo build --locked --release --target ${{ matrix.target }} --bin honk300
       - name: Build and exercise settings on native musl GTK
         run: |
-          docker run --rm -v "$PWD:/work" -w /work alpine:3.21.3 sh -eu -c '
+          docker run --rm -e GITHUB_ACTIONS -v "$PWD:/work" -w /work alpine:3.21.3 sh -eu -c '
             apk add --no-cache nodejs npm python3 build-base pkgconf gtk4.0-dev curl xz git xvfb xvfb-run xauth dbus
             curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/honk-rustup.sh
             sh /tmp/honk-rustup.sh -y --profile minimal --default-toolchain 1.95

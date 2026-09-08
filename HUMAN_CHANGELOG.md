@@ -43,6 +43,8 @@ Settings now expose their text and controls to Windows accessibility tools, with
 
 ### Behind the scenes
 
+Graphical-settings start and stop checks use the intended test environment, with desktop drawing checked separately where a compositor is available.
+
 Update checks now cover the command line and both settings screens with real installed packages, including a failed download followed by a retry and checks that the goose can restart afterward. Separate checks start and stop the goose from its graphical settings.
 
 Visual checks now distinguish the goose's outline from nearby seasonal decorations while continuing to catch clipped art, incorrect transparency, and color errors. Build checks keep their supporting components separate, and the reorganized installation code retains its Mac behavior.
