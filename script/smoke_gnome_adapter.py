@@ -155,8 +155,18 @@ def main():
             wait(lambda: find(ordinary['title'])['fullscreen'], 'native fullscreen observation')
             windows[0].unfullscreen()
             wait(lambda: not find(ordinary['title'])['fullscreen'], 'native fullscreen removal')
+            capture_environment = dict(environment)
             environment['DISPLAY'] = snapshot()['display']
             assert environment['DISPLAY'] and environment['DISPLAY'] != outer_display, environment['DISPLAY']
+            # Mutter creates a separate authenticated XWayland server. Use its
+            # one private authority file in this fixture's runtime directory;
+            # never read, copy, print or relax its cookie. The outer screenshot
+            # connection retains Xvfb's separate original authority.
+            authority = list(runtime.glob('.mutter-Xwaylandauth.*'))
+            assert len(authority) == 1 and not authority[0].is_symlink()
+            metadata = authority[0].stat()
+            assert metadata.st_uid == os.getuid() and metadata.st_mode & 0o077 == 0
+            environment['XAUTHORITY'] = str(authority[0])
             config = evidence / 'goose.toml'
             config.write_text('goose_config_version = 2\n[audio]\nenabled = false\n'
                               '[behavior]\nfirst_wander_time_seconds = 600.0\n'
@@ -179,7 +189,7 @@ def main():
                     pump()
                     time.sleep(0.05)
                 subprocess.run(['import', '-display', outer_display, '-window', 'root',
-                    str(evidence / 'native-goose.png')], env=environment, check=True, timeout=8)
+                    str(evidence / 'native-goose.png')], env=capture_environment, check=True, timeout=8)
                 subprocess.run([str(args.goose.resolve()), 'stop'], env=environment,
                     check=True, capture_output=True, timeout=5)
                 goose.wait(timeout=30)

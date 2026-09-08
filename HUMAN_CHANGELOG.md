@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Connect the goose to the private GNOME test desktop using its normal authenticated display connection.
+
+### Behind the scenes
 - Start the GNOME movement check after its private windows finish opening, while keeping stale-window protection in place.
 
 ### Behind the scenes

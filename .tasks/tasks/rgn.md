@@ -40,6 +40,7 @@ Active. Begin the real Shell extension lifecycle, native window interface and
 compatible XWayland goose overlay premise. No GNOME production capability is enabled.
 
 ## Activity
+- 2026-09-08 — The actual extension now passes owned movement, stale refusal and fullscreen. Overlay startup correctly rejects the outer Xvfb credential on Mutter's separate XWayland display. Use only Mutter's existing private authority file in this fixture's runtime directory, without reading/copying its cookie or relaxing authentication; keep the outer capture connection separate.
 - 2026-09-08 — All four native desktops reach real GTK window identities. The first movement is correctly refused by the exact target guard; retain its individual refusal reasons and wait for stable mapped geometry before testing a move. Disable decorative animations only through the private desktop's own settings.
 - 2026-09-08 — All four actual Shell extensions now enable and return authenticated native snapshots. The next shared failure is PyGObject's eager Gtk import before WAYLAND_DISPLAY selection. Move that import after the Shell snapshot; retain the actual desktop and extension as the source of display identity.
 - 2026-09-08 — All four real Shells now start but extension enable times out. Correct the private bus activation environment so dconf and Shell share the isolated settings root; collect actual extension discovery and enabled-settings diagnostics before the next native attempt.
