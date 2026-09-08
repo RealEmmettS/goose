@@ -6,6 +6,7 @@ use honk_engine::{CollectWindowCommand, CollectWindowPayload};
 use std::fs::File;
 use std::io::Read;
 use std::os::fd::AsRawFd;
+use std::os::unix::process::CommandExt;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command as Process, Stdio};
 use std::time::{Duration, Instant};
 
@@ -28,7 +29,9 @@ impl Controller {
         let current = std::env::current_exe()?;
         let settings = current.with_file_name("honk300-settings");
         let verified = crate::install::verify_settings_companion(&current, &settings)?;
-        let mut child = Process::new(settings)
+        let program = crate::install::verified_settings_program(&verified)?;
+        let mut child = Process::new(program)
+            .arg0(&settings)
             .arg("--owned-props")
             .env("GDK_BACKEND", if positioning { "x11" } else { "wayland" })
             .stdin(Stdio::piped())

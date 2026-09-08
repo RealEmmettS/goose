@@ -310,9 +310,18 @@ jobs:
             echo "archive_sha256_before=$archive_before"
             echo "binary_sha256_before=$binary_before"
           } > "$evidence/identity.txt"
-          HONK300_BIN="$PWD/$binary" \
-          HONK300_EVIDENCE_DIR="$PWD/$evidence/compositor" \
-            sh script/smoke_m17_m18_linux.sh
+          case "$target" in
+            *-linux-musl)
+              docker run --rm -e GITHUB_ACTIONS -e HONK_HOST_UID="$(id -u)" \
+                -e HONK300_BIN="/work/$binary" -e HONK300_EVIDENCE_DIR="/work/$evidence/compositor" \
+                -v "$PWD:/work" -w /work alpine:3.21.3 sh script/smoke_packaged_musl.sh
+              ;;
+            *)
+              HONK300_BIN="$PWD/$binary" \
+              HONK300_EVIDENCE_DIR="$PWD/$evidence/compositor" \
+                sh script/smoke_m17_m18_linux.sh
+              ;;
+          esac
           archive_after="$(sha256sum "$archive" | awk '{print $1}')"
           binary_after="$(sha256sum "$binary" | awk '{print $1}')"
           test "$archive_after" = "$archive_before"
