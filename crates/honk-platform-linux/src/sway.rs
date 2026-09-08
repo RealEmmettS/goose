@@ -93,11 +93,12 @@ impl Frame {
         if root.get("type").and_then(|value| value.as_str()) != Some("root") {
             return Err("Missing Sway root node");
         }
-        let mut stack = vec![(&root, 0)];
+        let mut stack = vec![(&root, 0, false, false)];
         let mut identities = HashSet::new();
         let mut windows = Vec::new();
         let mut count = 0;
-        while let Some((node, depth)) = stack.pop() {
+        let mut live_outputs = 0;
+        while let Some((node, depth, inherited_fullscreen, inherited_output)) = stack.pop() {
             count += 1;
             if count > 512 || depth > 16 {
                 return Err("Sway tree exceeds its node or depth bound");
@@ -120,6 +121,45 @@ impl Frame {
             ) {
                 return Err("Unknown Sway node type");
             }
+            let live_output = if kind == "output" {
+                // Sway includes i3's synthetic scratchpad output in GET_TREE.
+                // It is not a real monitor and has no active/power fields.
+                if id == i32::MAX as u64
+                    && node.get("name").and_then(|value| value.as_str()) == Some("__i3")
+                {
+                    false
+                } else {
+                    let active = node
+                        .get("active")
+                        .and_then(|value| value.as_bool())
+                        .ok_or("Missing Sway output activation state")?;
+                    let powered = node
+                        .get("dpms")
+                        .and_then(|value| value.as_bool())
+                        .ok_or("Missing Sway output power state")?;
+                    if active && powered {
+                        live_outputs += 1;
+                    }
+                    if live_outputs > 16 {
+                        return Err("Too many active Sway outputs");
+                    }
+                    active && powered
+                }
+            } else {
+                inherited_output
+            };
+            // Workspace fullscreen_mode is always 1 for i3 compatibility; only
+            // real containers carry fullscreen authority, inherited by leaves.
+            let own_fullscreen = if matches!(kind, "con" | "floating_con") {
+                node.get("fullscreen_mode")
+                    .and_then(|value| value.as_u64())
+                    .filter(|mode| *mode <= 2)
+                    .ok_or("Invalid Sway fullscreen mode")?
+                    != 0
+            } else {
+                false
+            };
+            let fullscreen = inherited_fullscreen || own_fullscreen;
             for key in ["nodes", "floating_nodes"] {
                 let children = node
                     .get(key)
@@ -128,7 +168,11 @@ impl Frame {
                 if children.len() + stack.len() + count > 512 {
                     return Err("Too many Sway child nodes");
                 }
-                stack.extend(children.iter().map(|child| (child, depth + 1)));
+                stack.extend(
+                    children
+                        .iter()
+                        .map(|child| (child, depth + 1, fullscreen, live_output)),
+                );
             }
             if node.get("pid").is_none_or(|value| value.is_null()) {
                 continue;
@@ -163,13 +207,8 @@ impl Frame {
             let visible = node
                 .get("visible")
                 .and_then(|value| value.as_bool())
-                .ok_or("Missing Sway window visibility")?;
-            let fullscreen = node
-                .get("fullscreen_mode")
-                .and_then(|value| value.as_u64())
-                .filter(|mode| *mode <= 2)
-                .ok_or("Invalid Sway fullscreen mode")?
-                != 0;
+                .ok_or("Missing Sway window visibility")?
+                && live_output;
             windows.push(Window {
                 id,
                 pid,
@@ -179,6 +218,9 @@ impl Frame {
                 visible,
                 fullscreen,
             });
+        }
+        if live_outputs == 0 {
+            return Err("No active Sway output is available");
         }
         Ok(Self { windows })
     }
@@ -191,11 +233,18 @@ mod tests {
 
     fn tree() -> serde_json::Value {
         // The actual native Sway premise supplies these node/window fields.
-        json!({"id":1,"type":"root","nodes":[],"floating_nodes":[{
+        json!({"id":1,"type":"root","floating_nodes":[],"nodes":[{
+            "id":2,"type":"output","name":"HEADLESS-1","active":true,"dpms":true,
+            "rect":{"x":0,"y":0,"width":1280,"height":900},"floating_nodes":[],"nodes":[{
+            "id":3,"type":"workspace","fullscreen_mode":1,"nodes":[],"floating_nodes":[{
             "id":6,"type":"floating_con","nodes":[],"floating_nodes":[],
             "pid":2489,"app_id":"honk300-sway-probe","name":"Honk300 ordinary Sway probe",
             "rect":{"x":490,"y":350,"width":300,"height":200},
-            "visible":true,"fullscreen_mode":0}]})
+            "visible":true,"fullscreen_mode":0}]}]}]})
+    }
+
+    fn window_mut(input: &mut serde_json::Value) -> &mut serde_json::Value {
+        &mut input["nodes"][0]["nodes"][0]["floating_nodes"][0]
     }
 
     fn decode(value: &serde_json::Value) -> Result<Frame, &'static str> {
@@ -208,9 +257,9 @@ mod tests {
         let frame = decode(&input).unwrap();
         assert_eq!(frame.windows[0].pid, 2489);
         assert!(!frame.fullscreen());
-        input["floating_nodes"][0]["fullscreen_mode"] = json!(2);
+        window_mut(&mut input)["fullscreen_mode"] = json!(2);
         assert!(decode(&input).unwrap().fullscreen());
-        input["floating_nodes"][0]["visible"] = json!(false);
+        window_mut(&mut input)["visible"] = json!(false);
         assert!(!decode(&input).unwrap().fullscreen());
     }
 
@@ -218,7 +267,7 @@ mod tests {
     fn malformed_ambiguous_or_oversized_inventory_fails_closed() {
         for field in ["pid", "visible", "rect", "fullscreen_mode", "app_id"] {
             let mut input = tree();
-            input["floating_nodes"][0][field] = if field == "app_id" {
+            window_mut(&mut input)[field] = if field == "app_id" {
                 json!(7)
             } else {
                 json!("invalid")
@@ -226,19 +275,42 @@ mod tests {
             assert!(decode(&input).is_err(), "{field}");
         }
         let mut duplicate = tree();
-        duplicate["floating_nodes"][0]["id"] = json!(1);
+        window_mut(&mut duplicate)["id"] = json!(1);
         assert!(decode(&duplicate).is_err());
         let mut excessive = tree();
-        let node = excessive["floating_nodes"][0].clone();
-        excessive["floating_nodes"] = json!((0..65)
+        let node = window_mut(&mut excessive).clone();
+        excessive["nodes"][0]["nodes"][0]["floating_nodes"] = json!((0..65)
             .map(|i| {
                 let mut copy = node.clone();
-                copy["id"] = json!(i + 2);
+                copy["id"] = json!(i + 6);
                 copy
             })
             .collect::<Vec<_>>());
         assert!(decode(&excessive).is_err());
         assert!(Frame::decode(&vec![b' '; MAX_REPLY + 1]).is_err());
+    }
+
+    #[test]
+    fn split_container_fullscreen_reaches_visible_descendants_only() {
+        let mut input = tree();
+        let window = window_mut(&mut input).take();
+        *window_mut(&mut input) = json!({"id":5,"type":"con","fullscreen_mode":1,
+            "floating_nodes":[],"nodes":[window]});
+        assert!(decode(&input).unwrap().fullscreen());
+        window_mut(&mut input)["nodes"][0]["visible"] = json!(false);
+        assert!(!decode(&input).unwrap().fullscreen());
+    }
+
+    #[test]
+    fn missing_or_powered_off_outputs_are_unknown_not_a_clear_desktop() {
+        let mut input = tree();
+        input["nodes"][0]["active"] = json!(false);
+        assert!(decode(&input).is_err());
+        input["nodes"][0]["active"] = json!(true);
+        input["nodes"][0]["dpms"] = json!(false);
+        assert!(decode(&input).is_err());
+        input["nodes"] = json!([]);
+        assert!(decode(&input).is_err());
     }
 
     #[test]

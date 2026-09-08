@@ -55,6 +55,11 @@ and pointer authority remain unsupported.
 Publication remains ordered after the qualified KDE release.
 
 ## Activity
+- 2026-09-08 — The first integrated native run reaches a live goose and settings window
+  but the new fixture omitted the accessibility service's enable step. Match the existing
+  native accessibility workflow before retrying. Production decoder regressions also expose
+  missing split-container fullscreen inheritance and no-output rejection; correct both and
+  require their actual native states, plus bounded fragmented socket exchange tests.
 - 2026-09-08 — Verify all four production Rust transport lanes, then connect explicit
   Sway consent to its independent bounded worker and native settings controls. Add actual
   engine fullscreen/configuration, native draft, revocation, socket replacement and

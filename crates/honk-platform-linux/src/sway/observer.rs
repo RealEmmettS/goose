@@ -48,7 +48,10 @@ impl Observer {
                         thread::park_timeout(Duration::from_millis(50));
                     }
                     Ok(())
-                })();
+            })();
+            if let Err(error) = &result {
+                eprintln!("honk300: optional Sway observations ended ({error}); repeat Sway setup to retry");
+            }
                 if let Ok(mut state) = shared.lock() {
                     state.frame = None;
                     state.failed = result.is_err();

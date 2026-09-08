@@ -26,6 +26,12 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Fixed
+- Inherit Sway fullscreen state through real split containers while excluding the synthetic workspace flag. Reject observations without an active powered output. Production decoder regressions fail before both corrections and pass afterward; native fixtures require both compositor states. Enable the private fixture's real accessibility bus before querying its native settings provider.
+
+### Behind the scenes
+- Exercise the production socket exchange against partial, oversized, mismatched and disconnected replies, retaining one deadline across all fragments and rejecting a replaced socket after readback.
+
 ### Added
 - Connect explicit Sway CLI and Native SDK setup/removal to a private consent record and the Rust observation worker. Keep request polling off the presentation loop, expire stale frames, retain the exact worker through removal, and require explicit reconnection after socket replacement. Qualify actual fullscreen manners, live configuration changes, native accessibility actions, drafts and restart in disposable Sway desktops.
 - Implement the read-only Sway window/fullscreen decoder and bounded native transport for independently qualified 1.9/1.10.1 desktops, requiring private socket ownership and a system-owned compositor peer. ADR 0046 leaves movement and pointer actions unsupported without authoritative user-drag/input evidence.

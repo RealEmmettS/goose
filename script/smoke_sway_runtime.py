@@ -11,7 +11,12 @@ def qualify(binary, settings, evidence, wait, window, find_window, ipc_path, GLi
     assert os.environ.get('GITHUB_ACTIONS') == 'true'
     import gi
     gi.require_version('Atspi', '2.0')
-    from gi.repository import Atspi
+    from gi.repository import Atspi, Gio
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    bus.call_sync('org.a11y.Bus', '/org/a11y/bus', 'org.freedesktop.DBus.Properties', 'Set',
+        GLib.Variant('(ssv)', ('org.a11y.Status', 'IsEnabled', GLib.Variant('b', True))),
+        None, Gio.DBusCallFlags.NONE, 2000, None)
+    Atspi.init()
     directory = evidence / 'goose'
     directory.mkdir()
     config = directory / 'config.toml'
@@ -217,6 +222,10 @@ preserve = "untouched"
             stopped_removal=True, unrelated_state_preserved=True), indent=2) + '\n')
     finally:
         (directory / 'observed-states.json').write_text(json.dumps(states, indent=2) + '\n')
+        if ui is not None and ui.poll() is None:
+            (directory / 'native-settings-tree.json').write_text(json.dumps([
+                dict(name=node.get_name(), role=node.get_role_name()) for node in nodes()
+            ], indent=2) + '\n')
         close(ui)
         close(runtime)
         if record.exists():

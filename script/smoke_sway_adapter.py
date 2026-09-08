@@ -181,9 +181,43 @@ def main():
                 from smoke_sway_runtime import qualify
                 qualify(args.goose.resolve(), args.settings.resolve(), evidence, wait,
                         windows[0], find, ipc_path, GLib)
+            # A floating split container has no PID of its own. Its real leaf
+            # keeps fullscreen_mode=0 while the parent enters fullscreen.
+            # Operate only on the exact fixture leaf and its single-child parent.
+            command(f'{criteria} split v')
+            def group():
+                return next((node for node in nodes(ipc(4))
+                    if not node.get('pid') and node.get('type') in ('con', 'floating_con')
+                    and len(node.get('nodes', [])) == 1
+                    and node['nodes'][0].get('id') == ordinary['id']), None)
+            parent = wait(group, 'native fixture split container')
+            command(f'[con_id={parent["id"]}] fullscreen enable')
+            parent = wait(lambda: (node if (node := group()) and node['fullscreen_mode'] > 0 else None),
+                          'native split-container fullscreen')
+            assert find(ordinary['name'])['fullscreen_mode'] == 0
+            rust = rust_snapshot('split-fullscreen')
+            if rust:
+                assert rust['fullscreen'], 'Fullscreen parent was lost at the production decoder'
+            (evidence / 'split-fullscreen.json').write_text(json.dumps(parent, indent=2) + '\n')
+            command(f'[con_id={parent["id"]}] fullscreen disable')
+            wait(lambda: group()['fullscreen_mode'] == 0, 'split-container fullscreen ends')
+            assert find(protected['name'])['rect'] == protected['rect'], 'Protected fixture was manipulated'
             windows[0].destroy()
             windows.pop(0)
             wait(lambda: find(ordinary['name']) is None, 'native disappearance')
+            if args.bridge:
+                output = next(node for node in nodes(ipc(4)) if node['type'] == 'output' and node.get('active'))
+                assert output['name'].startswith('HEADLESS-') and output['name'][9:].isdigit()
+                command(f'output {output["name"]} dpms off')
+                try:
+                    wait(lambda: not any(node.get('active') and node.get('dpms') for node in nodes(ipc(4))
+                        if node['type'] == 'output'), 'native output power removal')
+                    absent = subprocess.run([str(args.bridge.resolve())], env=environment,
+                        capture_output=True, text=True, timeout=5)
+                    assert absent.returncode != 0 and 'No active Sway output' in absent.stderr, absent.stderr
+                    (evidence / 'no-output.txt').write_text(absent.stderr)
+                finally:
+                    command(f'output {output["name"]} dpms on')
             (evidence / 'result.json').write_text(json.dumps(dict(ok=True,
                 compositor_pid=compositor.pid, unix_uid=os.getuid(), peer_credentials=True,
                 version=version, architecture=os.uname().machine, initial=ordinary,
@@ -192,6 +226,8 @@ def main():
                 user_drag_observation_qualified=False,
                 production_rust_observation=args.bridge is not None,
                 production_runtime=args.goose is not None,
+                split_fullscreen=args.bridge is not None,
+                no_output_is_unknown=args.bridge is not None,
                 untrusted_peer_refused=args.bridge is not None), indent=2) + '\n')
         finally:
             for window in windows:
