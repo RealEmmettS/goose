@@ -30,6 +30,8 @@ All notable changes to this project are documented here. Format based on
 - Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.
 
 ### Development
+- Exercise a prop's native Close button through AT-SPI; direct X window destruction bypasses GTK's user-close path. Preserve unexpected protocol output as failure evidence.
+- Embed the approved Makira faces in native Linux prop text/headers through private anonymous font files; cap command dispatch per GTK iteration while preserving bounded input storage.
 - Call the explicit AT-SPI Text interface in the native GTK prop fixture so Ubuntu's similarly named deprecated Accessible method cannot shadow text readback.
 - Run the dedicated native prop probe when its isolated implementation branch changes; this also initializes the new workflow before it exists on main.
 - Build a bounded private Linux prop mode into the existing GTK settings companion. Preserve Unicode note text, premultiplied full-image rendering, opaque identity, close origin, connection-owned cleanup and a native capacity/geometry fixture; runtime integration and Wayland qualification remain pending.

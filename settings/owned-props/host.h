@@ -17,7 +17,7 @@ typedef struct {
     size_t pixels_len;
 } HonkPropCommand;
 
-int honk_props_run(void);
+int honk_props_run(const unsigned char *light, size_t light_len, const unsigned char *bold, size_t bold_len);
 int honk_props_apply(const HonkPropCommand *command);
 int honk_props_decode(const unsigned char *json, size_t length);
 #endif

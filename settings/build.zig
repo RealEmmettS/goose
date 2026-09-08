@@ -46,6 +46,7 @@ pub fn build(b: *std.Build) void {
     } else {
         app.exe.root_module.addCSourceFile(.{ .file = b.path("owned-props/host.c"), .flags = &.{ "-std=c11", "-Wall", "-Wextra", "-Werror", "-Wno-deprecated-declarations" } });
         app.exe.root_module.addIncludePath(b.path("owned-props"));
+        app.exe.root_module.linkSystemLibrary("fontconfig", .{});
         app.exe.root_module.linkSystemLibrary("X11", .{});
         app.exe.root_module.linkSystemLibrary("gcc_s", .{ .use_pkg_config = .no });
         const gcc_library = std.mem.trim(u8, b.run(&.{ "cc", "-print-file-name=libgcc_s.so" }), " \r\n\t");

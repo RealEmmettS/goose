@@ -36,11 +36,13 @@ const Command = extern struct {
     pixels_len: usize,
 };
 
-extern fn honk_props_run() c_int;
+extern fn honk_props_run(light: [*]const u8, light_len: usize, bold: [*]const u8, bold_len: usize) c_int;
 extern fn honk_props_apply(command: *const Command) c_int;
 
 pub fn run() !void {
-    if (honk_props_run() != 0) return error.OwnedPropsUnavailable;
+    const light = @embedFile("fonts/Makira-Light.ttf");
+    const bold = @embedFile("fonts/Makira-Bold.ttf");
+    if (honk_props_run(light.ptr, light.len, bold.ptr, bold.len) != 0) return error.OwnedPropsUnavailable;
 }
 
 fn validText(text: []const u8, limit: usize) bool {

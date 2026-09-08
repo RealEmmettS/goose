@@ -53,6 +53,8 @@ Save remains available to accessibility tools after changing settings, including
 Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
 
 ### Behind the scenes
+- Test closing a Linux note through its real Close button and retain better diagnostics for unexpected exits.
+- Keep the requested typefaces in Linux note windows and keep their controls responsive while messages arrive.
 - Correct the Linux test tool's text-reading call after both native builds successfully created the full set of note windows.
 - Automatically check changes to the new Linux prop host on both processor types during development.
 - Build the Linux note and picture host and checks for text, image fit, closing windows and cleaning up when the goose stops.

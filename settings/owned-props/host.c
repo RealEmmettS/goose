@@ -1,15 +1,20 @@
 // Native, process-owned props only. No foreign-window or global-input API.
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include "host.h"
 #include <gtk/gtk.h>
 #include <gdk/x11/gdkx.h>
 #include <glib-unix.h>
 #include <X11/Xutil.h>
+#include <fontconfig/fontconfig.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/mman.h>
 
 #define PROP_LIMIT 8
 #define INPUT_LIMIT (4 * 1024 * 1024)
@@ -160,6 +165,7 @@ static int spawn_prop(Prop *prop, const HonkPropCommand *command) {
     g_signal_connect(prop->window, "close-request", G_CALLBACK(user_close), prop);
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+    gtk_widget_add_css_class(header, "honk-prop-header");
     GtkWidget *label = gtk_label_new(command->title);
     gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
     gtk_label_set_max_width_chars(GTK_LABEL(label), 1);
@@ -281,6 +287,18 @@ int honk_props_apply(const HonkPropCommand *command) {
     return !failed;
 }
 
+static gboolean consume_commands(void) {
+    for (unsigned index = 0; index < 32; index++) {
+        unsigned char *newline = memchr(input->data, '\n', input->len);
+        if (!newline) break;
+        size_t length = newline - input->data;
+        if (!length || !honk_props_decode(input->data, length)) { fail(); return FALSE; }
+        g_byte_array_remove_range(input, 0, (guint)length + 1);
+        if (stopping) return FALSE;
+    }
+    return TRUE;
+}
+
 static gboolean read_commands(gint fd, GIOCondition condition, gpointer unused) {
     (void)unused;
     unsigned char chunk[65536];
@@ -295,23 +313,16 @@ static gboolean read_commands(gint fd, GIOCondition condition, gpointer unused) 
         }
         if (input->len + count > INPUT_LIMIT) { fail(); return G_SOURCE_REMOVE; }
         g_byte_array_append(input, chunk, (guint)count);
-        for (;;) {
-            unsigned char *newline = memchr(input->data, '\n', input->len);
-            if (!newline) break;
-            size_t length = newline - input->data;
-            if (!length || !honk_props_decode(input->data, length)) { fail(); return G_SOURCE_REMOVE; }
-            g_byte_array_remove_range(input, 0, (guint)length + 1);
-            if (stopping) return G_SOURCE_REMOVE;
-        }
         processed += (size_t)count;
         if (processed >= 256 * 1024) break;
     }
     if (condition & (G_IO_ERR | G_IO_NVAL)) { fail(); return G_SOURCE_REMOVE; }
-    return G_SOURCE_CONTINUE;
+    return consume_commands();
 }
 
 static gboolean tick(gpointer unused) {
     (void)unused;
+    if (!consume_commands()) return G_SOURCE_REMOVE;
     for (unsigned index = 0; index < PROP_LIMIT && !failed; index++) {
         if (props[index].window) update_geometry(&props[index]);
     }
@@ -325,8 +336,33 @@ static gboolean terminate(gpointer unused) {
     return G_SOURCE_REMOVE;
 }
 
-int honk_props_run(void) {
+// Fontconfig needs a file identity. Anonymous, close-on-exec memory files keep
+// the already-embedded faces available without writing fonts into user folders.
+static int register_font(const unsigned char *bytes, size_t length) {
+    int fd = memfd_create("honk-prop-font", MFD_CLOEXEC);
+    if (fd < 0) return -1;
+    size_t offset = 0;
+    while (offset < length) {
+        ssize_t count = write(fd, bytes + offset, length - offset);
+        if (count < 0 && errno == EINTR) continue;
+        if (count <= 0) { close(fd); return -1; }
+        offset += (size_t)count;
+    }
+    char path[64];
+    g_snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
+    if (!FcConfigAppFontAddFile(NULL, (const FcChar8 *)path)) { close(fd); return -1; }
+    return fd;
+}
+
+int honk_props_run(const unsigned char *light, size_t light_len, const unsigned char *bold, size_t bold_len) {
     if (!gtk_init_check()) return 1;
+    int light_fd = register_font(light, light_len);
+    int bold_fd = register_font(bold, bold_len);
+    if (light_fd < 0 || bold_fd < 0) {
+        if (light_fd >= 0) close(light_fd);
+        if (bold_fd >= 0) close(bold_fd);
+        return 1;
+    }
     signal(SIGPIPE, SIG_IGN);
     if (fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK) < 0 ||
         fcntl(STDOUT_FILENO, F_SETFL, fcntl(STDOUT_FILENO, F_GETFL) | O_NONBLOCK) < 0) return 1;
@@ -334,6 +370,8 @@ int honk_props_run(void) {
     positioning = GDK_IS_X11_DISPLAY(display);
     GtkCssProvider *css = gtk_css_provider_new();
     gtk_css_provider_load_from_data(css,
+        "textview { font-family: 'Makira Light'; font-size: 15px; font-weight: 300; }"
+        ".honk-prop-header label { font-family: 'Makira'; font-size: 15px; font-weight: 700; }"
         ".honk-prop-close { min-width: 26px; min-height: 26px; padding: 0; margin: 0; border-radius: 0; }", -1);
     gtk_style_context_add_provider_for_display(display, GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     g_object_unref(css);
@@ -350,5 +388,7 @@ int honk_props_run(void) {
     for (unsigned index = 0; index < PROP_LIMIT; index++) close_prop(&props[index], FALSE);
     g_main_loop_unref(loop);
     g_byte_array_unref(input);
+    close(light_fd);
+    close(bold_fd);
     return failed ? 1 : 0;
 }

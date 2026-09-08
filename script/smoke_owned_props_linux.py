@@ -37,7 +37,11 @@ class Host:
         while time.monotonic() < deadline:
             if b'\n' in self.buffer:
                 line, self.buffer = self.buffer.split(b'\n', 1)
-                event = json.loads(line)
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    (self.directory / 'invalid-protocol.txt').write_text(repr(line) + '\n')
+                    raise
                 self.events.append(event)
                 (self.directory / 'events.json').write_text(json.dumps(self.events, indent=2) + '\n')
                 if predicate(event):
@@ -113,6 +117,27 @@ def main():
                                 capture_output=True, text=True)
         return result.stdout.splitlines() if result.returncode == 0 else []
 
+    def user_close_note(pid):
+        # xdotool windowclose uses XDestroyWindow, which bypasses GTK's close
+        # handling entirely. Activate the real, process-owned native Close
+        # button so this tests the user-close signal and preserves other notes.
+        root = Atspi.get_desktop(0)
+        root.clear_cache()
+        stack = [root.get_child_at_index(i) for i in range(root.get_child_count())]
+        stack = [node for node in stack if node and node.get_process_id() == pid]
+        inspected = 0
+        while stack and inspected < 512:
+            node = stack.pop()
+            node.clear_cache()
+            inspected += 1
+            if node.get_name() == 'Close' and node.get_role() == Atspi.Role.PUSH_BUTTON:
+                action = node.get_action_iface()
+                if action and Atspi.Action.do_action(action, 0):
+                    return
+            stack.extend(child for i in range(node.get_child_count())
+                         if (child := node.get_child_at_index(i)) is not None)
+        raise RuntimeError('Native owned Close action is unavailable')
+
     results = []
     try:
         for cycle in range(2):
@@ -135,7 +160,7 @@ def main():
                 host.wait(lambda event: event.get('id') == 1 and event.get('x') == 500 and event.get('y') == 300)
                 owned = native_windows(host.process.pid)
                 assert len(owned) == 8
-                subprocess.run(['xdotool', 'windowclose', owned[-1]], check=True)
+                user_close_note(host.process.pid)
                 closed = host.wait(lambda event: event.get('event') == 'window' and not event['alive'] and event['origin'] == 'user')
                 assert closed['id'] in range(1, 9)
                 host.send('note', id=10, x=40, y=40, width=400, height=250, title='Room again')
