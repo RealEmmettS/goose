@@ -41,6 +41,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Explain optional desktop setup and dependencies without claiming support for desktops that have not been tested.
 
 ### Fixed
+- Keep Sway desktop awareness steady when you repeat setup, preserving the existing connection and permission.
 - Recognize fullscreen groups of windows on Sway and report unavailable observations when its screens are off. Check that incomplete desktop replies cannot keep the goose waiting indefinitely.
 - Keep an existing pointer permission when you repeat KDE setup, so an unchanged setup does not send you through another permission dialog. Include the desktop companion when preparing the source package.
 - Keep exact desktop window positions when passing them to the goose, preventing a delivery from stopping after its first small movement.

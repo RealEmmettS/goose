@@ -42,19 +42,24 @@ it does not yet qualify animated deliveries. Resolve that safety boundary explic
 before production movement. Pointer authority remains separately unsupported.
 
 ## Verification
-- [ ] Actual supported Sway versions on x64/ARM64 pass native movement and refusal scenarios.
-- [ ] Rust controls and native settings preserve drafts, ownership and revocation behavior.
+- [x] Actual supported Sway versions on x64/ARM64 pass native movement and refusal scenarios.
+- [x] Rust controls and native settings preserve drafts, ownership and revocation behavior.
 - [ ] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
 Active. The initial socket/window/fullscreen premise passed all four native lanes.
 The actual bounded Rust decoder/transport and untrusted-peer refusal pass all four native
 lanes in run 34215421415. CLI, settings service, native GUI and owned observation worker
-are implemented; integrated desktop lifecycle qualification is now required. User drag
+pass integrated desktop lifecycle qualification in all four lanes of run 34218062301. User drag
 and pointer authority remain unsupported.
 Publication remains ordered after the qualified KDE release.
 
 ## Activity
+- 2026-09-08 — Inspect all four complete native runtime results: real fullscreen manners,
+  config changes, drafts, exact worker removal, consent revocation, socket replacement,
+  deliberate reconnection, graceful/crash recovery and unrelated state preservation pass.
+  Make the separate workflow mandatory for candidate/public builds. Preserve a healthy
+  observer through repeated setup and add native CLI/GUI worker-identity verification.
 - 2026-09-08 — The first integrated native run reaches a live goose and settings window
   but the new fixture omitted the accessibility service's enable step. Match the existing
   native accessibility workflow before retrying. Production decoder regressions also expose

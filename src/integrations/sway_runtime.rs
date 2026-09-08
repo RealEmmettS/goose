@@ -28,13 +28,32 @@ impl SwayRuntime {
     }
 
     pub(crate) fn enable(&mut self) -> Result<(), Error> {
+        let desired = (|| -> Result<_, Error> {
+            let consent = sway_consent::read(&directory()?)?
+                .ok_or("Use Sway setup before enabling observations")?;
+            if !consent.current() {
+                return Err("Repeat Sway setup for this observation update".into());
+            }
+            Ok(consent)
+        })();
+        let consent = match desired {
+            Ok(consent) => consent,
+            Err(error) => {
+                self.disable();
+                self.failed = true;
+                return Err(error);
+            }
+        };
+        if self.consent.as_ref() == Some(&consent)
+            && self
+                .observer
+                .as_ref()
+                .is_some_and(|worker| worker.snapshot().is_some())
+        {
+            return Ok(());
+        }
         self.disable();
         self.failed = true;
-        let consent = sway_consent::read(&directory()?)?
-            .ok_or("Use Sway setup before enabling observations")?;
-        if !consent.current() {
-            return Err("Repeat Sway setup for this observation update".into());
-        }
         self.observer = Some(Observer::start()?);
         self.consent = Some(consent);
         self.last_check = Some(Instant::now());

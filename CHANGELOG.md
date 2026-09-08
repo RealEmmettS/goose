@@ -26,7 +26,16 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Behind the scenes
+- Record v1.5.0 immutable publication, all-eight fresh-public qualification and independent verification of all 47 assets. Close both website handoffs against the actual renderer SVG deployment and verified Linux/Pi guidance with all 22 download mappings.
+
+### Behind the scenes
+- Reconcile v1.4.0 final-source publication and fresh-public evidence across current guidance, accessibility ADRs, the audit and completed foundation/settings/art tasks. Retain separate website/next-stage gates and track unresolved presence observation in its own milestone task.
+
+## [1.7.0] - Unreleased candidate
+
 ### Fixed
+- Preserve a healthy Sway observation worker through repeated CLI or native settings setup. Verify the actual worker identity and unchanged consent while fullscreen manners remain enabled.
 - Inherit Sway fullscreen state through real split containers while excluding the synthetic workspace flag. Reject observations without an active powered output. Production decoder regressions fail before both corrections and pass afterward; native fixtures require both compositor states. Enable the private fixture's real accessibility bus before querying its native settings provider.
 
 ### Behind the scenes
@@ -38,12 +47,6 @@ All notable changes to this project are documented here. Format based on
 
 ### Behind the scenes
 - Qualify the Sway 1.9/1.10.1 native premise on x64/ARM64 Ubuntu and Debian, checking real socket peer identity, window geometry, bounded owned-fixture motion and fullscreen state before runtime implementation. Retain the unresolved active-drag observation boundary before enabling production movement.
-
-### Behind the scenes
-- Record v1.5.0 immutable publication, all-eight fresh-public qualification and independent verification of all 47 assets. Close both website handoffs against the actual renderer SVG deployment and verified Linux/Pi guidance with all 22 download mappings.
-
-### Behind the scenes
-- Reconcile v1.4.0 final-source publication and fresh-public evidence across current guidance, accessibility ADRs, the audit and completed foundation/settings/art tasks. Retain separate website/next-stage gates and track unresolved presence observation in its own milestone task.
 
 ## [1.6.0] - Unreleased candidate
 

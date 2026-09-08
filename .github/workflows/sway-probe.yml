@@ -2,9 +2,16 @@ name: Native Sway adapter
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      commit:
+        required: true
+        type: string
+  pull_request:
+    paths: ['script/smoke_sway*', '.github/workflows/sway-probe.yml', '.github/workflows/release.yml', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
   push:
-    branches: [codex/goose-sway-integration]
-    paths: ['script/smoke_sway*', '.github/workflows/sway-probe.yml', 'crates/**', 'src/**', 'settings/**']
+    branches: [main, codex/goose-sway-integration]
+    paths: ['script/smoke_sway*', '.github/workflows/sway-probe.yml', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
 
 permissions:
   contents: read
@@ -21,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:

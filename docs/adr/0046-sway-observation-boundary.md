@@ -1,7 +1,7 @@
 # ADR 0046: explicit Sway observations with unsupported action capabilities
 
 Date: 2026-09-08
-Status: accepted design; native operation premise passed, production boundary in progress
+Status: accepted and implemented; complete native runtime evidence passed
 
 ## Evidence and decision
 
@@ -34,9 +34,12 @@ removal or shutdown. No foreign Sway configuration or binding is installed or ed
 
 ## Qualification
 
-The native premise permits implementation, not a public support claim. Production
-decoding/transport, explicit setup/removal, GUI drafts, unsupported actions, socket
-replacement/disconnect, fullscreen changes and graceful shutdown remain required.
+The complete [native run 34218062301](https://github.com/RealEmmettS/goose/actions/runs/34218062301)
+passes all four desktop lanes, including production transport, setup/removal through
+native accessible controls, GUI drafts, unsupported actions, socket replacement,
+fullscreen engine manners/config changes and graceful/crash recovery. Native split
+fullscreen and powered-off output scenarios exercise the production decoder.
+The final-source release repeats this separate desktop workflow as a mandatory gate.
 The release follows KDE publication, with separate native versions/architectures,
 complete same-source candidate/main gates, immutable artifacts and fresh public-byte
 verification. Other compositors and physical Pi behavior inherit no Sway evidence.
