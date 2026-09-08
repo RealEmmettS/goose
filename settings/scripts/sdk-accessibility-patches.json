@@ -177,7 +177,7 @@
       },
       {
         "before": "- (BOOL)isAccessibilitySelectorAllowed:(SEL)selector {\n    if (selector == @selector(accessibilityPerformPress)) {\n        return self.accessibilityEnabled && (self.actionFlags & NativeSdkWidgetPressActionFlags) != 0;\n    }\n    if (selector == @selector(accessibilityPerformIncrement)) {\n        return self.accessibilityEnabled && (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_INCREMENT) != 0;\n    }\n    if (selector == @selector(accessibilityPerformDecrement)) {\n        return self.accessibilityEnabled && (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_DECREMENT) != 0;\n    }\n    if (selector == @selector(accessibilityPerformCancel)) {\n        return self.accessibilityEnabled && (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_DISMISS) != 0;\n    }\n    return [super isAccessibilitySelectorAllowed:selector];\n}\n",
-        "after": "- (BOOL)isAccessibilitySelectorAllowed:(SEL)selector {\n    if (selector == @selector(accessibilityPerformPress)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NativeSdkWidgetPressActionFlags];\n    }\n    if (selector == @selector(accessibilityPerformIncrement)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_INCREMENT];\n    }\n    if (selector == @selector(accessibilityPerformDecrement)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_DECREMENT];\n    }\n    if (selector == @selector(accessibilityPerformCancel)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_DISMISS];\n    }\n    if (selector == @selector(setAccessibilityFocused:)) {\n        return [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_FOCUS];\n    }\n    return [super isAccessibilitySelectorAllowed:selector];\n}\n"
+        "after": "- (BOOL)isAccessibilitySelectorAllowed:(SEL)selector {\n    if (selector == @selector(accessibilityPerformPress)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NativeSdkWidgetPressActionFlags];\n    }\n    if (selector == @selector(accessibilityPerformIncrement)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_INCREMENT];\n    }\n    if (selector == @selector(accessibilityPerformDecrement)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_DECREMENT];\n    }\n    if (selector == @selector(accessibilityPerformCancel)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_DISMISS];\n    }\n    if (selector == @selector(setAccessibilityFocused:)) {\n        return [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_FOCUS];\n    }\n    if (selector == @selector(setAccessibilityValue:)) {\n        return [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_TEXT];\n    }\n    return [super isAccessibilitySelectorAllowed:selector];\n}\n"
       },
       {
         "before": "        return (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_TEXT) != 0;",
@@ -190,6 +190,26 @@
       {
         "before": "    if (!self.host || self.surfaceLabel.length == 0 || widgetId == 0) return NO;\n    const char *labelBytes = self.surfaceLabel.UTF8String ?: \"\";",
         "after": "    if (!self.host || self.surfaceLabel.length == 0 || widgetId == 0) return NO;\n    if (action < NATIVE_SDK_APPKIT_WIDGET_ACCESSIBILITY_ACTION_FOCUS ||\n        action > NATIVE_SDK_APPKIT_WIDGET_ACCESSIBILITY_ACTION_DISMISS) return NO;\n    BOOL allowed = NO;\n    // These pinned ABI action values correspond to their action-flag bit positions.\n    uint32_t requiredFlag = 1u << (unsigned int)action;\n    for (NativeSdkWidgetAccessibilityElement *current in self.widgetAccessibilityElements) {\n        if (current.widgetId == widgetId) {\n            allowed = current.accessibilityEnabled && (current.actionFlags & requiredFlag) != 0;\n            break;\n        }\n    }\n    if (!allowed) return NO;\n    const char *labelBytes = self.surfaceLabel.UTF8String ?: \"\";"
+      },
+      {
+        "before": "- (void)setAccessibilityFocused:(BOOL)focused {\n    [super setAccessibilityFocused:focused];\n    if (!focused || !self.accessibilityEnabled) return;\n    if ((self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_FOCUS) == 0) return;\n    [self.surfaceView emitWidgetAccessibilityActionWithId:self.widgetId action:NATIVE_SDK_APPKIT_WIDGET_ACCESSIBILITY_ACTION_FOCUS];\n}\n",
+        "after": "// Snapshot publication must not invoke the assistive input setters.\n- (void)honkApplyPublishedFocus:(BOOL)focused {\n    [super setAccessibilityFocused:focused];\n}\n\n- (void)setAccessibilityFocused:(BOOL)focused {\n    if (!focused || ![self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_FOCUS]) return;\n    [self.surfaceView emitWidgetAccessibilityActionWithId:self.widgetId action:NATIVE_SDK_APPKIT_WIDGET_ACCESSIBILITY_ACTION_FOCUS];\n}\n\n- (void)honkApplyPublishedValue:(id)value {\n    [super setAccessibilityValue:value];\n}\n\n// AX clients use the modern property setter on NSAccessibilityElement.\n// The inherited setter only changes this snapshot, never the app's draft.\n- (void)setAccessibilityValue:(id)value {\n    [self emitSetTextAccessibilityValue:value];\n}\n"
+      },
+      {
+        "before": "            element.accessibilityValue = [NSString stringWithFormat:@\"%.3f\", node.value];",
+        "after": "            [element honkApplyPublishedValue:[NSString stringWithFormat:@\"%.3f\", node.value]];"
+      },
+      {
+        "before": "            element.accessibilityValue = textValue;",
+        "after": "            [element honkApplyPublishedValue:textValue];"
+      },
+      {
+        "before": "            element.accessibilityValue = @(node.scroll_offset);",
+        "after": "            [element honkApplyPublishedValue:@(node.scroll_offset)];"
+      },
+      {
+        "before": "        element.accessibilityFocused = (node.state_flags & NATIVE_SDK_APPKIT_WIDGET_STATE_FOCUSED) != 0;",
+        "after": "        [element honkApplyPublishedFocus:(node.state_flags & NATIVE_SDK_APPKIT_WIDGET_STATE_FOCUSED) != 0];"
       }
     ]
   }

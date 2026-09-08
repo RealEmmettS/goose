@@ -21,6 +21,11 @@ dialog ancestry and checks cached actions against the current published scope.
 Repeat actual native reader checks before integrating either pending release.
 
 ## Activity
+- 2026-09-08 — Run 34291576968 passes modal isolation and cached-action refusal
+  on Intel and Apple Silicon, then fails edited-value persistence: the inherited
+  modern AXValue setter only changes the native snapshot. Route that setter into
+  the real text action and separate value/focus publication from input setters.
+  Preserve both failure trees and the existing save-readback assertion.
 - 2026-09-08 — Preserve run 34290279357's actual modal failure and both captured
   native trees; its initial Intel artifact transfer failure is separate. Cancel
   candidates 34287468666 and 34287505007 before publication. Add ADR 0051,

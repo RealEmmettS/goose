@@ -41,3 +41,12 @@ against the corrected companion. Carry this shared settings correction into
 both pending releases before tags. Repeat their final-source settings, candidate,
 main and public gates; earlier green SDK harness results are separate evidence.
 Physical VoiceOver user acceptance remains distinct from hosted AX-provider proof.
+
+The first corrected native run, 34291576968, passes modal isolation and retained
+background-reference refusal on both architectures. It then demonstrates a second
+provider defect: setting AXValue changes the inherited native element to `25`,
+but applying that edit leaves the draft unchanged and Save disabled. Route the
+modern AppKit value setter through the existing runtime text action, alongside
+the legacy attribute API. Publish snapshot value and focus through explicit
+superclass setters so readback cannot synthesize input or claim an unapplied edit.
+The original saved-value assertion remains required.

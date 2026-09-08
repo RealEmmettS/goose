@@ -38,6 +38,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
   including switches, text fields, dialogs and saved changes.
 
 ### Fixed
+- Make text changes from Mac assistive tools reach the settings draft so they
+  can be saved, and report the field's actual value and focus afterward.
 - Keep assistive navigation inside an open settings dialog and prevent older
   controls from acting after the page or dialog changes.
 
