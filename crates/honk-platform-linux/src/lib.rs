@@ -5,11 +5,15 @@
 //! out of `honk-engine` while the X11/Wayland presentation backends continue to mature.
 
 #[cfg(target_os = "linux")]
+mod native_socket;
+#[cfg(target_os = "linux")]
 mod tray;
 
 #[cfg(any(target_os = "linux", test))]
 pub mod kwin;
 
+#[cfg(any(target_os = "linux", test))]
+pub mod hyprland;
 #[cfg(any(target_os = "linux", test))]
 pub mod sway;
 

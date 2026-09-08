@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [codex/goose-hyprland-integration]
-    paths: ['script/smoke_hyprland*', 'script/select_vkms_device.py', '.github/workflows/hyprland-probe.yml']
+    paths: ['script/smoke_hyprland*', 'script/select_vkms_device.py', '.github/workflows/hyprland-probe.yml', 'crates/**']
 
 permissions:
   contents: read
@@ -22,6 +22,14 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.95'
+      - name: Build and test the actual observation transport
+        run: |
+          cargo test --locked -p honk-platform-linux --lib
+          cargo clippy --locked -p honk-platform-linux --all-targets -- -D warnings
+          cargo build --locked --release -p honk-platform-linux --example hyprland_bridge_probe
       - name: Prepare a disposable virtual graphics device
         id: graphics
         run: |
@@ -78,7 +86,7 @@ jobs:
             test -S /run/seatd.sock
             runuser -u honkprobe -- env GITHUB_ACTIONS=true dbus-run-session -- \
               python3 script/smoke_hyprland_adapter.py --evidence target/hyprland-evidence \
-                --generation "$generation"
+                --generation "$generation" --bridge target/release/examples/hyprland_bridge_probe
           '
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}

@@ -18,6 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--generation', choices=('legacy', 'lua'), required=True)
+    parser.add_argument('--bridge', type=Path)
     args = parser.parse_args()
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -164,6 +165,39 @@ def main():
             ordinary, protected = (find(window.get_title()) for window in windows)
             for node in (ordinary, protected):
                 assert node['mapped'] and not node['hidden'] and not node['xwayland'], node
+            def rust_snapshot(label):
+                if args.bridge is None:
+                    return None
+                result = subprocess.run([str(args.bridge.resolve())], env=environment,
+                    capture_output=True, text=True, timeout=5)
+                assert result.returncode == 0, result.stderr
+                observed = json.loads(result.stdout)
+                assert observed['peer_pid'] == compositor.pid and observed['peer_uid'] == os.getuid()
+                assert not observed['movement'] and not observed['pointer_control']
+                assert not observed['pointer_observation']
+                (evidence / f'rust-{label}.json').write_text(json.dumps(observed, indent=2) + '\n')
+                return observed
+            rust = rust_snapshot('initial')
+            if rust:
+                actual = next(window for window in rust['windows'] if window['id'] == ordinary['address'])
+                assert actual['pid'] == os.getpid() and actual['geometry'] == ordinary['at'] + ordinary['size']
+                assert actual['visible'] and not rust['fullscreen']
+                fake_signature = 'f' * 40 + '_1_1'
+                fake_directory = runtime / 'hypr' / fake_signature
+                fake_directory.mkdir(mode=0o700)
+                fake_socket = fake_directory / '.socket.sock'
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
+                    listener.bind(str(fake_socket))
+                    listener.listen(1)
+                    listener.settimeout(2)
+                    denied = subprocess.run([str(args.bridge.resolve())],
+                        env=dict(environment, HYPRLAND_INSTANCE_SIGNATURE=fake_signature),
+                        capture_output=True, text=True, timeout=5)
+                    assert denied.returncode != 0 and 'system-owned compositor executable' in denied.stderr, denied.stderr
+                    client, _ = listener.accept()
+                    with client:
+                        assert client.recv(32) == b'', 'An impostor received a query before rejection'
+                fake_socket.unlink()
             initial = ordinary['at']
             selector = 'address:' + ordinary['address']
             command("/dispatch hl.dsp.window.move({x=" + str(initial[0] + 6) + ',y=' +
@@ -175,6 +209,9 @@ def main():
             windows[0].fullscreen()
             fullscreen = wait(lambda: (node if (node := find(ordinary['title'])) and
                 node['fullscreen'] == 2 else None), 'actual fullscreen observation')
+            rust = rust_snapshot('fullscreen')
+            if rust:
+                assert rust['fullscreen']
             windows[0].unfullscreen()
             wait(lambda: find(ordinary['title'])['fullscreen'] == 0, 'fullscreen removal')
             windows[0].destroy()
@@ -183,7 +220,8 @@ def main():
             result = dict(ok=True, compositor_pid=compositor.pid, unix_uid=os.getuid(),
                 peer_credentials=True, version=version, architecture=os.uname().machine,
                 initial=ordinary, moved=moved, protected=protected, fullscreen=fullscreen,
-                vanished=True, pointer_control_qualified=False, user_drag_observation_qualified=False)
+                vanished=True, pointer_control_qualified=False, user_drag_observation_qualified=False,
+                production_rust_observation=args.bridge is not None, untrusted_peer_refused=args.bridge is not None)
             (evidence / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result))
         finally:

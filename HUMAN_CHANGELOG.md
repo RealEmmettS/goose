@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Begin connecting Hyprland desktop observations to the goose, with strict ownership checks and separate fullscreen awareness. Window movement remains unavailable until the desktop can reliably identify an active user drag.
+
+### Behind the scenes
 - Open the private desktop test windows at a fixed size so the placement check starts from a settled layout.
 
 ### Behind the scenes
