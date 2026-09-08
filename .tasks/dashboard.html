@@ -1248,6 +1248,11 @@
         denyNudge('A board save is still finishing — retry deletion when it settles');
         return false;
       }
+      const detailState = detailPersistenceState(task.id);
+      if (!await taskDetailIsPersisted(task.id) || !detailState.revision) {
+        denyNudge('Load and save the task detail before deleting it');
+        return false;
+      }
 
       let removed = null;
       for (const section of sections) {
@@ -1270,11 +1275,12 @@
             'X-Base-Mtime': String(lastModified),
             'X-Base-Board-Revision': lastBoardRevision,
             'X-Delete-Task-Id': task.id,
+            'X-Delete-Detail-Revision': detailState.revision,
           }),
           body: toMarkdown(),
         });
         verifyServerResponse(res);
-        if (res.status === 409) {
+        if (res.status === 409 || res.status === 412) {
           tasks[removed.sectionId].splice(
             Math.min(removed.index, tasks[removed.sectionId].length),
             0,
@@ -1282,7 +1288,7 @@
           );
           taskBoardReloadDeferred = true;
           renderTasks();
-          showStatus('Board changed before deletion — close the task to reload, then review and retry');
+          showStatus('Board or task detail changed before deletion — close the task to reload, then review and retry');
           return false;
         }
         if (!res.ok) throw new Error(`guarded task deletion returned ${res.status}`);
@@ -4083,6 +4089,10 @@
           try {
             const confirmedSource = await readTaskDetail(task.id);
             if (tmTask !== task || completionEpoch !== tmCompletionEpoch) return;
+            if (!confirmedSource.body.trim()) {
+              denyNudge('Write and save the task detail before marking it complete');
+              return;
+            }
             tmDetail = parseDetail(confirmedSource.body);
             tmDetailLoaded = true;
             const persistence = detailPersistenceState(task.id);

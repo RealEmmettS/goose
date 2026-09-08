@@ -24,19 +24,16 @@ Evidence: locked Rust tests and native GTK builds plus at least two real deliver
 ## Verification
 - [x] Real engine tests cover capacity exhaustion/recovery, placement-only delivery and interrupted actions.
 - [x] Native GTK note/image tests verify complete fit, exact owned-window movement, close events and child cleanup.
-- [ ] GNU/musl architecture builds preserve CLI/TUI availability and reject broken companion/protocol inputs.
+- [x] GNU/musl architecture builds preserve CLI/TUI availability and reject broken companion/protocol inputs.
 
 ## Status
-Active in the isolated `codex/goose-linux-expansion` checkout. Both native GNU architectures
-pass real X11 engine delivery/text, child-loss failure latching, reload, graceful cleanup,
-standalone controls, native capacity/close/move tests and complete-image pixels. The local
-Rust workspace, strict Clippy, release build, 130 Python checks (three host skips), native
-settings tests/check/build pass. Workflow 34186038608 passed both GNU architectures,
-including visible X11 delivery, actual labwc 0.7.1 placement and scales one/two, input
-rejection, child loss and standalone controls. ARM64 note and complete-image captures
-were visually reviewed. The exact official GNU companions passed on GTK 4.6 in the full
-native settings matrix. Add those same real prop checks to the shipped musl companions;
-their native results and complete release integration remain open. Nothing is published.
+Implementation qualified. Run 34189363866 passes all eight native settings lanes,
+including actual production GNU and musl x64/ARM64 host/runtime props, complete-image
+pixels, close/capacity, child-loss cleanup and standalone controls. GNU uses the GTK 4.6
+baseline; Alpine uses its native XRender compositor. Run 34186038608 passes native
+x64/ARM64 labwc 0.7.1 at both display scales; ARM64 captures were inspected.
+The final first-stage review fixes are integrated. Ordered final-source CI, packaging
+and public-byte publication belong to #rlpi; no physical Pi claim or public release is made.
 
 ## Evidence
 | Criterion | Oracle / invocation | Raw result or pointer | Interpretation | Limitation | Status |
@@ -46,9 +43,13 @@ their native results and complete release integration remain open. Nothing is pu
 | Runtime delivery, failure and shared status | smoke_runtime_props_linux.py | 34186038608 runtime-props-evidence/result.json and session-status.json | Real visible native text, child loss, failure latch, caller-independent status and standalone controls pass | Disposable GNU desktop | PASS |
 | Visible runtime note and labwc | strengthened capture and native placement probes | 34186038608 props-labwc/result.json and engine/result.json | Both native architectures pass labwc 0.7.1, scales one/two, normal placement and opt-in enforcement; ARM64 images inspected | Headless pixman, no physical Pi | PASS |
 | Oldest GTK and exact GNU release companions | Native settings production-payload prop checks | 34186768042 all eight settings lanes pass | GNU x64/ARM64 prop checks pass with GTK 4.6 after production identity verification | Disposable desktops, no physical Pi | PASS |
-| Exact musl release companions | Shared production-payload prop checks | next complete settings matrix | Require real host and runtime behavior under Alpine on both native architectures | Native result pending | NOT RUN |
+| Exact musl release companions | Shared production-payload prop checks | 34189363866 all eight settings lanes pass | Actual production host/runtime behavior, complete-image pixels, close and failure cleanup pass on both native Alpine architectures | Disposable desktops, no physical Pi | PASS |
 
 ## Activity
+- 2026-09-08: Completed implementation qualification with all eight native settings lanes in run 34189363866, including both shipped musl companions. Recorded the native evidence and handed final-source release integration to #rlpi.
+- 2026-09-08: Both musl jobs stopped during package installation because Alpine does not
+  ship xcompmgr. Its native x64/ARM64 picom package supplies the XRender compositor;
+  use that in the same private Xvfb session before repeating the unchanged prop assertions.
 - 2026-09-07: The entire native settings matrix passed, including real production GNU
   prop delivery on the older GTK baseline. Add the same host/runtime/pixel/failure checks
   for native x64/ARM64 musl payloads, retaining independently verified production identity.

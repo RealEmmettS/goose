@@ -5,13 +5,14 @@ across real monitor layouts, honks, leaves muddy footprints, reacts to the point
 bounded desktop pranks. Configuration and control stay local through a command-line interface
 and terminal settings screen.
 
-**v1.4.0 candidate in development:** this branch adds a fully redesigned, continuously projected
-goose with new expressions and motion, shared runtime reliability improvements, and a native
-graphical settings companion. `honk300 settings` and tray Configure open that window;
-`honk300 config` retains the TUI. Both edit the same Rust-owned configuration. Native accessibility,
-cross-platform packaging, and release qualification are still in progress; these changes are
-not part of the public stable release below. See [the refinement audit](docs/refinement-audit.md)
-and [ADR 0041](docs/adr/0041-refinement-native-settings-and-continuous-goose.md).
+**v1.5.0 candidate in development:** this branch adds owned Linux notes and pictures,
+live desktop-session reporting, and experimental Pi 4/5 64-bit Desktop guidance. X11 can
+animate owned deliveries; native Wayland uses normal compositor placement. These changes
+follow the v1.4.0 goose redesign, runtime reliability work and native graphical settings.
+`honk300 settings` and tray Configure open the GUI; `honk300 config` retains the TUI.
+Both edit the same Rust-owned configuration. Neither candidate is published yet; the
+stable release below remains authoritative. See [stage-two readiness](docs/readiness/v1.5.0-readiness.md),
+[Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
@@ -299,7 +300,11 @@ zero means the selected release, receipt, selector, and aliases were activated a
 | Linux X11/XWayland | x64/ARM64, GNU/musl | Full overlay and supported mischief; Configure/Update/Quit when a StatusNotifier host exists |
 | Linux native Wayland | x64/ARM64, GNU/musl | Opt-in reduced overlay mode; independent StatusNotifier control when hosted |
 
-Linux collect-window behavior is unsupported and reported honestly. Exact signed-app macOS
+This candidate's packaged Linux companion supplies owned notes and pictures on X11 and
+native Wayland. X11 positions only those owned windows; Wayland leaves placement to the
+compositor. A standalone Rust binary retains CLI/TUI controls and reports props unavailable
+when its companion is absent. KDE/portal and other privileged adapters remain separate,
+unreleased work. Exact signed-app macOS
 Accessibility evidence for first denial, non-nagging relaunch, live grant, and live revocation
 remains tracked in the readiness docs; hosted bundle and permission-adapter tests are release
 gates. Native release gates hold exact Windows/Linux binaries unchanged while checking
@@ -324,7 +329,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.4.0
+dist plan --tag=v1.5.0
 cargo audit --version 0.22.2
 ```
 

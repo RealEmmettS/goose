@@ -26,11 +26,6 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
-### Fixed
-- Honor the documented native Wayland opt-in on desktops without X11: a bare launch explains the existing command/config choice before creating an overlay or companion.
-- Give the native Linux prop close button the visible label Close; GTK's deferred child label had replaced the separate accessibility label with the multiplication symbol.
-- Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.
-
 ### Development
 - Wait for native fixture windows to map before activating the KWin probe, and record bounded stop reasons without window contents. KWin 5 passed the real Rust transport; investigate KWin 6's startup expiry without relaxing its action deadline.
 - Exercise real authenticated Rust/KWin exchange, actual bounded moves, rejected untrusted D-Bus callers, expiry, explicit reconnect and disable. Pin the script's unique bridge owner and stop on replacement, timeout or malformed responses.
@@ -39,6 +34,20 @@ All notable changes to this project are documented here. Format based on
 - Wait for KWin's actual D-Bus registration after its earlier Wayland socket creation; capture bus ownership and compositor diagnostics on a bounded timeout before testing the script API.
 - Remove the distro KWin binary's realtime file-capability request only inside its disposable software-rendered CI container; preserve capability diagnostics and readable native-probe artifacts without granting host privileges.
 - Begin the explicitly enabled KDE companion with a native KWin 5/6 premise probe for real window identity, bounded geometry changes, terminal/stale-target refusal and disable; no production capability is enabled before runtime qualification.
+
+## [1.5.0] - Unreleased candidate
+
+### Added
+- Add Honk300-owned Linux note/image deliveries through the existing verified GTK companion, with X11 animated positioning and native Wayland compositor placement. Expose live session and separate positioning capability in CLI/TUI/GUI, and document experimental Pi 4/5 64-bit Desktop support with native ARM64 labwc evidence.
+
+### Fixed
+- Honor the documented native Wayland opt-in on desktops without X11: a bare launch explains the existing command/config choice before creating an overlay or companion.
+- Give the native Linux prop close button the visible label Close; GTK's deferred child label had replaced the separate accessibility label with the multiplication symbol.
+- Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.
+
+### Development
+- Prepare the ordered Linux release candidate and reconcile current capability guidance with successful production GNU/musl and ARM64 labwc evidence; retain every final-source package/publication gate and the physical Pi acceptance boundary.
+- Use Alpine's available picom XRender compositor for private musl prop qualification, retaining the live compositor-selection and visible-note checks; xcompmgr remains the GNU baseline host.
 - Exercise the exact production musl companions with real X11 notes, complete-image pixels, user closes, runtime delivery and child-loss cleanup on native x64/ARM64 Alpine; share the isolated compositor runner with the GNU baseline gate.
 - Document experimental Pi 4/5 64-bit Raspberry Pi OS Desktop setup, actual labwc 0.7.1 x64/ARM64 qualification and the remaining physical-device boundary; index the refinement ADRs.
 - Exercise actual production GNU companions on the Ubuntu 22.04 GTK baseline after identity verification. Record successful native x64/ARM64 X11/labwc delivery, scale, close and failure evidence; require light note-body pixels so a gray test desktop cannot satisfy visibility.
@@ -73,6 +82,8 @@ All notable changes to this project are documented here. Format based on
 - Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
 
 ### Fixed
+- Hold the same configuration revision lock through login-start reconciliation so a concurrent GUI/TUI save cannot be followed by a stale OS setting. Detect external editors that ignore that lock before reporting success.
+- Guard dashboard deletion against changed task-detail contents, and reject completion when task detail is missing or empty; preserve concurrent Status/Activity updates.
 - Reconcile receipt-owned autostart intent before the native settings edit snapshot, preserve its resulting revision, and reject concurrent configuration changes during reconciliation.
 - Keep native settings editable when runtime status cannot be confirmed, display an unknown state instead of stopped, and omit an unused native path field that could panic on non-Unicode filenames.
 - Reject ordinary reload when its configuration file is missing, retaining the running choices instead of silently applying defaults.
@@ -91,6 +102,7 @@ All notable changes to this project are documented here. Format based on
 - Aim cursor-seeking locomotion at the body position that brings the beak to the pointer, avoiding a stationary-pointer chase that could never reach the grab distance.
 
 ### Development
+- Give the Debian GUI intent fixture an explicitly older config timestamp: reproducible package unpacking preserves the receipt's build timestamp. Retain the strict newer-receipt, actual Read/Save and unchanged-receipt assertions with recorded timestamp evidence.
 - Qualify non-Unicode configuration filenames on Linux and Windows, where the files are valid; retain macOS APFS's native EILSEQ rejection instead of treating an uncreatable filename as a service failure.
 - Verify null Windows standard handles and valid inheritance in an isolated native test; the pinned API binding already skips null handles. Refresh the task dashboard while preserving its settings and stopped state.
 - Require strict all-target workspace Clippy on both native Linux CI architectures. Limit the installer autostart glob import to its Windows and test callers; the explicit public re-exports remain unchanged.

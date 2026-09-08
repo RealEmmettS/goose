@@ -257,6 +257,10 @@ exec "$@" > "$HONK300_ENTRYPOINT_EVIDENCE/helper.stdout.txt" 2> "$HONK300_ENTRYP
         if mode == 'gui':
             with config.open('a') as stream:
                 stream.write('# Older preference must yield to fresh installer intent\n[lifecycle]\nautostart_on_login = true\n')
+            # Debian preserves the reproducible package's recorded receipt mtime.
+            # Model a genuinely older saved preference, rather than assuming that
+            # unpacking a package rewrites every file timestamp to installation time.
+            os.utime(config, ns=(1_000_000_000, 1_000_000_000))
         environment = dict(os.environ, PATH=str(launcher_dir) + os.pathsep + os.environ['PATH'],
                            HONK300_ENTRYPOINT_EVIDENCE=str(directory), TERM='xterm-256color')
         runtime = editor = None
@@ -267,7 +271,10 @@ exec "$@" > "$HONK300_ENTRYPOINT_EVIDENCE/helper.stdout.txt" 2> "$HONK300_ENTRYP
             verify_receipt(args.fixture_version)
             before = RECEIPT.read_bytes()
             if mode == 'gui':
-                assert RECEIPT.stat().st_mtime_ns > config.stat().st_mtime_ns
+                intent_times = {'receipt_ns': RECEIPT.stat().st_mtime_ns,
+                                'older_config_ns': config.stat().st_mtime_ns}
+                (directory / 'intent-timestamps.json').write_text(json.dumps(intent_times, indent=2) + '\n')
+                assert intent_times['receipt_ns'] > intent_times['older_config_ns'], intent_times
 
                 def settings_request(command):
                     response = run(INSTALLED, '__settings-service', '--config', config,

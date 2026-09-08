@@ -18,13 +18,6 @@
   - [ ] Prove the real KWin script API and owned test-window movement on KDE 5/6.
   - [ ] Connect the authenticated bounded Rust bridge and live runtime capabilities.
   - [ ] Add explicit setup/removal and failure/revocation tests.
-- [ ] **Linux owned prop implementation** - bounded native note/image windows and honest compositor placement in an isolated follow-on checkout (ms #refine) (owner codex) #lpr
-  - [x] Bound owned prop admission and preserve existing notes when the capacity is full.
-  - [x] Implement the companion protocol and native GTK note/image host.
-  - [x] Connect X11 delivery and Wayland compositor placement to the real runtime.
-  - [x] Report live display, session hints and separate prop positioning in CLI/TUI/GUI.
-  - [x] Exercise close, cleanup, disconnect, invalid input, image fitting and repeated delivery.
-  - [ ] Verify the actual GNU/musl release companions and oldest GTK baseline.
 - [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
   - [ ] Resolve final PR review findings and repeat qualification before tagging.
   - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
@@ -67,6 +60,13 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **Linux owned prop implementation** - bounded native note/image windows and honest compositor placement in an isolated follow-on checkout (ms #refine) (owner codex) (done 2026-09-08) #lpr
+  - [x] Bound owned prop admission and preserve existing notes when the capacity is full.
+  - [x] Implement the companion protocol and native GTK note/image host.
+  - [x] Connect X11 delivery and Wayland compositor placement to the real runtime.
+  - [x] Report live display, session hints and separate prop positioning in CLI/TUI/GUI.
+  - [x] Exercise close, cleanup, disconnect, invalid input, image fitting and repeated delivery.
+  - [x] Verify the actual GNU/musl release companions and oldest GTK baseline.
 - [x] **Publish v1.3.5 updater result panel** - made the retained tray-helper close instruction unmistakable with a color-independent ASCII result panel and published/installed the complete immutable patch (done 2026-07-22) (owner codex) #r135
   - [x] Preserve ADR 0038 semantics and select one aligned ASCII success/attention panel.
   - [x] Implement and test the separated result panel for updated, no-op, duplicate, lock, and failure outcomes.

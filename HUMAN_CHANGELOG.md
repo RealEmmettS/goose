@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Added
+- The goose can bring notes and pictures on Linux. Compatible desktops animate deliveries, while Wayland chooses where to place them. Settings explain the active desktop capabilities, and new guidance covers experimental Raspberry Pi desktop use.
+
 ### Behind the scenes
 - Record why an optional KDE connection stops and let its test windows finish opening before checking the connection.
 - Test the real KDE connection through Rust, including rejected impostor connections, recovery and stopping when access disappears.
@@ -41,6 +44,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Let the isolated KDE test wait for the desktop connection to finish starting, and retain clear diagnostics if that connection never becomes ready.
 - Adjust the isolated KDE test environment so it can start and retain useful failure evidence without requesting extra system privileges.
 - Begin testing optional KDE desktop support with real windows, including checks that protected apps stay untouched and disabling the connection stops further actions.
+- Prepare the Linux update using checks of the actual shipped companions, while keeping the remaining release checks and real Raspberry Pi testing visible.
+- Use the desktop compositor supplied by Alpine for its isolated note and picture checks, while keeping the same visibility requirements.
 - Check the shipped Linux note and picture windows on Alpine as well as Ubuntu, including visible deliveries and cleanup if the supporting process fails.
 - Add Raspberry Pi desktop setup guidance and explain exactly what has been tested and what still needs a real device.
 - Linux delivery checks now cover the older desktop libraries used for official packages, with stronger evidence that notes remain visible.
@@ -54,6 +59,8 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - On a desktop that only offers Wayland, starting the goose explains how to enable its reduced mode instead of selecting that mode silently.
 - Linux notes and pictures use a clearly named Close button that accessibility tools can identify.
 - The goose pauses new note and picture deliveries when several are already open, leaving your existing notes intact and resuming after you close one.
+- Keep login-start changes consistent with the saved preference when two settings windows are editing at once, and report conflicting external edits.
+- Refuse to delete a task after someone else updates its details, and require saved task details before marking it complete.
 - Opening settings now respects the installer's latest start-at-login choice, so changing an unrelated preference cannot undo it.
 - Settings remain editable when the goose cannot report its status, and unusual configuration filenames no longer prevent the window from loading.
 - Reloading after a configuration file disappears keeps the goose's current choices instead of silently resetting them.
@@ -88,6 +95,7 @@ Settings now expose their text and controls to Windows accessibility tools, with
 - Automatically check changes to the new Linux prop host on both processor types during development.
 - Build the Linux note and picture host and checks for text, image fit, closing windows and cleaning up when the goose stops.
 - Prepare Linux deliveries to use the desktop's normal placement when animated window dragging is unavailable.
+- Correct the age of the saved preference used in installer-choice checks, so the test really covers an older preference and records the evidence needed to diagnose failures.
 - Check unusual filenames on systems that allow creating them, while respecting the Mac filesystem's own filename rules.
 - Add focused startup and settings checks, and refresh the project dashboard while preserving its existing settings.
 - Linux builds now receive the same strict code checks as Windows, including unused platform-specific code.

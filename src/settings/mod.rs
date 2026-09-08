@@ -209,7 +209,12 @@ fn save(
     let revision = config.save_if_revision(path, &revision)?;
     let mut warning = None;
     if config.lifecycle != before.config.lifecycle {
-        warning = reconcile(&config).err();
+        warning = revision
+            .with_guard(path, || {
+                reconcile(&config).map_err(honk_config::ConfigError::InvalidTarget)
+            })
+            .err()
+            .map(|error| error.to_string());
     }
     let identity = revision.reload_token(path)?;
     let (apply_state, message) = match send_command(ControlCommand::ReloadIf(identity)) {
@@ -284,6 +289,36 @@ fn runtime_status_json(result: io::Result<ControlResponse>) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gui_save_holds_the_revision_guard_during_login_reconciliation() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        Config::default().save_atomic(&path).unwrap();
+        let before = ConfigSnapshot::load(&path).unwrap();
+        let result = save(
+            &path,
+            before.revision,
+            BTreeMap::from([("lifecycle.autostart_on_login".into(), json!(true))]),
+            &|config| {
+                assert!(config.lifecycle.autostart_on_login);
+                let saved = ConfigSnapshot::load(&path).unwrap();
+                let mut rival = saved.config;
+                rival.lifecycle.autostart_on_login = false;
+                assert!(rival.save_if_revision(&path, &saved.revision).is_err());
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert!(result["warning"].is_null());
+        assert!(
+            ConfigSnapshot::load(&path)
+                .unwrap()
+                .config
+                .lifecycle
+                .autostart_on_login
+        );
+    }
 
     #[test]
     fn read_reloads_installer_intent_before_exposing_the_edit_revision() {
