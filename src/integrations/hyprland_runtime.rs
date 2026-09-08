@@ -45,10 +45,7 @@ impl HyprlandRuntime {
             }
         };
         if self.consent.as_ref() == Some(&consent)
-            && self
-                .observer
-                .as_ref()
-                .is_some_and(|worker| worker.snapshot().is_some())
+            && self.observer.as_ref().is_some_and(Observer::running)
         {
             return Ok(());
         }

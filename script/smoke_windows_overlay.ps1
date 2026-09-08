@@ -34,6 +34,10 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+if ($BackgroundHost) {
+    Write-Output "background_stage=script_started utc=$([DateTime]::UtcNow.ToString('O'))"
+}
+
 if ($IsWindows) {
     # PowerShell has no DPI contract of its own. Establish PMv2 before either this
     # controller or the child background host loads WinForms or creates an HWND, so
@@ -539,6 +543,7 @@ function Read-SharedTextFile {
 function Start-ControlledBackground {
     param([string] $StateDirectory)
 
+    Write-Output "background_stage=loading_winforms utc=$([DateTime]::UtcNow.ToString('O'))"
     Add-Type -AssemblyName System.Windows.Forms
     try {
         Add-Type -AssemblyName System.Drawing.Common
@@ -595,6 +600,7 @@ function Start-ControlledBackground {
         & $applyColor
     })
     $form.Add_Shown({
+        Write-Output "background_stage=window_shown utc=$([DateTime]::UtcNow.ToString('O'))"
         & $applyColor
         if (-not $script:BackgroundRequestToken) {
             throw 'controlled background did not receive its initial color request'
@@ -947,7 +953,11 @@ function Wait-ForRuntime {
         [Parameter(Mandatory = $true)] [string] $EvidenceName
     )
     $last = ''
-    for ($attempt = 0; $attempt -lt 100; $attempt += 1) {
+    # Cold PowerShell/Add-Type startup on native ARM hosts may exceed five
+    # seconds before creating any surface. Bound fixture startup independently
+    # from the unchanged goose readiness and actual compositor pixel oracles.
+    $backgroundStartup = [Diagnostics.Stopwatch]::StartNew()
+    while ($backgroundStartup.Elapsed.TotalSeconds -lt 30) {
         if ($Process.HasExited) {
             throw "runtime exited before status became ready (exit $($Process.ExitCode))"
         }
@@ -1681,8 +1691,9 @@ strict_transparency_proof=disposable-ci-only
         Start-Sleep -Milliseconds 50
     }
     if (-not (Test-Path -LiteralPath $readyPath -PathType Leaf)) {
-        throw 'controlled background host did not expose an interactive desktop'
+        throw "controlled background host did not expose an interactive desktop within $($backgroundStartup.Elapsed.TotalSeconds) seconds; inspect background.stdout.log for its last startup stage"
     }
+    Write-Output "Controlled background ready after $($backgroundStartup.Elapsed.TotalSeconds) seconds"
     Wait-ForBackgroundReady -Expected $darkHex -Token $initialColorToken
     if (-not (Test-Path -LiteralPath $backgroundDiagnosticsPath -PathType Leaf)) {
         throw 'controlled background did not publish DPI and geometry diagnostics'

@@ -40,6 +40,8 @@ Sway's existing terminal-error policy; Hyprland's timeout recovery has separate 
 The retained production worker passes all four native lanes in run 34227542105;
 Sway separately passes all four shared-worker regression lanes in run 34227540869.
 
-Production setup/removal, retained worker ownership, configuration and GUI drafts,
-lost authority, lifecycle recovery and every architecture/package gate still need
-actual native qualification before a new immutable public release can claim support.
+The complete actual runtime and Native SDK lifecycle passes all four desktops in
+run 34231759048, including repeated setup with the same kernel thread, live consent
+removal, fullscreen/config manners, retained drafts, socket replacement and graceful
+and crash recovery. Rendered prop/settings review and final-source publication
+gates remain tracked in the release readiness record.

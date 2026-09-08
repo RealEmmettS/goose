@@ -277,11 +277,13 @@ def main():
                 native=fullscreen, gtk_size=[windows[0].get_width(), windows[0].get_height()]),
                 indent=2) + '\n')
             if watcher:
-                wait(lambda: (state if (state := watch_current()) and state['observed']
-                    and state['fullscreen'] else None), 'fresh fullscreen after native configure')
-            rust = rust_snapshot('fullscreen')
-            if rust:
-                assert rust['fullscreen']
+                observed = wait(lambda: (state if (state := watch_current()) and state['observed']
+                    and state['fullscreen'] and state['fullscreen_window'] is not None else None),
+                    'fresh fullscreen from the retained production observer')
+                actual = observed['fullscreen_window']
+                assert actual['id'] == ordinary['address'] and actual['pid'] == os.getpid(), actual
+                assert actual['geometry'] == fullscreen['at'] + fullscreen['size'], actual
+                (evidence / 'rust-fullscreen.json').write_text(json.dumps(observed, indent=2) + '\n')
             windows[0].unfullscreen()
             wait(lambda: find(ordinary['title'])['fullscreen'] == 0, 'fullscreen removal')
             if watcher:
@@ -299,13 +301,25 @@ def main():
             windows[0].destroy()
             wait(lambda: find(ordinary['title']) is None, 'vanished target')
             assert find(protected['title'])['at'] == protected['at'], 'Protected fixture changed'
+            if args.goose is not None:
+                windows[1].destroy()
+                wait(lambda: find(protected['title']) is None, 'native fixture cleanup before prop qualification')
+                for label, script, executable, extra in (
+                    ('owned-props', 'script/smoke_owned_props_linux.py', args.settings, []),
+                    ('runtime-props', 'script/smoke_runtime_props_linux.py', args.goose,
+                     ['--expected-desktop', 'Hyprland']),
+                ):
+                    with (evidence / f'{label}.log').open('w') as log:
+                        subprocess.run(['python3', script, '--binary', str(executable.resolve()),
+                            '--evidence', str(evidence / label), *extra],
+                            stdout=log, stderr=log, check=True, timeout=300)
             result = dict(ok=True, compositor_pid=compositor.pid, unix_uid=os.getuid(),
                 peer_credentials=True, version=version, architecture=os.uname().machine,
                 initial=ordinary, moved=moved, protected=protected, fullscreen=fullscreen,
                 vanished=True, pointer_control_qualified=False, user_drag_observation_qualified=False,
                 production_rust_observation=args.bridge is not None, untrusted_peer_refused=args.bridge is not None,
                 retained_worker_fullscreen_recovery=args.bridge is not None,
-                production_runtime=args.goose is not None,
+                production_runtime=args.goose is not None, native_owned_props=args.goose is not None,
                 expired_observation_samples=sum(not state['observed'] for state in watch_events))
             (evidence / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result))

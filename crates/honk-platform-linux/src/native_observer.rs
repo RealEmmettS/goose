@@ -117,6 +117,13 @@ impl<S: Source> Observer<S> {
     pub fn failed(&self) -> bool {
         self.state.lock().map_or(true, |state| state.failed)
     }
+    /// A recovering or connecting worker still owns its authenticated source.
+    /// Snapshot freshness determines capability, not permission to replace it.
+    pub fn running(&self) -> bool {
+        self.worker
+            .as_ref()
+            .is_some_and(|worker| !worker.is_finished())
+    }
 }
 
 impl<S: Source> Drop for Observer<S> {
@@ -126,7 +133,16 @@ impl<S: Source> Drop for Observer<S> {
             worker.thread().unpark();
             // Every source request is bounded; retain the exact worker until
             // it exits, including while permission is being removed.
-            let _ = worker.join();
+            let joined = worker.join();
+            if std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true")
+                && std::env::var("HONK300_TRACE_OBSERVER").as_deref() == Ok("1")
+            {
+                eprintln!(
+                    "honk300 observer trace: name={} joined={}",
+                    S::NAME,
+                    joined.is_ok()
+                );
+            }
         }
     }
 }

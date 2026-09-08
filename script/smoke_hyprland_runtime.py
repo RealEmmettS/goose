@@ -43,13 +43,14 @@ preserve = "untouched"
     runtime = ui = None
     logs = []
     states = []
+    thread_states = []
 
     def launch(executable, label, *arguments):
         path = directory / f'{label}-{len(logs)}.log'
         logs.append(path)
         with path.open('w') as log:
             process = subprocess.Popen([str(executable), *arguments], stdout=log, stderr=log,
-                                       env=dict(os.environ, HONK300_TRACE_PRESENCE='1'))
+                                       env=dict(os.environ, HONK300_TRACE_PRESENCE='1', HONK300_TRACE_OBSERVER='1'))
         return process, path
 
     def control(*arguments, success=True):
@@ -73,8 +74,30 @@ preserve = "untouched"
         return result
 
     def workers():
-        return sorted(p.parent.name for p in Path(f'/proc/{runtime.pid}/task').glob('*/comm')
-                      if p.read_text().strip() == 'hyprland-observer'[:15])
+        threads = []
+        for path in Path(f'/proc/{runtime.pid}/task').glob('*/comm'):
+            try:
+                name = path.read_text().strip()
+                if name == 'hyprland-observer'[:15]:
+                    threads.append(dict(id=path.parent.name, name=name,
+                        stat=(path.parent / 'stat').read_text()))
+            except FileNotFoundError:
+                continue
+        thread_states.append(dict(at=time.monotonic(), threads=threads))
+        return sorted(thread['id'] for thread in threads)
+
+    def joined_count():
+        return runtime_log.read_text().count('honk300 observer trace: name=hyprland joined=true')
+
+    def removed(previous_joins):
+        # Require the production JoinHandle to have completed before its
+        # unsupported reply. Separately observe the kernel's task retirement;
+        # a directory enumeration is not the Rust join completion boundary.
+        assert joined_count() == previous_joins + 1, runtime_log.read_text()[-2000:]
+        def retired():
+            assert status()['capabilities']['windows'] == 'unsupported'
+            return not workers()
+        wait(retired, 'joined native worker retired from proc', timeout=1)
 
     def nodes():
         assert ui.poll() is None, f'Settings exited with {ui.returncode}'
@@ -122,7 +145,7 @@ preserve = "untouched"
         assert not record.exists() and not status()['installed']
         runtime, runtime_log = launch(binary, 'runtime', 'start', '--config', str(config), '--wayland')
         expect('unsupported', 'default-off observations')
-        assert not workers()
+        assert not workers(), thread_states[-1]
         ui, _ = launch(settings, 'settings', '--config', str(config))
         wait(lambda: find('First wander (seconds)'), 'actual loaded settings')
         invoke('Appearance')
@@ -141,6 +164,10 @@ preserve = "untouched"
         foreign = record.parent / 'foreign.txt'
         foreign.write_text('Keep unrelated integration data')
         trace(False, False)
+        invoke('Refresh status')
+        wait(lambda: any('Window observation: supported | Fullscreen: supported' in node.get_name()
+                         for node in nodes()), 'native Hyprland status readback')
+        subprocess.run(['grim', str(directory / 'native-settings-goose.png')], check=True, timeout=8)
         control('do', 'nab', success=False)
         window.fullscreen()
         wait(lambda: find_window('Honk300 ordinary Hyprland probe')['fullscreen'] == 2, 'fixture fullscreen')
@@ -171,14 +198,17 @@ preserve = "untouched"
              node.get_state_set().contains(Atspi.StateType.PRESSED), 'draft survives Hyprland setup and status')
         assert config.read_text() == original
         invoke('Platform & status')
+        previous_joins = joined_count()
         invoke('Remove Hyprland observations')
         expect('unsupported', 'native settings revokes live observations')
-        assert not workers() and not record.exists()
+        removed(previous_joins)
+        assert not record.exists()
         control('integrations', 'hyprland', 'setup')
         expect('supported', 'explicit CLI setup')
+        previous_joins = joined_count()
         record.unlink()
         expect('unsupported', 'external consent removal')
-        assert not workers()
+        removed(previous_joins)
         control('integrations', 'hyprland', 'setup')
         expect('supported', 'new consent after external removal')
         # Replace only this disposable compositor's IPC pathname. The overlay
@@ -210,6 +240,10 @@ preserve = "untouched"
         close(ui)
         ui = None
         expect('supported', 'closing settings preserves the runtime owner')
+        for index in range(4):
+            captured_after = time.monotonic() + 1
+            wait(lambda: time.monotonic() >= captured_after, 'native entry animation')
+            subprocess.run(['grim', str(directory / f'native-goose-{index}.png')], check=True, timeout=8)
         runtime.kill()
         runtime.wait(timeout=5)
         runtime = None
@@ -231,6 +265,7 @@ preserve = "untouched"
             no_automatic_reconnect=True, graceful_restart=True, crash_restart=True,
             stopped_removal=True, unrelated_state_preserved=True), indent=2) + '\n')
     finally:
+        (directory / 'worker-identities.json').write_text(json.dumps(thread_states, indent=2) + '\n')
         (directory / 'observed-states.json').write_text(json.dumps(states, indent=2) + '\n')
         if ui is not None and ui.poll() is None:
             (directory / 'native-settings-tree.json').write_text(json.dumps([

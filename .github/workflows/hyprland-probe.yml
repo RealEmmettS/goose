@@ -2,9 +2,16 @@ name: Native Hyprland adapter
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      commit:
+        required: true
+        type: string
+  pull_request:
+    paths: ['script/smoke_hyprland*', 'script/smoke_owned_props_linux.py', 'script/smoke_runtime_props_linux.py', 'script/select_vkms_device.py', '.github/workflows/hyprland-probe.yml', '.github/workflows/release.yml', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
   push:
-    branches: [codex/goose-hyprland-integration]
-    paths: ['script/smoke_hyprland*', 'script/select_vkms_device.py', '.github/workflows/hyprland-probe.yml', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
+    branches: [main, codex/goose-hyprland-integration]
+    paths: ['script/smoke_hyprland*', 'script/smoke_owned_props_linux.py', 'script/smoke_runtime_props_linux.py', 'script/select_vkms_device.py', '.github/workflows/hyprland-probe.yml', 'crates/**', 'src/**', 'settings/**', 'Cargo.lock']
 
 permissions:
   contents: read
@@ -21,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
@@ -80,7 +88,7 @@ jobs:
             DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
               dbus-x11 python3 python3-gi gir1.2-gtk-4.0 libgtk-4-1 \
               libgl1-mesa-dri libegl-mesa0 mesa-utils util-linux passwd seatd libasound2t64 \
-              at-spi2-core gir1.2-atspi-2.0
+              at-spi2-core gir1.2-atspi-2.0 grim python3-pil libglib2.0-bin
             if test "$generation" = lua; then
               DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y -t trixie-backports hyprland
             else

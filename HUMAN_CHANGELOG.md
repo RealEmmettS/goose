@@ -31,72 +31,33 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ---
 
-## In development — September 2026
+## GNOME desktop observations — In development
 
 ### Added
-- Bring each private drag-test window forward explicitly so the desktop can keep its normal protection against background apps taking focus.
-- Check GNOME startup after its note and picture window helper has finished opening.
-- Keep the goose connected when GNOME refuses another program’s observation request, without giving that program access or keeping old window information.
-- Keep the GNOME connection checks compatible with the project’s strict build checks.
-- Check GNOME permissions against correctly installed application files while continuing to reject files owned by an unrelated account.
-- Keep optional GNOME setup and shutdown responsive when the desktop connection stops answering, and retain complete permission files without exposing private test permissions.
-- Add optional GNOME desktop observations with clear setup and removal. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
-- Add an optional Hyprland setup in graphical settings and the command line so the goose can notice fullscreen windows. Turning it off removes its access immediately and keeps your unsaved settings and other desktop integrations intact.
+- Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
+
+### Security
+- Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost and keep setup responsive when a connection stops answering.
+
+### Behind the scenes
+- Check the real GNOME desktop, goose and settings together, including private test-window drags, lost access, restarts and unexpected failures. Preserve unrelated desktop settings and keep private test permissions out of the evidence files.
+
+## Hyprland desktop observations — September 2026
+
+### Added
+- Add optional Hyprland setup in graphical settings and the command line so the goose can notice fullscreen windows. Turning it off removes its access immediately and preserves your unsaved settings and other desktop integrations.
 
 ### Improved
-- Let a busy Hyprland desktop resume fresh window observations after a slow transition, without using old information or connecting to a replacement desktop behind your back.
-- Keep Hyprland window observations together so a busy desktop has fewer separate requests to answer, while still discarding late or incomplete information.
+- Keep desktop observations together and let a busy Hyprland desktop recover from a slow transition. Discard old information and require your explicit action to connect after desktop ownership or permission changes.
+
+### Fixed
+- Keep the same Hyprland connection when you repeat setup during a fullscreen transition.
 
 ### Behind the scenes
-- Preserve more detail when an older Hyprland desktop replies too slowly, so the cause can be identified while that support remains unqualified.
-- Keep private test windows responsive while the separate desktop observer runs, including fullscreen transitions.
+- Check that removing Hyprland access finishes the goose’s desktop worker before reporting success, then verify that the operating system removes the finished thread.
+- Check the real goose, settings, notes and pictures on independently tested Hyprland desktops, including restarts, lost access and unexpected window-helper exits. Wait for a note’s words to appear before recording its desktop proof.
+- Give the private Windows test desktop enough time to start on a cold machine, record where startup stalls, and keep the same strict checks for the goose’s appearance.
 
-### Behind the scenes
-- Begin connecting Hyprland desktop observations to the goose, with strict ownership checks and separate fullscreen awareness. Window movement remains unavailable until the desktop can reliably identify an active user drag.
-
-### Behind the scenes
-- Open the private desktop test windows at a fixed size so the placement check starts from a settled layout.
-
-### Behind the scenes
-- Let the private test windows respond normally while Hyprland processes their placement, and record the replies needed to diagnose a stalled desktop check.
-
-### Behind the scenes
-- Ask the operating system which virtual graphics device is present instead of assuming how its device folders are arranged.
-
-### Behind the scenes
-- Select the intended virtual graphics device for Hyprland tests after the desktop chose a different, incompatible one.
-
-### Behind the scenes
-- Give the isolated Hyprland test desktop the virtual graphics device it needs to start, and preserve its failure details before repeating qualification.
-
-### Behind the scenes
-- Test optional Hyprland support in isolated desktops before offering it, checking that desktop observations are trustworthy and unrelated windows remain untouched.
-### Behind the scenes
-- Check that GNOME can tell when you are dragging a window and keeps automatic movements out of your way, alongside the now-visible goose desktop checks.
-
-### Behind the scenes
-- Check that the goose is actually visible on the GNOME desktop after leaving the startup overview.
-
-### Behind the scenes
-- Connect the goose to the private GNOME test desktop using its normal authenticated display connection.
-
-### Behind the scenes
-- Start the GNOME movement check after its private windows finish opening, while keeping stale-window protection in place.
-
-### Behind the scenes
-- Wait for the private GNOME desktop before opening its test windows.
-
-### Behind the scenes
-- Keep the separate GNOME test desktop's settings in one private location and retain its extension diagnostics when setup fails.
-
-### Behind the scenes
-- Correct the isolated GNOME test environment so the desktop does not try to use a login service that is absent there.
-
-### Behind the scenes
-- Check that GNOME desktop observations really come from the running desktop before trusting them.
-
-### Behind the scenes
-- Test the real GNOME desktop and goose display together before offering an optional companion, including removing it while other windows stay open.
 - Keep the website's KDE setup guidance and download choices aligned with the freshly verified desktop release.
 
 ### Behind the scenes

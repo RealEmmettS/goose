@@ -3,7 +3,7 @@
     .name = "honk300-settings",
     .display_name = "Honk300 Settings",
     .description = "Native settings for Honk300.",
-    .version = "1.7.0",
+    .version = "1.8.0",
     .icons = .{"assets/icon.png"},
     .platforms = .{ "macos", "windows", "linux" },
     .permissions = .{ "view", "command" },

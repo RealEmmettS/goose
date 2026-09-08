@@ -5,10 +5,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let observer = honk_platform_linux::hyprland::Observer::start()?;
         for _ in 0..400 {
             let frame = observer.snapshot();
+            let fullscreen_window = frame.as_ref().and_then(|frame| frame.windows.iter()
+                .find(|window| window.visible && window.fullscreen))
+                .map(|window| serde_json::json!({"id":window.id,"pid":window.pid,"geometry":window.geometry}));
             println!(
                 "{}",
                 serde_json::json!({"observed":frame.is_some(),
-                "failed":observer.failed(),"fullscreen":frame.as_ref().is_some_and(|frame|frame.fullscreen())})
+                "failed":observer.failed(),"fullscreen":frame.as_ref().is_some_and(|frame|frame.fullscreen()),
+                "fullscreen_window":fullscreen_window})
             );
             std::io::stdout().flush()?;
             std::thread::sleep(std::time::Duration::from_millis(50));

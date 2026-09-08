@@ -12,6 +12,31 @@ import subprocess
 import time
 
 
+def rendered_note_text(picture, bounds=None):
+    """Require body ink in this fixture's actual scale-one, light native note.
+
+    A white window and accessible text can precede the compositor's text paint.
+    Exclude the header, border and center pointer from the body observation.
+    """
+    if bounds is None:
+        rows = []
+        pixels = picture.load()
+        for y in range(picture.height):
+            white = [x for x in range(picture.width) if min(pixels[x, y]) > 220]
+            if len(white) >= 200:
+                rows.append((y, white[0], white[-1]))
+        if not rows:
+            return False
+        # The delivered note is the only large white surface on this isolated
+        # desktop; the goose cannot supply a two-hundred-pixel-wide row.
+        left = sorted(row[1] for row in rows)[len(rows) // 2]
+        right = sorted(row[2] for row in rows)[len(rows) // 2]
+        bounds = (left, rows[0][0], right - left + 1, rows[-1][0] - rows[0][0] + 1)
+    x, y, width, height = bounds
+    body = picture.crop((x + 8, y + 34, x + min(198, width // 2 - 4), y + min(130, height - 8)))
+    return sum(max(pixel) < 180 for pixel in body.getdata()) >= 16
+
+
 def main():
     if os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('GDK_BACKEND') not in ('x11', 'wayland'):
         raise RuntimeError('This probe requires the disposable GitHub desktop')
@@ -22,6 +47,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
+    parser.add_argument('--expected-desktop', default='labwc')
     args = parser.parse_args()
     binary, evidence = args.binary.resolve(), args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -121,12 +147,12 @@ def main():
                     # This private desktop uses the native default light theme.
                     # Gray root pixels cannot stand in for the white note body.
                     painted = sum(min(pixel) > 220 for pixel in pixels.getdata())
-                    return painted > width * height * 0.3
+                    return painted > width * height * 0.3 and rendered_note_text(picture, (x, y, width, height))
             # Wayland does not expose global prop coordinates. On this empty,
             # black test desktop, a real painted note is much larger than the
             # goose, while AT-SPI separately confirms its owned native text.
             with Image.open(path).convert('RGB') as picture:
-                return sum(min(pixel) > 220 for pixel in picture.getdata()) > 25_000
+                return sum(min(pixel) > 220 for pixel in picture.getdata()) > 25_000 and rendered_note_text(picture)
 
         wait(visible, 'visible native note in the composited desktop', 15)
 
@@ -179,7 +205,7 @@ autumn = false
                     assert f'display backend: {"X11" if positioning else "native Wayland"}' in status, status
                     assert f'note/picture positioning: {"supported" if positioning else "unsupported"}' in status, status
                     if not positioning:
-                        assert 'desktop (session hint): labwc' in status, status
+                        assert f'desktop (session hint): {args.expected_desktop}' in status, status
                     service = subprocess.run([str(binary), '__settings-service', '--config', str(config)],
                         input=json.dumps({'protocol': 1, 'request_id': 78, 'command': {'op': 'status'}}),
                         capture_output=True, text=True, check=True, timeout=15)
