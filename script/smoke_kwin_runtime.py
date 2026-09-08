@@ -49,10 +49,18 @@ preserve = "untouched"
 
     def supported():
         details = status()
-        return details if (details.get('capabilities') or {}).get('windows') == 'supported' else None
+        if (details.get('capabilities') or {}).get('windows') != 'supported':
+            return None
+        summary = control('status')
+        assert 'do not disturb observation: unsupported' in summary, summary
+        return details if 'fullscreen observation: supported' in summary else None
 
     def unsupported():
-        return (status().get('capabilities') or {}).get('windows') == 'unsupported'
+        if (status().get('capabilities') or {}).get('windows') != 'unsupported':
+            return False
+        summary = control('status')
+        assert 'do not disturb observation: unsupported' in summary, summary
+        return 'fullscreen observation: unsupported' in summary
 
     def loaded(name):
         return call('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting', 'isScriptLoaded',

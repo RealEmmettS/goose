@@ -24,9 +24,10 @@ def main():
     config = root / 'config.toml'
     log_path = root / 'runtime.log'
     def write_config(enabled):
-        config.write_text('[sound]\nenabled = false\n[mischief]\nmouse_steal = false\n'
-            '[schedule]\nquiet_hours_enabled = false\nautumn = false\nseasonal = false\n'
-            f'pause_on_fullscreen = {str(enabled).lower()}\ndnd_respect = true\n')
+        config.write_text('goose_config_version = 2\n[behavior]\nfirst_wander_time_seconds = 600.0\n'
+            '[audio]\nenabled = false\n[safety]\nno_mouse_steal = true\nno_window_ride = true\n'
+            f'pause_on_fullscreen = {str(enabled).lower()}\n'
+            '[schedule]\nquiet_hours_enabled = false\nautumn = false\nseasonal = false\ndnd_respect = true\n')
     def cli(*words):
         return subprocess.run([str(binary), *words], env=environment, text=True,
                               capture_output=True, timeout=12)

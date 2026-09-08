@@ -67,6 +67,11 @@ preserve = "untouched"
                               else None), label)
         caps = result['capabilities']
         assert caps['fullscreen'] == state, caps
+        def independent():
+            summary = control('status')
+            assert 'do not disturb observation: unsupported' in summary, summary
+            return summary if f'fullscreen observation: {state}' in summary else None
+        wait(independent, 'independent fullscreen/DND status: ' + label)
         for key in ('movement', 'pointer_observation', 'pointer_control', 'dnd', 'prop_positioning'):
             assert caps[key] == 'unsupported', (key, caps)
         states.append(dict(label=label, state=state, capabilities=caps))
