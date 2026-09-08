@@ -62,6 +62,7 @@ include = [
     "/Assets/**",
     "/crates/**",
     "/src/**",
+    "/integrations/kwin/**",
     "/script/**",
     "!/script/**/__pycache__/**",
     "/wix/**",

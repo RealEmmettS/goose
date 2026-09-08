@@ -40,6 +40,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Explain optional desktop setup and dependencies without claiming support for desktops that have not been tested.
 
 ### Fixed
+- Keep an existing pointer permission when you repeat KDE setup, so an unchanged setup does not send you through another permission dialog. Include the desktop companion when preparing the source package.
 - Keep exact desktop window positions when passing them to the goose, preventing a delivery from stopping after its first small movement.
 - Bring controls below the settings scroll area into view when a screen reader activates them, while keeping disabled controls inactive.
 - Let the goose recognize its own transparent drawing surface so granted pointer pranks work while other windows remain protected. Keep desktop observations running during longer sessions.
