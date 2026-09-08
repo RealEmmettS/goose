@@ -39,6 +39,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ### Security
 - Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost and keep setup responsive when a connection stops answering.
 
+### Fixed
+- Keep GNOME setup available according to its own desktop support, independently of Hyprland.
+
 ### Behind the scenes
 - Share the connection-worker checks across optional desktop integrations so they follow the same shutdown rules.
 - Check that a window ride ends when you turn it off, close its window or remove desktop access, and that removing access finishes even while settings is still updating its display.

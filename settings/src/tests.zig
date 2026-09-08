@@ -193,6 +193,28 @@ test "Hyprland setup and removal retain the settings draft and separate capabili
     try std.testing.expectEqualStrings("true", model.fields[0].value());
 }
 
+test "GNOME actions use their own capability even when Hyprland differs" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const model = try arena.allocator().create(main.Model);
+    model.* = .{ .gnome_supported = true, .hyprland_supported = false };
+    const effects = try arena.allocator().create(main.Effects);
+    effects.* = main.Effects.init(arena.allocator());
+    defer effects.deinit();
+    main.update(model, .gnome_setup, effects);
+    try std.testing.expect(model.gnome_prompt);
+    main.update(model, .gnome_cancel, effects);
+    try std.testing.expect(!model.gnome_prompt);
+    model.gnome_supported = false;
+    model.hyprland_supported = true;
+    main.update(model, .gnome_setup, effects);
+    try std.testing.expect(!model.gnome_prompt);
+    main.update(model, .gnome_confirm, effects);
+    main.update(model, .gnome_remove, effects);
+    try std.testing.expect(!model.busy);
+    try std.testing.expectEqual(@as(u64, 0), model.request_id);
+}
+
 test "Gnome setup and removal retain the settings draft and separate capability limits" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();

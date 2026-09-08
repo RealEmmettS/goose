@@ -30,6 +30,9 @@ All notable changes to this project are documented here. Format based on
 - Add an explicitly installed, versioned GNOME Shell companion for native window, fullscreen and user-drag observations. Keep the compatible XWayland overlay, independent owned-prop positioning and honest unsupported native pointer/movement/DND capabilities.
 - Add Rust CLI, versioned IPC and Native SDK setup/removal controls with private recoverable consent, exact executable ownership, retained drafts, comments and unknown configuration.
 
+### Fixed
+- Gate GNOME settings actions on their own capability instead of the unrelated Hyprland flag; exercise the actual update handlers with opposite compositor support values.
+
 ### Security
 - Authenticate the pinned system Shell and approved runtime executable before returning bounded observations. Apply one total deadline through bus authentication and each complete snapshot; discard stale or revoked data and require explicit reconnection after terminal failure. Keep rejected credential lookups separate from authenticated delivery.
 

@@ -234,9 +234,17 @@ preserve = "untouched"
         drag(window)
         drag(protected_window, protected=True)
         invoke('Refresh status')
+        window.set_visible(False)
+        protected_window.set_visible(False)
+        wait(lambda: not find_window(window.get_title()) and not find_window(protected_window.get_title()),
+             'unobscured native settings capture')
         subprocess.run(['import', '-display', capture_environment['DISPLAY'], '-window', 'root',
                         str(directory / 'native-settings-goose.png')], env=capture_environment,
                        check=True, timeout=8)
+        protected_window.present()
+        window.present()
+        wait(lambda: find_window(window.get_title()) and find_window(protected_window.get_title()),
+             'restored private desktop fixtures')
         control('do', 'nab', success=False)
         window.fullscreen()
         wait(lambda: find_window('Honk300 ordinary GNOME probe')['fullscreen'], 'fixture fullscreen')

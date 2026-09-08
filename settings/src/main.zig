@@ -344,15 +344,15 @@ pub fn update(model: *Model, msg: Msg, fx: *Effects) void {
         .hyprland_remove => if (model.canSetupHyprland()) {
             submit(model, .hyprland_remove, fx);
         },
-        .gnome_setup => if (model.canSetupHyprland()) {
+        .gnome_setup => if (model.canSetupGnome()) {
             model.gnome_prompt = true;
         },
         .gnome_cancel => model.gnome_prompt = false,
-        .gnome_confirm => if (model.canSetupHyprland()) {
+        .gnome_confirm => if (model.canSetupGnome()) {
             model.gnome_prompt = false;
             submit(model, .gnome_setup, fx);
         },
-        .gnome_remove => if (model.canSetupHyprland()) {
+        .gnome_remove => if (model.canSetupGnome()) {
             submit(model, .gnome_remove, fx);
         },
         .pointer_request => if (model.canRequestPointer()) {
