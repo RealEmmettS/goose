@@ -35,17 +35,13 @@ this task owns the native implementation evidence and #rkde owns publication.
 - [x] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
-The integrated pointer lifecycle passes both KDE 6 architectures in 34210973568.
-The instrumented 34212367155 reproduces the short delivery on KDE 6 x64: the engine
-walks to its destination while the note remains at its first fractional position.
-The production JSON decoder changes 117.48895263671875 to 117.48895263671876,
-causing the exact native stale-geometry guard to refuse all subsequent commands.
-The captured-coordinate regression fails before enabling serde_json float_roundtrip
-and passes after it; all 26 Linux platform tests pass. The unchanged native guards
-and four delivery/revocation/restart repetitions per lane must now qualify the fix.
-Complete versioned packages remain held under #rkde.
+Done. Final source d38e4845 passes all four KDE desktops, including repeated
+fractional-position delivery, native settings, exact identity/refusal and revocation.
+The complete candidate and unchanged main gates pass, and v1.6.0 is published with
+all eight fresh-public installation lanes verified. The stage's website record is #rkde.
 
 ## Activity
+- 2026-09-08 — Complete final-source native run 34217301483, candidate 34217330049, main native 34220324626, publication 34222242693 and all fresh-public lanes in 34225303741; retain all earlier failure evidence below.
 - 2026-09-08: Reproduce the native one-ULP geometry loss through the production
   Frame decoder and response state. Enable exact float roundtrips instead of
   relaxing KWin's stale-geometry check. Native fourfold repetition is pending.

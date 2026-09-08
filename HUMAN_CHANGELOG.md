@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Keep the release guidance aligned with the published KDE update and freshly checked downloads across every supported platform.
+
+### Behind the scenes
 - Verify the process identity actually reported by the desktop when checking an untitled application, and distinguish that native result from the missing-identity regression.
 
 ### Fixed

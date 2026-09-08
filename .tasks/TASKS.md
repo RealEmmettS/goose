@@ -31,19 +31,9 @@
   - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
 - [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) #rkde
   - [x] Prepare guided setup documentation and the distinct release metadata.
-  - [ ] Pass integrated native pointer and settings lifecycle checks.
-  - [ ] Pass complete candidate, unchanged-source main and immutable publication gates.
+  - [x] Pass integrated native pointer and settings lifecycle checks.
+  - [x] Pass complete candidate, unchanged-source main and immutable publication gates.
   - [ ] Verify fresh public downloads and deployed website guidance.
-- [ ] **Explicit portal pointer integration** - request only pointer access through the native portal, validate granted EIS devices and cancel on revocation; terminal exclusion requires independently proven window observation (needs #a6e) (ms #refine) (owner codex) #wlp
-  - [x] Prove native portal grant, libei device readiness, cancellation and bounded movement on KDE 6.
-  - [x] Connect ephemeral pointer permission to Rust controls and native settings.
-  - [x] Qualify terminal exclusions, disconnects and unsupported desktop behavior.
-- [ ] **KDE native Wayland companion** - implement the explicitly enabled KWin bridge and prove exact identities, bounded movement, terminal exclusions and revocation (needs #a6e) (ms #refine) (owner codex) #wlk
-  - [x] Prove the real KWin script API and owned test-window movement on KDE 5/6.
-  - [x] Connect the authenticated bounded Rust bridge and live runtime capabilities.
-  - [x] Add explicit setup/removal and failure/revocation tests.
-  - [x] Qualify actual KDE-owned prop movement and immediate placement revocation.
-  - [ ] Exercise the guided native settings controls and qualifying package integrations.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
@@ -65,6 +55,16 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **KDE native Wayland companion** - implement the explicitly enabled KWin bridge and prove exact identities, bounded movement, terminal exclusions and revocation (needs #a6e) (ms #refine) (owner codex) (done 2026-09-08) #wlk
+  - [x] Prove the real KWin script API and owned test-window movement on KDE 5/6.
+  - [x] Connect the authenticated bounded Rust bridge and live runtime capabilities.
+  - [x] Add explicit setup/removal and failure/revocation tests.
+  - [x] Qualify actual KDE-owned prop movement and immediate placement revocation.
+  - [x] Exercise the guided native settings controls and qualifying package integrations.
+- [x] **Explicit portal pointer integration** - request only pointer access through the native portal, validate granted EIS devices and cancel on revocation; terminal exclusion requires independently proven window observation (needs #a6e) (ms #refine) (owner codex) (done 2026-09-08) #wlp
+  - [x] Prove native portal grant, libei device readiness, cancellation and bounded movement on KDE 6.
+  - [x] Connect ephemeral pointer permission to Rust controls and native settings.
+  - [x] Qualify terminal exclusions, disconnects and unsupported desktop behavior.
 - [x] **Linux props and experimental Raspberry Pi support** - integrate and publish owned props, session reporting, and ARM64 labwc packages after the first refinement release (needs #rfnd, #rart, #rgui, #lpr) (ms #refine) (owner codex) #rlpi
   - [x] Qualify native ARM64 labwc placement, scaling and dependency/standalone behavior.
   - [x] Document experimental Pi 4/5 setup and the physical acceptance boundary.
