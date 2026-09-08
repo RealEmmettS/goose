@@ -43,6 +43,12 @@ extension removal or lost consent; reconnecting requires an explicit action.
 Credential lookup allows at most four concurrent requests. A busy response from
 the same pinned Shell withdraws any old frame and may retry a bounded snapshot;
 an unapproved caller cannot terminate the real worker merely by using a lookup slot.
+Bounded query timeouts use the same retained connection and recheck its original
+Shell owner and full live consent before publishing again. This never reconnects
+to a new bus owner or restores a revoked grant. Connection establishment, identity,
+permission, extension and decoding failures remain terminal. Native diagnostic
+run 34256746560 records a real deadline during the final consent read; it does not
+justify extending the 200 ms Shell or 250 ms transport/sample bounds.
 
 Consent monitoring is part of that authenticated worker exchange. The rendering
 thread performs no periodic user-data file reads. Shell reads private metadata

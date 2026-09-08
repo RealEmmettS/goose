@@ -52,6 +52,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
 
 ### Fixed
+- Recover from a briefly slow GNOME permission check without using old desktop information or restoring access that you removed.
 - Include everything needed to build GNOME support from source, ignore unavailable pointer input and keep transient windows from unnecessarily disabling desktop observations.
 - Keep the goose and desktop responsive while reading saved permissions, and cancel pending observations when you remove access.
 - Keep GNOME observations working while an app creates or remaps a window. End a window ride when you turn it off, close its window or remove desktop access.
@@ -61,6 +62,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost, keep setup responsive when a connection stops answering, and preserve unrelated desktop settings.
 
 ### Behind the scenes
+- Check real window input and dragging correctly when the desktop redraws a test window's title bar.
+- Verify the published Hyprland update and matching website downloads, and keep the remaining desktop work clearly tracked.
+- Make desktop connection failures easier to diagnose without recording private information or changing permission checks.
 - Wait until each private test desktop is actually ready before checking the goose, while keeping communication and behavior checks strict.
 - Start test drags on a clear part of the title bar when the goose is sitting over its middle, preserving the goose's normal response to clicks.
 - Place private test windows clear of desktop panels, wait until they receive the pointer, and require an actual window drag before checking the goose.

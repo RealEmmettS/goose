@@ -40,10 +40,14 @@ sets of native settings, goose, painted note and complete-image captures were in
 ## Status
 Active. Production companion, authenticated Rust worker, compatible XWayland capability
 boundary, recoverable consent and native settings are implemented under ADR 0048.
-All four integrated desktop fixtures pass. Final-source architecture/settings,
-complete candidate/main/publication, fresh-public and website gates remain open.
+All four earlier integrated desktop fixtures passed. Final review corrections now
+repeat native qualification; final-source architecture/settings, complete
+candidate/main/publication, fresh-public and website gates remain open.
 
 ## Activity
+- 2026-09-08 — The same diagnostic run reaches late remapped-window grabs on both x64 desktops. Captures show the pointer on a native frame decoration while GTK correctly reports it outside its client surface. Prove GTK pointer entry inside the exact client first, then require the unchanged real title-bar gesture and Mutter grab; preserve engine ride, terminal and interruption assertions.
+- 2026-09-08 — Diagnostic run 34256746560 identifies the actual older-ARM interruption as the unchanged Shell deadline during the final consent read. Retry only late/busy queries on the retained authenticated connection, withdrawing old data before recovery; keep revoked consent, changed identity, extension loss and invalid replies terminal. Extend actual production request cancellation/recovery coverage and repeat all native gates.
+- 2026-09-08 — Three corrected native lanes lose their observer after initial healthy operation. Preserve cancellation and add fixed phase/deadline diagnostics without private data before changing recovery behavior; the affected release remains blocked on qualification.
 - 2026-09-08 — Confirm all four PR review findings before publication. Add missing source-archive inputs; withdraw blind XWayland pointer samples; count only reportable actors; replace rendering-thread consent reads with authenticated worker revocation and bounded asynchronous Shell file reads. Production JavaScript cancellation/window-bound regressions and real Cargo selection pass; repeat native desktop and complete release qualification on the corrected source.
 - 2026-09-08 — Final GNOME source 3537508 passes all four native Shell/version lanes in 34252264898; inspect twelve settings, delivered-note and complete-image captures. A separate Sway regression lane fails before Honk300 at its first version request. Bring the previously prepared bounded startup-readiness fix into this candidate, preserving exact transaction and authentication checks; restart the complete candidate on the corrected source.
 - 2026-09-08 — The strengthened fixture reaches the later cancellation cases; actual captures show the goose covering the centered title-bar input after a prior ride. Keep natural goose hit-testing unchanged and send the real gesture to the clear left title-bar portion, still requiring exact GTK entry and an actual compositor grab.

@@ -109,6 +109,7 @@ test('65 actual reportable windows still fail closed', async () => {
 
 test('slow consent stays asynchronous, bounded and cancellable', async () => {
     const f = fixture();
+    const healthyConsent = f.extension._consent;
     f.extension._consent = cancellable => new Promise((_resolve, reject) => {
         cancellable.listeners.push(() => reject(new Error('Cancelled')));
     });
@@ -119,9 +120,20 @@ test('slow consent stays asynchronous, bounded and cancellable', async () => {
     await new Promise(resolve => setTimeout(resolve, 10));
     assert.equal(f.extension._requests.size, 4, 'The main loop must continue while all reads wait');
     await Promise.all(pending.map(request => request.finished));
-    for (const {result} of pending) assert.equal(result.error, 'dev.emmetts.Honk300.Gnome1.Unavailable');
+    for (const {result} of pending) {
+        assert.equal(result.error, 'dev.emmetts.Honk300.Gnome1.Deadline');
+        assert.equal(result.message, 'GNOME observation failed during consent-before');
+    }
     assert.equal(f.extension._requests.size, 0);
     assert.equal(f.timers.size, 0);
+    // A timed-out request publishes nothing and releases its slot. A new
+    // request must perform live consent again before it can report a frame.
+    f.extension._consent = healthyConsent;
+    const recovered = f.request();
+    await recovered.finished;
+    assert.equal(recovered.result.error, undefined);
+    assert.equal(recovered.result.frame.windows.length, 0);
+    assert.equal(f.extension._requests.size, 0);
 });
 
 test('explicit revocation remains distinct from a failed observation', async () => {

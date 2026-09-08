@@ -28,17 +28,17 @@ Exact desktop versions, request semantics and native behavior require direct qua
 ## Verification
 - [x] Actual supported Hyprland versions on x64/ARM64 pass native movement and refusal scenarios.
 - [x] Rust controls and native settings preserve drafts, ownership and live cancellation.
-- [ ] Required source, architecture, package, immutable-publication and website checks pass.
+- [x] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Active. The complete candidate and unchanged-main platform, settings and compositor gates
-pass at `970cdb20c2e5f75ea3784adbbc35ea2746734bbf`. The new immutable tag is building
-in publication 34249861698. Two environment failures remain: a cold private compositor
-version request before Honk300 starts, and artifact finalization after successful native
-scenarios. Preserve the tag and retry failed jobs on its unchanged source. Fresh-public
-and website verification remain required; the prepared website change is held.
+Done. Immutable v1.8.0 is public from 970cdb20c2e5f75ea3784adbbc35ea2746734bbf
+after complete candidate and unchanged-source main qualification. All 39 publication
+jobs and eight fresh-public native lanes passed. The independent audit verifies
+47 assets and all 22 payloads; the deployed website matches them and retains the
+selected artwork. Native 0.53.3/0.55.2 x64/ARM64 evidence remains distinct from physical acceptance.
 
 ## Activity
+- 2026-09-08 — Close publication 34249861698, fresh-public 34255173155 and the 47-asset exact-tag audit. Website PR 11 deploys as 9599a85 after all four CI jobs, live visual review and all 22 download/hash pairs pass. Record the unchanged-source transient publication failures and successful retry in readiness; preserve every immutable asset and the user's installation.
 - 2026-09-08 — Complete candidate 34241011570 (all jobs) and unchanged-main CI/settings/KDE/Sway/Hyprland gates. Create the new immutable tag only after those passes; retain publication startup/upload failures and hold website PR 11 until every public-download gate passes.
 - 2026-09-08 — Final PR Windows checks catch the fixture stopwatch declaration in the similarly shaped runtime-readiness loop. Restore that runtime loop byte for byte and put the stopwatch only beside the background-host launch, preserving every goose timing and compositor assertion before final candidate qualification.
 - 2026-09-08 — All four strengthened native lanes pass at 2868497 in run 34238317252, including completed worker joins, bounded task retirement and actual painted notes. Inspect all four final settings, goose and note captures and record the completed native gate before freezing the candidate.
