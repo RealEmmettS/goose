@@ -32,7 +32,7 @@ All notable changes to this project are documented here. Format based on
 ### Behind the scenes
 - Reconcile v1.4.0 final-source publication and fresh-public evidence across current guidance, accessibility ADRs, the audit and completed foundation/settings/art tasks. Retain separate website/next-stage gates and track unresolved presence observation in its own milestone task.
 
-## [1.5.0] - Unreleased candidate
+## [1.5.0] - 2026-09-08
 
 ### Behind the scenes
 - Correct the owned-prop launch's module path after native Linux compilation, before qualification of the updated packages.
