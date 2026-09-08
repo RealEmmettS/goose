@@ -103,7 +103,22 @@ def main():
             def find(title):
                 return next((node for node in nodes(ipc(4)) if node.get('name') == title), None)
 
-            version = ipc(7)
+            # A socket can exist before the private compositor finishes startup.
+            # Retry only this initial read; preserve peer/protocol validation and
+            # each bounded transaction, and never retry a mutating command.
+            startup_began = time.monotonic()
+            startup_attempts = 0
+            def initial_version():
+                nonlocal startup_attempts
+                startup_attempts += 1
+                try:
+                    return ipc(7)
+                except TimeoutError:
+                    return None
+            version = wait(initial_version, 'initial version response')
+            (evidence / 'startup-readiness.json').write_text(json.dumps(dict(
+                seconds=time.monotonic() - startup_began,
+                attempts=startup_attempts), indent=2))
             (evidence / 'version.json').write_text(json.dumps(version, indent=2) + '\n')
             (evidence / 'seats.json').write_text(json.dumps(ipc(101), indent=2) + '\n')
             import gi
