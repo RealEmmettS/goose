@@ -34,6 +34,7 @@ Active. Begin native socket/window qualification on separately packaged Hyprland
 generations, with private configuration and no production runtime claims yet.
 
 ## Activity
+- 2026-09-08 — The kernel-identified vkms device boots all four real compositors. Actual requests now reach monitor/window operations, but bounded replies time out. Keep the GTK client event loop active during IPC and retry read-only startup waits; preserve each exchange's deadline and EOF check and record transaction timing/bytes for the next native run.
 - 2026-09-08 — The third attempt fails in device selection before launching the
   compositor: vkms has no ordinary platform driver symlink on these kernels. Query
   the real DRM version ioctl instead, record all returned driver names, and accept

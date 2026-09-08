@@ -27,6 +27,7 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Keep native GTK fixture configure acknowledgements flowing during Hyprland IPC and retain bounded transaction timing/byte evidence. Retry only read-side startup observations while retaining the original 250 ms per-exchange deadline and EOF requirement.
 - Identify the disposable vkms device through the actual DRM version ioctl after the host exposes no normal driver symlink; reject missing or ambiguous device identities before launching Hyprland.
 
 ### Behind the scenes

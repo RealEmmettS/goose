@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Let the private test windows respond normally while Hyprland processes their placement, and record the replies needed to diagnose a stalled desktop check.
+
+### Behind the scenes
 - Ask the operating system which virtual graphics device is present instead of assuming how its device folders are arranged.
 
 ### Behind the scenes

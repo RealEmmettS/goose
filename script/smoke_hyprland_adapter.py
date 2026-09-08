@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import select
 import shutil
 import socket
 import struct
@@ -47,6 +48,7 @@ def main():
     windows = []
     modules = {}
     ipc_path = None
+    transactions = []
     with (evidence / 'compositor.log').open('w') as log:
         compositor = subprocess.Popen(['Hyprland', '--config', str(config)],
                                       env=environment, stdout=log, stderr=log)
@@ -61,8 +63,14 @@ def main():
                             if not context.pending():
                                 break
                             context.iteration(False)
-                    if result := check():
-                        return result
+                    try:
+                        if result := check():
+                            return result
+                    except TimeoutError:
+                        # Output creation can occupy the compositor before the
+                        # first observation. Retry only this read-side wait; each
+                        # transaction still has the original single deadline.
+                        pass
                     time.sleep(0.01)
                 raise AssertionError('Timed out waiting for ' + description)
 
@@ -76,7 +84,10 @@ def main():
             def ipc(payload, decode=True):
                 # Hyprland handles each request synchronously. Never keep the
                 # connection open between transactions or reset its total deadline.
-                deadline = time.monotonic() + 0.25
+                started = time.monotonic()
+                deadline = started + 0.25
+                transaction = dict(request=payload, bytes=0, complete=False)
+                transactions.append(transaction)
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
                     connection.settimeout(max(0.001, deadline - time.monotonic()))
                     connection.connect(str(ipc_path))
@@ -87,14 +98,31 @@ def main():
                     chunks = bytearray()
                     while True:
                         remaining = deadline - time.monotonic()
-                        assert remaining > 0, 'Hyprland response exceeded the total deadline'
+                        if remaining <= 0:
+                            raise TimeoutError('Hyprland response exceeded the total deadline')
                         connection.settimeout(remaining)
+                        # GTK fixture windows live in this process. Keep their
+                        # configure acknowledgements flowing while the real
+                        # compositor handles the request; a blocking recv would
+                        # stall the very client whose placement is under test.
+                        if 'GLib' in modules:
+                            context = modules['GLib'].MainContext.default()
+                            for _ in range(100):
+                                if not context.pending():
+                                    break
+                                context.iteration(False)
+                        if not select.select([connection], [], [], min(0.01, remaining))[0]:
+                            if time.monotonic() >= deadline:
+                                raise TimeoutError('Hyprland response exceeded the total deadline')
+                            continue
                         chunk = connection.recv(min(8192, 256 * 1024 + 1 - len(chunks)))
                         if not chunk:
                             break
                         chunks.extend(chunk)
+                        transaction['bytes'] = len(chunks)
                         assert len(chunks) <= 256 * 1024, 'Oversized native response'
                     text = chunks.decode()
+                    transaction.update(complete=True, elapsed_ms=(time.monotonic() - started) * 1000)
                     return json.loads(text) if decode else text
 
             def command(text):
@@ -160,6 +188,7 @@ def main():
             (evidence / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result))
         finally:
+            (evidence / 'transactions.json').write_text(json.dumps(transactions, indent=2) + '\n')
             for window in windows:
                 window.destroy()
             compositor.terminate()
