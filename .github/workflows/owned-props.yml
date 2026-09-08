@@ -30,7 +30,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y build-essential pkg-config libgtk-4-dev \
             libasound2-dev xvfb xauth dbus-x11 xz-utils python3-gi gir1.2-atspi-2.0 \
-            at-spi2-core xdotool libglib2.0-bin openbox imagemagick python3-pil labwc wlr-randr grim
+            at-spi2-core xdotool libglib2.0-bin openbox xcompmgr imagemagick python3-pil labwc wlr-randr grim
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -55,7 +55,9 @@ jobs:
           xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session -- bash -euc '
             openbox >target/props-evidence/window-manager.log 2>&1 &
             manager=$!
-            trap "kill $manager 2>/dev/null || true" EXIT
+            xcompmgr -a >target/props-evidence/compositor.log 2>&1 &
+            compositor=$!
+            trap "kill $manager $compositor 2>/dev/null || true" EXIT
             GDK_BACKEND=x11 python3 script/smoke_owned_props_linux.py --binary target/props-probe/honk300-settings --evidence target/props-evidence
             GDK_BACKEND=x11 GDK_SCALE=2 python3 script/smoke_owned_props_linux.py --binary target/props-probe/honk300-settings --evidence target/props-evidence-scale-2
             GDK_BACKEND=x11 python3 script/smoke_runtime_props_linux.py --binary target/props-probe/honk300 --evidence target/runtime-props-evidence

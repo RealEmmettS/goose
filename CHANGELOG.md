@@ -31,6 +31,7 @@ All notable changes to this project are documented here. Format based on
 - Bound retained owned props to eight windows across supported native controllers. Defer new delivery at capacity, preserve existing notes, and resume after a close; finish an already admitted delivery normally.
 
 ### Development
+- Start and verify the disposable X11 compositor before real prop delivery; GTK windows alone do not satisfy the production overlay's transparent-composition contract.
 - Read the CLI's reported running state in the native delivery fixture; a successful status command also reports that no runtime is active.
 - Exercise malformed/oversized private prop input and standalone runtime/settings-service operation without the companion. Document the actual bounded ownership protocol and preserve fixture pipe cleanup after failure.
 - Add native labwc and scaled-display probes using normal Wayland placement, complete-image pixels and real engine delivery, with no physical Pi acceptance claim. The first strict Linux build found a stale installer import; limit it to its actual Windows/test callers.

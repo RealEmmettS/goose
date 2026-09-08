@@ -2,6 +2,7 @@
 """Exercise the real Rust engine/GTK child connection on a disposable Linux desktop."""
 from __future__ import annotations
 import argparse
+import ctypes
 import json
 import os
 from pathlib import Path
@@ -40,6 +41,28 @@ def main():
                 return result
             time.sleep(0.1)
         raise RuntimeError(f'Timed out waiting for {description}')
+
+    if positioning:
+        # The production transparent overlay requires a live compositing manager.
+        # A window manager alone is sufficient for GTK props, but not the goose.
+        x11 = ctypes.CDLL('libX11.so.6')
+        x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+        x11.XOpenDisplay.restype = ctypes.c_void_p
+        x11.XDefaultScreen.argtypes = [ctypes.c_void_p]
+        x11.XDefaultScreen.restype = ctypes.c_int
+        x11.XInternAtom.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
+        x11.XInternAtom.restype = ctypes.c_ulong
+        x11.XGetSelectionOwner.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+        x11.XGetSelectionOwner.restype = ctypes.c_ulong
+        x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+        display = x11.XOpenDisplay(None)
+        assert display, 'Private X11 display is unavailable'
+        try:
+            screen = x11.XDefaultScreen(display)
+            atom = x11.XInternAtom(display, f'_NET_WM_CM_S{screen}'.encode(), 0)
+            wait(lambda: x11.XGetSelectionOwner(display, atom), 'private X11 compositor selection', 15)
+        finally:
+            x11.XCloseDisplay(display)
 
     def nodes(pid):
         context = GLib.MainContext.default()

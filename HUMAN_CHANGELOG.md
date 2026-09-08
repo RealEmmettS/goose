@@ -33,6 +33,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## In development — September 2026
 
+### Behind the scenes
+- Linux delivery checks now start a complete test desktop before asking the goose to bring a note.
+
 ### Fixed
 - Linux notes and pictures use a clearly named Close button that accessibility tools can identify.
 - The goose pauses new note and picture deliveries when several are already open, leaving your existing notes intact and resuming after you close one.
