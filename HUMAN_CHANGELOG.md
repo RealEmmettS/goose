@@ -37,6 +37,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Add optional GNOME setup and removal in graphical settings and the command line. The goose can notice fullscreen apps and ride an ordinary window while you drag it, while leaving terminal windows alone and preserving your unsaved settings.
 
 ### Fixed
+- Let the goose settle its feet naturally when it stops delivering a note, instead of stretching a leg toward where it had been walking.
 - Show a consistent disconnected status when the GNOME companion is disabled, while still stopping the goose's window ride immediately.
 - Reduce delays while checking GNOME permissions, while keeping the same ownership checks and finishing cancelled work safely.
 - Recover from a briefly slow GNOME permission check without using old desktop information or restoring access that you removed.

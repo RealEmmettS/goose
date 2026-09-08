@@ -72,6 +72,10 @@ struct Swing {
     /// Progress 0..1.
     t: f32,
     duration: f32,
+    /// A moving landing prediction is withdrawn when locomotion stops.
+    motion_lead: bool,
+    /// Preserve the current position and lift phase when retargeting a stopped swing.
+    easing_start: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -156,10 +160,19 @@ impl FeetState {
 
         // Advance any active swing.
         for (foot, home) in [(&mut self.left, home_l), (&mut self.right, home_r)] {
-            let _ = home;
             if let Some(swing) = &mut foot.swing {
+                if speed <= 1.0 && swing.motion_lead {
+                    swing.from = foot.pos;
+                    swing.to = home;
+                    swing.easing_start = smoothstep(swing.t);
+                    swing.motion_lead = false;
+                }
                 swing.t = (swing.t + dt / swing.duration).min(1.0);
-                let eased = smoothstep(swing.t);
+                let eased = if swing.t >= 1.0 || swing.easing_start >= 1.0 {
+                    1.0
+                } else {
+                    (smoothstep(swing.t) - swing.easing_start) / (1.0 - swing.easing_start)
+                };
                 foot.pos = Vec2::lerp(swing.from, swing.to, eased);
                 let dir = swing.to - swing.from;
                 if dir.magnitude() > 1e-3 {
@@ -206,6 +219,8 @@ impl FeetState {
                     to: target,
                     t: 0.0,
                     duration,
+                    motion_lead: speed > 1.0,
+                    easing_start: 0.0,
                 });
             }
         }
@@ -489,5 +504,48 @@ mod tests {
         let sample = sample_straight_gait(120.0, ParametersTable::default().step_time_normal);
 
         assert_eq!(sample.first_swing_ticks, 18);
+    }
+
+    #[test]
+    fn stopping_recovery_does_not_extend_the_old_motion_lead() {
+        let parameters = ParametersTable::default();
+        for tier in [SpeedTier::Walk, SpeedTier::Run, SpeedTier::Charge] {
+            for heading in [0.0, 90.0, 180.0, 270.0] {
+                for stop_tick in 40..80 {
+                    let forward = Vec2::from_angle_degrees(heading);
+                    let velocity = forward * parameters.speed(tier);
+                    let mut center = Vec2::ZERO;
+                    let mut state = FeetState::new(center, forward);
+                    for _ in 0..stop_tick {
+                        center = center + velocity * DT;
+                        state.tick(DT, center, forward, velocity, parameters.step_time(tier));
+                        state.drain_plants(|_| {});
+                    }
+                    let (left_home, right_home) = homes(center, forward);
+                    let homes = [left_home, right_home];
+                    let arrival = state.poses();
+                    for _ in 0..60 {
+                        let before = state.poses();
+                        state.tick(DT, center, forward, Vec2::ZERO, parameters.step_time(tier));
+                        for (index, foot) in state.poses().into_iter().enumerate() {
+                            let limit = Vec2::distance(arrival[index].pos, homes[index]).max(8.0);
+                            let distance = Vec2::distance(foot.pos, homes[index]);
+                            assert!(
+                                distance <= limit + 0.001,
+                                "{tier:?} heading {heading} stop {stop_tick}: foot {index} continued its old lead ({distance:.3}px > {limit:.3}px)"
+                            );
+                            if !before[index].swinging && !foot.swinging {
+                                assert_eq!(foot.pos, before[index].pos, "a planted contact slid");
+                            }
+                        }
+                        state.drain_plants(|_| {});
+                    }
+                    for (foot, home) in state.poses().into_iter().zip(homes) {
+                        assert!(!foot.swinging, "stopping recovery did not settle");
+                        assert!(Vec2::distance(foot.pos, home) <= 5.0);
+                    }
+                }
+            }
+        }
     }
 }

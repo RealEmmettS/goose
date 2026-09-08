@@ -3079,6 +3079,95 @@ mod tests {
     }
 
     #[test]
+    fn delivered_note_recovery_withdraws_the_airborne_walking_prediction() {
+        for (delay, initial) in [(0, Vec2::new(500.0, 150.0)), (10, Vec2::new(500.0, 300.0))] {
+            let mut options = WorldOptions::default();
+            options.timing.first_wander_time = 600.0;
+            options.schedule.seasonal = false;
+            options.collect_window = CollectWindowOptions::with_backend_support(
+                CollectWindowCapabilities {
+                    spawn_note: true,
+                    spawn_image: true,
+                    move_window: true,
+                    set_passthrough: true,
+                    synthesize_text: true,
+                },
+                12,
+                15,
+            );
+            let mut world =
+                World::with_options(Rect::new(Vec2::ZERO, Vec2::new(1280.0, 900.0)), 3, options);
+            for _ in 0..delay {
+                world.tick();
+            }
+            world.force_collect_window(CollectWindowKind::Note);
+            let mut native = None;
+            let mut arrival = None;
+            let mut typed = false;
+            let mut settled = false;
+            let size = Vec2::new(420.0, 288.0);
+            for tick in 0..1800 {
+                world.tick();
+                for command in world.take_collect_window_commands() {
+                    match command {
+                        CollectWindowCommand::Spawn { request, payload } => {
+                            native = Some(CollectWindowSnapshot {
+                                id: CollectWindowId(1),
+                                request,
+                                kind: payload.kind(),
+                                rect: Rect::new(initial, initial + size),
+                                alive: true,
+                                close_origin: None,
+                            });
+                        }
+                        CollectWindowCommand::Move { top_left, .. } => {
+                            let prop = native.as_mut().expect("move follows native creation");
+                            prop.rect = Rect::new(top_left, top_left + size);
+                        }
+                        CollectWindowCommand::TypeNote { .. } => {
+                            typed = true;
+                        }
+                        _ => {}
+                    }
+                }
+                // Exercise delayed native creation followed by actual delivery commands.
+                if tick > 60 {
+                    world.set_collect_window_snapshot(native);
+                }
+                if typed && arrival.is_none() && world.goose.velocity == Vec2::ZERO {
+                    arrival = Some((tick, world.goose.rig.feet_pose));
+                }
+                if let Some((typed_at, feet)) = arrival {
+                    assert_eq!(world.goose.velocity, Vec2::ZERO);
+                    let stance = crate::feet::FeetState::new(
+                        world.goose.position,
+                        Vec2::from_angle_degrees(world.goose.direction),
+                    )
+                    .poses();
+                    for (index, foot) in world.goose.rig.feet_pose.iter().enumerate() {
+                        let arrival_distance = Vec2::distance(feet[index].pos, stance[index].pos);
+                        assert!(
+                            Vec2::distance(foot.pos, stance[index].pos)
+                                <= arrival_distance.max(8.0) + 0.001,
+                            "a delivered note must not leave a foot extending its old walking lead"
+                        );
+                    }
+                    if tick >= typed_at + 60 {
+                        assert!(world.goose.rig.feet_pose.iter().all(|foot| !foot.swinging));
+                        settled = true;
+                        break;
+                    }
+                }
+            }
+            assert!(arrival.is_some(), "actual note delivery did not finish");
+            assert!(
+                settled,
+                "delivery recovery did not complete its observation window"
+            );
+        }
+    }
+
+    #[test]
     fn poke_honk_queues_sound_without_ticking() {
         let mut w = World::new(bounds(), 19);
         assert_eq!(w.poke(PokeAction::Honk), PokeOutcome::Applied);
