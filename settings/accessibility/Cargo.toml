@@ -6,6 +6,10 @@ publish = false
 license = "PolyForm-Noncommercial-1.0.0"
 
 [workspace]
+members = ["vendor/accesskit_atspi_common"]
+
+[patch.crates-io]
+accesskit_atspi_common = { path = "vendor/accesskit_atspi_common" }
 
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]

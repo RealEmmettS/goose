@@ -37,6 +37,7 @@ The requested behavior runs through its production path and the supporting evide
 Active: all five settings pages, Rust persistence/service, GUI and TUI update controls, packaging identity and native accessibility are implemented. Native Windows isolated edit/save and actual text/focus/status checks pass. The dirty-page accessibility truncation is corrected. Musl builds passed on both architectures; hosted Windows/GNU Linux OS-pattern checks and final Mac/ARM builds are rerunning.
 
 ## Activity
+- 2026-09-07: Real Debian GUI update qualification exposed an upstream AT-SPI bug: disabled buttons advertised Enabled despite lacking an action. Pinned the minimal provider correction with licenses, real translation regressions, and native disabled-state checks; rerunning all source and candidate gates.
 - 2026-09-07: Native macOS builds and both GNU Linux AT-SPI edit/save gates passed at 8a30875. The largest page has 122 semantic widgets before edits, so the final bound is 256 with eight simultaneous native-toggle changes covered on Windows/Linux. CLI, TUI and actual native GUI public discovery passed with the expected unmanaged state.
 - 2026-09-07: Reproduced the missing Save accessibility node on an actual changed page; increased the bounded toolkit/bridge capacity and verified native Windows save plus config/status readback. Isolated SDK test modules from platform linkage to repair Windows ARM analysis and DLL loading.
 

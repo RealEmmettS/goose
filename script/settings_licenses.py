@@ -16,9 +16,11 @@ def accessibility_notices(project: Path, target: str) -> str:
     included = {node["id"] for node in metadata["resolve"]["nodes"]}
     notices = ["\n\nNative accessibility dependencies\n"]
     for package in sorted(metadata["packages"], key=lambda item: (item["name"], item["version"])):
-        if package["id"] not in included or package["source"] is None:
+        if package["id"] not in included:
             continue
         directory = Path(package["manifest_path"]).parent
+        if package["source"] is None and directory.resolve() == (project / "accessibility").resolve():
+            continue  # Only our bridge is first-party; vendored dependencies retain notices.
         files = sorted({p for pattern in ("LICENSE*", "LICENCE*", "COPYING*")
                         for p in directory.glob(pattern) if p.is_file()})
         if package.get("license_file"):

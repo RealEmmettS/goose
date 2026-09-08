@@ -590,7 +590,13 @@ exercise_mode() {
   cat "${STATUS}"
   grep -q "platform: Linux" "${STATUS}"
   wait_for_frame "${frame}"
+}
 
+exercise_commands() {
+  # Let the scripted entrance reach the visible desktop before replacing its
+  # locomotion task. Issuing Wander on the first partially visible frame can
+  # redirect it along an exposed edge; pausing for every paired capture then
+  # gives it almost no simulation time to finish entering.
   "${BIN}" do honk
   "${BIN}" do mud
   "${BIN}" do wander
@@ -634,6 +640,7 @@ grep -q "Linux StatusNotifier controls are unavailable; CLI controls remain acti
 grep -q "cursor: supported" "${STATUS}"
 grep -q "window: supported" "${STATUS}"
 capture_x11_background_pairs
+exercise_commands
 "${BIN}" do nab >"${WORK}/x11-nab.txt" 2>&1 || {
   cat "${WORK}/x11-nab.txt" >&2
   exit 1
@@ -651,6 +658,7 @@ grep -Eq "cursor: (unsupported|failed)" "${STATUS}"
 grep -Eq "window: (unsupported|failed)" "${STATUS}"
 wait_for_collect_capability
 capture_wayland_background_pairs
+exercise_commands
 if "${BIN}" do nab >"${NAB}" 2>&1; then
   echo "smoke_m17_m18_linux: nab unexpectedly succeeded in Wayland reduced mode" >&2
   cat "${NAB}" >&2

@@ -64,6 +64,8 @@ All notable changes to this project are documented here. Format based on
 - Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
 
 ### Fixed
+- Capture the native Linux startup goose before issuing a Wander command that replaces its entrance task. Preserve the paired-background image oracle and later honk/mud/wander/reload checks; the ARM64 Debian fixture had repeatedly paused a partial edge pose.
+- Correct AccessKit's Linux AT-SPI Enabled/Sensitive state for disabled buttons using a pinned, licensed local patch. Test the actual state translation and native disabled-to-available Update now workflow.
 - Keep Windows owned note/meme delivery available when foreground activation is denied by normal OS focus policy. A failed `SetForegroundWindow` request no longer invents a Win32 error or permanently disables collect capability; note text still targets the owned edit control directly.
 - Clear the inherited standard-handle flags at both Windows process entry points before child creation. Captured CLI, app and settings launches now receive EOF while the detached runtime remains alive; the native settings Start action finishes instead of retaining its service output pipe.
 - Give each Native SDK license file its own WiX component and key path, satisfying automatic component identity rules in both Windows MSI editions.
@@ -77,6 +79,8 @@ All notable changes to this project are documented here. Format based on
 - Aim cursor-seeking locomotion at the body position that brings the beak to the pointer, avoiding a stationary-pointer chase that could never reach the grab distance.
 
 ### Development
+- Require strict all-target workspace Clippy on both native Linux CI architectures. Limit the installer autostart glob import to its Windows and test callers; the explicit public re-exports remain unchanged.
+- Wait for the GUI's new check response before retrying an update in the native Debian fixture; queued accessibility actions must not reuse the previous enabled state. Require a new retained helper before awaiting transaction success.
 - Exercise captured Windows CLI/app starts through real process EOF and runtime readiness on x64/ARM64. Give the disposable Linux TUI update fixture its own controlling PTY and preserve failed terminal output for diagnosis.
 - Scroll the real settings pane before toggling controls below smaller host viewports, checking every changed switch and all eight saved values while retaining the zero-dispatch-error gate.
 - Keep disposable settings lifecycle checks scoped to their CI environment and use Linux's explicit headless fallback where the fixture has no compositor; the independent Linux overlay gate continues to require visible pixels.
