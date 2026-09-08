@@ -134,7 +134,11 @@ def main():
                 response = ipc(text, False)
                 assert response.strip() == 'ok', (text, response)
 
-            version = ipc('j/version')
+            startup_began = time.monotonic()
+            version = wait(lambda: ipc('j/version'), 'initial version response')
+            (evidence / 'startup-readiness.json').write_text(json.dumps(dict(
+                seconds=time.monotonic() - startup_began,
+                attempts=len(transactions), transaction_deadline_seconds=.25), indent=2))
             (evidence / 'version.json').write_text(json.dumps(version, indent=2) + '\n')
             command('/output create headless HONK-PROBE')
             monitors = wait(lambda: ipc('j/monitors'), 'headless output')

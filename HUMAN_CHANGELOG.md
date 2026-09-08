@@ -40,6 +40,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Refresh Windows manners availability after a temporary failure recovers, and show Linux fullscreen support according to the desktop integration that is actually connected.
 
 ### Behind the scenes
+- Let private test desktops finish starting before testing the goose, while keeping communication checks strict and recording startup timing.
 - Bring setup guidance up to date with the published Linux features and tested accessibility controls, and explain what the separate manners status labels mean.
 - Check every fullscreen transition and the private test window's final completion so a window closing during an observation cannot produce a misleading test result.
 - Check that assistive software can read fullscreen and do-not-disturb availability separately, and test the Mac goose when desktop permission is denied.

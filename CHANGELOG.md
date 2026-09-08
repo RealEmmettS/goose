@@ -33,6 +33,7 @@ All notable changes to this project are documented here. Format based on
 - Recover Windows notification-observation status after a successful poll follows an error, and expose the current Linux compositor fullscreen capability independently of unsupported DND observation.
 
 ### Behind the scenes
+- Wait for initial read-only Sway/Hyprland version readiness on private test desktops after observed cold-start timeouts; retain each transaction's original deadline, peer identity and protocol checks and never retry mutating commands.
 - Reconcile published Linux and native accessibility guidance, and document independent observation labels and older-runtime fallback in the settings companion.
 - Re-read the private Mac fixture's atomic completion record after a final AX query and require matching native/observed normal, fullscreen and restored states before accepting the API premise.
 - Check separate presence labels through real Windows UI Automation and Linux AT-SPI, and qualify denied Mac runtime observations in a private uninstalled LaunchServices bundle without granting permission.
