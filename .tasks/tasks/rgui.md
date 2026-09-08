@@ -39,6 +39,8 @@ Windows computer-use mouse/save and actual Makira font rendering passed with an 
 
 ## Activity
 
+- 2026-09-07: Both Mac and GNU Linux settings builds, native window exercises and production identity checks pass. Musl builds compile but lacked Alpine's separate xvfb-run package; Windows ARM build runner crashed before diagnostics. Added the missing package, pinned x64 Zig host with native ARM64 safety-enabled tests, real Linux AT-SPI qualification and bounded text runs. AccessKit consumer reads Unicode/empty fields; five bridge tests, strict clippy and Windows GUI rebuild pass. Windows OS fixture now selects only actionable buttons and retains failure trees.
+
 - 2026-09-07: user explicitly requested CLI/TUI update acceptance and GUI Check for updates / Update now controls; use the existing verified update lifecycle and typed results.
 
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).

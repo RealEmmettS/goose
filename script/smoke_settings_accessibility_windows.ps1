@@ -25,6 +25,9 @@ function Wait-For([scriptblock] $Check, [string] $Description) {
         if (& $Check) { return }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
+    $window.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition) | ForEach-Object {
+        [ordered]@{ name = $_.Current.Name; type = $_.Current.ControlType.ProgrammaticName; enabled = $_.Current.IsEnabled }
+    } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'failed-tree.json') -Encoding utf8
     throw "Native accessibility did not provide $Description"
 }
 
@@ -34,8 +37,11 @@ function Find-Named([string] $Name) {
 }
 
 function Invoke-Named([string] $Name) {
-    Wait-For { $found = Find-Named $Name; $null -ne $found -and $found.Current.IsEnabled } $Name
-    $element = Find-Named $Name
+    $condition = [Windows.Automation.AndCondition]::new(
+        [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, $Name),
+        [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Button))
+    Wait-For { $found = $window.FindFirst([Windows.Automation.TreeScope]::Descendants, $condition); $null -ne $found -and $found.Current.IsEnabled } $Name
+    $element = $window.FindFirst([Windows.Automation.TreeScope]::Descendants, $condition)
     $pattern = $element.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)
     $pattern.Invoke()
 }

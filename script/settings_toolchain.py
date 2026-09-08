@@ -22,12 +22,19 @@ HASHES = {
 
 
 def ensure_zig(root: Path) -> str:
-    for candidate in [os.environ.get("NATIVE_SDK_ZIG"), shutil.which("zig")]:
+    machine = platform.machine().lower()
+    system = {"Windows": "windows", "Linux": "linux", "Darwin": "macos"}[platform.system()]
+    windows_arm = system == "windows" and machine in {"arm64", "aarch64"}
+    # Zig 0.16's ARM Windows build runner exits before emitting diagnostics on
+    # the native CI host. Run the pinned x64 compiler under Windows emulation;
+    # the product target remains explicit and is checked after compilation.
+    candidates = [] if windows_arm else [os.environ.get("NATIVE_SDK_ZIG"), shutil.which("zig")]
+    for candidate in candidates:
         if candidate and subprocess.check_output([candidate, "version"], text=True).strip() == "0.16.0":
             return str(Path(candidate).resolve())
-    machine = platform.machine().lower()
     arch = {"amd64": "x86_64", "x86_64": "x86_64", "arm64": "aarch64", "aarch64": "aarch64"}[machine]
-    system = {"Windows": "windows", "Linux": "linux", "Darwin": "macos"}[platform.system()]
+    if windows_arm:
+        arch = "x86_64"
     host = f"{arch}-{system}"
     name = f"zig-{host}-0.16.0"
     directory = root / "target/settings-toolchain"

@@ -42,7 +42,8 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
             ca-certificates curl git build-essential pkg-config libgtk-4-dev libasound2-dev \
-            xvfb xauth dbus-x11 xz-utils unzip python3 python-is-python3 python3-tomli
+            xvfb xauth dbus-x11 xz-utils unzip python3 python-is-python3 python3-tomli \
+            python3-gi gir1.2-atspi-2.0 at-spi2-core xdotool libglib2.0-bin
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.commit || github.sha }}
@@ -89,6 +90,13 @@ jobs:
           .\script\smoke_settings_accessibility_windows.ps1
           -Binary target/${{ matrix.target }}/release/honk300-settings.exe
           -EvidenceDirectory target/settings-ui-evidence/native-uia
+      - name: Exercise Linux AT-SPI provider
+        if: ${{ contains(matrix.target, '-linux-gnu') }}
+        run: >-
+          xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session --
+          python script/smoke_settings_accessibility_linux.py
+          --binary target/${{ matrix.target }}/release/honk300-settings
+          --evidence target/settings-ui-evidence/native-atspi
       - name: Build production companion with automation disabled
         run: >-
           python script/build_settings.py --target ${{ matrix.target }}
@@ -137,7 +145,7 @@ jobs:
       - name: Build and exercise settings on native musl GTK
         run: |
           docker run --rm -v "$PWD:/work" -w /work alpine:3.21.3 sh -eu -c '
-            apk add --no-cache nodejs npm python3 build-base pkgconf gtk4.0-dev curl xz git xvfb xauth dbus
+            apk add --no-cache nodejs npm python3 build-base pkgconf gtk4.0-dev curl xz git xvfb xvfb-run xauth dbus
             curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/honk-rustup.sh
             sh /tmp/honk-rustup.sh -y --profile minimal --default-toolchain 1.95
             . /root/.cargo/env

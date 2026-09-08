@@ -39,6 +39,8 @@ Settings now expose their text and controls to Windows accessibility tools, with
 
 ### Behind the scenes
 
+Linux accessibility checks now read and edit real settings fields and verify their saved values. Windows on ARM and Alpine checks have dedicated build and display setup so the same native app can be checked there.
+
 Installation code is now organized by what it owns, making startup, saved media, and installer identity easier to maintain without changing how they work.
 
 Automated Windows checks now operate settings through the same controls used by accessibility tools, including switches, text fields, and dialogs. Linux builds use the matching system libraries while retaining support for ordinary processors.

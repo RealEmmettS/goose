@@ -148,7 +148,13 @@ fn convert(mut snapshot: Snapshot, scale: f64) -> Option<(TreeUpdate, HashMap<u6
         return None;
     }
     let ids: HashSet<u64> = snapshot.nodes.iter().map(|node| node.id).collect();
-    if ids.len() != snapshot.nodes.len() || ids.contains(&ROOT.0) {
+    if ids.len() != snapshot.nodes.len()
+        || ids.iter().any(|id| *id >= ROOT.0 - MAX_NODES as u64)
+        || snapshot
+            .nodes
+            .iter()
+            .any(|node| node.text_value.len() > MAX_TEXT || node.label.len() > MAX_TEXT)
+    {
         return None;
     }
     let parents: HashMap<_, _> = snapshot.nodes.iter().map(|n| (n.id, n.parent_id)).collect();
@@ -200,7 +206,7 @@ fn convert(mut snapshot: Snapshot, scale: f64) -> Option<(TreeUpdate, HashMap<u6
     let mut nodes = vec![(ROOT, root)];
     let mut actions = HashMap::new();
     let mut focus = ROOT;
-    for widget in snapshot.nodes {
+    for (index, widget) in snapshot.nodes.into_iter().enumerate() {
         let b = widget.bounds;
         if [b.x, b.y, b.width, b.height].iter().any(|v| !v.is_finite())
             || b.width < 0.0
@@ -286,7 +292,23 @@ fn convert(mut snapshot: Snapshot, scale: f64) -> Option<(TreeUpdate, HashMap<u6
             }
             actions.insert(widget.id, a);
         }
-        nodes.push((NodeId(widget.id), node));
+        // AT-SPI reads field contents through Text, which requires a TextRun.
+        // Retain UTF-8 character boundaries without inventing glyph geometry or
+        // cursor selection that the toolkit has not published.
+        if matches!(widget.role.as_str(), "textbox" | "text") {
+            let text = node.value().unwrap_or("").to_owned();
+            let text_id = NodeId(ROOT.0 - 1 - index as u64);
+            let mut run = Node::new(Role::TextRun);
+            run.set_character_lengths(text.chars().map(|c| c.len_utf8() as u8).collect::<Vec<_>>());
+            run.set_value(text);
+            let mut text_children = node.children().to_vec();
+            text_children.push(text_id);
+            node.set_children(text_children);
+            nodes.push((NodeId(widget.id), node));
+            nodes.push((text_id, run));
+        } else {
+            nodes.push((NodeId(widget.id), node));
+        }
     }
     let mut tree = Tree::new(ROOT);
     tree.toolkit_name = Some("Native SDK / AccessKit".into());
@@ -583,10 +605,23 @@ mod tests {
             1.0,
         )
         .unwrap();
-        assert_eq!(tree.nodes.len(), 3);
+        assert_eq!(tree.nodes.len(), 4);
         assert_eq!(tree.nodes[0].1.children(), &[NodeId(8)]);
         assert_eq!(tree.nodes[2].1.value(), Some("Reduced motion"));
         assert!(!actions.contains_key(&7));
+    }
+    #[test]
+    fn native_consumer_reads_unicode_and_empty_editor_contents() {
+        for value in ["25", "Caf\u{e9} \u{1f986}", ""] {
+            let mut field = widget(7);
+            field.role = "textbox".into();
+            field.text_value = value.into();
+            let (update, _) = convert(Snapshot { nodes: vec![field] }, 1.0).unwrap();
+            let tree = accesskit_consumer::Tree::new(update, true);
+            let node = tree.state().focus().unwrap();
+            assert!(node.supports_text_ranges());
+            assert_eq!(node.document_range().text(), value);
+        }
     }
     #[test]
     fn stale_and_disabled_actions_are_rejected_and_queue_is_bounded() {
