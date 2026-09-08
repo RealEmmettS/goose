@@ -44,6 +44,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [1.5.0] - Unreleased candidate
 
+### Behind the scenes
+- Qualify the exact musl archive on native-architecture Alpine with its required GTK libraries and the unchanged compositor/prop readiness checks. Bind the Linux prop launch to the retained verified file descriptor and preserve invalid-receipt failures.
+
 ### Added
 - Add Honk300-owned Linux note/image deliveries through the existing verified GTK companion, with X11 animated positioning and native Wayland compositor placement. Expose live session and separate positioning capability in CLI/TUI/GUI, and document experimental Pi 4/5 64-bit Desktop support with native ARM64 labwc evidence.
 
@@ -89,6 +92,7 @@ All notable changes to this project are documented here. Format based on
 - Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
 
 ### Fixed
+- Reject malformed or conflicting companion receipts before considering unmanaged launch; retain independent portable/source use alongside a valid foreign installation. On Linux, execute the retained verified file descriptor so sibling pathname replacement cannot redirect the graphical settings launcher.
 - Hold the same configuration revision lock through login-start reconciliation so a concurrent GUI/TUI save cannot be followed by a stale OS setting. Detect external editors that ignore that lock before reporting success.
 - Guard dashboard deletion against changed task-detail contents, and reject completion when task detail is missing or empty; preserve concurrent Status/Activity updates.
 - Reconcile receipt-owned autostart intent before the native settings edit snapshot, preserve its resulting revision, and reject concurrent configuration changes during reconciliation.

@@ -51,6 +51,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Let the isolated KDE test wait for the desktop connection to finish starting, and retain clear diagnostics if that connection never becomes ready.
 - Adjust the isolated KDE test environment so it can start and retain useful failure evidence without requesting extra system privileges.
 - Begin testing optional KDE desktop support with real windows, including checks that protected apps stay untouched and disabling the connection stops further actions.
+- Check the packaged Linux companion on the desktop libraries it was built for, and keep deliveries tied to the program verified before launch.
 - Prepare the Linux update using checks of the actual shipped companions, while keeping the remaining release checks and real Raspberry Pi testing visible.
 - Use the desktop compositor supplied by Alpine for its isolated note and picture checks, while keeping the same visibility requirements.
 - Check the shipped Linux note and picture windows on Alpine as well as Ubuntu, including visible deliveries and cleanup if the supporting process fails.
@@ -66,6 +67,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - On a desktop that only offers Wayland, starting the goose explains how to enable its reduced mode instead of selecting that mode silently.
 - Linux notes and pictures use a clearly named Close button that accessibility tools can identify.
 - The goose pauses new note and picture deliveries when several are already open, leaving your existing notes intact and resuming after you close one.
+- Keep graphical settings tied to the program that was checked before launch, and stop when its installation record is damaged instead of treating it as an unmanaged copy.
 - Keep login-start changes consistent with the saved preference when two settings windows are editing at once, and report conflicting external edits.
 - Refuse to delete a task after someone else updates its details, and require saved task details before marking it complete.
 - Opening settings now respects the installer's latest start-at-login choice, so changing an unrelated preference cannot undo it.

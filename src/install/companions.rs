@@ -70,15 +70,63 @@ pub(crate) fn verify_settings_companion(
     current: &Path,
     settings: &Path,
 ) -> Result<Vec<File>, DynError> {
+    verify_settings_with_candidates(
+        current,
+        settings,
+        current_owned_receipt_candidates(current),
+        external_receipt_candidates(),
+        detect_install_source(),
+    )
+}
+
+fn verify_settings_with_candidates(
+    current: &Path,
+    settings: &Path,
+    owned: Vec<PathBuf>,
+    external: Vec<PathBuf>,
+    fallback: InstallSource,
+) -> Result<Vec<File>, DynError> {
     let files = open_settings_files(settings)?;
-    let source = detect_install_source();
+    let mut candidates = owned;
+    for path in external {
+        if candidates.contains(&path) {
+            continue;
+        }
+        // A healthy external receipt for another installation must not turn a
+        // separate source/portable launch into that installation. Damaged evidence
+        // remains an error; only a fully valid foreign receipt is ignored.
+        let regular = fs::symlink_metadata(&path)
+            .is_ok_and(|metadata| metadata.is_file() && !metadata.file_type().is_symlink());
+        let foreign = regular
+            && fs::read(&path)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                .is_some_and(|receipt| {
+                    receipt
+                        .get("install_root")
+                        .and_then(serde_json::Value::as_str)
+                        .map(Path::new)
+                        .is_some_and(|root| {
+                            !path_is_within(current, root)
+                                && validated_receipt_source(&receipt, &root.join("honk300"))
+                                    .is_some()
+                        })
+                });
+        if !foreign {
+            candidates.push(path);
+        }
+    }
+    let source = match install_receipt_source_from_candidates(&candidates, current) {
+        InstallSourceEvidence::InvalidOrConflicting => {
+            return Err("settings install receipt is invalid or conflicting".into())
+        }
+        InstallSourceEvidence::Valid(source) => source,
+        InstallSourceEvidence::Missing => fallback,
+    };
     if matches!(source, InstallSource::Unknown | InstallSource::ManualLocal) {
         return Ok(files);
     }
-    for path in current_owned_receipt_candidates(current)
-        .into_iter()
-        .chain(external_receipt_candidates())
-    {
+    for path in candidates {
         let metadata = match fs::symlink_metadata(&path) {
             Ok(metadata) => metadata,
             Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
@@ -97,6 +145,20 @@ pub(crate) fn verify_settings_companion(
     Err("cannot verify the settings companion against its owned installation receipt".into())
 }
 
+/// Linux exec resolves this retained descriptor before closing CLOEXEC handles.
+/// Pathname replacement cannot redirect the launch to an unverified inode.
+#[cfg(target_os = "linux")]
+pub(crate) fn verified_settings_program(files: &[File]) -> io::Result<PathBuf> {
+    use std::os::fd::AsRawFd;
+    let executable = files
+        .first()
+        .ok_or_else(|| io::Error::other("verified settings executable is missing"))?;
+    Ok(PathBuf::from(format!(
+        "/proc/self/fd/{}",
+        executable.as_raw_fd()
+    )))
+}
+
 fn open_verified_file(settings: &Path) -> Result<File, DynError> {
     let metadata = fs::symlink_metadata(settings)?;
     if !metadata.is_file() || metadata.file_type().is_symlink() {
@@ -104,6 +166,11 @@ fn open_verified_file(settings: &Path) -> Result<File, DynError> {
     }
     let mut options = fs::OpenOptions::new();
     options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
     #[cfg(windows)]
     {
         use std::os::windows::fs::OpenOptionsExt;
@@ -172,6 +239,87 @@ pub(crate) fn verify_receipted_settings(
 mod tests {
     use super::*;
     use sha2::{Digest, Sha256};
+
+    #[test]
+    fn invalid_receipts_cannot_downgrade_companion_verification_to_unmanaged() {
+        let directory = tempfile::tempdir().unwrap();
+        let current = directory.path().join("honk300");
+        let settings = directory.path().join(SETTINGS_NAME);
+        fs::write(&settings, b"settings").unwrap();
+        #[cfg(windows)]
+        fs::write(settings.with_file_name(ACCESSIBILITY_NAME), b"bridge").unwrap();
+        let receipt = directory.path().join("install-receipt.json");
+        for fallback in [InstallSource::Unknown, InstallSource::ManualLocal] {
+            assert!(
+                verify_settings_with_candidates(&current, &settings, vec![], vec![], fallback)
+                    .is_ok()
+            );
+            for bytes in [
+                b"invalid receipt".as_slice(),
+                br#"{"schema":"wrong","install_root":"/other"}"#,
+            ] {
+                fs::write(&receipt, bytes).unwrap();
+                assert!(verify_settings_with_candidates(
+                    &current,
+                    &settings,
+                    vec![receipt.clone()],
+                    vec![],
+                    fallback
+                )
+                .is_err());
+                assert!(verify_settings_with_candidates(
+                    &current,
+                    &settings,
+                    vec![],
+                    vec![receipt.clone()],
+                    fallback
+                )
+                .is_err());
+            }
+        }
+        let foreign = directory.path().join("other-install");
+        fs::write(
+            &receipt,
+            serde_json::to_vec(&serde_json::json!({
+                "schema": OWNERSHIP_MARKER, "install_root": foreign, "channel": "shell",
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(verify_settings_with_candidates(
+            &current,
+            &settings,
+            vec![],
+            vec![receipt],
+            InstallSource::Unknown
+        )
+        .is_ok());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn verified_linux_exec_ignores_a_replaced_sibling_path() {
+        use std::os::unix::process::CommandExt;
+        let directory = tempfile::tempdir().unwrap();
+        let settings = directory.path().join(SETTINGS_NAME);
+        fs::copy(std::env::current_exe().unwrap(), &settings).unwrap();
+        let identity = serde_json::json!({ "name": SETTINGS_NAME,
+            "size": fs::metadata(&settings).unwrap().len(),
+            "sha256": format!("{:x}", Sha256::digest(fs::read(&settings).unwrap())),
+        });
+        let files = open_settings_files(&settings).unwrap();
+        verify_identity(&identity, &files[0], &settings).unwrap();
+        fs::rename(&settings, directory.path().join("verified-original")).unwrap();
+        fs::write(&settings, b"unverified replacement").unwrap();
+        let status = std::process::Command::new(verified_settings_program(&files).unwrap())
+            .arg0(&settings)
+            .arg("--list")
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert_eq!(fs::read(&settings).unwrap(), b"unverified replacement");
+    }
 
     #[test]
     fn receipt_rejects_missing_swapped_and_changed_settings_bytes() {

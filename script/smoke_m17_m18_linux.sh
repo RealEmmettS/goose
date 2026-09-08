@@ -441,7 +441,7 @@ start_x11_server() {
   need_cmd Xvfb
   need_cmd import
   need_cmd xsetroot
-  need_cmd xcompmgr
+  if ! command -v xcompmgr >/dev/null 2>&1; then need_cmd picom; fi
   export DISPLAY="${HONK300_XVFB_DISPLAY:-:99}"
   Xvfb "${DISPLAY}" -screen 0 1280x720x24 >"${WORK}/xvfb.log" 2>&1 &
   XVFB_PID="$!"
@@ -460,7 +460,11 @@ start_x11_server() {
   # paints the final desktop into the Composite overlay. Automatic server-side
   # mode (-a) is a debugging mode whose root capture can flatten ARGB windows
   # against black instead of proving their per-pixel composition.
-  xcompmgr -n >"${WORK}/xcompmgr.log" 2>&1 &
+  if command -v xcompmgr >/dev/null 2>&1; then
+    xcompmgr -n >"${WORK}/xcompmgr.log" 2>&1 &
+  else
+    picom --config /dev/null --backend xrender >"${WORK}/xcompmgr.log" 2>&1 &
+  fi
   XCOMPMGR_PID="$!"
   wait_for_x11_compositor
   start_x11_background "#203040"

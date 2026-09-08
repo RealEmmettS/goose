@@ -15,7 +15,7 @@ pub(crate) fn launch(config: Option<PathBuf>) -> io::Result<()> {
             "the settings executable is not a regular sibling file",
         ));
     }
-    let _verified = crate::install::verify_settings_companion(&executable, &settings)
+    let verified = crate::install::verify_settings_companion(&executable, &settings)
         .map_err(|error| io::Error::other(error.to_string()))?;
     let config = config
         .map(|path| honk_config::resolve_path(Some(path)))
@@ -23,6 +23,7 @@ pub(crate) fn launch(config: Option<PathBuf>) -> io::Result<()> {
         .map_err(io::Error::other)?;
     #[cfg(windows)]
     {
+        let _verified = verified;
         use std::os::windows::process::CommandExt;
         const BASE: u32 = 0x0800_0000 | 0x0000_0200;
         const BREAKAWAY: u32 = 0x0100_0000;
@@ -38,8 +39,20 @@ pub(crate) fn launch(config: Option<PathBuf>) -> io::Result<()> {
             Err(error) => Err(error),
         }
     }
-    #[cfg(not(windows))]
-    command(&settings, config.as_deref()).spawn().map(|_| ())
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::process::CommandExt;
+        let program = crate::install::companions::verified_settings_program(&verified)?;
+        command(&program, config.as_deref())
+            .arg0(&settings)
+            .spawn()
+            .map(|_| ())
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        let _verified = verified;
+        command(&settings, config.as_deref()).spawn().map(|_| ())
+    }
 }
 
 #[cfg(windows)]
