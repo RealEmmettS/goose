@@ -10,6 +10,7 @@ const PACKAGE_NAME: &str = "honk300";
 
 type DynError = Box<dyn std::error::Error>;
 
+#[cfg(target_os = "linux")]
 pub(crate) fn prove_current_executable(current_exe: &Path) -> Result<PathBuf, DynError> {
     let expected = prove_installed_executable()?;
     if !paths_equivalent(current_exe, &expected) {
@@ -76,6 +77,7 @@ fn dpkg_search_proves_owner(output: &str, expected: &Path) -> bool {
     })
 }
 
+#[cfg(target_os = "linux")]
 fn paths_equivalent(left: &Path, right: &Path) -> bool {
     match (left.canonicalize(), right.canonicalize()) {
         (Ok(left), Ok(right)) => left == right,

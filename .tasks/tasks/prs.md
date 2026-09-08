@@ -27,6 +27,7 @@ failed to arrive; retain an explicit unsupported product capability. Native runt
 interruption, settings, unavailable target and shutdown qualification are next.
 
 ## Activity
+- 2026-09-08 — The native observer now compiles; full-workspace strict Mac lint identifies two existing Linux-only Debian identity helpers. Compile those only on Linux and repeat the native gate with warnings still treated as errors.
 - 2026-09-08 — Native Mac compilation catches the Objective-C nullable identity argument and explicit unsafe trust-call boundaries; correct the bindings and report permission withdrawal distinctly from timeout before repeating the actual runtime gate. Windows-host Rust tests/lint/build, Python checks and separate Native SDK tests/check/build pass.
 - 2026-09-08 — Add ADR 0049, a bounded additive presence frame and independent editor status. Implement a retained Mac worker with target generations, total native query deadline, sample expiry and permission withdrawal; add actual native runtime and stopped-target scenarios. Keep the unresolved Focus experiment optional and production prompts unchanged.
 - 2026-09-08 — Preserve the qualified GNOME integration while starting the independent manners correction. LaunchServices separates the private probe identity, but its Focus request still has no callback; inspect a fully activated native setup window before ending that qualification route.
