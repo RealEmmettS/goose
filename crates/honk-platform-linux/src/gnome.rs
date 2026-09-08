@@ -75,20 +75,28 @@ impl Frame {
         let mut identities = HashSet::new();
         let mut dragging = 0;
         for window in &frame.windows {
-            if window.id == 0
-                || !identities.insert(window.id)
-                || window.pid == Some(0)
-                || window.app.as_ref().is_some_and(|text| text.len() > 1024)
+            if window.id == 0 || !identities.insert(window.id) || window.pid == Some(0) {
+                return Err("Invalid or repeated GNOME window identity");
+            }
+            if window.app.as_ref().is_some_and(|text| text.len() > 1024)
                 || window.title.as_ref().is_some_and(|text| text.len() > 1024)
-                || window.geometry[..2]
-                    .iter()
-                    .any(|v| v.abs_diff(0) > 1_000_000)
+            {
+                return Err("GNOME window identity exceeds its text bound");
+            }
+            if window.geometry[2..].iter().any(|v| *v <= 0) {
+                return Err("GNOME window has nonpositive dimensions");
+            }
+            if window.geometry[..2]
+                .iter()
+                .any(|v| v.abs_diff(0) > 1_000_000)
                 || window.geometry[2..]
                     .iter()
                     .any(|v| !(1..=1_000_000).contains(v))
-                || (window.dragging && !frame.grabbed)
             {
-                return Err("Invalid GNOME window identity, bounds or grab state");
+                return Err("GNOME window geometry exceeds its coordinate bound");
+            }
+            if window.dragging && !frame.grabbed {
+                return Err("GNOME drag has no current native grab");
             }
             dragging += u8::from(window.dragging);
         }
