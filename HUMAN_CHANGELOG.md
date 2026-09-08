@@ -43,6 +43,8 @@ Starting the goose from graphical settings now finishes promptly, and tools that
 
 Release checks now include every supporting settings file and wait for screens to finish responding before testing the next action.
 
+Terminal update checks now close their own test processes in the correct order after confirming that the update and restart worked.
+
 Update checks explain when to use the official installer to enable automatic updates, using the same clear message in both settings screens.
 
 Save remains available to accessibility tools after changing settings, including pages with many controls.

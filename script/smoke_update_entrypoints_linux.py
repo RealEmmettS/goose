@@ -65,17 +65,30 @@ def stop_helper(directory):
         pid = int(pid_file.read_text())
         # This PID is emitted immediately before exec by our private terminal
         # adapter. Check the command identity before sending it any signal.
-        command = Path(f'/proc/{pid}/cmdline')
-        if command.exists():
-            argv = command.read_bytes().split(b'\0')
-            if argv[:2] != [os.fsencode(INSTALLED), b'__control-surface-update']:
-                raise RuntimeError('Retained helper PID changed identity')
-            os.kill(pid, signal.SIGTERM)
-            def exited():
-                try:
-                    return Path(f'/proc/{pid}/stat').read_text().split()[2] == 'Z'
-                except FileNotFoundError:
-                    return True
+        def exited():
+            try:
+                # comm is parenthesized and may itself contain spaces.
+                return Path(f'/proc/{pid}/stat').read_text().rsplit(') ', 1)[1].split()[0] == 'Z'
+            except FileNotFoundError:
+                return True
+        if not exited():
+            # Bind the signal to this process, even if its numeric PID is
+            # recycled between identity readback and cleanup.
+            try:
+                descriptor = os.pidfd_open(pid)
+            except ProcessLookupError:
+                pid_file.unlink()
+                return
+            try:
+                argv = Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')
+                if not exited():
+                    if argv[:2] != [os.fsencode(INSTALLED), b'__control-surface-update']:
+                        raise RuntimeError('Retained helper PID changed identity')
+                    signal.pidfd_send_signal(descriptor, signal.SIGTERM)
+            except (FileNotFoundError, ProcessLookupError):
+                pass
+            finally:
+                os.close(descriptor)
             wait(exited, 'owned helper exit', 10)
         pid_file.unlink()
 
@@ -289,9 +302,11 @@ exec "$@" > "$HONK300_ENTRYPOINT_EVIDENCE/helper.stdout.txt" 2> "$HONK300_ENTRYP
                             'receipt': 'verified', 'result': 'updated', 'public_no_op': True,
                             'helper_relaunch': mode != 'cli', 'failed_update_preserved_state': mode == 'gui'})
         finally:
+            # Closing the owning PTY first may deliver SIGHUP to its child.
+            # Verify and retire the retained helper while that terminal is live.
+            stop_helper(directory)
             if editor is not None:
                 editor.close()
-            stop_helper(directory)
             if INSTALLED.exists():
                 subprocess.run([str(INSTALLED), 'stop', '--force'], capture_output=True, timeout=15)
             stop_process(runtime)
