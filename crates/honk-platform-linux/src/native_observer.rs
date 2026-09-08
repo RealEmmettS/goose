@@ -126,7 +126,16 @@ impl<S: Source> Drop for Observer<S> {
             worker.thread().unpark();
             // Every source request is bounded; retain the exact worker until
             // it exits, including while permission is being removed.
-            let _ = worker.join();
+            let joined = worker.join();
+            if std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true")
+                && std::env::var("HONK300_TRACE_OBSERVER").as_deref() == Ok("1")
+            {
+                eprintln!(
+                    "honk300 observer trace: name={} joined={}",
+                    S::NAME,
+                    joined.is_ok()
+                );
+            }
         }
     }
 }

@@ -50,7 +50,7 @@ preserve = "untouched"
         logs.append(path)
         with path.open('w') as log:
             process = subprocess.Popen([str(executable), *arguments], stdout=log, stderr=log,
-                                       env=dict(os.environ, HONK300_TRACE_PRESENCE='1'))
+                                       env=dict(os.environ, HONK300_TRACE_PRESENCE='1', HONK300_TRACE_OBSERVER='1'))
         return process, path
 
     def control(*arguments, success=True):
@@ -85,6 +85,19 @@ preserve = "untouched"
                 continue
         thread_states.append(dict(at=time.monotonic(), threads=threads))
         return sorted(thread['id'] for thread in threads)
+
+    def joined_count():
+        return runtime_log.read_text().count('honk300 observer trace: name=hyprland joined=true')
+
+    def removed(previous_joins):
+        # Require the production JoinHandle to have completed before its
+        # unsupported reply. Separately observe the kernel's task retirement;
+        # a directory enumeration is not the Rust join completion boundary.
+        assert joined_count() == previous_joins + 1, runtime_log.read_text()[-2000:]
+        def retired():
+            assert status()['capabilities']['windows'] == 'unsupported'
+            return not workers()
+        wait(retired, 'joined native worker retired from proc', timeout=1)
 
     def nodes():
         assert ui.poll() is None, f'Settings exited with {ui.returncode}'
@@ -185,14 +198,17 @@ preserve = "untouched"
              node.get_state_set().contains(Atspi.StateType.PRESSED), 'draft survives Hyprland setup and status')
         assert config.read_text() == original
         invoke('Platform & status')
+        previous_joins = joined_count()
         invoke('Remove Hyprland observations')
         expect('unsupported', 'native settings revokes live observations')
-        assert not workers() and not record.exists(), thread_states[-1]
+        removed(previous_joins)
+        assert not record.exists()
         control('integrations', 'hyprland', 'setup')
         expect('supported', 'explicit CLI setup')
+        previous_joins = joined_count()
         record.unlink()
         expect('unsupported', 'external consent removal')
-        assert not workers(), thread_states[-1]
+        removed(previous_joins)
         control('integrations', 'hyprland', 'setup')
         expect('supported', 'new consent after external removal')
         # Replace only this disposable compositor's IPC pathname. The overlay

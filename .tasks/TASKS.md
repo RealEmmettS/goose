@@ -21,7 +21,7 @@
 ## Active
 - [ ] **Hyprland desktop integration** - separately probe supported native IPC operations and preserve per-operation capability claims (needs #rkde) (ms #refine) (owner codex) #rhy
   - [x] Prove native socket ownership, exact window identity and supported bounded placement.
-  - [ ] Integrate explicit setup/removal and exercise disconnect, stale identity and terminal refusals.
+  - [x] Integrate explicit setup/removal and exercise disconnect, stale identity and terminal refusals.
   - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
 - [ ] **Sway desktop observations** - explicit native window/fullscreen support with exact-version evidence and honest action limitations (needs #rkde) (ms #refine) (owner codex) #rsw
   - [x] Prove the authenticated native socket, window identity and actual bounded placement premise.
