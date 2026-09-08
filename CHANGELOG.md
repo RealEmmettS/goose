@@ -56,6 +56,7 @@ All notable changes to this project are documented here. Format based on
 - Preserve the exact running Hyprland worker and consent when repeated setup overlaps fullscreen recovery, independently from snapshot freshness.
 
 ### Behind the scenes
+- Record Sway's unchanged-source candidate/main qualification, immutable publication and independent public artifact audit, and close the separate native Hyprland visual/lifecycle gate before its candidate.
 - Require completed production worker joins before reporting revoked Hyprland access, then independently bound kernel task retirement in the native fixture; retain the exact thread and capability evidence for both boundaries.
 - Qualify Hyprland 0.53.3/0.55.2 on native x64/ARM64 using an isolated system-identified virtual graphics device, responsive GTK fixtures and actual production transport. Exercise impostor refusal, engine fullscreen manners, config changes, native settings, drafts, revocation and graceful/crash recovery.
 - Inspect native goose/settings and complete-image captures; qualify owned note/image limits, close handling and child failure recovery. Require painted note-body text as well as native accessibility text before recording delivery evidence.

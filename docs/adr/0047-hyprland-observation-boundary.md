@@ -1,6 +1,6 @@
 # ADR 0047: independently qualified Hyprland observations
 
-Status: accepted for implementation; public qualification pending.
+Status: implemented and natively qualified; public qualification pending.
 
 The approved refinement requires a separate Hyprland milestone after KDE and Sway.
 Native run [34222607423](https://github.com/RealEmmettS/goose/actions/runs/34222607423)

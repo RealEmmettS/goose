@@ -61,6 +61,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Keep the same Hyprland connection when you repeat setup during a fullscreen transition.
 
 ### Behind the scenes
+- Verify the published Sway downloads and finish the separate Hyprland desktop, settings and delivery checks before preparing its release.
 - Check that removing Hyprland access finishes the goose’s desktop worker before reporting success, then verify that the operating system removes the finished thread.
 - Check the real goose, settings, notes and pictures on independently tested Hyprland desktops, including restarts, lost access and unexpected window-helper exits. Wait for a note’s words to appear before recording its desktop proof.
 - Give the private Windows test desktop enough time to start on a cold machine, record where startup stalls, and keep the same strict checks for the goose’s appearance.
