@@ -33,12 +33,14 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ## Remaining manners observations — In development
 
-### Behind the scenes
-- Keep the remaining manners checks aligned with the new desktop support and test private permission setup after its window is ready.
+### Added
+- Let the Mac goose notice fullscreen apps through its existing desktop permission, while keeping commands responsive if an app stops answering. Show fullscreen and do-not-disturb support separately in every settings interface.
+
+### Fixed
+- Refresh Windows manners availability after a temporary failure recovers, and show Linux fullscreen support according to the desktop integration that is actually connected.
 
 ### Behind the scenes
-- Check actual desktop permission before treating a notification value as reliable, and stop private checks cleanly when they finish.
-- Check what macOS can actually tell the goose about fullscreen apps and interrupted notifications before adding support or asking for more access.
+- Exercise real Mac fullscreen changes, interrupted apps, live settings and shutdown. Keep do-not-disturb unavailable where its signal has not been verified, and preserve the existing permission experience.
 
 ## GNOME desktop observations — September 2026
 

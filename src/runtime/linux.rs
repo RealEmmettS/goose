@@ -316,6 +316,18 @@ pub fn run(
                     }
                     request.respond(ControlResponse::Wayland(status));
                 }
+                ControlCommand::PresenceStatus => {
+                    let fullscreen = honk_control::combine_capabilities([
+                        kwin.status().fullscreen,
+                        sway.status().fullscreen,
+                        hyprland.status().fullscreen,
+                        gnome.status().fullscreen,
+                    ]);
+                    request.respond(ControlResponse::Presence(honk_control::PresenceStatus {
+                        fullscreen,
+                        dnd: CapabilityStatus::Unsupported,
+                    }));
+                }
                 ControlCommand::KwinEnable => {
                     let response = if overlay_mode != OverlayMode::Wayland {
                         ControlResponse::Err("UNSUPPORTED".into())
@@ -436,13 +448,19 @@ pub fn run(
                     request.respond(outcome.into());
                 }
                 ControlCommand::Status => {
+                    let fullscreen = honk_control::combine_capabilities([
+                        kwin.status().fullscreen,
+                        sway.status().fullscreen,
+                        hyprland.status().fullscreen,
+                        gnome.status().fullscreen,
+                    ]);
                     request.respond(ControlResponse::Status(runtime_status(
                         overlay_capability(overlay_mode, display_server),
                         backend_state(
                             cursor_warp,
                             window_watch,
                             collect_window,
-                            presence_capability(display_server),
+                            super::backend_capability(fullscreen),
                             audio_capability,
                             assets.note_count(),
                             assets.meme_count(),

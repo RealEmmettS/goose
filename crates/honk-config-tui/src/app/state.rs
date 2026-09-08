@@ -1,7 +1,7 @@
 use super::Action;
 use crossterm::event::{KeyCode, KeyEvent};
 use honk_config::{Config, ConfigRevision};
-use honk_control::RuntimeStatus;
+use honk_control::{PresenceStatus, RuntimeStatus};
 use honk_engine::PokeAction;
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -79,6 +79,7 @@ pub struct CommandResult {
     pub saved_revision: Option<ConfigRevision>,
     pub loaded_config: Option<(Config, Config)>,
     pub runtime_status: Option<RuntimeStatus>,
+    pub presence_status: Option<PresenceStatus>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -182,6 +183,7 @@ pub struct AppState {
     pub status_is_error: bool,
     pub status_scroll: u16,
     pub runtime_status: RuntimeStatus,
+    pub presence_status: PresenceStatus,
     pending_commands: VecDeque<TuiCommand>,
     confirm_quit: bool,
 }
@@ -200,6 +202,7 @@ impl AppState {
             status_is_error: false,
             status_scroll: 0,
             runtime_status: RuntimeStatus::not_running(),
+            presence_status: PresenceStatus::unprobed(),
             pending_commands: VecDeque::new(),
             confirm_quit: false,
         }
@@ -334,6 +337,12 @@ impl AppState {
                 }
                 if let Some(status) = result.runtime_status {
                     self.runtime_status = status;
+                    if !status.running {
+                        self.presence_status = PresenceStatus::unprobed();
+                    }
+                }
+                if let Some(status) = result.presence_status {
+                    self.presence_status = status;
                 }
                 self.set_status(result.status, result.is_error);
             }
@@ -1026,8 +1035,13 @@ impl AppState {
                     RowKind::Static,
                 ),
                 row(
-                    "Presence",
-                    self.runtime_status.presence.label().into(),
+                    "Fullscreen observation",
+                    self.presence_status.fullscreen.label().into(),
+                    RowKind::Static,
+                ),
+                row(
+                    "Do not disturb observation",
+                    self.presence_status.dnd.label().into(),
                     RowKind::Static,
                 ),
                 row(
@@ -1414,6 +1428,7 @@ mod tests {
             loaded_config: None,
             saved_config: None,
             runtime_status: None,
+            presence_status: None,
         })));
         assert_eq!(app.status, "saved");
         assert!(!app.status_is_error);
@@ -1435,6 +1450,7 @@ mod tests {
             loaded_config: None,
             saved_config: Some(saved_config),
             runtime_status: None,
+            presence_status: None,
         })));
 
         assert!(
@@ -1460,6 +1476,11 @@ mod tests {
     #[test]
     fn status_rows_show_runtime_capabilities() {
         let mut app = app();
+        app.runtime_status.presence = honk_control::CapabilityStatus::Supported;
+        app.presence_status = PresenceStatus {
+            fullscreen: honk_control::CapabilityStatus::Denied,
+            dnd: honk_control::CapabilityStatus::Unsupported,
+        };
         app.apply(Action::SelectCategory(Category::Status));
         let rows = app.rows();
         for label in [
@@ -1471,11 +1492,18 @@ mod tests {
             "Cursor",
             "Window ride",
             "Collect windows",
-            "Presence",
+            "Fullscreen observation",
+            "Do not disturb observation",
             "Audio",
             "Assets",
         ] {
             assert!(rows.iter().any(|row| row.label == label), "{label}");
         }
+        assert!(rows
+            .iter()
+            .any(|row| row.label == "Fullscreen observation" && row.value == "denied"));
+        assert!(rows
+            .iter()
+            .any(|row| row.label == "Do not disturb observation" && row.value == "unsupported"));
     }
 }

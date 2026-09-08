@@ -253,16 +253,36 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(())
         }
-        ControlResponse::Session(_) | ControlResponse::Wayland(_) => {
-            Err("honk300: unexpected session response.".into())
-        }
+        ControlResponse::Session(_)
+        | ControlResponse::Wayland(_)
+        | ControlResponse::Presence(_) => Err("honk300: unexpected session response.".into()),
     }
 }
 
 fn print_status(status: RuntimeStatus) -> io::Result<()> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    ignore_broken_pipe(write_status(&mut stdout, status))
+    let presence = if status.running {
+        match send_command(ControlCommand::PresenceStatus) {
+            Ok(ControlResponse::Presence(value)) => value,
+            _ => honk_control::PresenceStatus::unprobed(),
+        }
+    } else {
+        honk_control::PresenceStatus::unprobed()
+    };
+    ignore_broken_pipe((|| {
+        write_status(&mut stdout, status)?;
+        writeln!(
+            stdout,
+            "fullscreen observation: {}",
+            presence.fullscreen.label()
+        )?;
+        writeln!(
+            stdout,
+            "do not disturb observation: {}",
+            presence.dnd.label()
+        )
+    })())
 }
 
 fn write_status(writer: &mut impl Write, status: RuntimeStatus) -> io::Result<()> {

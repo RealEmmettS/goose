@@ -228,7 +228,10 @@ fn stop_runtime_for_lifecycle_with(
             "runtime rejected stop before lifecycle mutation: {code}"
         ))),
         Ok(
-            ControlResponse::Status(_) | ControlResponse::Session(_) | ControlResponse::Wayland(_),
+            ControlResponse::Status(_)
+            | ControlResponse::Session(_)
+            | ControlResponse::Wayland(_)
+            | ControlResponse::Presence(_),
         ) => Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "runtime returned status to lifecycle stop request",

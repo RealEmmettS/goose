@@ -41,6 +41,19 @@ pub(crate) fn audio_probe_capability(available: bool) -> BackendCapability {
     }
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub(crate) fn backend_capability(status: honk_control::CapabilityStatus) -> BackendCapability {
+    use honk_control::CapabilityStatus;
+    match status {
+        CapabilityStatus::Supported => BackendCapability::Supported,
+        CapabilityStatus::Denied => BackendCapability::Denied,
+        CapabilityStatus::Failed => BackendCapability::Failed,
+        CapabilityStatus::Unprobed | CapabilityStatus::Unsupported => {
+            BackendCapability::Unsupported
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::audio_probe_capability;

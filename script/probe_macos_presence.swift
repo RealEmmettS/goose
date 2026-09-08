@@ -20,10 +20,14 @@ func write(_ value: [String: Any], _ name: String) {
 
 final class Fixture: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var window: NSWindow!
+    var controlTimer: Timer?
+    var lastCommand = 0
+    var phase = "normal"
     func record(_ phase: String) {
+        self.phase = phase
         write(["phase": phase, "pid": ProcessInfo.processInfo.processIdentifier,
                "native_fullscreen": window.styleMask.contains(.fullScreen),
-               "window_id": window.windowNumber], "fixture.json")
+               "window_id": window.windowNumber, "command": lastCommand], "fixture.json")
     }
     func applicationDidFinishLaunching(_ notification: Notification) {
         window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 520, height: 360),
@@ -35,19 +39,37 @@ final class Fixture: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
         record("normal")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.window.toggleFullScreen(nil) }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 24) { exit(2) }
+        if mode == "controlled" {
+            controlTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+                guard let data = try? Data(contentsOf: evidence.appendingPathComponent("command.json")),
+                      let command = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let sequence = command["sequence"] as? Int,
+                      sequence > self.lastCommand, let op = command["op"] as? String else { return }
+                self.lastCommand = sequence
+                switch op {
+                case "fullscreen", "restore": self.window.toggleFullScreen(nil)
+                case "hide": self.window.orderOut(nil); self.record("hidden")
+                case "show": self.window.makeKeyAndOrderFront(nil); NSApplication.shared.activate(ignoringOtherApps: true); self.record("normal")
+                case "close": self.record("done"); NSApplication.shared.terminate(nil)
+                default: exit(4)
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 90) { exit(2) }
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.window.toggleFullScreen(nil) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 24) { exit(2) }
+        }
     }
     func windowDidEnterFullScreen(_ notification: Notification) {
         record("fullscreen")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { self.window.toggleFullScreen(nil) }
+        if mode != "controlled" { DispatchQueue.main.asyncAfter(deadline: .now() + 4) { self.window.toggleFullScreen(nil) } }
     }
     func windowDidExitFullScreen(_ notification: Notification) {
         record("restored")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+        if mode != "controlled" { DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             self.record("done")
             NSApplication.shared.terminate(nil)
-        }
+        } }
     }
 }
 
@@ -96,7 +118,7 @@ if mode == "focus" {
     let delegate = FocusFixture()
     app.delegate = delegate
     withExtendedLifetime(delegate) { app.run() }
-} else if mode == "fixture" {
+} else if mode == "fixture" || mode == "controlled" {
     app.setActivationPolicy(.regular)
     let delegate = Fixture()
     app.delegate = delegate

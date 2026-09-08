@@ -293,6 +293,14 @@ fn runtime_status_json(result: io::Result<ControlResponse>) -> Value {
             "error": format!("Runtime status could not be confirmed: {result:?}")})
         }
     };
+    let presence = if status.running {
+        match send_command(ControlCommand::PresenceStatus) {
+            Ok(ControlResponse::Presence(value)) => value,
+            _ => honk_control::PresenceStatus::unprobed(),
+        }
+    } else {
+        honk_control::PresenceStatus::unprobed()
+    };
     let session = if status.running && status.platform == honk_control::PlatformStatus::Linux {
         match send_command(ControlCommand::Session) {
             Ok(ControlResponse::Session(session)) => Some(json!({
@@ -308,6 +316,7 @@ fn runtime_status_json(result: io::Result<ControlResponse>) -> Value {
         "overlay": status.overlay.label(), "accessibility": status.accessibility.label(),
         "cursor": status.cursor.label(), "windows": status.window.label(),
         "notes_and_memes": status.collect.label(), "manners": status.presence.label(),
+        "fullscreen": presence.fullscreen.label(), "dnd": presence.dnd.label(),
         "audio": status.audio.label(), "notes": status.notes, "memes": status.memes,
         "session": session})
 }

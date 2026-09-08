@@ -22,8 +22,8 @@ use honk_engine::{
 };
 use honk_platform_macos::{
     accessibility_state, local_time, main_bundle_release_metadata, open_accessibility_settings,
-    open_update_helper, presence_state, request_accessibility_prompt, warp_cursor,
-    AccessibilityState, CollectWindowController, ForeignWindowWatcher, Overlay,
+    open_update_helper, request_accessibility_prompt, warp_cursor, AccessibilityState,
+    CollectWindowController, ForeignWindowWatcher, Overlay, PresenceObserver,
 };
 
 pub fn run(
@@ -49,7 +49,8 @@ pub fn run(
     let mut cursor_warp = accessibility_capability_from_state(accessibility);
     let mut window_watch = accessibility_capability_from_state(accessibility);
     let mut collect_window = BackendCapability::Supported;
-    let presence = BackendCapability::Unsupported;
+    let mut presence_observer = PresenceObserver::new().ok();
+    let mut presence = BackendCapability::Unsupported;
     let mut audio_capability = BackendCapability::Supported;
 
     let mut effective = effective_options(
@@ -124,9 +125,42 @@ pub fn run(
         "honk300: a macOS goose is loose. Use the Honk menu or `honk300 stop` to send it home."
     );
 
+    let trace_presence = std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true")
+        && std::env::var("HONK300_TRACE_PRESENCE").as_deref() == Ok("1");
+    let mut last_presence_trace = None;
+    let mut presence_trace_count = 0;
     loop {
         if !overlay.pump() {
             break;
+        }
+        let (presence_snapshot, presence_status) = presence_observer
+            .as_mut()
+            .map(PresenceObserver::poll)
+            .unwrap_or((
+                PresenceSnapshot::unsupported(),
+                honk_control::PresenceStatus {
+                    fullscreen: CapabilityStatus::Failed,
+                    dnd: CapabilityStatus::Unsupported,
+                },
+            ));
+        presence = super::backend_capability(presence_status.aggregate());
+        world.set_presence(presence_snapshot);
+        if trace_presence && presence_trace_count < 64 {
+            let state = (
+                presence_status.fullscreen,
+                presence_snapshot.state == honk_engine::PresenceState::Fullscreen,
+                world.manners_active(),
+            );
+            if last_presence_trace != Some(state) {
+                last_presence_trace = Some(state);
+                presence_trace_count += 1;
+                eprintln!(
+                    "honk300 macos presence trace: {}",
+                    serde_json::json!({
+                        "fullscreen_status": state.0.label(), "fullscreen": state.1, "manners": state.2,
+                    })
+                );
+            }
         }
         world.set_collect_window_capacity(collect_controller.has_capacity());
 
@@ -255,6 +289,9 @@ pub fn run(
                         assets.meme_count(),
                     )));
                 }
+                ControlCommand::PresenceStatus => {
+                    request.respond(ControlResponse::Presence(presence_status));
+                }
                 ControlCommand::Session
                 | ControlCommand::WaylandStatus
                 | ControlCommand::KwinEnable
@@ -276,7 +313,6 @@ pub fn run(
         }
 
         world.set_local_time(local_time());
-        world.set_presence(presence_state().unwrap_or_else(|_| PresenceSnapshot::unsupported()));
 
         let now = frame.now();
         if onboarding.managed() && now >= next_accessibility_probe {

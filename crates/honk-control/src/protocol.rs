@@ -1,6 +1,6 @@
 #![cfg_attr(not(windows), allow(dead_code))]
 
-use crate::{SessionStatus, WaylandStatus};
+use crate::{PresenceStatus, SessionStatus, WaylandStatus};
 use honk_engine::{PokeAction, PokeOutcome};
 use std::error::Error;
 use std::fmt;
@@ -15,6 +15,7 @@ pub enum ControlCommand {
     Reload,
     ReloadIf([u8; 32]),
     Status,
+    PresenceStatus,
     Session,
     WaylandStatus,
     KwinEnable,
@@ -38,6 +39,7 @@ pub enum ControlResponse {
     Ok,
     Err(String),
     Status(RuntimeStatus),
+    Presence(PresenceStatus),
     Session(SessionStatus),
     Wayland(WaylandStatus),
 }
@@ -126,6 +128,7 @@ impl ControlCommand {
             }
             Self::Reload => format!("{VERSION} RELOAD\n"),
             Self::Status => format!("{VERSION} STATUS\n"),
+            Self::PresenceStatus => format!("{VERSION} PRESENCE\n"),
             Self::Session => format!("{VERSION} SESSION\n"),
             Self::WaylandStatus => format!("{VERSION} WAYLAND\n"),
             Self::KwinEnable => format!("{VERSION} KWIN_ENABLE\n"),
@@ -211,6 +214,10 @@ impl ControlCommand {
                 ensure_end(parts)?;
                 Ok(Self::Status)
             }
+            "PRESENCE" => {
+                ensure_end(parts)?;
+                Ok(Self::PresenceStatus)
+            }
             "SESSION" => {
                 ensure_end(parts)?;
                 Ok(Self::Session)
@@ -245,6 +252,7 @@ impl ControlResponse {
             Self::Ok => "OK\n".to_string(),
             Self::Err(code) => format!("ERR {code}\n"),
             Self::Status(status) => status.encode(),
+            Self::Presence(status) => status.encode(),
             Self::Session(session) => session.encode(),
             Self::Wayland(status) => status.encode(),
         }
@@ -272,6 +280,7 @@ impl ControlResponse {
                 Ok(Self::Err(code.to_string()))
             }
             Some("STATUS") => RuntimeStatus::decode(parts).map(Self::Status),
+            Some("PRESENCE") => PresenceStatus::decode(parts).map(Self::Presence),
             Some("SESSION") => SessionStatus::decode(parts).map(Self::Session),
             Some("WAYLAND") => WaylandStatus::decode(parts).map(Self::Wayland),
             _ => Err(ProtocolError::MalformedResponse),

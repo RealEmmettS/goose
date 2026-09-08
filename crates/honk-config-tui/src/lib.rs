@@ -191,7 +191,8 @@ fn handle_command(
                             Ok(
                                 ControlResponse::Status(_)
                                 | ControlResponse::Session(_)
-                                | ControlResponse::Wayland(_),
+                                | ControlResponse::Wayland(_)
+                                | ControlResponse::Presence(_),
                             ) => result("saved; unexpected status response", true, true),
                             Err(error)
                                 if matches!(
@@ -234,13 +235,22 @@ fn handle_command(
             Ok(
                 ControlResponse::Status(_)
                 | ControlResponse::Session(_)
-                | ControlResponse::Wayland(_),
+                | ControlResponse::Wayland(_)
+                | ControlResponse::Presence(_),
             ) => result("reload got unexpected status", true, false),
             Err(err) => result(format!("reload failed: {err}"), true, false),
         },
         TuiCommand::Status => match send_command(ControlCommand::Status) {
             Ok(ControlResponse::Status(status)) => {
                 let mut result = status_result(status);
+                result.presence_status = Some(if status.running {
+                    match send_command(ControlCommand::PresenceStatus) {
+                        Ok(ControlResponse::Presence(value)) => value,
+                        _ => honk_control::PresenceStatus::unprobed(),
+                    }
+                } else {
+                    honk_control::PresenceStatus::unprobed()
+                });
                 if status.running && status.platform == honk_control::PlatformStatus::Linux {
                     if let Ok(ControlResponse::Session(session)) =
                         send_command(ControlCommand::Session)
@@ -255,9 +265,11 @@ fn handle_command(
                 }
                 result
             }
-            Ok(ControlResponse::Session(_) | ControlResponse::Wayland(_)) => {
-                result("status got unexpected session detail", true, false)
-            }
+            Ok(
+                ControlResponse::Session(_)
+                | ControlResponse::Wayland(_)
+                | ControlResponse::Presence(_),
+            ) => result("status got unexpected session detail", true, false),
             Ok(ControlResponse::Ok) => result("status got unexpected ok", true, false),
             Ok(ControlResponse::Err(code)) => {
                 result(format!("status rejected: {code}"), true, false)
@@ -283,7 +295,8 @@ fn handle_command(
             Ok(
                 ControlResponse::Status(_)
                 | ControlResponse::Session(_)
-                | ControlResponse::Wayland(_),
+                | ControlResponse::Wayland(_)
+                | ControlResponse::Presence(_),
             ) => result("stop got unexpected status", true, false),
             Err(err) => result(format!("stop failed: {err}"), true, false),
         },
@@ -293,7 +306,8 @@ fn handle_command(
             Ok(
                 ControlResponse::Status(_)
                 | ControlResponse::Session(_)
-                | ControlResponse::Wayland(_),
+                | ControlResponse::Wayland(_)
+                | ControlResponse::Presence(_),
             ) => result("poke got unexpected status", true, false),
             Err(err) => result(format!("poke failed: {err}"), true, false),
         },
@@ -379,9 +393,11 @@ where
             Ok(ControlResponse::Status(_)) => "runtime reported not running".into(),
             Ok(ControlResponse::Err(code)) => format!("status rejected: {code}"),
             Ok(ControlResponse::Ok) => "status returned an unexpected OK".into(),
-            Ok(ControlResponse::Session(_) | ControlResponse::Wayland(_)) => {
-                "status returned unexpected session detail".into()
-            }
+            Ok(
+                ControlResponse::Session(_)
+                | ControlResponse::Wayland(_)
+                | ControlResponse::Presence(_),
+            ) => "status returned unexpected session detail".into(),
             Err(err) => {
                 let message = err.to_string();
                 if !matches!(
@@ -443,6 +459,7 @@ fn result(status: impl Into<String>, is_error: bool, mark_saved: bool) -> Comman
         loaded_config: None,
         saved_config: None,
         runtime_status: None,
+        presence_status: None,
     }
 }
 
@@ -459,6 +476,7 @@ fn status_result(status: RuntimeStatus) -> CommandResult {
         loaded_config: None,
         saved_config: None,
         runtime_status: Some(status),
+        presence_status: None,
     }
 }
 

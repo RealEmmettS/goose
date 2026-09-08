@@ -20,13 +20,14 @@ The functional bar is honest independent fullscreen/DND status and correct manne
 - [ ] Settings and runtime status agree after permission loss, reload and unsupported-session selection.
 
 ## Status
-Active. Linux compositor fullscreen now has separate native evidence. Probe actual
-macOS system presentation, window accessibility and Focus authorization from an
-independent accessory process during a private native app's fullscreen transitions.
-Keep production permission behavior unchanged; any explicit authorization experiment
-runs only in the private disposable probe. Do not infer availability from window size.
+Active. Implement the proven Mac Accessibility fullscreen path with one retained,
+bounded worker, and separate fullscreen/DND status in CLI, TUI and native settings.
+The Focus authorization route remains unqualified after app-specific callbacks
+failed to arrive; retain an explicit unsupported product capability. Native runtime
+interruption, settings, unavailable target and shutdown qualification are next.
 
 ## Activity
+- 2026-09-08 — Add ADR 0049, a bounded additive presence frame and independent editor status. Implement a retained Mac worker with target generations, total native query deadline, sample expiry and permission withdrawal; add actual native runtime and stopped-target scenarios. Keep the unresolved Focus experiment optional and production prompts unchanged.
 - 2026-09-08 — Preserve the qualified GNOME integration while starting the independent manners correction. LaunchServices separates the private probe identity, but its Focus request still has no callback; inspect a fully activated native setup window before ending that qualification route.
 - 2026-09-08 — Both 34244463220 screenshots show the real Focus permission dialog attributed to the hosted command runner. Launch the private bundle through LaunchServices before qualifying its own permission identity; do not grant the broader runner or classify an unanswered native prompt as an unsupported API.
 - 2026-09-08 — Both signed private Focus requests in 34244111946 reach authorization not-determined and do not call back within the bound. Capture the actual disposable native permission surface before classifying this as an unavailable API or awaiting user consent.

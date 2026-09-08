@@ -493,8 +493,8 @@ pub fn acceptResponse(model: *Model, bytes: []const u8) !void {
         const description = if (runtime_error.len > 0)
             try std.fmt.allocPrint(allocator, "Goose status unavailable\n{s}\nSettings remain editable. Refresh to try again.", .{runtime_error})
         else
-            try std.fmt.allocPrint(allocator, "Goose: {s}\nDesktop: {s}\nOverlay: {s}  |  Sound: {s}\nCursor: {s}  |  Window rides: {s}\nNotes and memes: {s}  |  Manners: {s}\nAccessibility: {s}", .{
-                if (flag(runtime, "running")) "running" else "stopped", string(runtime, "platform"), string(runtime, "overlay"), string(runtime, "audio"), string(runtime, "cursor"), string(runtime, "windows"), string(runtime, "notes_and_memes"), string(runtime, "manners"), string(runtime, "accessibility"),
+            try std.fmt.allocPrint(allocator, "Goose: {s}\nDesktop: {s}\nOverlay: {s}  |  Sound: {s}\nCursor: {s}  |  Window rides: {s}\nNotes and memes: {s}\nFullscreen observation: {s}  |  Do not disturb: {s}\nAccessibility: {s}", .{
+                if (flag(runtime, "running")) "running" else "stopped", string(runtime, "platform"), string(runtime, "overlay"), string(runtime, "audio"), string(runtime, "cursor"), string(runtime, "windows"), string(runtime, "notes_and_memes"), if (string(runtime, "fullscreen").len > 0) string(runtime, "fullscreen") else "unprobed", if (string(runtime, "dnd").len > 0) string(runtime, "dnd") else "unprobed", string(runtime, "accessibility"),
             });
         if (runtime.object.get("session")) |session| {
             if (session == .object) {

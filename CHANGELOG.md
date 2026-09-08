@@ -24,6 +24,17 @@ All notable changes to this project are documented here. Format based on
 > release packaging with artifact evidence. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
+## [Unreleased]
+
+### Added
+- Add a retained, bounded macOS Accessibility fullscreen observer with live target identity, permission withdrawal and stale-sample expiry. Add independent fullscreen/DND capabilities through an additive bounded IPC frame, CLI, TUI and Native SDK settings; older runtimes remain unprobed.
+
+### Fixed
+- Recover Windows notification-observation status after a successful poll follows an error, and expose the current Linux compositor fullscreen capability independently of unsupported DND observation.
+
+### Behind the scenes
+- Qualify Mac presence through native AppKit windows, actual engine manners, live settings, unresponsive targets and graceful shutdown. Preserve the unanswered private Focus-authorization evidence as unqualified and keep it an explicit optional experiment without production prompts.
+
 ## [1.9.0] - 2026-09-08
 
 ### Added
@@ -39,10 +50,6 @@ All notable changes to this project are documented here. Format based on
 ### Behind the scenes
 - Require the real GNOME runtime, native settings and owned-prop scenarios as same-source release gates, including unapproved callers, actual held input, terminal protection, saved drafts, native note text, uncropped images, helper failures and restart. Preserve private display authentication and omit private consent from evidence.
 - Record separately qualified desktop and publication evidence, including the verified Sway website handoff with the user's selected artwork.
-
-### Behind the scenes
-- Separate native API availability from permission: bound probe shutdown, reject the ineffective macOS system-presentation premise, and test the documented Focus authorization flow in a private fixture bundle.
-- Probe native macOS fullscreen and Focus observations independently from a real app's normal/fullscreen/restored transitions, without requesting permission or inferring fullscreen from geometry.
 
 ## [1.8.0] - 2026-09-08
 

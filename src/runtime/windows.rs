@@ -60,6 +60,7 @@ pub fn run(
     let mut window_watch = BackendCapability::Supported;
     let mut collect_window = BackendCapability::Supported;
     let mut presence = BackendCapability::Supported;
+    let mut presence_status = honk_control::PresenceStatus::unprobed();
     let mut audio_capability = BackendCapability::Supported;
     let initial_effective = effective_options(
         &config,
@@ -316,6 +317,9 @@ pub fn run(
                         assets.meme_count(),
                     )));
                 }
+                ControlCommand::PresenceStatus => {
+                    request.respond(ControlResponse::Presence(presence_status));
+                }
                 ControlCommand::Session
                 | ControlCommand::WaylandStatus
                 | ControlCommand::KwinEnable
@@ -341,9 +345,21 @@ pub fn run(
         if now - last_presence_poll >= PRESENCE_POLL_INTERVAL {
             last_presence_poll = now;
             match presence_state() {
-                Ok(snapshot) => world.set_presence(snapshot),
+                Ok(snapshot) => {
+                    presence = BackendCapability::from(snapshot.supported);
+                    let state = capability_status(presence);
+                    presence_status = honk_control::PresenceStatus {
+                        fullscreen: state,
+                        dnd: state,
+                    };
+                    world.set_presence(snapshot);
+                }
                 Err(err) => {
                     presence = BackendCapability::Failed;
+                    presence_status = honk_control::PresenceStatus {
+                        fullscreen: CapabilityStatus::Failed,
+                        dnd: CapabilityStatus::Failed,
+                    };
                     world.set_presence(PresenceSnapshot::unsupported());
                     if !warned_presence {
                         warned_presence = true;

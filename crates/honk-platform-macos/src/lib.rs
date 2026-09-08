@@ -5,6 +5,11 @@
 
 use honk_engine::{Rect, Vec2};
 
+#[cfg(any(target_os = "macos", test))]
+mod presence;
+#[cfg(target_os = "macos")]
+pub use presence::PresenceObserver;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AppKitFrame {
     pub x: f64,
@@ -129,9 +134,7 @@ mod platform {
         CollectWindowKind, CollectWindowRequestId, CollectWindowSnapshot,
         MAX_OWNED_COLLECT_WINDOWS,
     };
-    use honk_engine::{
-        ForeignWindowId, ForeignWindowSnapshot, LocalTime, PresenceSnapshot, Rect, Vec2,
-    };
+    use honk_engine::{ForeignWindowId, ForeignWindowSnapshot, LocalTime, Rect, Vec2};
     use objc2::rc::{autoreleasepool, Retained};
     use objc2::runtime::{AnyObject, NSObjectProtocol};
     use objc2::MainThreadMarker;
@@ -549,10 +552,6 @@ mod platform {
                 }
             }
         }
-    }
-
-    pub fn presence_state() -> io::Result<PresenceSnapshot> {
-        Ok(PresenceSnapshot::unsupported())
     }
 
     pub fn warp_cursor(pos: Vec2) -> io::Result<()> {
@@ -1994,9 +1993,9 @@ mod platform {
 #[cfg(target_os = "macos")]
 pub use platform::{
     accessibility_state, local_time, main_bundle_release_metadata, open_accessibility_settings,
-    open_configuration_tui, open_update_helper, presence_state, request_accessibility_prompt,
-    warp_cursor, AccessibilityState, CollectWindowController, ForeignWindowWatcher,
-    MacBundleReleaseMetadata, Overlay,
+    open_configuration_tui, open_update_helper, request_accessibility_prompt, warp_cursor,
+    AccessibilityState, CollectWindowController, ForeignWindowWatcher, MacBundleReleaseMetadata,
+    Overlay,
 };
 
 #[cfg(test)]

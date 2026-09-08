@@ -180,7 +180,8 @@ fn probe_runtime() -> RuntimeProbe {
             ControlResponse::Ok
             | ControlResponse::Err(_)
             | ControlResponse::Session(_)
-            | ControlResponse::Wayland(_),
+            | ControlResponse::Wayland(_)
+            | ControlResponse::Presence(_),
         )
         | Err(_) => RuntimeProbe::Fatal,
     }

@@ -1,10 +1,22 @@
-name: Native presence premise
+name: Native macOS presence
 
 on:
   workflow_dispatch:
+    inputs:
+      focus_premise:
+        description: 'Run the still-unqualified private Focus authorization experiment'
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      commit:
+        required: true
+        type: string
+  pull_request:
+    paths: ['crates/honk-platform-macos/**', 'crates/honk-control/**', 'src/runtime/**', 'src/settings/**', 'script/*macos_presence*', '.github/workflows/presence-probe.yml']
   push:
-    branches: [codex/goose-presence-observation]
-    paths: ['script/probe_macos_presence.swift', '.github/workflows/presence-probe.yml']
+    branches: [main, codex/goose-presence-observation]
+    paths: ['crates/honk-platform-macos/**', 'crates/honk-control/**', 'src/runtime/**', 'src/settings/**', 'script/*macos_presence*', '.github/workflows/presence-probe.yml']
 
 permissions:
   contents: read
@@ -13,7 +25,7 @@ jobs:
   macos:
     name: macOS presence (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 3
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -22,13 +34,25 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          ref: ${{ inputs.commit || github.sha }}
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.95.0
+      - name: Check and build the actual native Rust runtime
+        run: |
+          cargo clippy --locked --all-targets --workspace -- -D warnings
+          cargo test --locked --workspace
+          cargo build --locked --release
       - name: Build the native observer and isolated fullscreen fixture
         run: |
           mkdir -p target/presence-evidence
           swiftc script/probe_macos_presence.swift -o target/presence-probe
       - name: Observe actual fullscreen transitions without requesting permission
         run: target/presence-probe observe "$PWD/target/presence-evidence"
+      - name: Exercise actual fullscreen, live settings, interrupted target and graceful shutdown
+        run: python3 script/smoke_macos_presence.py --binary target/release/honk300 --fixture target/presence-probe --evidence target/presence-evidence/runtime
       - name: Probe documented Focus authorization in a private bundle
+        if: ${{ inputs.focus_premise == true }}
         run: |
           app="$PWD/target/HonkPresenceProbe.app"
           mkdir -p "$app/Contents/MacOS"

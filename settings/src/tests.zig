@@ -105,6 +105,25 @@ test "unknown runtime status preserves editable settings without claiming the go
     try std.testing.expect(std.mem.indexOf(u8, model.runtime(), "stopped") == null);
 }
 
+test "fullscreen and DND status stay independent of legacy manners and saved settings" {
+    var model = main.Model{};
+    model.request_id = 1;
+    try main.acceptResponse(&model, @embedFile("fixtures/read.json"));
+    model.fields[0].value_buffer.set("true");
+    try main.acceptResponse(&model,
+        \\{"protocol":1,"request_id":1,"ok":true,"data":{"runtime":{"running":true,"manners":"supported","fullscreen":"denied","dnd":"unsupported"}}}
+    );
+    try std.testing.expect(model.dirty());
+    try std.testing.expect(std.mem.indexOf(u8, model.runtime(), "Fullscreen observation: denied") != null);
+    try std.testing.expect(std.mem.indexOf(u8, model.runtime(), "Do not disturb: unsupported") != null);
+    try main.acceptResponse(&model,
+        \\{"protocol":1,"request_id":1,"ok":true,"data":{"runtime":{"running":true,"manners":"supported"}}}
+    );
+    try std.testing.expect(model.dirty());
+    try std.testing.expect(std.mem.indexOf(u8, model.runtime(), "Fullscreen observation: unprobed") != null);
+    try std.testing.expect(std.mem.indexOf(u8, model.runtime(), "Do not disturb: unprobed") != null);
+}
+
 test "KDE permission responses and native consent dialog preserve unsaved settings" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();

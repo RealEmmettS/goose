@@ -5,10 +5,12 @@
 //! platform-neutral command data.
 
 mod platform;
+mod presence;
 mod protocol;
 mod session;
 mod wayland;
 
+pub use presence::{combine_capabilities, PresenceStatus};
 pub use session::{DesktopBackend, DesktopEnvironment, SessionStatus};
 pub use wayland::WaylandStatus;
 
