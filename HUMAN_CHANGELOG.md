@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Use the desktop compositor supplied by Alpine for its isolated note and picture checks, while keeping the same visibility requirements.
 - Check the shipped Linux note and picture windows on Alpine as well as Ubuntu, including visible deliveries and cleanup if the supporting process fails.
 - Add Raspberry Pi desktop setup guidance and explain exactly what has been tested and what still needs a real device.
 - Linux delivery checks now cover the older desktop libraries used for official packages, with stronger evidence that notes remain visible.

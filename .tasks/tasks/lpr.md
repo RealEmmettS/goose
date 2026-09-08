@@ -49,6 +49,9 @@ their native results and complete release integration remain open. Nothing is pu
 | Exact musl release companions | Shared production-payload prop checks | next complete settings matrix | Require real host and runtime behavior under Alpine on both native architectures | Native result pending | NOT RUN |
 
 ## Activity
+- 2026-09-08: Both musl jobs stopped during package installation because Alpine does not
+  ship xcompmgr. Its native x64/ARM64 picom package supplies the XRender compositor;
+  use that in the same private Xvfb session before repeating the unchanged prop assertions.
 - 2026-09-07: The entire native settings matrix passed, including real production GNU
   prop delivery on the older GTK baseline. Add the same host/runtime/pixel/failure checks
   for native x64/ARM64 musl payloads, retaining independently verified production identity.
