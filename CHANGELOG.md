@@ -34,7 +34,8 @@ All notable changes to this project are documented here. Format based on
 ### Fixed
 - Route the modern Mac AXValue setter through actual runtime text input and
   separate snapshot value/focus publication from assistive input setters, after
-  the native reader exposed an edit that never reached the settings draft.
+  the native reader exposed an edit that never reached the settings draft. Keep
+  the exact-hash patch reversible across repeated prepare/test/build invocations.
 - Bound Mac settings accessibility to the active dialog and validate cached
   native actions against current published permissions under ADR 0051; retain
   both actual native reader checks in the production companion matrix.

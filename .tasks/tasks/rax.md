@@ -21,6 +21,10 @@ dialog ancestry and checks cached actions against the current published scope.
 Repeat actual native reader checks before integrating either pending release.
 
 ## Activity
+- 2026-09-08 — Native run 34292132561's repeat preparation rejects an ambiguous
+  reverse-patch match before compilation. Qualify the text-attribute replacement
+  with its complete surrounding condition; repeated local preparation now
+  recovers the exact original hash. Retain the guard and rerun both native lanes.
 - 2026-09-08 — Run 34291576968 passes modal isolation and cached-action refusal
   on Intel and Apple Silicon, then fails edited-value persistence: the inherited
   modern AXValue setter only changes the native snapshot. Route that setter into

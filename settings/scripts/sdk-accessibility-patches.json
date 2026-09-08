@@ -180,8 +180,8 @@
         "after": "- (BOOL)isAccessibilitySelectorAllowed:(SEL)selector {\n    if (selector == @selector(accessibilityPerformPress)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NativeSdkWidgetPressActionFlags];\n    }\n    if (selector == @selector(accessibilityPerformIncrement)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_INCREMENT];\n    }\n    if (selector == @selector(accessibilityPerformDecrement)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_DECREMENT];\n    }\n    if (selector == @selector(accessibilityPerformCancel)) {\n        return self.accessibilityEnabled && [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_DISMISS];\n    }\n    if (selector == @selector(setAccessibilityFocused:)) {\n        return [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_FOCUS];\n    }\n    if (selector == @selector(setAccessibilityValue:)) {\n        return [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_TEXT];\n    }\n    return [super isAccessibilitySelectorAllowed:selector];\n}\n"
       },
       {
-        "before": "        return (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_TEXT) != 0;",
-        "after": "        return [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_TEXT];"
+        "before": "    if (self.accessibilityEnabled && [attribute isEqualToString:NSAccessibilityValueAttribute]) {\n        return (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_TEXT) != 0;\n    }",
+        "after": "    if (self.accessibilityEnabled && [attribute isEqualToString:NSAccessibilityValueAttribute]) {\n        return [self honkAllowsPublishedActionFlags:NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_TEXT];\n    }"
       },
       {
         "before": "        return (self.actionFlags & NATIVE_SDK_APPKIT_WIDGET_ACTION_SET_SELECTION) != 0;",
