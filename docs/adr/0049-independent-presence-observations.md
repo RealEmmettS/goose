@@ -1,6 +1,6 @@
 # ADR 0049: independent fullscreen and notification observations
 
-Status: accepted for implementation; native runtime qualification pending.
+Status: accepted; native Intel/Apple Silicon runtime and denied-identity qualification passed, publication pending.
 
 Audit R05 requires effective observations independently from saved manners toggles.
 Add a bounded additive `PRESENCE` control frame with separate fullscreen and DND
@@ -21,14 +21,18 @@ Keep AppKit identity lookup on the main thread using
 One retained worker receives only its PID and a generation. It uses the remaining
 time from a single 100 ms query deadline for each AX operation. No native query
 runs under the shared result lock. Samples age from before the query, expire
-after 250 ms and are discarded on target change or permission loss. The worker
+after 250 ms and are discarded on target change or permission loss. An expired
+completed sample reports failed; unprobed is reserved for a new target. A fresh
+result recovers the capability without extending the observation lifetime. The worker
 is joined on shutdown; unresponsive native target, live setting changes, stale
 results and graceful stop must be exercised through the actual runtime.
 
 This adds no production permission prompt or persistence mechanism. Existing
 managed Accessibility onboarding retains its receipt and update boundaries.
 Native denied behavior, in-flight withdrawal and physical permission acceptance
-remain distinct evidence.
+remain distinct evidence. Native run 34253150265 passes fullscreen transitions,
+stopped-target expiry/recovery, live preferences, independent commands, shutdown
+and the separate denied app identity on Intel and Apple Silicon.
 
 Apple documents
 [INFocusStatusCenter authorization](https://developer.apple.com/documentation/intents/infocusstatuscenter/requestauthorization(completionhandler:))

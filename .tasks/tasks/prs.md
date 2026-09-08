@@ -20,13 +20,15 @@ The functional bar is honest independent fullscreen/DND status and correct manne
 - [ ] Settings and runtime status agree after permission loss, reload and unsupported-session selection.
 
 ## Status
-Active. Implement the proven Mac Accessibility fullscreen path with one retained,
-bounded worker, and separate fullscreen/DND status in CLI, TUI and native settings.
-The Focus authorization route remains unqualified after app-specific callbacks
-failed to arrive; retain an explicit unsupported product capability. Native runtime
-interruption, settings, unavailable target and shutdown qualification are next.
+Active. The retained Mac fullscreen worker and separate CLI/TUI/native settings
+status are implemented. Native Intel and Apple Silicon pass actual fullscreen,
+frozen-target expiry/recovery, live settings, unavailable windows, graceful stop
+and the private denied app. Mac/Linux DND stays explicitly unsupported. Integrate
+the GNOME review fixes, then complete final-source candidate, main, publication,
+fresh-public and website gates.
 
 ## Activity
+- 2026-09-08 — Run 34253150265 passes both native Mac architectures on the corrected expiry implementation, including independent denied-identity scenarios. Inspect both fullscreen captures; status and graceful-stop bounds pass. Integrate the four GNOME review corrections before final-source release qualification; earlier candidates remain cancelled and unpublished.
 - 2026-09-08 — Apple Silicon repeat 34251439574 withdraws fullscreen correctly but exposes expired results flickering back to unprobed during the actual frozen-target check. Report completed-but-expired observations as Failed, retaining the exact freshness deadline; add actual worker expiry/recovery coverage and repeat the unchanged native oracle. Intel passes both runtime and private denied-identity scenarios.
 - 2026-09-08 — Preserve the immutable Hyprland publication's cold-start failure and earlier main Sway startup failure. In future source, bound initial read-only version readiness separately from each original transaction; keep exact peer/protocol checks, record timing/attempts and never retry mutating commands. Published-source retry remains unchanged.
 - 2026-09-08 — The repeated Apple Silicon API premise captures all real normal/fullscreen/restored transitions, but its child writes completion during the final AX request. Re-read that atomic completion record and explicitly require all matching native/observed transitions; retain the failed evidence and repeat without changing the runtime observer.
