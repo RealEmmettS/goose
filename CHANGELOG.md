@@ -27,6 +27,9 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Behind the scenes
+- Bind the GNOME native probe to its unique D-Bus owner and verify the bus-reported process identity before accepting extension observations.
+
+### Behind the scenes
 - Begin independent GNOME Shell 46/48 desktop qualification: actual extension lifecycle and Meta.Window identities, bounded owned-fixture movement, stale geometry refusal, fullscreen, protocol inventory and the existing XWayland goose overlay on native x64/ARM64.
 
 ### Behind the scenes

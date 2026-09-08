@@ -40,6 +40,9 @@ Active. Begin the real Shell extension lifecycle, native window interface and
 compatible XWayland goose overlay premise. No GNOME production capability is enabled.
 
 ## Activity
+- 2026-09-08 — Pin the probe to the actual unique bus owner and verify its kernel
+  process identity before trusting extension observations; do not infer authority
+  from a process ID reported inside the reply itself.
 - 2026-09-08 — Prepare private GNOME 46/48 x64/ARM64 desktop qualification. Record
   actual Wayland globals, exact native target identities, bounded fixture movement,
   stale refusal, fullscreen, extension disable and the real goose overlay capture.

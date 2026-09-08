@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Check that GNOME desktop observations really come from the running desktop before trusting them.
+
+### Behind the scenes
 - Test the real GNOME desktop and goose display together before offering an optional companion, including removing it while other windows stay open.
 
 ### Added

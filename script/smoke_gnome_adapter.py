@@ -65,7 +65,7 @@ def main():
                 raise AssertionError('Timed out waiting for ' + description)
 
             def call(method, parameters=None):
-                reply = bus.call_sync('dev.emmetts.Honk300.GnomeProbe1',
+                reply = bus.call_sync(owner_name,
                     '/dev/emmetts/Honk300/GnomeProbe1', 'dev.emmetts.Honk300.GnomeProbe1',
                     method, parameters, GLib.VariantType.new('(s)'), Gio.DBusCallFlags.NONE, 500, None)
                 return reply.unpack()[0]
@@ -80,6 +80,15 @@ def main():
                     GLib.VariantType.new('(b)'), Gio.DBusCallFlags.NONE, 500, None).unpack()[0]
 
             wait(owner, 'actual extension enable')
+            owner_name = bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus',
+                'org.freedesktop.DBus', 'GetNameOwner',
+                GLib.Variant('(s)', ('dev.emmetts.Honk300.GnomeProbe1',)),
+                GLib.VariantType.new('(s)'), Gio.DBusCallFlags.NONE, 500, None).unpack()[0]
+            owner_pid = bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus',
+                'org.freedesktop.DBus', 'GetConnectionUnixProcessID',
+                GLib.Variant('(s)', (owner_name,)), GLib.VariantType.new('(u)'),
+                Gio.DBusCallFlags.NONE, 500, None).unpack()[0]
+            assert owner_pid == shell.pid, 'The system bus peer is not the launched Shell'
             initial = snapshot()
             assert initial['pid'] == shell.pid and initial['session_wayland'], initial
             assert initial['version'].split('.')[0] in ('46', '48'), initial

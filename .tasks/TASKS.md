@@ -17,12 +17,12 @@
   - [ ] Prove native socket ownership, exact window identity and supported bounded placement.
   - [ ] Integrate explicit setup/removal and exercise disconnect, stale identity and terminal refusals.
   - [ ] Qualify native architectures, the complete candidate and fresh public distribution before website claims.
+
+## Active
 - [ ] **GNOME desktop companion** - versioned explicit Shell integration with proven observation, placement and a compatible overlay path (needs #rkde) (ms #refine) (owner codex) #rgn
   - [ ] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
   - [ ] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
   - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
-
-## Active
 - [ ] **Sway desktop observations** - explicit native window/fullscreen support with exact-version evidence and honest action limitations (needs #rkde) (ms #refine) (owner codex) #rsw
   - [x] Prove the authenticated native socket, window identity and actual bounded placement premise.
   - [x] Resolve the active-drag boundary: keep movement unsupported under ADR 0046.
