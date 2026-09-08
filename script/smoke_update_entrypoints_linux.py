@@ -282,6 +282,11 @@ exec "$@" > "$HONK300_ENTRYPOINT_EVIDENCE/helper.stdout.txt" 2> "$HONK300_ENTRYP
             else:
                 editor = NativeSettings(config, directory, environment)
                 editor.invoke('Platform & status')
+                disabled = editor.find('Update now')
+                assert not disabled.get_state_set().contains(editor.Atspi.StateType.ENABLED), 'Disabled Update now reported enabled'
+                assert not disabled.get_state_set().contains(editor.Atspi.StateType.SENSITIVE), 'Disabled Update now reported sensitive'
+                action = disabled.get_action_iface()
+                assert action is None or action.get_n_actions() == 0, 'Disabled Update now exposed an action'
                 editor.invoke('Check for updates')
                 editor.find('Update now', actionable=True)
                 (directory / 'offline').touch()

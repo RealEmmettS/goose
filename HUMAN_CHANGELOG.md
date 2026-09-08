@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Fixed
+- Linux screen readers now correctly identify unavailable settings buttons, including Update now while no update is ready.
 
 The goose can keep bringing notes and pictures when Windows leaves focus with the app you are using. Notes still receive their text without typing into another app.
 

@@ -133,9 +133,16 @@ def main() -> None:
             wait(lambda: find(name, Atspi.Role.TOGGLE_BUTTON).get_state_set().contains(Atspi.StateType.PRESSED) != was_on, f"changed {name}")
         invoke("Save & apply")
         wait(lambda: "no_mouse_steal = true" in config.read_text() and "can_attack_mouse = false" in config.read_text(), "saved full-page changes")
+        invoke("Platform & status")
+        disabled = wait(lambda: find("Update now", Atspi.Role.PUSH_BUTTON), "disabled update button")
+        if disabled.get_state_set().contains(Atspi.StateType.ENABLED) or disabled.get_state_set().contains(Atspi.StateType.SENSITIVE):
+            raise RuntimeError("Disabled Update now was reported as enabled or sensitive")
+        action = disabled.get_action_iface()
+        if action is not None and action.get_n_actions() != 0:
+            raise RuntimeError("Disabled Update now exposed an action")
         (evidence / "result.json").write_text(json.dumps({
             "schema": "honk300.settings-atspi-smoke.v1", "ok": True,
-            "checks": ["native-names", "action", "toggle-state", "text-interface", "focus", "keyboard-edit", "modal-isolation", "save-readback", "largest-dirty-page"],
+            "checks": ["native-names", "action", "toggle-state", "text-interface", "focus", "keyboard-edit", "modal-isolation", "save-readback", "largest-dirty-page", "disabled-button-state"],
         }, indent=2) + "\n", encoding="utf-8")
     except Exception:
         (evidence / "failed-tree.json").write_text(json.dumps([

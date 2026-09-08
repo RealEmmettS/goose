@@ -69,7 +69,7 @@ def main() -> None:
         target_flags = ["-Dtarget=" + TARGETS[args.target]]
     if args.test:
         if "windows" in args.target or "linux" in args.target:
-            run("cargo", "test", "--locked", "--manifest-path", "accessibility/Cargo.toml",
+            run("cargo", "test", "--locked", "--workspace", "--manifest-path", "accessibility/Cargo.toml",
                 "--target", args.target)
         # Execute native ARM64 tests on the ARM runner while the build compiler
         # uses x64 emulation. ReleaseSafe retains safety checks and uses LLVM.

@@ -39,6 +39,7 @@ All notable changes to this project are documented here. Format based on
 - Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
 
 ### Fixed
+- Correct AccessKit's Linux AT-SPI Enabled/Sensitive state for disabled buttons using a pinned, licensed local patch. Test the actual state translation and native disabled-to-available Update now workflow.
 - Keep Windows owned note/meme delivery available when foreground activation is denied by normal OS focus policy. A failed `SetForegroundWindow` request no longer invents a Win32 error or permanently disables collect capability; note text still targets the owned edit control directly.
 - Clear the inherited standard-handle flags at both Windows process entry points before child creation. Captured CLI, app and settings launches now receive EOF while the detached runtime remains alive; the native settings Start action finishes instead of retaining its service output pipe.
 - Give each Native SDK license file its own WiX component and key path, satisfying automatic component identity rules in both Windows MSI editions.
