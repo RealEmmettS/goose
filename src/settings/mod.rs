@@ -336,7 +336,9 @@ mod tests {
         assert_eq!(stopped["running"], false);
     }
 
-    #[cfg(any(unix, windows))]
+    // APFS rejects this filename before the service runs (EILSEQ). Exercise
+    // genuinely valid non-Unicode paths on the native filesystems that accept them.
+    #[cfg(any(target_os = "linux", windows))]
     #[test]
     fn native_non_unicode_config_path_keeps_the_service_protocol_valid() {
         let directory = tempfile::tempdir().unwrap();

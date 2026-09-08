@@ -57,6 +57,7 @@ All notable changes to this project are documented here. Format based on
 - Aim cursor-seeking locomotion at the body position that brings the beak to the pointer, avoiding a stationary-pointer chase that could never reach the grab distance.
 
 ### Development
+- Qualify non-Unicode configuration filenames on Linux and Windows, where the files are valid; retain macOS APFS's native EILSEQ rejection instead of treating an uncreatable filename as a service failure.
 - Verify null Windows standard handles and valid inheritance in an isolated native test; the pinned API binding already skips null handles. Refresh the task dashboard while preserving its settings and stopped state.
 - Require strict all-target workspace Clippy on both native Linux CI architectures. Limit the installer autostart glob import to its Windows and test callers; the explicit public re-exports remain unchanged.
 - Wait for the GUI's new check response before retrying an update in the native Debian fixture; queued accessibility actions must not reuse the previous enabled state. Require a new retained helper before awaiting transaction success.
