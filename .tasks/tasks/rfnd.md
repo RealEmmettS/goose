@@ -28,4 +28,5 @@ The requested behavior runs through its production path and the supporting evide
 Active; shared canvas/pacing, deferred presentation acknowledgement, and actual audio pool checks implemented; validation in progress.
 
 ## Activity
+- 2026-09-07: Separated provenance, autostart, mutable-media migration, and existing lifecycle regressions into focused modules; current guidance already shortened with complete historical copies retained. Strict workspace clippy, formatting, the full Rust workspace suite, and all 129 Python checks pass (three platform skips). Native cfg checks remain in CI.
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).

@@ -12,6 +12,7 @@ CORPORATE_WIX = (ROOT / "wix-corporate" / "corporate.wxs").read_text(encoding="u
 GLOBAL_INNO = (ROOT / "inno" / "global.iss").read_text(encoding="utf-8")
 CORPORATE_INNO = (ROOT / "inno" / "corporate.iss").read_text(encoding="utf-8")
 INSTALL_RS = (ROOT / "src" / "install.rs").read_text(encoding="utf-8")
+AUTOSTART_RS = (ROOT / "src" / "install" / "autostart.rs").read_text(encoding="utf-8")
 MAIN_RS = (ROOT / "src" / "main.rs").read_text(encoding="utf-8")
 WINDOWS_APP = (ROOT / "src" / "bin" / "honk300-app.rs").read_text(encoding="utf-8")
 CONFIG_TUI = (ROOT / "crates" / "honk-config-tui" / "src" / "lib.rs").read_text(
@@ -166,14 +167,14 @@ class WindowsPackagingTests(unittest.TestCase):
             self.assertNotIn(r'Filename: "{app}\bin\honk300.exe"; Parameters: "start"', inno)
         for required in (
             'WINDOWS_APP_LAUNCHER_NAME: &str = "honk300-app.exe"',
-            "windows_autostart_command",
-            "legacy_windows_autostart_command",
             'creation_flags(CREATE_NO_WINDOW)',
             '"__windows-retire-owner"',
             "remove_windows_retired_owner_integrations",
             "windows_public_path_contains",
         ):
             self.assertIn(required, INSTALL_RS)
+        for required in ("windows_autostart_command", "legacy_windows_autostart_command"):
+            self.assertIn(required, AUTOSTART_RS)
         for required in (
             '#![cfg_attr(windows, windows_subsystem = "windows")]',
             "Command::new(runtime)",

@@ -29,7 +29,7 @@
   - [ ] Record the audit register and baseline measurements.
   - [ ] Share bounded canvas reuse and accumulator-aware runtime pacing.
   - [ ] Replace tests disconnected from production behavior.
-  - [ ] Separate lifecycle responsibilities and shorten current guidance.
+  - [x] Separate lifecycle responsibilities and shorten current guidance.
   - [ ] Pass focused regressions and complete local checks.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.

@@ -43,6 +43,7 @@ All notable changes to this project are documented here. Format based on
 - Aim cursor-seeking locomotion at the body position that brings the beak to the pointer, avoiding a stationary-pointer chase that could never reach the grab distance.
 
 ### Development
+- Separate installer provenance, receipt-owned autostart, user-media migration, and existing lifecycle regressions into focused modules while retaining the public lifecycle API.
 - Add a hosted Windows UI Automation check for actual Invoke/Toggle/Value patterns and modal isolation. Keep native bridge outputs ordered in Zig's build graph and compile Linux against matching distro headers with a baseline CPU.
 - Add actual Rust motion exports, heading/alpha/bounds regressions, renderer timing workloads, and a tracked refinement audit. Native desktop, distribution, GUI, and complete release qualification remain in progress.
 

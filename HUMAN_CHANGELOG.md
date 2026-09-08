@@ -39,6 +39,8 @@ Settings now expose their text and controls to Windows accessibility tools, with
 
 ### Behind the scenes
 
+Installation code is now organized by what it owns, making startup, saved media, and installer identity easier to maintain without changing how they work.
+
 Automated Windows checks now operate settings through the same controls used by accessibility tools, including switches, text fields, and dialogs. Linux builds use the matching system libraries while retaining support for ordinary processors.
 
 Native builds use a consistent compiler and retain the notices for their supporting libraries, making installation checks more dependable across machines.
