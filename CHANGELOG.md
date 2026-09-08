@@ -43,6 +43,7 @@ All notable changes to this project are documented here. Format based on
 - Authenticate the pinned system Shell and approved runtime executable, bound complete connection and snapshot operations, preserve exact owned files and recoverable consent, and withdraw stale or revoked observations until explicit reconnection.
 
 ### Behind the scenes
+- Record bounded native delivery foot state and capture timing after a corrected GNOME run still shows an overextended leg; keep publication held while distinguishing engine recovery from presentation artifacts.
 - Preserve the complete 6ff7611 candidate and failed main input evidence; repeat all release gates after a production status-race regression and native per-step drag acknowledgments away from the goose's return route.
 - Verify newly captured GNOME handle motion against actual widget bounds and surface ownership instead of an enter-state property that may predate controller attachment.
 - Start GNOME qualification gestures on GTK's native client-area WindowHandle after actual pointer entry; require the same Mutter grab, engine ride, terminal exclusion and held-action cancellation across remapping.

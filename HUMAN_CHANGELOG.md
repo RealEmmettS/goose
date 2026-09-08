@@ -50,6 +50,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Check that observations come from your actual desktop and that only the approved goose can request them. Stop using old information when access is lost, keep setup responsive when a connection stops answering, and preserve unrelated desktop settings.
 
 ### Behind the scenes
+- Record the goose's actual movement alongside test screenshots to investigate a remaining stretched leg before publishing.
 - Keep failed desktop evidence and repeat the complete release checks after correcting a status race and making private drag input easier to observe accurately.
 - Verify that each test drag actually reaches its native handle, including when the pointer was already over the window.
 - Start test drags on a clearly reachable native window handle, then check the same real window movement, goose ride and interruption behavior.

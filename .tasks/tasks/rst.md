@@ -44,6 +44,12 @@ Active. Production correction and reproducing regressions are implemented.
 Native review and both affected releases remain held.
 
 ## Activity
+- 2026-09-08 — All four native GNOME suites pass in 34276905894, but newer-ARM
+  cycle-zero delivery still shows an overextended leg. Keep publication held;
+  capture bounded actual foot/velocity state and screenshot timing in a separate
+  diagnostic branch before deciding whether another gait or presentation change
+  is warranted. The first correction resolves its demonstrated regression but
+  does not establish complete native visual acceptance.
 - 2026-09-08 — Inspect sixteen sequential frames around each front, rear and
   fast abrupt stop plus the existing gradual run-stop sequence. Settling feet
   retract without extending the old lead; no visual golden was changed. Full
