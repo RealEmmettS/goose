@@ -35,15 +35,20 @@ this task owns the native implementation evidence and #rkde owns publication.
 - [x] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
-The earlier native runtime gates pass in 34203908233 and 34205879636. Final-source
-repetition remains open: 34210973568 passes KDE 5 x64 and the complete KDE 6 ARM64
-pointer lifecycle, but KDE 5 ARM64 stops its note after approximately three pixels
-of motion with continuous compositor observations and no later topology change.
-Bounded CI collection-state diagnostics now distinguish an engine release from
-movement refusal without changing the native movement or freshness assertions.
-The complete versioned packages remain held under #rkde.
+The integrated pointer lifecycle passes both KDE 6 architectures in 34210973568.
+The instrumented 34212367155 reproduces the short delivery on KDE 6 x64: the engine
+walks to its destination while the note remains at its first fractional position.
+The production JSON decoder changes 117.48895263671875 to 117.48895263671876,
+causing the exact native stale-geometry guard to refuse all subsequent commands.
+The captured-coordinate regression fails before enabling serde_json float_roundtrip
+and passes after it; all 26 Linux platform tests pass. The unchanged native guards
+and four delivery/revocation/restart repetitions per lane must now qualify the fix.
+Complete versioned packages remain held under #rkde.
 
 ## Activity
+- 2026-09-08: Reproduce the native one-ULP geometry loss through the production
+  Frame decoder and response state. Enable exact float roundtrips instead of
+  relaxing KWin's stale-geometry check. Native fourfold repetition is pending.
 - 2026-09-08: The diagnostic run passes both KDE 5 architectures and KDE 6 ARM64
   without a production correction for the intermittent short delivery. Require four
   independent actual-runtime delivery/revocation/restart repetitions per native lane

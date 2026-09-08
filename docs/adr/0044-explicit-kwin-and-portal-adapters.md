@@ -26,6 +26,10 @@ implementation of the Rust boundary, not a public capability claim.
   maximum observation age. Validate schema, unique identities, geometry, target process/app,
   current desktop/activity, terminal exclusion and the current window again before moving.
   Movement stays within the target's real output and within 24 logical pixels per exchange.
+- Preserve exact native floating-point geometry through JSON decoding and replies.
+  The captured native delivery regression proves that a one-ULP parse change can
+  invalidate the script's exact stale-position check. Enable float roundtrips at
+  the Rust boundary; never add tolerance to the native identity/geometry guard.
 - Keep terminal protection at both boundaries. Blank, oversized or ambiguous identities do
   not authorize operations. Codex, ChatGPT and Visual Studio Code remain protected.
   The pointer guard recognizes only the running process's own immovable `honk300`
