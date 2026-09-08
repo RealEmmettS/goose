@@ -80,6 +80,7 @@ Settings now expose their text and controls to Windows accessibility tools, with
 - Automatically check changes to the new Linux prop host on both processor types during development.
 - Build the Linux note and picture host and checks for text, image fit, closing windows and cleaning up when the goose stops.
 - Prepare Linux deliveries to use the desktop's normal placement when animated window dragging is unavailable.
+- Check unusual filenames on systems that allow creating them, while respecting the Mac filesystem's own filename rules.
 - Add focused startup and settings checks, and refresh the project dashboard while preserving its existing settings.
 - Linux builds now receive the same strict code checks as Windows, including unused platform-specific code.
 - Update retry checks now wait for the new result before pressing Update, matching the settings screen's normal sequence.
