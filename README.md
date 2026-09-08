@@ -5,7 +5,7 @@ across real monitor layouts, honks, leaves muddy footprints, reacts to the point
 bounded desktop pranks. Configuration and control stay local through a command-line interface
 and terminal settings screen.
 
-**Refinement in development:** this branch adds a fully redesigned, continuously projected
+**v1.4.0 candidate in development:** this branch adds a fully redesigned, continuously projected
 goose with new expressions and motion, shared runtime reliability improvements, and a native
 graphical settings companion. `honk300 settings` and tray Configure open that window;
 `honk300 config` retains the TUI. Both edit the same Rust-owned configuration. Native accessibility,
@@ -320,7 +320,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --workspace -- -D warnings
 cargo test --workspace
 cargo build --release
-dist plan --tag=v1.3.7
+dist plan --tag=v1.4.0
 cargo audit --version 0.22.2
 ```
 

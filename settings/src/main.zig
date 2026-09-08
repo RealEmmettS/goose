@@ -29,7 +29,7 @@ const dev = @import("builtin").mode == .Debug;
 pub const Effects = native_sdk.Effects(Msg);
 pub const AppUi = canvas.Ui(Msg);
 pub const app_markup = @embedFile("app.native");
-pub const version = "1.3.7";
+pub const version = "1.4.0";
 const SettingsApp = native_sdk.UiAppWithFeatures(Model, Msg, .{ .runtime_markup = dev });
 const CompiledView = canvas.CompiledMarkupView(Model, Msg, app_markup);
 const body_font: canvas.FontId = canvas.min_registered_font_id;

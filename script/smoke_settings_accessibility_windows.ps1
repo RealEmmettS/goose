@@ -86,11 +86,24 @@ try {
     Invoke-Named 'Save & apply'
     Wait-For { (Get-Content -LiteralPath $config -Raw) -match 'first_wander_time_seconds = 25' } 'the saved numeric value'
     Wait-For { $null -ne (Find-Named 'Saved. The goose will use these settings when it starts.') } 'the readable saved status'
+    # Dirty badges on the largest page exceed the former 128-node ceiling.
+    Invoke-Named 'Behavior'
+    foreach ($name in @('Honk on the hour', 'Travel across monitors', 'Allow cursor nabs',
+        'Random cursor nabs', 'Prevent all cursor nabs', 'Prevent window rides',
+        'Ride supported windows', 'Bring notes and memes')) {
+        Wait-For { $null -ne (Find-Named $name) } $name
+        $toggle = (Find-Named $name).GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
+        $wasOn = $toggle.Current.ToggleState
+        $toggle.Toggle()
+        Wait-For { $toggle.Current.ToggleState -ne $wasOn } ('changed ' + $name)
+    }
+    Invoke-Named 'Save & apply'
+    Wait-For { $text = Get-Content -LiteralPath $config -Raw; $text -match 'no_mouse_steal = true' -and $text -match 'can_attack_mouse = false' } 'the saved full-page changes'
     [ordered]@{
         schema = 'honk300.settings-uia-smoke.v1'
         binary = $binaryPath
         ok = $true
-        checks = @('native-names', 'invoke-pattern', 'toggle-pattern', 'value-pattern', 'modal-isolation', 'save-readback')
+        checks = @('native-names', 'invoke-pattern', 'toggle-pattern', 'value-pattern', 'modal-isolation', 'save-readback', 'largest-dirty-page')
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'result.json') -Encoding utf8
 } finally {
     if ($null -ne $process) {

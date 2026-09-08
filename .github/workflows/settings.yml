@@ -65,7 +65,7 @@ jobs:
           toolchain: '1.95'
           targets: ${{ matrix.target }}
       - name: Build exact Rust settings service
-        run: cargo build --locked --release --target ${{ matrix.target }} --bin honk300
+        run: cargo build --locked --release --target ${{ matrix.target }} --bins
       - name: Compile and test native UI
         run: >-
           python script/build_settings.py --target ${{ matrix.target }}
@@ -75,14 +75,14 @@ jobs:
         run: >-
           python script/smoke_settings.py
           --binary target/${{ matrix.target }}/release/honk300-settings${{ runner.os == 'Windows' && '.exe' || '' }}
-          --evidence target/settings-ui-evidence
+          --evidence target/settings-ui-evidence --lifecycle
       - name: Exercise real GTK settings window
         if: ${{ contains(matrix.target, '-linux-gnu') }}
         run: >-
           xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session --
           python script/smoke_settings.py
           --binary target/${{ matrix.target }}/release/honk300-settings
-          --evidence target/settings-ui-evidence
+          --evidence target/settings-ui-evidence --lifecycle
       - name: Exercise Windows UI Automation provider
         if: ${{ runner.os == 'Windows' }}
         shell: powershell
@@ -150,7 +150,7 @@ jobs:
             sh /tmp/honk-rustup.sh -y --profile minimal --default-toolchain 1.95
             . /root/.cargo/env
             python3 script/build_settings.py --target "${{ matrix.target }}" --output "target/${{ matrix.target }}/release" --automation --test
-            xvfb-run -a -s "-screen 0 1280x900x24" dbus-run-session -- python3 script/smoke_settings.py --binary "target/${{ matrix.target }}/release/honk300-settings" --evidence target/settings-ui-evidence
+            xvfb-run -a -s "-screen 0 1280x900x24" dbus-run-session -- python3 script/smoke_settings.py --binary "target/${{ matrix.target }}/release/honk300-settings" --evidence target/settings-ui-evidence --lifecycle
             python3 script/build_settings.py --target "${{ matrix.target }}" --output "target/settings-release/${{ matrix.target }}" --skip-install
             python3 script/verify_settings.py --target "${{ matrix.target }}" --directory "target/settings-release/${{ matrix.target }}" --execute
           '

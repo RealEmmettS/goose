@@ -74,8 +74,9 @@ for name in ("package.json", "package-lock.json"):
     if "packages" in data:
         data["packages"][""]["version"] = version
     path.write_text(json.dumps(data, indent=2) + "\n")
-path = settings / "app.zon"
-path.write_text(re.sub(r'(\.version = ")[^"]+("[ ,])', lambda m: m[1] + version + m[2], path.read_text()))
+for name in ("app.zon", "build.zig.zon"):
+    path = settings / name
+    path.write_text(re.sub(r'(\.version = ")[^"]+("[ ,])', lambda m: m[1] + version + m[2], path.read_text()))
 path = settings / "src/main.zig"
 path.write_text(re.sub(r'(pub const version = ")[^"]+(";)', lambda m: m[1] + version + m[2], path.read_text()))
 PY
@@ -183,3 +184,15 @@ PY
 
 printf 'native Debian helper Updated/restart/hold fixture passed (%s -> %s)\n' \
   "$FIXTURE_VERSION" "$UPDATED_VERSION"
+
+# Reuse the same genuine package to exercise the user entrypoints. Release the
+# retained helper first so the next transaction owns the real updater singleton.
+kill "$HELPER_PID"
+wait "$HELPER_PID" 2>/dev/null || true
+HELPER_PID=""
+"$INSTALLED" stop --force >/dev/null 2>&1 || true
+wait "$RUNTIME_PID" 2>/dev/null || true
+RUNTIME_PID=""
+/usr/bin/python3 "$PROJECT_ROOT/script/smoke_update_entrypoints_linux.py" \
+  --package "$PACKAGE" --fixture-version "$FIXTURE_VERSION" \
+  --evidence "$EVIDENCE_DIR/entrypoints"

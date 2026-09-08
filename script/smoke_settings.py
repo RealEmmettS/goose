@@ -26,6 +26,7 @@ def main() -> None:
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--network", action="store_true")
+    parser.add_argument("--lifecycle", action="store_true", help="start/stop on a disposable CI desktop")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     binary = args.binary.resolve(strict=True)
@@ -35,6 +36,8 @@ def main() -> None:
     evidence = args.evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    if args.lifecycle and os.environ.get("GITHUB_ACTIONS") != "true":
+        raise RuntimeError("Lifecycle fixture runs only on a disposable GitHub desktop")
     # Unique cwd isolates the SDK's file protocol from other development windows.
     with tempfile.TemporaryDirectory(prefix="honk300-settings-") as temporary:
         work = Path(temporary)
@@ -44,6 +47,11 @@ def main() -> None:
                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL)
         snapshot_path = work / ".zig-cache/native-sdk-automation/snapshot.txt"
+        started_runtime = False
+
+        def control(*arguments: str):
+            return subprocess.run([str(service), *arguments], capture_output=True, text=True,
+                                  timeout=20, creationflags=hidden)
 
         def snapshot() -> str:
             return snapshot_path.read_text(encoding="utf-8") if snapshot_path.exists() else ""
@@ -121,6 +129,28 @@ def main() -> None:
             click("Reload saved settings")
             click("Discard and reload")
             wait('name="Ready.')
+            click("Behavior")
+            for label in ("Honk on the hour", "Travel across monitors", "Allow cursor nabs",
+                          "Random cursor nabs", "Prevent all cursor nabs", "Prevent window rides",
+                          "Ride supported windows", "Bring notes and memes"):
+                click(label, "switch")
+            capture("largest-dirty-page")
+            click("Save & apply")
+            wait(r'role=text name="Saved\.')
+            saved = tomllib.loads(config.read_text(encoding="utf-8"))
+            assert saved["safety"]["no_mouse_steal"] is True
+            assert saved["behavior"]["can_attack_mouse"] is False
+            if args.lifecycle:
+                assert "honk300: not running" in control("status").stdout, "fixture found an existing runtime"
+                click("General")
+                started_runtime = True
+                click("Start goose")
+                wait('role=text name="start ready"')
+                assert "honk300: running" in control("status").stdout
+                click("Stop goose")
+                wait('role=text name="Goose stopped.')
+                assert "honk300: not running" in control("status").stdout
+                started_runtime = False
             if args.network:
                 click("Platform & status")
                 click("Check for updates")
@@ -129,13 +159,16 @@ def main() -> None:
             assert "dispatch_errors=0 " in snapshot(), snapshot()[-6000:]
             (evidence / "result.json").write_text(json.dumps({
                 "ok": True, "binary": str(binary), "network": args.network,
+                "lifecycle": args.lifecycle,
                 "checks": ["five-pages", "save-readback", "comment-preservation", "revision-conflict",
                            "keep-draft", "discard-reload", "numeric-validation", "keyboard-input",
-                           "modal-layout", "scale-two", "no-dispatch-errors"],
+                           "modal-layout", "scale-two", "largest-dirty-page", "no-dispatch-errors"],
                 "pixels": "Native SDK retained-scene renderer"
             }, indent=2) + "\n", encoding="utf-8")
             print("Native settings smoke passed; evidence:", evidence)
         finally:
+            if started_runtime:
+                control("stop", "--force")
             if snapshot_path.exists():
                 (evidence / "final-snapshot.txt").write_text(snapshot(), encoding="utf-8")
             if process.poll() is None:

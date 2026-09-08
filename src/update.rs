@@ -644,6 +644,8 @@ pub(crate) struct UpdateCheck {
     pub origin: String,
     pub target: String,
     pub message: String,
+    /// Machine-readable diagnostic; the UI presents the actionable summary.
+    pub detail: Option<String>,
 }
 
 pub(crate) fn check() -> Result<UpdateCheck, DynError> {
@@ -656,9 +658,10 @@ pub(crate) fn check() -> Result<UpdateCheck, DynError> {
         if let Err(error) = strategy_owned_executable(plan.strategy, source, target) {
             check.managed = false;
             check.message = format!(
-                "Latest release: {}. Update unavailable: {error}",
+                "Latest release: {}. This installation could not be verified. Reinstall using an official installer to enable updates.",
                 check.latest_version
             );
+            check.detail = Some(error.to_string());
         }
     }
     Ok(check)
@@ -671,7 +674,7 @@ fn check_manifest(
     manifest: &ReleaseManifest,
 ) -> Result<UpdateCheck, String> {
     let available = is_newer(current, &manifest.version);
-    let (managed, message) = match select_update_plan(source, target) {
+    let (managed, message, detail) = match select_update_plan(source, target) {
         Ok(plan) => {
             // Never enable Update from a manifest with a missing or mismatched payload.
             manifest_artifact(manifest, &plan, target)?;
@@ -683,14 +686,15 @@ fn check_manifest(
                     manifest.version
                 )
             };
-            (true, message)
+            (true, message, None)
         }
         Err(reason) => (
             false,
             format!(
-                "Latest release: {}. Update unavailable: {reason}",
+                "Latest release: {}. This copy is not managed by an installer. Install the official package to enable updates.",
                 manifest.version
             ),
+            Some(reason),
         ),
     };
     Ok(UpdateCheck {
@@ -701,6 +705,7 @@ fn check_manifest(
         origin: source.marker_value().into(),
         target: target.triple().into(),
         message,
+        detail,
     })
 }
 

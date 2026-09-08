@@ -43,7 +43,7 @@ def main() -> None:
             if app and app.get_process_id() == process.pid:
                 stack.append(app)
         found = []
-        while stack and len(found) < 320:
+        while stack and len(found) < 640:
             node = stack.pop()
             try:
                 node.clear_cache()
@@ -120,9 +120,22 @@ def main() -> None:
         invoke("Save & apply")
         wait(lambda: "first_wander_time_seconds = 25" in config.read_text(), "saved editor value")
         wait(lambda: find("Saved. The goose will use these settings when it starts."), "readable saved status")
+        # The largest page grows beyond the former 128-node ceiling as dirty
+        # badges appear. Exercise its complete native action tree before Save.
+        invoke("Behavior")
+        for name in ("Honk on the hour", "Travel across monitors", "Allow cursor nabs",
+                     "Random cursor nabs", "Prevent all cursor nabs", "Prevent window rides",
+                     "Ride supported windows", "Bring notes and memes"):
+            node = wait(lambda: find(name, Atspi.Role.TOGGLE_BUTTON), name)
+            was_on = node.get_state_set().contains(Atspi.StateType.PRESSED)
+            if not node.get_action_iface().do_action(0):
+                raise RuntimeError(f"AT-SPI could not change {name}")
+            wait(lambda: find(name, Atspi.Role.TOGGLE_BUTTON).get_state_set().contains(Atspi.StateType.PRESSED) != was_on, f"changed {name}")
+        invoke("Save & apply")
+        wait(lambda: "no_mouse_steal = true" in config.read_text() and "can_attack_mouse = false" in config.read_text(), "saved full-page changes")
         (evidence / "result.json").write_text(json.dumps({
             "schema": "honk300.settings-atspi-smoke.v1", "ok": True,
-            "checks": ["native-names", "action", "toggle-state", "text-interface", "focus", "keyboard-edit", "modal-isolation", "save-readback"],
+            "checks": ["native-names", "action", "toggle-state", "text-interface", "focus", "keyboard-edit", "modal-isolation", "save-readback", "largest-dirty-page"],
         }, indent=2) + "\n", encoding="utf-8")
     except Exception:
         (evidence / "failed-tree.json").write_text(json.dumps([

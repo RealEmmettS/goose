@@ -11,6 +11,9 @@ Its completed publication evidence is in `docs/readiness/v1.3.7-readiness.md`.
 Official installed Windows acceptance remains open: the administrator prompt was not approved,
 so this machine's v1.3.5 installation and protected receipt remain unchanged.
 
+The first refinement candidate is v1.4.0; it is not published. Its current qualification
+record is `docs/readiness/v1.4.0-readiness.md`.
+
 The approved refinement is in progress under `.tasks/milestones/refine.md` and ADR 0041:
 1. Reliability cleanup, a fully redesigned continuously projected goose and animations, and a
    separate Native SDK settings companion while retaining the TUI and shared Rust ownership.

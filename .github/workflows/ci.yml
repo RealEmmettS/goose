@@ -234,7 +234,7 @@ jobs:
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y dbus libasound2-dev libgtk-4-dev xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway swaybg grim
+          sudo apt-get install -y dbus libasound2-dev libgtk-4-dev xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway swaybg grim python3-gi gir1.2-atspi-2.0 at-spi2-core libglib2.0-bin
       - name: Install Rust targets
         run: rustup target add ${{ matrix.gnu_target }} ${{ matrix.musl_target }}
       - name: Test
@@ -256,6 +256,7 @@ jobs:
         if: ${{ matrix.gnu_target == 'x86_64-unknown-linux-gnu' }}
         run: >-
           xvfb-run -a -s '-screen 0 1920x1080x24'
+          dbus-run-session --
           env HONK300_EVIDENCE_DIR="$PWD/target/control-surface-updated-evidence"
           sh script/smoke_control_surface_updated_deb.sh
       - name: Linux X11 and Wayland smoke

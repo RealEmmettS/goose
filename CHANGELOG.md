@@ -26,8 +26,11 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.4.0] - Unreleased candidate
+
 ### Added
 - Add the Native SDK/Zig settings application, exact-sibling `settings` launcher and tray Configure routing, and a bounded versioned Rust service covering all 53 editable fields. Keep the terminal editor and add GUI/TUI update controls plus read-only `update --check`.
+- Separate concise update eligibility text from the detailed JSON diagnostic, so unmanaged or unverifiable copies explain how to enable updates without exposing installer internals in the settings flow.
 - Protect GUI and TUI saves with shared revision-aware atomic persistence and conditional runtime reload tokens tied to the selected file and saved revision. Preserve comments, compatible unknown fields, and drafts after validation or conflict failures.
 
 ### Changed
@@ -36,7 +39,7 @@ All notable changes to this project are documented here. Format based on
 - Reuse bounded transparent damage canvases across platforms and the supersampled renderer; pace Windows/Linux ticks against the shared accumulator deadline rather than fixed 2 ms polling.
 
 ### Fixed
-- Preserve the complete native accessibility tree after settings become dirty; the pinned toolkit and bridge now accept 128 bounded widgets. Keep test modules separate from platform link inputs even when optimization modes match, and restore the original macOS lifecycle cfg boundaries after module extraction.
+- Preserve the complete native accessibility tree after settings become dirty; the pinned toolkit and bridge now accept 256 bounded widgets. Keep test modules separate from platform link inputs even when optimization modes match, and restore the original macOS lifecycle cfg boundaries after module extraction.
 - Forward native settings semantics to Windows UI Automation and Linux AT-SPI through bounded AccessKit adapters (ADR 0042). Bind the Windows bridge DLL to archive/slot/receipt identities and retain both file leases until GUI initialization. Pin the Zig compiler bootstrap and repair native CI toolchain selection.
 - Keep forward steps planted ahead until the body passes over them, and give the rounded belly enough clearance for visible front/rear feet. Preserve the gait cadence and real ground contacts.
 - Do not acknowledge native Wayland presentation while all retained buffers are busy or a required output is unconfigured; retry the pending damage, including graceful final clears.
@@ -44,6 +47,7 @@ All notable changes to this project are documented here. Format based on
 - Aim cursor-seeking locomotion at the body position that brings the beak to the pointer, avoiding a stationary-pointer chase that could never reach the grab distance.
 
 ### Development
+- Qualify CLI, real terminal-editor keys and native GTK update actions with genuine Debian installation transactions. Exercise GUI download failure, unchanged receipt/runtime, retry, helper relaunch and public no-op results using an isolated terminal-output adapter. Exercise settings Start/Stop through the real runtime on disposable native desktops.
 - Scope the goose's antialiased edge-color oracle to its actual silhouette so independently colored seasonal props do not contaminate the sample. Preserve global alpha, crop, black-rectangle, and channel checks; add paired-compositor and raw-DIB regressions for a separate translucent prop.
 - Exercise Linux controls, text, focus and save through native AT-SPI; expose bounded UTF-8 text runs to assistive readers. Use the pinned x64 Zig build host and native ARM64 ReleaseSafe tests on Windows ARM, and install Alpine's separate virtual-display runner.
 - Separate installer provenance, receipt-owned autostart, user-media migration, and existing lifecycle regressions into focused modules while retaining the public lifecycle API.

@@ -8,13 +8,13 @@
 
 ## To-Do
 
-- [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
-  - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
 - [ ] **Linux props and experimental Raspberry Pi support** - own note/image windows, improve session reporting, and qualify ARM64 labwc packages (needs #rr1) (ms #refine) (owner codex) #rlpi
 - [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi) (ms #refine) (owner codex) #rkde
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
 
 ## Active
+- [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
+  - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
 - [ ] **Native SDK graphical settings** - ship a separate Zig settings app backed by Rust validation and retain the TUI (needs #rfnd) (ms #refine) (owner codex) #rgui
   - [x] Implement revision-aware shared settings persistence and bounded stdio service.
   - [ ] Build and exercise all five native settings pages.

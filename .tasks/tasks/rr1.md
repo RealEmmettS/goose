@@ -25,8 +25,10 @@ The requested behavior runs through its production path and the supporting evide
 - [ ] Integration and required package/release checks pass before publication.
 
 ## Status
-Queued; not implemented or qualified.
+Active: v1.4.0 candidate selected and stamped across Rust/settings metadata; no tag or release created. CLI, real TUI and native GUI update discovery passed against public v1.3.7, correctly identifying the development copy as unmanaged. Exact native settings and full CI are running; final candidate/main/package/public-byte gates remain open in docs/readiness/v1.4.0-readiness.md.
 
 ## Activity
+- 2026-09-07: Extended the disposable Debian fixture to run genuine updates from CLI, TUI keys and native AT-SPI GUI actions, including an offline helper failure/retry, unchanged failure receipt/runtime, successful relaunch and a public no-op. The terminal adapter records the real helper and does not substitute the installer; hosted execution is pending.
+- 2026-09-07: Opened the v1.4.0 readiness record and candidate metadata. Verified actual CLI/TUI/GUI discovery, improved user-facing eligibility wording, and retained machine-readable installer diagnostics. Existing hosted Debian update/relaunch proof will repeat on the final source; immutable publication remains gated.
 - 2026-09-07: user explicitly requested CLI/TUI update acceptance and GUI Check for updates / Update now controls; use the existing verified update lifecycle and typed results.
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).

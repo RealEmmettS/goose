@@ -17,7 +17,7 @@ Windows and Linux. Keep macOS's existing native bridge. Small, exact-source-hash
 patches wire the local SDK dependency's publish, focus, destruction, and action
 events. The global framework remains untouched.
 
-The bridge retains at most 128 widget nodes, one text run per text widget, and
+The bridge retains at most 256 widget nodes, one text run per text widget, and
 32 queued actions. It rejects malformed
 trees and stale or disabled targets, and applies actions on the owning UI thread.
 OS callbacks never enter Zig. Static text uses AccessKit's value representation;
@@ -54,7 +54,13 @@ on the current Windows-only setup and must remain explicit.
 
 Actual editing found that the SDK's original 64-node limit truncated Save after
 changed-field labels appeared on the Appearance page. The pinned local SDK and
-bridge now share a 128-widget ceiling; the OS qualification edits that page and
+bridge now share a 256-widget ceiling; the OS qualification edits that page and
 requires the final Save action and persistent readback. Text runs expose Unicode
 and empty field contents to native readers without fabricating glyph positions
 or caret selection.
+
+The largest Behavior page already has 122 semantic widgets before edits. Its
+changed-field badges and dialogs require more than an intermediate 128-node limit;
+the final 256-widget bound covers every current page with all its fields changed.
+Both native OS fixtures toggle eight fields on that page and require Save plus
+readback, in addition to the smaller-page and modal checks.

@@ -44,6 +44,7 @@ def main() -> None:
     manifest = (project / "app.zon").read_text(encoding="utf-8")
     source = (project / "src/main.zig").read_text(encoding="utf-8")
     assert f'.version = "{version}"' in manifest, "settings manifest version mismatch"
+    assert f'.version = "{version}"' in (project / "build.zig.zon").read_text(encoding="utf-8"), "settings package version mismatch"
     assert f'pub const version = "{version}";' in source, "settings binary version mismatch"
     assert json.loads((project / "package.json").read_text())["version"] == version
     npm = shutil.which("npm.cmd" if os.name == "nt" else "npm")

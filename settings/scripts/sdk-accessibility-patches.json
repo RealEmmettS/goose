@@ -121,7 +121,7 @@
     "edits": [
       {
         "before": "pub const max_widget_accessibility_nodes: usize = 64;",
-        "after": "// Honk300: retain complete settings pages, including changed-field labels and Save.\npub const max_widget_accessibility_nodes: usize = 128;"
+        "after": "// Honk300: retain complete settings pages, including changed-field labels and Save.\npub const max_widget_accessibility_nodes: usize = 256;"
       }
     ]
   },

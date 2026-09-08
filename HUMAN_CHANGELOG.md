@@ -35,11 +35,15 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ### Improved
 
+Update checks explain when to use the official installer to enable automatic updates, using the same clear message in both settings screens.
+
 Save remains available to accessibility tools after changing settings, including pages with many controls.
 
 Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
 
 ### Behind the scenes
+
+Update checks now cover the command line and both settings screens with real installed packages, including a failed download followed by a retry and checks that the goose can restart afterward. Separate checks start and stop the goose from its graphical settings.
 
 Visual checks now distinguish the goose's outline from nearby seasonal decorations while continuing to catch clipped art, incorrect transparency, and color errors. Build checks keep their supporting components separate, and the reorganized installation code retains its Mac behavior.
 
