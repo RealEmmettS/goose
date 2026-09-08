@@ -22,23 +22,16 @@ The requested behavior runs through its production path and the supporting evide
 ## Verification
 - [x] Relevant production-path regression tests pass.
 - [x] Actual behavior or rendered output is inspected in its supported environment.
-- [ ] Integration and required package/release checks pass before publication.
+- [x] Integration and required package/release checks pass before publication.
+- [x] Website release guidance is deployed and verified.
 
 ## Status
-The exact Alpine archive now passes X11 visual and prop readiness checks. Candidate
-34195690566 next stopped at Sway exec because the distribution's realtime file
-capability is unavailable in the container. Drop that request only inside the private
-fixture, retain its metadata and rerun the unchanged runtime/visual assertions.
-The first complete candidate failed musl prop startup: Ubuntu lacked the musl GTK
-libraries required by the packaged companion. Exact musl archives now use a native
-Alpine desktop fixture with unchanged readiness and visual checks; the rerun is pending.
-The implementation task #lpr is qualified: all eight native settings lanes pass in
-34189363866, including real production GNU/musl props and failure/cleanup checks.
-Native ARM64 labwc and inspected captures support experimental Pi guidance. This branch
-prepares v1.5.0 with the final first-stage fixes integrated. Publication remains queued
-behind #rr1; final-source CI, the complete candidate, main and public-byte gates are open.
+Complete. Published and publicly verified at `af0bec1394361902dca350d5d900d5c56f391046`. Complete candidate 34197518984, CI 34197525381, settings 34197525160, unchanged-main CI 34200176912/settings 34200202241, publication 34202588431 and all-eight fresh-public run 34205240737 pass. Every public asset and latest control was independently checked. Website PR #7/deployment 6323960197 is live with verified Linux/Pi guidance, 22 download mappings and manifest hashes. Physical Pi acceptance remains explicitly open.
 
 ## Activity
+- 2026-09-08: Verified the completed website follow-through at source 5cc6f3a: production assets match the reviewed build, all 22 download mappings and manifest hashes match the public release, and Linux ARM64/Pi guidance is visible without advertising upcoming KDE permissions. Stage two is complete within its explicit physical-device boundary.
+- 2026-09-08: Published v1.5.0 and passed every fresh-public lane. Independently downloaded all 47 assets and checked exact identity, 22 payloads, manifests and latest controls; handed the verified release to the website task. A documentation-branch updater test crossed the publication switch: CLI correctly selected 1.4.0, later TUI correctly selected 1.5.0, and its once-captured expected version rejected the difference. Preserve this fixture evidence and repeat against stable latest.
+- 2026-09-08: Final candidate and unchanged-main qualification pass at af0bec1. Stage-one public-byte checks are complete, so the new v1.5.0 tag is building. This task retains its own fresh-public and website gates. Its release dependency is the completed first-stage implementation/publication evidence; #rr1's remaining website coordination does not block this build.
 - 2026-09-08: Candidate 34195690566 proves the exact ARM64 musl archive launches its GTK prop companion and passes X11 compositor checks. Sway then exits with EPERM before its socket exists. Preserve the container's capability metadata and remove only its unnecessary realtime request, as already qualified for private KWin tests. The Windows host CI failure was a missing interactive test desktop; only that failed job was restarted.
 - 2026-09-08: The native integration build catches an incorrect module path in the new prop descriptor launch. Use the companion module's actual exported function; the old candidate is superseded before package execution.
 - 2026-09-08: Candidate 34191310461 exposed missing musl GTK dependencies in its Ubuntu fixture (native prop child exited 127). Move exact musl package execution to Alpine on the same native architecture; retain before/after archive identity and all capability checks. Integrate the shared verified-descriptor and invalid-receipt launcher fix for owned props.

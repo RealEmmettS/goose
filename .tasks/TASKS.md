@@ -5,46 +5,28 @@
 - [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## To-Do
-- [ ] **Linux props and experimental Raspberry Pi support** - integrate and publish owned props, session reporting, and ARM64 labwc packages after the first refinement release (needs #rr1, #lpr) (ms #refine) (owner codex) #rlpi
-  - [x] Qualify native ARM64 labwc placement, scaling and dependency/standalone behavior.
-  - [x] Document experimental Pi 4/5 setup and the physical acceptance boundary.
-  - [ ] Integrate the first release and complete every platform/package/public-byte gate.
-- [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) #rkde
+- [ ] **Fullscreen and do-not-disturb observations** - resolve audit R05 with separately proven platform observations and honest fallback (needs #rfnd) (ms #refine) (owner codex) #prs
+  - [ ] Qualify macOS fullscreen and supported system do-not-disturb observation paths.
+  - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
+  - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
 
 ## Active
+- [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi, #wlk, #wlp) (ms #refine) (owner codex) #rkde
+  - [x] Prepare guided setup documentation and the distinct release metadata.
+  - [ ] Pass integrated native pointer and settings lifecycle checks.
+  - [ ] Pass complete candidate, unchanged-source main and immutable publication gates.
+  - [ ] Verify fresh public downloads and deployed website guidance.
 - [ ] **Explicit portal pointer integration** - request only pointer access through the native portal, validate granted EIS devices and cancel on revocation; terminal exclusion requires independently proven window observation (needs #a6e) (ms #refine) (owner codex) #wlp
   - [x] Prove native portal grant, libei device readiness, cancellation and bounded movement on KDE 6.
-  - [ ] Connect ephemeral pointer permission to Rust controls and native settings.
+  - [x] Connect ephemeral pointer permission to Rust controls and native settings.
   - [ ] Qualify terminal exclusions, disconnects and unsupported desktop behavior.
 - [ ] **KDE native Wayland companion** - implement the explicitly enabled KWin bridge and prove exact identities, bounded movement, terminal exclusions and revocation (needs #a6e) (ms #refine) (owner codex) #wlk
   - [x] Prove the real KWin script API and owned test-window movement on KDE 5/6.
   - [x] Connect the authenticated bounded Rust bridge and live runtime capabilities.
   - [x] Add explicit setup/removal and failure/revocation tests.
-  - [ ] Qualify actual KDE-owned prop movement and immediate placement revocation.
+  - [x] Qualify actual KDE-owned prop movement and immediate placement revocation.
   - [ ] Exercise the guided native settings controls and qualifying package integrations.
-- [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
-  - [ ] Deliver editable renderer SVGs and verify the website against the published release.
-  - [ ] Resolve final PR review findings and repeat qualification before tagging.
-  - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
-  - [x] Correct captured Windows start and verify native GUI Start, independent settings close, and graceful Stop.
-  - [x] Compare isolated native CPU/memory/IPC workloads and verify note/meme delivery after foreground denial.
-- [ ] **Native SDK graphical settings** - ship a separate Zig settings app backed by Rust validation and retain the TUI (needs #rfnd) (ms #refine) (owner codex) #rgui
-  - [x] Implement revision-aware shared settings persistence and bounded stdio service.
-  - [ ] Build and exercise all five native settings pages.
-  - [x] Add Check for updates and Update now through the verified existing updater.
-  - [ ] Integrate launch, package identity, signing, update, and uninstall paths.
-  - [ ] Qualify actual Windows UI Automation and Linux AT-SPI controls, modal focus, and native package payloads.
-- [ ] **Continuous goose rig and expressive behavior** - replace silhouette crossfades, refine motion, and verify actual render sequences (ms #refine) (owner codex) #rart
-  - [x] Implement continuous projected geometry and meaningful interaction anchors.
-  - [x] Add bounded task-driven expressions and reduced motion.
-  - [x] Review motion exports and update independently checked visual fixtures.
-- [ ] **Refinement audit and reliability foundation** - evidence-backed corrections, production-path tests, shared bounded rendering resources, and maintainable lifecycle modules (ms #refine) (owner codex) #rfnd
-  - [x] Record the audit register and baseline measurements.
-  - [x] Share bounded canvas reuse and accumulator-aware runtime pacing.
-  - [x] Replace tests disconnected from production behavior.
-  - [x] Separate lifecycle responsibilities and shorten current guidance.
-  - [ ] Pass focused regressions and complete local checks.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
@@ -66,6 +48,33 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **Linux props and experimental Raspberry Pi support** - integrate and publish owned props, session reporting, and ARM64 labwc packages after the first refinement release (needs #rfnd, #rart, #rgui, #lpr) (ms #refine) (owner codex) #rlpi
+  - [x] Qualify native ARM64 labwc placement, scaling and dependency/standalone behavior.
+  - [x] Document experimental Pi 4/5 setup and the physical acceptance boundary.
+  - [x] Integrate the first release and complete every platform/package/public-byte gate.
+  - [x] Verify the deployed second-stage website release guidance.
+- [x] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
+  - [x] Deliver editable renderer SVGs and verify the website against the published release.
+  - [x] Resolve final PR review findings and repeat qualification before tagging.
+  - [x] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
+  - [x] Correct captured Windows start and verify native GUI Start, independent settings close, and graceful Stop.
+  - [x] Compare isolated native CPU/memory/IPC workloads and verify note/meme delivery after foreground denial.
+- [x] **Refinement audit and reliability foundation** - evidence-backed corrections, production-path tests, shared bounded rendering resources, and maintainable lifecycle modules (ms #refine) (owner codex) (done 2026-09-08) #rfnd
+  - [x] Record the audit register and baseline measurements.
+  - [x] Share bounded canvas reuse and accumulator-aware runtime pacing.
+  - [x] Replace tests disconnected from production behavior.
+  - [x] Separate lifecycle responsibilities and shorten current guidance.
+  - [x] Pass focused regressions and complete local checks.
+- [x] **Continuous goose rig and expressive behavior** - replace silhouette crossfades, refine motion, and verify actual render sequences (ms #refine) (owner codex) (done 2026-09-08) #rart
+  - [x] Implement continuous projected geometry and meaningful interaction anchors.
+  - [x] Add bounded task-driven expressions and reduced motion.
+  - [x] Review motion exports and update independently checked visual fixtures.
+- [x] **Native SDK graphical settings** - ship a separate Zig settings app backed by Rust validation and retain the TUI (needs #rfnd) (ms #refine) (owner codex) (done 2026-09-08) #rgui
+  - [x] Implement revision-aware shared settings persistence and bounded stdio service.
+  - [x] Build and exercise all five native settings pages.
+  - [x] Add Check for updates and Update now through the verified existing updater.
+  - [x] Integrate launch, package identity, signing, update, and uninstall paths.
+  - [x] Qualify actual Windows UI Automation and Linux AT-SPI controls, modal focus, and native package payloads.
 - [x] **Linux owned prop implementation** - bounded native note/image windows and honest compositor placement in an isolated follow-on checkout (ms #refine) (owner codex) (done 2026-09-08) #lpr
   - [x] Bound owned prop admission and preserve existing notes when the capacity is full.
   - [x] Implement the companion protocol and native GTK note/image host.

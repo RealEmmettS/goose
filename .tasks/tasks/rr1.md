@@ -20,19 +20,26 @@ Qualify and publish the reliability, art, and GUI stage through immutable candid
 The requested behavior runs through its production path and the supporting evidence matches the claimed platform and installation.
 
 ## Verification
-- [ ] Relevant production-path regression tests pass.
-- [ ] Actual behavior or rendered output is inspected in its supported environment.
-- [ ] Integration and required package/release checks pass before publication.
+- [x] Relevant production-path regression tests pass.
+- [x] Actual behavior or rendered output is inspected in its supported environment.
+- [x] Integration and required package/release checks pass before publication.
+
+- [x] Website artwork, downloads and platform claims are deployed and verified.
 
 ## Status
-PR #7 merged by fast-forward at qualified source 972e6b4 after complete CI, all eight
-settings lanes and candidate 34184304491 passed. Final review identified four confirmed
-edge cases in settings intent/status/path handling and missing-file reload; corrected
-source is on codex/refinement-review-fixes and must repeat all release gates. The alleged
-null-handle launcher defect was refuted against the pinned binding and an actual isolated
-Windows process test. No v1.4.0 tag/public bytes exist; user installation is unchanged.
+Complete. The final review defects are corrected, all candidate and unchanged-main gates pass, and all eight fresh-public installation lanes pass. Website PR #6 merged as 2647c55; deployment 6323594580 succeeded, and the live page and recorded renderer SVG provenance were verified. Later Linux guidance belongs to #rlpi.
+See [v1.4.0 readiness](../../docs/readiness/v1.4.0-readiness.md): final source `85c9d426f7409800198ee5e89bca7d6042034082`, candidate 34193858719, publication 34197957744 and all-eight fresh-public run 34202201615.
+Hosted desktop/package proof does not close the historical installed Windows elevation or unavailable physical Mac/Pi acceptance.
+
+## Evidence
+| Criterion | Oracle | Result | Limitation |
+|---|---|---|---|
+| Production behavior and publication | Final source, native candidate and public download runs linked in readiness | PASS | Hosted proof remains distinct from physical acceptance |
+| Website deployment | PR #6, source 2647c55, deployment 6323594580, live page and SVG provenance | PASS | Later Linux guidance remains a separate stage |
 
 ## Activity
+- 2026-09-08: Completed the renderer SVG handoff and verified the deployed artwork/native-settings guidance from website PR #6. Publication, public-download and website acceptance for this stage are complete.
+- 2026-09-08: Reconciled final candidate, main, immutable publication and all-eight fresh-public evidence; website follow-through remains under #rr1.
 - 2026-09-08: The stage-two review found two shared companion-launch defects also affecting stage one: pathname re-resolution on Linux and invalid receipt evidence falling through to unmanaged launch. Hold publication, bind exec to the retained descriptor and reject invalid evidence while preserving valid separate installations; add real pathname-replacement and malformed-receipt regressions before new candidate/main gates.
 - 2026-09-08: Final PR #9 review exposed a second autostart race and two vendored-board
   transaction gaps. Hold the existing OS config lock through reconciliation and add

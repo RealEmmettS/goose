@@ -26,6 +26,12 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Behind the scenes
+- Record v1.5.0 immutable publication, all-eight fresh-public qualification and independent verification of all 47 assets. Close both website handoffs against the actual renderer SVG deployment and verified Linux/Pi guidance with all 22 download mappings.
+
+### Behind the scenes
+- Reconcile v1.4.0 final-source publication and fresh-public evidence across current guidance, accessibility ADRs, the audit and completed foundation/settings/art tasks. Retain separate website/next-stage gates and track unresolved presence observation in its own milestone task.
+
 ## [1.6.0] - Unreleased candidate
 
 ### Added
@@ -44,7 +50,7 @@ All notable changes to this project are documented here. Format based on
 - Qualify real consent, bounded motion, protected targets, native settings drafts and recovery in disposable desktops with normal Plasma service registration and PipeWire. Retain bounded failure/observer evidence without granting container or compositor privileges.
 - Await the completed native settings save response before Windows test readback, so the fixture does not deny atomic replacement.
 
-## [1.5.0] - Unreleased candidate
+## [1.5.0] - 2026-09-08
 
 ### Behind the scenes
 - Correct the owned-prop launch's module path after native Linux compilation, before qualification of the updated packages.
@@ -83,7 +89,7 @@ All notable changes to this project are documented here. Format based on
 - Build a bounded private Linux prop mode into the existing GTK settings companion. Preserve Unicode note text, premultiplied full-image rendering, opaque identity, close origin, connection-owned cleanup and a native capacity/geometry fixture; runtime integration and Wayland qualification remain pending.
 - Add placement-only collect behavior for a native host that can create its own props but cannot position them globally. Pin the behavior and admission recovery in production engine tests; Linux native host implementation remains pending under ADR 0043.
 
-## [1.4.0] - Unreleased candidate
+## [1.4.0] - 2026-09-08
 
 ### Added
 - Add the Native SDK/Zig settings application, exact-sibling `settings` launcher and tray Configure routing, and a bounded versioned Rust service covering all 53 editable fields. Keep the terminal editor and add GUI/TUI update controls plus read-only `update --check`.

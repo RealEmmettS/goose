@@ -32,31 +32,15 @@ this task owns the native implementation evidence and #rkde owns publication.
 ## Verification
 - [x] Native KDE 5/6 probes exercise actual window data, movement and protected targets.
 - [x] The real Rust runtime handles opt-in, identity, capability loss and graceful cleanup.
-- [ ] Setup/removal and supported architecture/desktop checks preserve unrelated state.
+- [x] Setup/removal and supported architecture/desktop checks preserve unrelated state.
 
 ## Status
-Run 34202408579 passes the actual optimized runtime on both KDE 5 architectures and
-KDE 6 x64. KDE 6 ARM still stops after less than four pixels; its correct identity and
-dimensions are observed. Add bounded first-loss/refusal diagnostics and native frame
-timing to distinguish expiry, binding failure and completed delivery before another fix.
-The 250 ms expiry and actual movement/revocation requirements remain unchanged.
-The full production runtime and setup path passed all four KWin 5/6 x64/ARM64 lanes
-in 34195263902. Evidence includes default-off state, separate capabilities, native Rust
-settings-service status, live and external removal, crash recovery, graceful cleanup,
-stopped removal and unchanged configuration/foreign files. Guided native UI and package
-integration remain open. Pointer control is a separate #wlp gate.
-Sealed activation and cleanup passed all four native KWin lanes in 34192401152.
-The real runtime now consumes explicit private consent, reports distinct live capabilities,
-and clears engine observations on removal or lost frames. CLI/native-settings setup and
-removal preserve drafts and configuration. New actual-runtime and crash-recovery probes
-are pending; portal control and owned-prop positioning remain unsupported.
-The actual Rust transport and KWin 5.27/6.3 pass in 34190701777: exact identity,
-bounded native movement, terminal/stale/excessive refusal, untrusted peer rejection,
-expiry after disconnect, explicit reconnect and stop. The source includes the qualified
-Linux implementation and final first-stage review corrections. Current desktop/activity,
-fullscreen and actual user-drag boundaries are now implemented with focused Rust tests;
-expanded native x64/ARM64 probes are next. Runtime and explicit setup remain open.
-No public integration is enabled or advertised.
+The actual runtime, owned-note movement and revocation, native KDE setup/removal,
+terminal boundaries and crash recovery pass on KDE 5/6 x64/ARM64 in 34203908233 and
+again in 34205879636. No expiry or movement oracle changed. The latter run isolates
+its remaining failures to the new pointer settings control being outside the viewport;
+#wlp owns that integrated pointer check. The shared accessibility correction and
+complete versioned packages must still pass final-source qualification under #rkde.
 
 ## Activity
 - 2026-09-08: The optimized native gate passes three full runtime lanes. Both KDE 6 portal grant/movement/cancel checks now pass independently; the remaining ARM note-motion failure gets first-loss/refusal diagnostics and timestamped compositor observations before the next correction.

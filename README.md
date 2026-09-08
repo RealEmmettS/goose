@@ -3,26 +3,24 @@
 `honk300` is a clean-room, procedural desktop goose for Windows, macOS, and Linux. It walks
 across real monitor layouts, honks, leaves muddy footprints, reacts to the pointer, and performs
 bounded desktop pranks. Configuration and control stay local through a command-line interface
-and terminal settings screen.
+and native graphical and terminal settings screens.
 
-**v1.5.0 candidate in development:** this branch adds owned Linux notes and pictures,
+**New in v1.5.0:** owned Linux notes and pictures,
 live desktop-session reporting, and experimental Pi 4/5 64-bit Desktop guidance. X11 can
 animate owned deliveries; native Wayland uses normal compositor placement. These changes
 follow the v1.4.0 goose redesign, runtime reliability work and native graphical settings.
 `honk300 settings` and tray Configure open the GUI; `honk300 config` retains the TUI.
-Both edit the same Rust-owned configuration. Neither candidate is published yet; the
-stable release below remains authoritative. See [stage-two readiness](docs/readiness/v1.5.0-readiness.md),
+Both edit the same Rust-owned configuration. All eight managed installation checks passed
+against fresh public downloads. See [stage-two readiness](docs/readiness/v1.5.0-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.3.7](https://github.com/RealEmmettS/goose/releases/tag/v1.3.7),
-published from exact commit `7174688b50c70c2eab560ab5eaed30550c9f6731`. It retains v1.3.6's
-calmer mud defaults—natural puddle trips every 3–5 minutes, automatic tracking for 10–30 seconds,
-and a 10-second fresh/direct default without replacing an existing saved preference—and repairs
-the Windows self-update PowerShell archive-path handoff exposed during v1.3.6 installed
-acceptance. Published v1.3.6 assets remain immutable.
+**Current stable release:** [v1.5.0](https://github.com/RealEmmettS/goose/releases/tag/v1.5.0),
+published from exact commit `af0bec1394361902dca350d5d900d5c56f391046`. It includes the
+continuous goose redesign, expressive motion, bounded rendering resources, native
+graphical settings, and the new Linux deliveries. See [release evidence](docs/readiness/v1.5.0-readiness.md).
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
