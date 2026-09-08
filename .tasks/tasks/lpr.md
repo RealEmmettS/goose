@@ -22,12 +22,27 @@ Functional: real runtime deliveries create bounded, fully fitted owned windows; 
 Evidence: locked Rust tests and native GTK builds plus at least two real delivery/close cycles under Xvfb and native ARM64 labwc. Signed/platform packaging and public publication belong to #rlpi, after #rr1. No physical Pi acceptance is inferred. Checkpoint after the first native note probe and after each distinct failure; two attempts without new evidence require added diagnostics or a changed premise.
 
 ## Verification
-- [ ] Real engine tests cover capacity exhaustion/recovery, placement-only delivery and interrupted actions.
+- [x] Real engine tests cover capacity exhaustion/recovery, placement-only delivery and interrupted actions.
 - [ ] Native GTK note/image tests verify complete fit, exact owned-window movement, close events and child cleanup.
 - [ ] GNU/musl architecture builds preserve CLI/TUI availability and reject broken companion/protocol inputs.
 
 ## Status
-Active in the isolated `codex/goose-linux-expansion` checkout. Native GNU x64/ARM64 note, capacity, move, close and EOF checks pass. Rust runtime integration is implemented and awaits its first native build/delivery/failure test; image pixels and native Wayland qualification remain open. Nothing is published.
+Active in the isolated `codex/goose-linux-expansion` checkout. Both native GNU architectures
+pass real X11 engine delivery/text, child-loss failure latching, reload, graceful cleanup,
+standalone controls, native capacity/close/move tests and complete-image pixels. The local
+Rust workspace, strict Clippy, release build, 130 Python checks (three host skips), native
+settings tests/check/build pass. Visible runtime-note captures and native labwc placement
+remain open; workflow 34186038608 tests client-side composition and the installed output
+query interface. Musl/full-platform release integration follows the first release. Nothing
+is published.
+
+## Evidence
+| Criterion | Oracle / invocation | Raw result or pointer | Interpretation | Limitation | Status |
+|---|---|---|---|---|---|
+| Bounded engine admission and placement-only behavior | locked workspace suite and native GNU controller tests | 34185456570; local complete workspace suite | Existing notes retained at capacity; no invented Wayland movement | Native full-platform package gates pending | PASS |
+| Native host text, pixels, moves, closes, invalid input and EOF | smoke_owned_props_linux.py, scales one and two | 34185456570 GNU x64/ARM64 artifacts | Both cycles and complete-picture pixel checks pass | X11 native host; no Pi hardware | PASS |
+| Runtime delivery, failure and shared status | smoke_runtime_props_linux.py | 34185456570 runtime-props-evidence/result.json and session-status.json | Real native text, child loss, failure latch, caller-independent status and standalone controls pass | Debug compositor capture does not prove visible runtime note | PARTIAL |
+| Visible runtime note and labwc | strengthened capture and native placement probes | 34186038608 | Corrected fixture is running | Required before support/publication claims | NOT RUN |
 
 ## Activity
 - 2026-09-07: Real x64 X11 engine delivery, text, companion failure latching, graceful cleanup, caller-independent session readback and standalone controls pass at eafa11c. Screenshot review found the test compositor's debug mode flattened the transparent overlay over the note; use the existing production-like client-composition mode and require visible note pixels/geometry. Labwc then stopped on the older wlr-randr lacking --json; read its actual text output. Visual and Wayland gates remain open.

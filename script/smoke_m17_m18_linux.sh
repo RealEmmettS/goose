@@ -120,6 +120,28 @@ wait_for_status() {
   fi
 }
 
+wait_for_collect_capability() {
+  expected=unsupported
+  # Inspect the owned running ELF's real directory, including managed selectors.
+  runtime_binary="$(readlink -f "/proc/${PID}/exe")"
+  if [ -x "$(dirname "$runtime_binary")/honk300-settings" ]; then
+    expected=supported
+  fi
+  for _ in $(seq 1 40); do
+    "${BIN}" status >"${STATUS}" 2>&1
+    if grep -q "^collect: ${expected}$" "${STATUS}"; then
+      return 0
+    fi
+    if grep -q '^collect: failed$' "${STATUS}"; then
+      break
+    fi
+    sleep 0.25
+  done
+  cat "${STATUS}" >&2
+  echo "smoke_m17_m18_linux: expected collect ${expected} for the actual payload" >&2
+  exit 1
+}
+
 wait_for_x11_compositor() {
   for _ in $(seq 1 40); do
     if python3 <<'PY'
@@ -627,7 +649,7 @@ grep -q "overlay mode is Wayland" "${WORK}/wayland-runtime.log"
 grep -q "Linux StatusNotifier controls are unavailable; CLI controls remain active" "${WORK}/wayland-runtime.log"
 grep -Eq "cursor: (unsupported|failed)" "${STATUS}"
 grep -Eq "window: (unsupported|failed)" "${STATUS}"
-grep -Eq "collect: (unsupported|failed)" "${STATUS}"
+wait_for_collect_capability
 capture_wayland_background_pairs
 if "${BIN}" do nab >"${NAB}" 2>&1; then
   echo "smoke_m17_m18_linux: nab unexpectedly succeeded in Wayland reduced mode" >&2
