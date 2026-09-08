@@ -173,7 +173,7 @@ static int spawn_prop(Prop *prop, const HonkPropCommand *command) {
     gtk_widget_set_hexpand(label, TRUE);
     gtk_widget_set_margin_start(label, 8);
     gtk_widget_set_halign(label, GTK_ALIGN_FILL);
-    GtkWidget *close = gtk_button_new_with_label("\303\227");
+    GtkWidget *close = gtk_button_new_with_label("Close");
     gtk_widget_add_css_class(close, "honk-prop-close");
     gtk_accessible_update_property(GTK_ACCESSIBLE(close), GTK_ACCESSIBLE_PROPERTY_LABEL, "Close", -1);
     g_signal_connect(close, "clicked", G_CALLBACK(close_clicked), prop);
