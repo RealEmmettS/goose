@@ -34,6 +34,7 @@ Active. Begin native socket/window qualification on separately packaged Hyprland
 generations, with private configuration and no production runtime claims yet.
 
 ## Activity
+- 2026-09-08 — Native Hyprland 0.55 ARM64 passes the full premise. Both 0.53 hosts now reach ordinary GTK mapping and fail specifically while changing tiling into floating mode; the compositor logs the operation and late reply. Use fixed-size native fixture clients that float at map time, preserving the same actual placement/refusal tests and bounded response deadline without requiring this unrelated layout snapshot.
 - 2026-09-08 — The kernel-identified vkms device boots all four real compositors. Actual requests now reach monitor/window operations, but bounded replies time out. Keep the GTK client event loop active during IPC and retry read-only startup waits; preserve each exchange's deadline and EOF check and record transaction timing/bytes for the next native run.
 - 2026-09-08 — The third attempt fails in device selection before launching the
   compositor: vkms has no ordinary platform driver symlink on these kernels. Query

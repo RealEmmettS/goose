@@ -34,6 +34,9 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Open the private desktop test windows at a fixed size so the placement check starts from a settled layout.
+
+### Behind the scenes
 - Let the private test windows respond normally while Hyprland processes their placement, and record the replies needed to diagnose a stalled desktop check.
 
 ### Behind the scenes

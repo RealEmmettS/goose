@@ -147,20 +147,19 @@ def main():
             def find(title):
                 return next((node for node in ipc('j/clients') if node.get('title') == title), None)
 
-            # Float each fixture before creating the next one, preventing tiling
-            # reflow from being confused with an integration touching a terminal.
+            # Fixed-size clients are natively floated by Hyprland before mapping.
+            # Avoid a layout-mode transition (which makes a software-rendered
+            # snapshot) while qualifying observations and ordinary placement.
             for title in ('Honk300 ordinary Hyprland probe', 'ChatGPT Codex terminal probe'):
                 window = Gtk.Window(title=title)
                 window.set_default_size(300, 200)
+                window.set_resizable(False)
                 window.set_child(Gtk.Label(label=title))
                 window.present()
                 windows.append(window)
                 node = wait(lambda: find(title), 'native fixture identity')
                 assert node['pid'] == os.getpid() and node['class'] == 'honk300-hyprland-probe', node
                 assert re.fullmatch(r'0x[0-9a-fA-F]+', node['address']), node
-                selector = 'address:' + node['address']
-                command("/dispatch hl.dsp.window.float({action='set',window='" + selector + "'})"
-                        if lua else '/dispatch setfloating ' + selector)
                 wait(lambda: find(title)['floating'], 'floating fixture')
             ordinary, protected = (find(window.get_title()) for window in windows)
             for node in (ordinary, protected):
