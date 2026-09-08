@@ -18,9 +18,10 @@
 - [ ] **Linux owned prop implementation** - bounded native note/image windows and honest compositor placement in an isolated follow-on checkout (ms #refine) (owner codex) #lpr
   - [x] Bound owned prop admission and preserve existing notes when the capacity is full.
   - [x] Implement the companion protocol and native GTK note/image host.
-  - [ ] Connect X11 delivery and Wayland compositor placement to the real runtime.
-  - [ ] Report live display, session hints and separate prop positioning in CLI/TUI/GUI.
-  - [ ] Exercise close, cleanup, disconnect, invalid input, image fitting and repeated delivery.
+  - [x] Connect X11 delivery and Wayland compositor placement to the real runtime.
+  - [x] Report live display, session hints and separate prop positioning in CLI/TUI/GUI.
+  - [x] Exercise close, cleanup, disconnect, invalid input, image fitting and repeated delivery.
+  - [ ] Verify the actual GNU/musl release companions and oldest GTK baseline.
 - [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
   - [ ] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
   - [x] Correct captured Windows start and verify native GUI Start, independent settings close, and graceful Stop.

@@ -118,13 +118,15 @@ def main():
                     # Native text readback is necessary but cannot prove a
                     # transparent overlay has not obscured the entire prop.
                     pixels = picture.crop((x, y, x + width, y + height))
-                    painted = sum(max(pixel) > 12 for pixel in pixels.getdata())
+                    # This private desktop uses the native default light theme.
+                    # Gray root pixels cannot stand in for the white note body.
+                    painted = sum(min(pixel) > 220 for pixel in pixels.getdata())
                     return painted > width * height * 0.3
             # Wayland does not expose global prop coordinates. On this empty,
             # black test desktop, a real painted note is much larger than the
             # goose, while AT-SPI separately confirms its owned native text.
             with Image.open(path).convert('RGB') as picture:
-                return sum(max(pixel) > 12 for pixel in picture.getdata()) > 25_000
+                return sum(min(pixel) > 220 for pixel in picture.getdata()) > 25_000
 
         wait(visible, 'visible native note in the composited desktop', 15)
 

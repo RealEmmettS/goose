@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Linux delivery checks now cover the older desktop libraries used for official packages, with stronger evidence that notes remain visible.
 - Linux package checks now require included note support to become ready, while checking that a standalone command remains usable without it.
 - Native delivery checks now verify that the note is actually visible beside the goose, as well as readable by accessibility tools.
 - The project board now keeps implementation progress and release prerequisites clearer, using the current dashboard while preserving its existing settings.
