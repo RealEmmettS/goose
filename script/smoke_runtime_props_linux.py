@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shutil
 import subprocess
 import time
 
@@ -27,7 +28,7 @@ def main():
     def control(*arguments, check=True):
         return subprocess.run([str(binary), *arguments], capture_output=True, text=True, timeout=10, check=check)
 
-    assert control('status', check=False).returncode != 0, 'Another runtime is already active'
+    assert 'honk300: running' not in control('status', check=False).stdout, 'Another runtime is already active'
     subprocess.run(['gdbus', 'call', '--session', '--dest', 'org.a11y.Bus', '--object-path', '/org/a11y/bus',
                     '--method', 'org.freedesktop.DBus.Properties.Set', 'org.a11y.Status', 'IsEnabled', '<true>'], check=True)
     Atspi.init()
@@ -146,7 +147,32 @@ autumn = false
                         except subprocess.TimeoutExpired:
                             runtime.kill()
                             runtime.wait()
-        (evidence / 'result.json').write_text(json.dumps({'ok': True, 'cycles': results}, indent=2) + '\n')
+        standalone = evidence / 'without-companion'
+        standalone.mkdir()
+        shutil.copy2(binary, standalone / 'honk300')
+        with (standalone / 'runtime.log').open('w') as log:
+            runtime = subprocess.Popen([str(standalone / 'honk300'), 'start', '--config', str(config),
+                                        *([] if positioning else ['--wayland'])], stdout=log, stderr=log)
+            try:
+                status = wait(lambda: (value if 'collect: unsupported' in (value := control('status', check=False).stdout) else None), 'standalone runtime without GTK companion')
+                assert 'running' in status
+                service = subprocess.run([str(standalone / 'honk300'), '__settings-service', '--config', str(config)],
+                                         input=json.dumps({'protocol': 1, 'request_id': 77, 'command': {'op': 'read'}}),
+                                         capture_output=True, text=True, check=True, timeout=15)
+                response = json.loads(service.stdout)
+                assert response['ok'] and len(response['data']['fields']) >= 50, response
+                control('stop')
+                assert runtime.wait(timeout=60) == 0
+            finally:
+                if runtime.poll() is None:
+                    control('stop', '--force', check=False)
+                    try:
+                        runtime.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        runtime.kill()
+                        runtime.wait()
+        (evidence / 'result.json').write_text(json.dumps({'ok': True, 'cycles': results,
+            'without_companion': {'runtime': True, 'shared_settings_service': True, 'props': 'unsupported'}}, indent=2) + '\n')
     finally:
         Atspi.exit()
 

@@ -57,14 +57,18 @@ class Host:
         return self.wait(lambda event: event.get('event') == 'window' and event.get('id') == identity and event['alive'])
 
     def close(self):
-        if self.process.poll() is None:
+        try:
             self.process.stdin.close()
+        except BrokenPipeError:
+            pass
+        if self.process.poll() is None:
             try:
                 self.process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 self.process.kill()
                 self.process.wait()
         self.selector.close()
+        self.process.stdout.close()
         self.log.close()
 
 
@@ -274,8 +278,28 @@ def main():
             assert not native_windows(disconnected.process.pid)
         finally:
             disconnected.close()
+        rejected = []
+        for failure in ('unknown-field', 'oversized-frame'):
+            broken = Host(args.binary.resolve(), evidence / failure, positioning)
+            try:
+                broken.send('note', id=1, x=80, y=80, width=400, height=250, title='Connection-owned note')
+                broken.window(1)
+                if failure == 'unknown-field':
+                    broken.send('close', id=1, foreign_window_id=123456)
+                else:
+                    try:
+                        broken.process.stdin.write(b'x' * (4 * 1024 * 1024 + 1))
+                        broken.process.stdin.flush()
+                    except BrokenPipeError:
+                        pass
+                assert broken.process.wait(timeout=15) != 0, 'Malformed input did not fail the connection'
+                assert not native_windows(broken.process.pid)
+                rejected.append(failure)
+            finally:
+                broken.close()
         (evidence / 'result.json').write_text(json.dumps({'schema': 'honk300.owned-props.v1', 'ok': True,
             'cycles': results, 'stdin_eof_removed_windows': True,
+            'malformed_input_closed_owned_windows': rejected,
             'proof': f'native GTK on disposable {os.environ["GDK_BACKEND"]}'}, indent=2) + '\n')
     finally:
         Atspi.exit()

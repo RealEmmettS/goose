@@ -54,6 +54,8 @@ Save remains available to accessibility tools after changing settings, including
 Settings now expose their text and controls to Windows accessibility tools, with Linux support undergoing the same checks. The installer keeps the supporting accessibility component with its matching app, and the app checks that both are intact before opening.
 
 ### Behind the scenes
+- Delivery checks now distinguish a stopped goose from a failed status request before starting their isolated run.
+- Linux checks cover damaged messages and starting without the graphical companion, so the goose's basic controls remain usable when picture and note support is unavailable.
 - Linux desktop checks now include display scaling and ordinary Wayland window placement. They also check code paths that a Windows build cannot exercise.
 - Linux delivery checks now follow a real note from the goose into its window and test recovery when the supporting process disappears. Picture checks wait until the complete image is visible.
 - Keep picture memory valid while closing, allow dragging a note by its header, and capture the native controls when close checks fail.
