@@ -6,8 +6,8 @@ use crate::runtime::owned_props::Controller as PropController;
 use crate::runtime::{audio_probe_capability, RuntimeOptions};
 use honk_config::{BackendCapability, BackendState, Config, EffectiveOptions};
 use honk_control::{
-    BundleStatus, CapabilityStatus, CommandServer, ControlCommand, ControlResponse, PlatformStatus,
-    RuntimeStatus,
+    BundleStatus, CapabilityStatus, CommandServer, ControlCommand, ControlResponse, DesktopBackend,
+    PlatformStatus, RuntimeStatus, SessionStatus,
 };
 use honk_engine::render::DamageCanvas;
 use honk_engine::render::{
@@ -262,6 +262,33 @@ pub fn run(
                             assets.meme_count(),
                         ),
                     )));
+                }
+                ControlCommand::Session => {
+                    let backend = match overlay_mode {
+                        OverlayMode::X11
+                            if session
+                                .xdg_session_type
+                                .as_deref()
+                                .is_some_and(|value| value.eq_ignore_ascii_case("wayland")) =>
+                        {
+                            DesktopBackend::X11OnWayland
+                        }
+                        OverlayMode::X11 => DesktopBackend::X11,
+                        OverlayMode::Wayland => DesktopBackend::Wayland,
+                        OverlayMode::Headless => DesktopBackend::Headless,
+                    };
+                    let prop_positioning = if collect_window == BackendCapability::Supported
+                        && overlay_mode != OverlayMode::X11
+                    {
+                        CapabilityStatus::Unsupported
+                    } else {
+                        capability_status(collect_window)
+                    };
+                    request.respond(ControlResponse::Session(SessionStatus {
+                        backend,
+                        desktop: session.desktop,
+                        prop_positioning,
+                    }));
                 }
             }
         }

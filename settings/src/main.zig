@@ -370,7 +370,13 @@ pub fn acceptResponse(model: *Model, bytes: []const u8) !void {
         const description = try std.fmt.allocPrint(allocator, "Goose: {s}\nDesktop: {s}\nOverlay: {s}  |  Sound: {s}\nCursor: {s}  |  Window rides: {s}\nNotes and memes: {s}  |  Manners: {s}\nAccessibility: {s}", .{
             if (flag(runtime, "running")) "running" else "stopped", string(runtime, "platform"), string(runtime, "overlay"), string(runtime, "audio"), string(runtime, "cursor"), string(runtime, "windows"), string(runtime, "notes_and_memes"), string(runtime, "manners"), string(runtime, "accessibility"),
         });
-        model.runtime_buffer.set(description);
+        if (runtime.object.get("session")) |session| {
+            if (session == .object) {
+                model.runtime_buffer.set(try std.fmt.allocPrint(allocator, "{s}\nDisplay: {s}\nSession reports: {s}\nNote placement: {s}", .{
+                    description, string(session, "backend"), string(session, "desktop_hint"), string(session, "prop_positioning"),
+                }));
+            } else model.runtime_buffer.set(description);
+        } else model.runtime_buffer.set(description);
     }
     if (data.object.get("updates")) |updates| {
         model.update_available = flag(updates, "available");

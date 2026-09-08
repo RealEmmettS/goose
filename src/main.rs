@@ -189,8 +189,18 @@ fn run_client_command(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         ControlResponse::Err(code) => Err(format!("honk300 command rejected: {code}").into()),
         ControlResponse::Status(status) => {
             print_status(status)?;
+            if status.running && status.platform == honk_control::PlatformStatus::Linux {
+                if let Ok(ControlResponse::Session(session)) = send_command(ControlCommand::Session)
+                {
+                    let stdout = io::stdout();
+                    let mut writer = stdout.lock();
+                    ignore_broken_pipe(writeln!(writer, "display backend: {}\ndesktop (session hint): {}\nnote/picture positioning: {}",
+                        session.backend.label(), session.desktop.label(), session.prop_positioning.label()))?;
+                }
+            }
             Ok(())
         }
+        ControlResponse::Session(_) => Err("honk300: unexpected session response.".into()),
     }
 }
 

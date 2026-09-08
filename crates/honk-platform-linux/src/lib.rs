@@ -10,6 +10,7 @@ mod tray;
 #[cfg(target_os = "linux")]
 pub use tray::StatusTray;
 
+use honk_control::DesktopEnvironment;
 use honk_engine::{LocalTime, Rect, Vec2};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,6 +37,7 @@ pub struct SessionInfo {
     pub wayland_display: Option<String>,
     pub xdg_session_type: Option<String>,
     pub forced_wayland: bool,
+    pub desktop: DesktopEnvironment,
 }
 
 impl SessionInfo {
@@ -55,6 +57,7 @@ impl SessionInfo {
             wayland_display,
             xdg_session_type,
             forced_wayland: force_wayland,
+            desktop: DesktopEnvironment::from_hint(non_empty_env("XDG_CURRENT_DESKTOP").as_deref()),
         }
     }
 }

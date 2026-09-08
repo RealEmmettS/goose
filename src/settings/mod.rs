@@ -241,12 +241,24 @@ fn runtime_json() -> Result<Value, Error> {
         }
         result => return Err(format!("runtime status was not confirmed: {result:?}").into()),
     };
+    let session = if status.running && status.platform == honk_control::PlatformStatus::Linux {
+        match send_command(ControlCommand::Session) {
+            Ok(ControlResponse::Session(session)) => Some(json!({
+                "backend": session.backend.label(), "desktop_hint": session.desktop.label(),
+                "prop_positioning": session.prop_positioning.label(),
+            })),
+            _ => None,
+        }
+    } else {
+        None
+    };
     Ok(
         json!({"running": status.running, "platform": status.platform.label(),
         "overlay": status.overlay.label(), "accessibility": status.accessibility.label(),
         "cursor": status.cursor.label(), "windows": status.window.label(),
         "notes_and_memes": status.collect.label(), "manners": status.presence.label(),
-        "audio": status.audio.label(), "notes": status.notes, "memes": status.memes}),
+        "audio": status.audio.label(), "notes": status.notes, "memes": status.memes,
+        "session": session}),
     )
 }
 

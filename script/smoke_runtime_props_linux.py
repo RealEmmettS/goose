@@ -101,7 +101,7 @@ def main():
     config = evidence / 'config.toml'
     config.write_text('''goose_config_version = 2
 [behavior]
-first_wander_time_seconds = 0.0
+first_wander_time_seconds = 600.0
 [audio]
 enabled = false
 [safety]
@@ -124,7 +124,14 @@ autumn = false
                                             *([] if positioning else ['--wayland'])], stdout=log, stderr=log)
                 host_pid = None
                 try:
-                    wait(lambda: 'collect: supported' in control('status', check=False).stdout, 'real prop readiness')
+                    def ready():
+                        if runtime.poll() is not None:
+                            raise RuntimeError(f'Goose exited during startup: {(directory / "runtime.log").read_text()[-4000:]}')
+                        status = control('status', check=False).stdout
+                        if 'collect: failed' in status:
+                            raise RuntimeError(f'Owned companion failed: {(directory / "runtime.log").read_text()[-4000:]}')
+                        return 'collect: supported' in status
+                    wait(ready, 'real prop readiness')
                     children = Path(f'/proc/{runtime.pid}/task/{runtime.pid}/children').read_text().split()
                     candidates = [int(pid) for pid in children if Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')[:2] ==
                                   [os.fsencode(binary.with_name('honk300-settings')), b'--owned-props']]
@@ -136,7 +143,21 @@ autumn = false
                     capture_prefix = ['import', '-window', 'root'] if positioning else ['grim']
                     subprocess.run([*capture_prefix, str(directory / 'delivered-note.png')], check=True)
                     assert owned_windows(host_pid), 'Delivered note has no native window'
-                    assert 'collect: supported' in control('status').stdout
+                    status = control('status').stdout
+                    assert 'collect: supported' in status
+                    assert f'display backend: {"X11" if positioning else "native Wayland"}' in status, status
+                    assert f'note/picture positioning: {"supported" if positioning else "unsupported"}' in status, status
+                    if not positioning:
+                        assert 'desktop (session hint): labwc' in status, status
+                    service = subprocess.run([str(binary), '__settings-service', '--config', str(config)],
+                        input=json.dumps({'protocol': 1, 'request_id': 78, 'command': {'op': 'status'}}),
+                        capture_output=True, text=True, check=True, timeout=15)
+                    details = json.loads(service.stdout)['data']['runtime']['session']
+                    assert details['prop_positioning'] == ('supported' if positioning else 'unsupported'), details
+                    caller = subprocess.run([str(binary), 'status'], capture_output=True, text=True, check=True, timeout=10,
+                        env=dict(os.environ, XDG_CURRENT_DESKTOP='untrusted-caller', XDG_SESSION_TYPE='tty'))
+                    assert f'desktop (session hint): {details["desktop_hint"]}' in caller.stdout, caller.stdout
+                    (directory / 'session-status.json').write_text(json.dumps(details, indent=2) + '\n')
                     if not positioning:
                         status = control('status').stdout
                         assert 'cursor: unsupported' in status and 'window: unsupported' in status, status

@@ -6,6 +6,9 @@
 
 mod platform;
 mod protocol;
+mod session;
+
+pub use session::{DesktopBackend, DesktopEnvironment, SessionStatus};
 
 pub use platform::CommandServer;
 pub use platform::{

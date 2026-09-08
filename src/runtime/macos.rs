@@ -255,6 +255,9 @@ pub fn run(
                         assets.meme_count(),
                     )));
                 }
+                ControlCommand::Session => {
+                    request.respond(ControlResponse::Err("UNSUPPORTED".into()))
+                }
             }
         }
 

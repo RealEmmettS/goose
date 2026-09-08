@@ -1,5 +1,6 @@
 #![cfg_attr(not(windows), allow(dead_code))]
 
+use crate::SessionStatus;
 use honk_engine::{PokeAction, PokeOutcome};
 use std::error::Error;
 use std::fmt;
@@ -14,6 +15,7 @@ pub enum ControlCommand {
     Reload,
     ReloadIf([u8; 32]),
     Status,
+    Session,
     Do(PokeAction),
 }
 
@@ -22,6 +24,7 @@ pub enum ControlResponse {
     Ok,
     Err(String),
     Status(RuntimeStatus),
+    Session(SessionStatus),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,6 +111,7 @@ impl ControlCommand {
             }
             Self::Reload => format!("{VERSION} RELOAD\n"),
             Self::Status => format!("{VERSION} STATUS\n"),
+            Self::Session => format!("{VERSION} SESSION\n"),
             Self::Do(action) => format!("{VERSION} DO {}\n", encode_action(action)),
         }
     }
@@ -157,6 +161,10 @@ impl ControlCommand {
                 ensure_end(parts)?;
                 Ok(Self::Status)
             }
+            "SESSION" => {
+                ensure_end(parts)?;
+                Ok(Self::Session)
+            }
             "DO" => {
                 let Some(action) = parts.next() else {
                     return Err(ProtocolError::MissingAction);
@@ -187,6 +195,7 @@ impl ControlResponse {
             Self::Ok => "OK\n".to_string(),
             Self::Err(code) => format!("ERR {code}\n"),
             Self::Status(status) => status.encode(),
+            Self::Session(session) => session.encode(),
         }
     }
 
@@ -212,6 +221,7 @@ impl ControlResponse {
                 Ok(Self::Err(code.to_string()))
             }
             Some("STATUS") => RuntimeStatus::decode(parts).map(Self::Status),
+            Some("SESSION") => SessionStatus::decode(parts).map(Self::Session),
             _ => Err(ProtocolError::MalformedResponse),
         }
     }
@@ -412,7 +422,7 @@ impl CapabilityStatus {
         }
     }
 
-    fn encode(self) -> &'static str {
+    pub(crate) fn encode(self) -> &'static str {
         match self {
             Self::Unprobed => "N",
             Self::Supported => "S",
@@ -422,7 +432,7 @@ impl CapabilityStatus {
         }
     }
 
-    fn decode(value: &str) -> Result<Self, ProtocolError> {
+    pub(crate) fn decode(value: &str) -> Result<Self, ProtocolError> {
         match value {
             "N" => Ok(Self::Unprobed),
             "S" => Ok(Self::Supported),

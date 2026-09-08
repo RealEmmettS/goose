@@ -8,11 +8,15 @@
 
 ## To-Do
 
-- [ ] **Linux props and experimental Raspberry Pi support** - integrate and publish owned props, session reporting, and ARM64 labwc packages after the first refinement release (needs #rr1, #lpr) (ms #refine) (owner codex) #rlpi
 - [ ] **Opt-in KDE and portal integration** - guided revocable capabilities with independently qualified window and pointer operations (needs #rlpi) (ms #refine) (owner codex) #rkde
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
 
 ## Active
+- [ ] **Linux props and experimental Raspberry Pi support** - integrate and publish owned props, session reporting, and ARM64 labwc packages after the first refinement release (needs #rr1, #lpr) (ms #refine) (owner codex) #rlpi
+  - [ ] Report live display, session hints and separate prop positioning in CLI/TUI/GUI.
+  - [ ] Qualify native ARM64 labwc placement, scaling and dependency/standalone behavior.
+  - [ ] Document experimental Pi 4/5 setup and the physical acceptance boundary.
+  - [ ] Rebase onto the first release and complete every platform/package/public-byte gate.
 - [ ] **Linux owned prop implementation** - bounded native note/image windows and honest compositor placement in an isolated follow-on checkout (ms #refine) (owner codex) #lpr
   - [x] Bound owned prop admission and preserve existing notes when the capacity is full.
   - [x] Implement the companion protocol and native GTK note/image host.

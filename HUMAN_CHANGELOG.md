@@ -34,6 +34,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 ## In development — September 2026
 
 ### Behind the scenes
+- Delivery checks now report startup failures immediately and keep the goose from choosing a random errand while a requested note is being checked.
 - Linux delivery checks now start a complete test desktop before asking the goose to bring a note.
 
 ### Fixed
@@ -43,6 +44,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 The goose can keep bringing notes and pictures when Windows leaves focus with the app you are using. Notes still receive their text without typing into another app.
 
 ### Improved
+- Linux status shows the active display connection, the desktop reported by the session, and whether the goose can move its own notes. These details also appear in both settings screens.
 
 Starting the goose from graphical settings now finishes promptly, and tools that capture a start command's output can finish while the goose keeps running. Closing settings leaves the goose running independently.
 

@@ -50,7 +50,23 @@ is platform-specific and deprecated in newer GTK4; its continued availability is
 build/runtime gate, not evidence of a portable Wayland operation. Input regions use the
 documented [`GdkSurface` API](https://docs.gtk.org/gdk4/method.Surface.set_input_region.html).
 
-## Qualification
+## Session reporting
+
+An additive `HONK300/1 SESSION` request reports the live overlay backend, a closed-set
+desktop hint and the separate owned-prop positioning capability. Existing `STATUS`
+frames are unchanged, so old clients remain usable and new clients tolerate an old
+runtime declining the optional detail. CLI, TUI and the Rust settings service use the
+same runtime response; they do not infer runtime state from the caller's environment.
+
+`XDG_CURRENT_DESKTOP` is a bounded, colon-separated hint according to the
+[desktop-entry specification](https://xdg.pages.freedesktop.org/xdg-specs/desktop-entry/latest/recognized-keys.html).
+It never enables an integration or authorizes a window/pointer operation. An X11
+overlay in an environment reporting a Wayland session is labeled accordingly; this
+does not claim a native Wayland connection. Unknown values are not echoed into UI.
+Full-screen/DND observations remain explicitly unsupported until a qualified observer
+supplies them; a saved manners toggle is not evidence of desktop observation.
+
+## Qualification evidence
 
 Exercise actual child protocol, note/image fit, user and program closes, capacity
 exhaustion/recovery, disconnect, stale ids, display change and graceful shutdown.

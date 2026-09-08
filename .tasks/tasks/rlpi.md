@@ -25,7 +25,10 @@ The requested behavior runs through its production path and the supporting evide
 - [ ] Integration and required package/release checks pass before publication.
 
 ## Status
-Queued; not implemented or qualified.
+Active development in the isolated Linux expansion checkout while the first release qualifies.
+Shared runtime session/placement reporting is implemented and undergoing local/native tests;
+real prop delivery and labwc gates remain open. Publication still follows #rr1 and #lpr.
 
 ## Activity
+- 2026-09-07: Added an optional finite SESSION response without changing existing STATUS bytes. CLI, TUI and the Rust GUI service show live runtime details; untrusted desktop names are reduced to known labels and cannot enable capabilities. Native readback and packaging remain pending.
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).
