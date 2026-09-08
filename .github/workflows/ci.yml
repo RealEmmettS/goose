@@ -279,6 +279,7 @@ jobs:
           sh script/smoke_control_surface_updated_deb.sh
       - name: Linux X11 and Wayland smoke
         run: |
+          cargo clippy --locked --all-targets --workspace -- -D warnings
           cargo build --locked --bin honk300
           HONK300_BIN="$PWD/target/debug/honk300" \
           HONK300_EVIDENCE_DIR="$PWD/target/linux-overlay-evidence-${{ matrix.gnu_target }}" \
