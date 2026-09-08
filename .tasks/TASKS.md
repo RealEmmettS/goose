@@ -15,16 +15,6 @@
 - [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
 
 ## Active
-- [ ] **Linux props and experimental Raspberry Pi support** - integrate and publish owned props, session reporting, and ARM64 labwc packages after the first refinement release (needs #rfnd, #rart, #rgui, #lpr) (ms #refine) (owner codex) #rlpi
-  - [x] Qualify native ARM64 labwc placement, scaling and dependency/standalone behavior.
-  - [x] Document experimental Pi 4/5 setup and the physical acceptance boundary.
-  - [ ] Integrate the first release and complete every platform/package/public-byte gate.
-- [ ] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
-  - [ ] Deliver editable renderer SVGs and verify the website against the published release.
-  - [x] Resolve final PR review findings and repeat qualification before tagging.
-  - [x] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
-  - [x] Correct captured Windows start and verify native GUI Start, independent settings close, and graceful Stop.
-  - [x] Compare isolated native CPU/memory/IPC workloads and verify note/meme delivery after foreground denial.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
@@ -46,6 +36,17 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **Linux props and experimental Raspberry Pi support** - integrate and publish owned props, session reporting, and ARM64 labwc packages after the first refinement release (needs #rfnd, #rart, #rgui, #lpr) (ms #refine) (owner codex) #rlpi
+  - [x] Qualify native ARM64 labwc placement, scaling and dependency/standalone behavior.
+  - [x] Document experimental Pi 4/5 setup and the physical acceptance boundary.
+  - [x] Integrate the first release and complete every platform/package/public-byte gate.
+  - [x] Verify the deployed second-stage website release guidance.
+- [x] **Refinement first release qualification** - qualify and publish the reliability, art, and settings update (needs #rfnd, #rart, #rgui) (ms #refine) (owner codex) #rr1
+  - [x] Deliver editable renderer SVGs and verify the website against the published release.
+  - [x] Resolve final PR review findings and repeat qualification before tagging.
+  - [x] Verify CLI, TUI, and GUI updater success, no-op, failure, receipt, and relaunch behavior.
+  - [x] Correct captured Windows start and verify native GUI Start, independent settings close, and graceful Stop.
+  - [x] Compare isolated native CPU/memory/IPC workloads and verify note/meme delivery after foreground denial.
 - [x] **Refinement audit and reliability foundation** - evidence-backed corrections, production-path tests, shared bounded rendering resources, and maintainable lifecycle modules (ms #refine) (owner codex) (done 2026-09-08) #rfnd
   - [x] Record the audit register and baseline measurements.
   - [x] Share bounded canvas reuse and accumulator-aware runtime pacing.

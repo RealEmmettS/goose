@@ -6,15 +6,14 @@ Honk300 is a cross-platform Rust desktop goose with a procedural renderer and Wi
 macOS, X11, and opt-in reduced Wayland runtimes. `honk300` is the primary binary;
 `honk` and `goose` are its command aliases. The Cargo workspace uses Rust 1.95, edition 2021.
 
-Public stable is v1.4.0, source `85c9d426f7409800198ee5e89bca7d6042034082`.
-Its completed publication and fresh-public-byte evidence is in `docs/readiness/v1.4.0-readiness.md`.
+Public stable is v1.5.0, source `af0bec1394361902dca350d5d900d5c56f391046`.
+Its completed publication and fresh-public-byte evidence is in `docs/readiness/v1.5.0-readiness.md`.
 Official installed Windows acceptance remains open: the administrator prompt was not approved,
 so this machine's v1.3.5 installation and protected receipt remain unchanged.
 
-The second stage, v1.5.0, is tagged at qualified source
-`af0bec1394361902dca350d5d900d5c56f391046` and its publication build is running.
-It adds owned Linux props, session reporting and experimental Pi guidance. See
-`docs/readiness/v1.5.0-readiness.md`; no public claim precedes its final download checks.
+The first two stages are published: the redesigned goose and native settings, followed by
+owned Linux props, session reporting and experimental Pi guidance. The website uses the
+actual renderer's editable SVGs and verified second-stage Linux/Pi guidance.
 Native GNU/musl and ARM64 labwc proof is not physical Pi acceptance.
 
 The approved refinement is in progress under `.tasks/milestones/refine.md` and ADR 0041:

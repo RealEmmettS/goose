@@ -5,23 +5,22 @@ across real monitor layouts, honks, leaves muddy footprints, reacts to the point
 bounded desktop pranks. Configuration and control stay local through a command-line interface
 and native graphical and terminal settings screens.
 
-**Next release, v1.5.0:** the qualified source adds owned Linux notes and pictures,
+**New in v1.5.0:** owned Linux notes and pictures,
 live desktop-session reporting, and experimental Pi 4/5 64-bit Desktop guidance. X11 can
 animate owned deliveries; native Wayland uses normal compositor placement. These changes
 follow the v1.4.0 goose redesign, runtime reliability work and native graphical settings.
 `honk300 settings` and tray Configure open the GUI; `honk300 config` retains the TUI.
-Both edit the same Rust-owned configuration. The new immutable tag is building; public
-availability follows complete publication and fresh-download checks. See [stage-two readiness](docs/readiness/v1.5.0-readiness.md),
+Both edit the same Rust-owned configuration. All eight managed installation checks passed
+against fresh public downloads. See [stage-two readiness](docs/readiness/v1.5.0-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
 The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
 `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.4.0](https://github.com/RealEmmettS/goose/releases/tag/v1.4.0),
-published from exact commit `85c9d426f7409800198ee5e89bca7d6042034082`. It brings the
-continuous goose redesign, expressive motion, bounded rendering resources, and native
-graphical settings with the existing configuration and updater. All eight managed
-installation checks passed against fresh public downloads. See [release evidence](docs/readiness/v1.4.0-readiness.md).
+**Current stable release:** [v1.5.0](https://github.com/RealEmmettS/goose/releases/tag/v1.5.0),
+published from exact commit `af0bec1394361902dca350d5d900d5c56f391046`. It includes the
+continuous goose redesign, expressive motion, bounded rendering resources, native
+graphical settings, and the new Linux deliveries. See [release evidence](docs/readiness/v1.5.0-readiness.md).
 
 The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
 fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
