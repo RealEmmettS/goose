@@ -17,7 +17,7 @@ has implementation details; [the README](README.md) describes current features a
 - Give Linux application entries the full goose artwork, preserve login startup, and verify that Windows and Mac can read their packaged application icons.
 
 ### Behind the scenes
-- Check the installed application shortcuts, icons and graphical controls during release testing, including upgrades that leave an older installation record behind. Check that shared Windows shortcuts belong to the shared installation.
+- Check the installed application shortcuts, icons and graphical controls during release testing, including upgrades that leave an older installation record behind. Check both personal and shared Windows installations, including how Windows locates their artwork.
 - Keep tray descriptions and their checks consistent with the new application name.
 
 ## Refinement release records — September 2026

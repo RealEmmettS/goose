@@ -48,6 +48,9 @@ arguments and icon after installation rather than accepting successful MSI exit 
 MSI publishes its primary icon through the documented
 [Windows Installer ProductIcon API](https://learn.microsoft.com/en-us/windows/win32/api/msi/nf-msi-msigetproductinfow).
 Qualification reads that icon and compares the real cached file with the approved artwork.
+Resolve environment-variable icon descriptors before native decoding, and retain both the
+registered descriptor and verified path in the evidence. Per-user and per-machine icon caches
+have [different locations](https://learn.microsoft.com/en-us/windows/win32/msi/installation-context).
 The EXE installer continues to use its owned launcher's `DisplayIcon`. A missing
 `DisplayIcon` registry value alone is not proof of a missing MSI icon. Icon-table filenames
 keep their `.ico` extension for shell interpretation. Mac qualification decodes the actual

@@ -23,10 +23,10 @@ $binary=Join-Path $root 'bin/honk300.exe'
 $launcher=Join-Path $root 'bin/honk300-app.exe'
 $settings=Join-Path $root 'bin/honk300-settings.exe'
 function Get-VerifiedIconPath([string]$Descriptor) {
-    $iconPath=($Descriptor -replace ',\s*-?\d+$','').Trim('"')
+    $iconPath=[Environment]::ExpandEnvironmentVariables(($Descriptor -replace ',\s*-?\d+$','').Trim('"'))
     if (-not $iconPath -or -not (Test-Path -LiteralPath $iconPath -PathType Leaf) -or
         [GooseAppIcons]::ExtractIconEx($iconPath,-1,[IntPtr]::Zero,[IntPtr]::Zero,0) -lt 1) {
-        throw 'The registered application icon is missing or cannot be read by Windows'
+        throw "The registered application icon is missing or cannot be read by Windows: '$Descriptor' -> '$iconPath'"
     }
     return $iconPath
 }
@@ -48,7 +48,7 @@ if (-not $shortcut) { throw 'No Goose app-menu shortcut with verified controls t
 $registrations=@(foreach($hive in @('HKLM:','HKCU:')) {
     Get-ChildItem "$hive/Software/Microsoft/Windows/CurrentVersion/Uninstall" -ErrorAction SilentlyContinue |
         Where-Object { $_.GetValue('Publisher','') -eq 'Emmett S' -and ([string]$_.GetValue('InstallLocation','')).TrimEnd('\') -eq $root.TrimEnd('\') -and $_.GetValue('DisplayName','') -in @('Goose','Goose (Corporate Edition)') } |
-        ForEach-Object { [PSCustomObject]@{Key=$_.PSChildName;DisplayName=$_.GetValue('DisplayName','');DisplayVersion=$_.GetValue('DisplayVersion','');DisplayIcon=$_.GetValue('DisplayIcon','');WindowsInstaller=$_.GetValue('WindowsInstaller',0);VerifiedIcon='';IconSource=''} }
+        ForEach-Object { [PSCustomObject]@{Key=$_.PSChildName;DisplayName=$_.GetValue('DisplayName','');DisplayVersion=$_.GetValue('DisplayVersion','');DisplayIcon=$_.GetValue('DisplayIcon','');WindowsInstaller=$_.GetValue('WindowsInstaller',0);IconDescriptor='';VerifiedIcon='';IconSource=''} }
 })
 if (-not $registrations) { throw 'Goose installed-app registration is missing' }
 $msi=New-Object -ComObject WindowsInstaller.Installer
@@ -64,6 +64,7 @@ try {
             $registration.IconSource='Uninstall DisplayIcon'
             $registration.DisplayIcon
         }
+        $registration.IconDescriptor=$descriptor
         $iconPath=Get-VerifiedIconPath $descriptor
         if ($registration.WindowsInstaller -eq 1) {
             $expectedIcon=Join-Path $PSScriptRoot '../Assets/UI/honk300-app.ico'
