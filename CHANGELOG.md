@@ -1,28 +1,17 @@
 # Changelog
 
-All notable changes to this project are documented here. Format based on
-[Keep a Changelog](https://keepachangelog.com/); release versions follow
-[Semantic Versioning](https://semver.org/).
+All notable changes are recorded here using [Keep a Changelog](https://keepachangelog.com/)
+and [Semantic Versioning](https://semver.org/). Plain-English explanations are in
+[the human changelog](HUMAN_CHANGELOG.md). See [the README](README.md) for current
+features and installation, and [readiness records](docs/readiness/) for release evidence.
 
-> **Project stage: first stable release.** Milestones M0-M19 are implemented in-tree. The
-> managed macOS Accessibility first run is implemented and one unchanged signed executable has
-> passed denied, non-nagging relaunch, live-grant, and live-revocation on the physical M2; exact-
-> final-SHA and unavailable-hardware/tooling limitations are retained as explicit forward-
-> verification waivers. The goose now renders, walks, leaves mud, plays sounds, reacts to the
-> cursor, can
-> perform bounded cursor-nab mischief, can perch on user-dragged windows, and can collect
-> owned note/image windows on Windows. It now enters/leaves through real exposed edges, occasionally
-> wraps only while fully hidden, and can react when a user closes one of its collected windows.
-> It can be controlled through a single-instance local IPC
-> channel. It now has the three-name goose-speak CLI plus durable TOML configuration and the
-> ratatui config TUI, dynamic moods, the local on-hour double honk, quiet-hours/DND/fullscreen
-> manners, built-in Autumn leaves, Windows multi-monitor chase, and live appearance/recolor
-> controls, plus macOS runtime/status/app-bundle staging and a menu-bar shortcut to the existing
-> TUI/graceful Quit, Windows notification-area controls, Linux StatusNotifier controls and X11
-> visible overlay support,
-> native Wayland reduced-mode rendering, CI smoke gates, and M19 Windows/Linux lifecycle plus
-> release packaging with artifact evidence. A plain-English companion lives in
-> [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
+## [Unreleased]
+
+### Behind the scenes
+- Close the complete refinement milestone with final GNOME/presence source, native,
+  publication, fresh-public and website evidence; reconcile adapter/gait/readiness/accessibility
+  tasks and audit states, shorten current guidance, archive outdated changelog introductions and preserve historical failures
+  plus all unresolved physical and official installed-acceptance records.
 
 ## [1.10.1] - 2026-09-08
 
@@ -132,7 +121,7 @@ Publication was blocked by the GNOME consent-fixture write race recorded in
 ### Behind the scenes
 - Reconcile v1.4.0 final-source publication and fresh-public evidence across current guidance, accessibility ADRs, the audit and completed foundation/settings/art tasks. Retain separate website/next-stage gates and track unresolved presence observation in its own milestone task.
 
-## [1.7.0] - Unreleased candidate
+## [1.7.0] - 2026-09-08
 
 ### Fixed
 - Retain XRes-derived process identity in the native untitled-client fixture: both qualified XWayland generations report the real PID despite an absent `_NET_WM_PID`. Qualify the actual null title natively and keep nullable-PID behavior covered by its separate production decoder regression.
@@ -151,7 +140,7 @@ Publication was blocked by the GNOME consent-fixture write race recorded in
 ### Behind the scenes
 - Qualify the Sway 1.9/1.10.1 native premise on x64/ARM64 Ubuntu and Debian, checking real socket peer identity, window geometry, bounded owned-fixture motion and fullscreen state before runtime implementation. Retain the unresolved active-drag observation boundary before enabling production movement.
 
-## [1.6.0] - Unreleased candidate
+## [1.6.0] - 2026-09-08
 
 ### Added
 - Add explicit KDE setup/removal in CLI and Native SDK settings, backed by a private consent record and sealed, same-user KWin companion. Report window observation, bounded movement, owned-prop positioning, pointer observation, fullscreen and DND separately.

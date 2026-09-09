@@ -25,25 +25,32 @@ The corrected source passes every required release gate and fresh-public check.
 ## Evidence
 - Criterion: production stopping behavior. Oracle: FeetState phase sweep and
   actual World delivery regression. Both fail against the original gait and
-  pass with the correction; existing visual goldens remain unchanged.
+  pass with the final correction. Only the two inspected turn fixtures changed.
 - Criterion: visible defect. Oracle: run 34271715326, newer ARM delivered-note
   capture. Independent actual-engine sweep of 23,040 deliveries reproduces the
   stale lead; maximum below-body foot displacement changes from 31.730 to
   17.913 pixels. This is a diagnostic measurement, not an acceptance threshold
   or proof of the native capture's exact pixel cause.
 - Criterion: final native/public behavior. Oracle: new native captures and
-  same-source publication. Pending; cancelled candidates do not qualify it.
+  same-source publication. Complete in the final readiness records; cancelled
+  candidates remain historical evidence and do not qualify later changes.
 
 ## Verification
 - [x] Original production regressions fail and corrected stopping/contact checks pass.
-- [ ] Inspect actual Rust stopping motion and complete native delivery captures.
-- [ ] Pass final-source checks, immutable publication and fresh-public verification.
+- [x] Inspect actual Rust stopping motion and complete native delivery captures.
+- [x] Pass final-source checks, immutable publication and fresh-public verification.
 
 ## Status
-Active. Production correction and reproducing regressions are implemented.
-Native review and both affected releases remain held.
+Done. Actual World regressions reproduce and correct stale airborne lead
+during stops and reversals while preserving planted contacts and step timing.
+Eight Rust motion sequences and all 48 repeated native delivery captures are
+reviewed; the final diagnostic uses unchanged production engine/runtime code.
+The correction is published and fresh-public verified in v1.9.0 and v1.10.1.
+Only the two inspected turn fixtures changed; other goldens and all independent
+alpha, clipping, channel and geometry limits remain intact.
 
 ## Activity
+- 2026-09-08 — Complete the ordered publication, fresh-public and website gates. See the final records in docs/readiness/v1.9.0-readiness.md and docs/readiness/v1.10.1-readiness.md. Preserve prior failures below as qualification history and keep unavailable physical acceptance separate.
 - 2026-09-08 — Final local formatting, strict workspace clippy, complete Rust
   tests, release build, 138 Python checks (three platform skips), eight production
   JavaScript checks and separate Native SDK test/check/build pass. Review final

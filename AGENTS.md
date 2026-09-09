@@ -6,27 +6,23 @@ Honk300 is a cross-platform Rust desktop goose with a procedural renderer and Wi
 macOS, X11, and opt-in reduced Wayland runtimes. `honk300` is the primary binary;
 `honk` and `goose` are its command aliases. The Cargo workspace uses Rust 1.95, edition 2021.
 
-Public stable is v1.8.0, source `970cdb20c2e5f75ea3784adbbc35ea2746734bbf`.
-Its publication and fresh-public qualification record is `docs/readiness/v1.8.0-readiness.md`.
+Public stable is v1.10.1, source `127cd148e0af0cf76ecd6a7954777c23c156a862`.
+Its publication and fresh-public qualification record is `docs/readiness/v1.10.1-readiness.md`.
 Official installed Windows acceptance remains open: the administrator prompt was not approved,
 so this machine's v1.3.5 installation and protected receipt remain unchanged.
 
-The first three stages are published: the redesigned goose and native settings, owned Linux
-props and experimental Pi guidance, and explicit KDE window/portal integration.
-Sway and Hyprland observations are also published. GNOME and the independent
-Mac fullscreen/status follow-on retain their final qualification and publication gates.
-The website retains the user's restored r6 artwork; application renderer exports
-remain available separately. Preserve that explicit website choice during release handoffs.
-Native GNU/musl and ARM64 labwc proof is not physical Pi acceptance.
+The approved refinement is published through `.tasks/milestones/refine.md` and ADR 0041:
+the redesigned continuously projected goose, reliability cleanup, Native SDK settings
+with retained TUI, Linux owned props, experimental Pi guidance, and separately qualified
+KDE/portal, Sway, Hyprland and GNOME integrations. Independent fullscreen/DND status and
+the Mac fullscreen observer complete the final stage; Mac/Linux DND remains unsupported.
 
-The approved refinement is in progress under `.tasks/milestones/refine.md` and ADR 0041:
-1. Reliability cleanup, a fully redesigned continuously projected goose and animations, and a
-   separate Native SDK settings companion while retaining the TUI and shared Rust ownership.
-2. Linux owned props, session capability work, and experimental Pi 4/5 64-bit labwc qualification.
-3. Guided opt-in Wayland integrations, with KDE/portal first and separate compositor adapters.
-
-These are staged releases after qualification. Development exports and local/hosted checks are
-not public-release or physical-device acceptance. `docs/refinement-audit.md` tracks open findings.
+The website retains the user's restored r6 artwork; application renderer exports remain
+available separately. Preserve that explicit website choice during release handoffs.
+Native GNU/musl and ARM64 labwc proof is not physical Pi acceptance. Hosted Mac checks do
+not complete physical permission or screen-reader user acceptance. Development exports, local checks and public
+distribution evidence retain their separate boundaries in `docs/refinement-audit.md` and
+the readiness records.
 
 ## Source of truth
 
@@ -95,8 +91,9 @@ not public-release or physical-device acceptance. `docs/refinement-audit.md` tra
 - A user—not program cleanup—closing a spawned note or meme gets an independent 30% annoyed
   reaction roll. The reaction may chain only the existing bounded cursor nab and only after live
   capability, permission/pointer, configuration, and manners checks. Linux props are owned
-  by the verified companion: X11 positions only those windows, while native Wayland uses
-  normal compositor placement. User closes and connection-owned cleanup remain distinct.
+  by the verified companion: X11 positions only those windows. Native Wayland uses normal
+  compositor placement unless explicitly enabled KDE owned-prop support is active. User
+  closes and connection-owned cleanup remain distinct.
 - Install/update/uninstall retain the real runtime singleton for the whole mutation. Unix signals
   roll back with explicit nonzero status. Windows payloads remain pinned from same-stream
   size/hash verification through execution; generated bootstrap delegation must reacquire without

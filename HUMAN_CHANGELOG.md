@@ -1,35 +1,14 @@
 # Human Changelog
 
-A plain-English companion to [CHANGELOG.md](./CHANGELOG.md). Every change in the technical
-changelog has a layman's-terms version here. No version numbers, no code references — just
-what changed and why.
+A plain-English account of what changed and why. The [technical changelog](CHANGELOG.md)
+has implementation details; [the README](README.md) describes current features and setup.
 
-For the technical version with file paths and exact details, see CHANGELOG.md.
+## Refinement release records — September 2026
 
-> **Where the project is:** the goose is alive on screen. It appears on your desktop, walks
-> around, reacts to your mouse, makes sounds, can steal the cursor in a short, bounded prank,
-> can hop onto a window while you drag it around, and can now bring in note and meme windows.
-> It can now be controlled through a local command channel for starting, stopping, reloading, and
-> simple poke commands. It now understands the friendly three-name command grammar and has a
-> terminal settings screen backed by a saved config file. It now has dynamic moods and a double
-> honk at the top of each hour. It now also respects quiet times, fullscreen/DND manners, and
-> seasonal Autumn leaves. It now supports Windows multi-monitor chasing and fuller appearance
-> controls. Mac support and the Linux desktop paths are now in the codebase, with repeatable
-> CI smoke proof for hosted Mac bundle checks and Linux desktop behavior. The installed Mac app
-> now has a calm, non-nagging permission handoff. One unchanged signed copy passed denied,
-> repeat-denied, granted, and revoked behavior on the physical Mac; a later fresh-release repeat
-> remains visible follow-up work. While running, the Mac app also has a small goose menu that
-> opens the same terminal settings screen or starts its animated goodbye.
-> Windows and compatible Linux desktops now show the same small goose control as the Mac: it
-> opens the one terminal settings screen or starts the Goose's animated goodbye.
-> Every desktop now stages the
-> Goose's arrival and departure beyond a real screen edge, and a person closing its note or meme
-> can provoke a safely bounded annoyed reaction. The Windows/Linux installer
-> and update
-> work now has release artifact proof, including Windows installers for both regular x64 and ARM64
-> machines.
-
----
+### Behind the scenes
+- Finished the release records and simplified the current guides so supported
+  desktops, setup choices and remaining hands-on checks are easier to find.
+  Earlier test failures and fixes remain documented for future maintenance.
 
 ## Reliable permission-removal checks — September 2026
 

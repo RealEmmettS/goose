@@ -2,41 +2,11 @@
 
 ## Backlog
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
-- [ ] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) #wlg
 
 ## To-Do
 
 
 ## Active
-- [ ] **Mac settings native accessibility acceptance** - query and operate the actual AppKit provider independently of the SDK harness (needs #rgui) (ms #refine) (owner codex) #rax
-  - [x] Exercise named controls, switch state, focused text editing and isolated saves on both native Mac architectures.
-  - [x] Correct any demonstrated provider failure and repeat the unchanged native assertions.
-  - [ ] Record final-source proof and retain future native reader qualification.
-- [ ] **Fullscreen and do-not-disturb observations** - resolve audit R05 with separately proven platform observations and honest fallback (needs #rfnd) (ms #refine) (owner codex) #prs
-  - [x] Qualify macOS fullscreen and supported system do-not-disturb observation paths.
-  - [x] Correct and qualify the native Mac startup-readiness connection failure.
-  - [ ] Qualify the shared Mac native Accessibility correction and independent status labels.
-  - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
-  - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
-  - [ ] Correct the external-consent fixture race and qualify the new immutable patch.
-  - [ ] Qualify the complete candidate, unchanged main, fresh public distribution and website guidance.
-- [ ] **Stopping foot recovery** - withdraw stale airborne walking lead and qualify actual delivery motion (ms #refine) (owner codex) #rst
-  - [x] Reproduce and correct the production gait while preserving planted contacts and timing.
-  - [x] Qualify the native-height reversal regression and its actual rendered motion.
-  - [x] Inspect actual Rust motion and repeat native delivered-note captures.
-  - [ ] Pass complete same-source release and fresh-public verification (needs #rgn).
-- [ ] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) #rwl
-  - [x] Complete the separately qualified Sway implementation (needs #rsw).
-  - [x] Complete the separately qualified Hyprland implementation (needs #rhy).
-  - [ ] Complete the versioned GNOME companion and its desktop qualification (needs #rgn).
-- [ ] **GNOME desktop companion** - versioned explicit Shell integration with proven observation, placement and a compatible overlay path (needs #rkde) (ms #refine) (owner codex) #rgn
-  - [ ] Qualify the shared Mac native Accessibility correction with actual provider checks.
-  - [x] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
-  - [x] Prove live user-drag observation and automatic movement refusal through actual desktop input.
-  - [x] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
-  - [ ] Qualify shared startup-readiness recovery with three actual GUI start/stop cycles.
-  - [ ] Pass complete runtime, native settings, held-ride cancellation and owned-prop scenarios on both Shell versions and native architectures.
-  - [ ] Qualify supported Shell versions, native architectures, complete distribution and website claims.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
@@ -58,6 +28,36 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **Mac settings native accessibility acceptance** - query and operate the actual AppKit provider independently of the SDK harness (needs #rgui) (ms #refine) (owner codex) (done 2026-09-08) #rax
+  - [x] Exercise named controls, switch state, focused text editing and isolated saves on both native Mac architectures.
+  - [x] Correct any demonstrated provider failure and repeat the unchanged native assertions.
+  - [x] Record final-source proof and retain future native reader qualification.
+- [x] **Fullscreen and do-not-disturb observations** - resolve audit R05 with separately proven platform observations and honest fallback (needs #rfnd) (ms #refine) (owner codex) (done 2026-09-08) #prs
+  - [x] Probe Mac fullscreen/DND APIs and retain only proven support.
+  - [x] Correct and qualify the native Mac startup-readiness connection failure.
+  - [x] Qualify the shared Mac native Accessibility correction and independent status labels.
+  - [x] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
+  - [x] Verify permission loss, unsupported fallbacks and the resulting settings status.
+  - [x] Correct the external-consent fixture race and qualify the new immutable patch.
+  - [x] Qualify the complete candidate, unchanged main, fresh public distribution and website guidance.
+- [x] **Stopping foot recovery** - withdraw stale airborne walking lead and qualify actual delivery motion (ms #refine) (owner codex) (done 2026-09-08) #rst
+  - [x] Reproduce and correct the production gait while preserving planted contacts and timing.
+  - [x] Qualify the native-height reversal regression and its actual rendered motion.
+  - [x] Inspect actual Rust motion and repeat native delivered-note captures.
+  - [x] Pass complete same-source release and fresh-public verification (needs #rgn).
+- [x] **Additional Wayland adapters** - separately qualify GNOME, Sway, and Hyprland without inheriting KDE support claims (needs #rkde) (ms #refine) (owner codex) (done 2026-09-08) #rwl
+  - [x] Complete the separately qualified Sway implementation (needs #rsw).
+  - [x] Complete the separately qualified Hyprland implementation (needs #rhy).
+  - [x] Complete the versioned GNOME companion and its desktop qualification (needs #rgn).
+- [x] **GNOME desktop companion** - versioned explicit Shell integration with proven observation, placement and a compatible overlay path (needs #rkde) (ms #refine) (owner codex) (done 2026-09-08) #rgn
+  - [x] Qualify the shared Mac native Accessibility correction with actual provider checks.
+  - [x] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
+  - [x] Prove live user-drag observation and automatic movement refusal through actual desktop input.
+  - [x] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
+  - [x] Qualify shared startup-readiness recovery with three actual GUI start/stop cycles.
+  - [x] Pass complete runtime, native settings, held-ride cancellation and owned-prop scenarios on both Shell versions and native architectures.
+  - [x] Qualify supported Shell versions, native architectures, complete distribution and website claims.
+- [x] **GNOME and wlroots adapter prototypes** - separately test a versioned GNOME Shell `Meta.Window` companion and capability-probed Sway/Hyprland adapters; publish support only per proven compositor/version (needs #a6e) (done 2026-09-08) #wlg
 - [x] **Hyprland desktop integration** - separately probe supported native IPC operations and preserve per-operation capability claims (needs #rkde) (ms #refine) (owner codex) (done 2026-09-08) #rhy
   - [x] Prove native socket ownership, exact window identity and supported bounded placement.
   - [x] Integrate explicit setup/removal and exercise disconnect, stale identity and terminal refusals.
