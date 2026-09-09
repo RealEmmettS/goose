@@ -16,7 +16,7 @@ has implementation details; [the README](README.md) describes current features a
 - Show the goose artwork in application entries, installed-app listings and the settings window. Make failed tray actions visible so a click no longer appears to do nothing.
 
 ### Behind the scenes
-- Check the installed application shortcuts, icons and graphical controls during release testing, including upgrades that leave an older installation record behind.
+- Check the installed application shortcuts, icons and graphical controls during release testing, including upgrades that leave an older installation record behind. Check that shared Windows shortcuts belong to the shared installation.
 - Keep tray descriptions and their checks consistent with the new application name.
 
 ## Refinement release records — September 2026

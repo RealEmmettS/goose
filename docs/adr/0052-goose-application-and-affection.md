@@ -30,9 +30,15 @@ as specified by [Apple's bundle naming documentation](https://developer.apple.co
 
 ## Installed Configure repair
 
-The Global MSI must use Windows Installer's standard `ProgramMenuFolder`, which resolves
-to the all-users menu for the existing per-machine scope, as documented by
+The Global MSI binds Windows Installer's standard `ProgramMenuFolder` to an explicit
+`MachineProgramMenuFolder` using WiX `SetDirectory`. The standard property resolves to
+the all-users menu for the existing per-machine scope, as documented by
 [Microsoft](https://learn.microsoft.com/en-us/windows/win32/msi/programmenufolder).
+The explicit machine directory retains the HKLM component key path and avoids treating
+the contextual standard directory as per-user component data. WiX schedules the
+[directory assignment](https://docs.firegiant.com/wix3/xsd/wix/setdirectory/) before
+cost finalization in both installation sequences. Native linker checks must pass without
+suppressing ICE43 or ICE57; changing the machine component to HKCU is not a scope-preserving fix.
 The former undefined `CommonProgramsFolder` resolved to the drive root. A real candidate
 installation wrote `D:\Goose\Goose.lnk`; the user's old `C:\honk300\Honk300.lnk` confirms
 the same original defect. Preserve installation scope and package identities while correcting

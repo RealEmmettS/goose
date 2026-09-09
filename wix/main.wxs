@@ -46,6 +46,8 @@
         <Property Id='ApplicationFolderName' Value='honk300'/>
         <Property Id='HONK300ORIGIN' Value='msi-global' Secure='yes'/>
         <Property Id='HONK300AUTOSTART' Value='false' Secure='yes'/>
+        <!-- Bind the contextual standard path to this package's machine-owned menu component. -->
+        <SetDirectory Id='MachineProgramMenuFolder' Value='[ProgramMenuFolder]' />
 
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
@@ -103,8 +105,7 @@
                     </Directory>
                 </Directory>
             </Directory>
-            <!-- ProgramMenuFolder resolves to the all-users menu for this per-machine MSI. -->
-            <Directory Id='ProgramMenuFolder'>
+            <Directory Id='MachineProgramMenuFolder'>
                 <Directory Id='ApplicationProgramsFolder' Name='Goose'/>
                 <Directory Id='LegacyApplicationProgramsFolder' Name='honk300'/>
             </Directory>
