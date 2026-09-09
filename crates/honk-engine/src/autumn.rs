@@ -16,6 +16,8 @@ pub const MAX_LEAF_PILES: usize = 6;
 pub const LEAVES_PER_PILE: usize = 128;
 pub const SPAWN_ANIM_LENGTH: f32 = 1.0;
 pub const LIFETIME_AFTER_KICKED: f32 = 10.0;
+pub const PILE_LIFETIME: f64 = 30.0;
+const PILE_FADE_SECONDS: f64 = 4.0;
 pub const GRAVITY: f32 = -900.0;
 pub const MAX_VEL_XY: f32 = 200.0;
 pub const KICK_MIN_VERT_VEL: f32 = 10.0;
@@ -154,10 +156,12 @@ impl AutumnPile {
     }
 
     pub fn fade_out(&self, now: f64) -> f32 {
-        let Some(kicked_at) = self.kicked_at else {
-            return 0.0;
-        };
-        clamp((((now - kicked_at) - 8.0) / 2.0) as f32, 0.0, 1.0)
+        let age_fade =
+            (now - self.created_at - (PILE_LIFETIME - PILE_FADE_SECONDS)) / PILE_FADE_SECONDS;
+        let kick_fade = self.kicked_at.map_or(0.0, |at| {
+            (now - at - (LIFETIME_AFTER_KICKED as f64 - 2.0)) / 2.0
+        });
+        clamp(age_fade.max(kick_fade) as f32, 0.0, 1.0)
     }
 }
 
@@ -254,10 +258,7 @@ impl AutumnState {
             }
             pile.tick();
         }
-        self.piles.retain(|pile| {
-            pile.kicked_at
-                .is_none_or(|kicked_at| now - kicked_at <= LIFETIME_AFTER_KICKED as f64)
-        });
+        self.piles.retain(|pile| pile.fade_out(now) < 1.0);
     }
 
     fn spawn_pile(&mut self, now: f64, layout: &DesktopLayout, rng: &mut SplitMix64) {
@@ -380,5 +381,36 @@ mod tests {
         assert!(autumn.piles()[0].kicked_at.is_some());
         autumn.tick(21.0, true, bounds(), &goose, &mut rng);
         assert!(autumn.piles().is_empty());
+    }
+
+    #[test]
+    fn untouched_piles_fade_and_expire_without_goose_contact() {
+        let mut autumn = AutumnState::new();
+        let goose = GooseEntity::new();
+        let mut rng = SplitMix64::seed(4);
+        autumn.spawn_pile(0.0, &DesktopLayout::single(bounds()), &mut rng);
+        autumn.next_pile_at = Some(100.0);
+        assert_eq!(autumn.piles()[0].fade_out(25.0), 0.0);
+        assert_eq!(autumn.piles()[0].fade_out(28.0), 0.5);
+        autumn.tick(30.0, true, bounds(), &goose, &mut rng);
+        assert!(autumn.piles().is_empty());
+    }
+
+    #[test]
+    fn charging_retains_stronger_scatter_and_a_late_kick_cannot_extend_expiry() {
+        let mut rng = SplitMix64::seed(15);
+        let mut walking = AutumnPile::new(AutumnPileId(1), Vec2::ZERO, 40.0, 40.0, 0.0, &mut rng);
+        let mut charging = walking.clone();
+        walking.kick(Vec2::new(80.0, 0.0), 0.0, 28.0, &mut SplitMix64::seed(10));
+        charging.kick(Vec2::new(400.0, 0.0), 1.0, 28.0, &mut SplitMix64::seed(10));
+        let energy = |pile: &AutumnPile| {
+            pile.leaves
+                .iter()
+                .map(|leaf| leaf.vel_planar.magnitude().powi(2) + leaf.vel_z.powi(2))
+                .sum::<f32>()
+        };
+        assert!(energy(&charging) > energy(&walking) * 2.0);
+        assert_eq!(charging.fade_out(28.0), 0.5);
+        assert_eq!(charging.fade_out(30.0), 1.0);
     }
 }

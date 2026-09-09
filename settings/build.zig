@@ -27,6 +27,10 @@ pub fn build(b: *std.Build) void {
     bridge.has_side_effects = true; // Cargo owns source/dependency caching.
     const library = bridge_output.path(b, b.fmt("{s}/release/{s}", .{ triple, if (os == .windows) "honk_settings_accessibility.dll.lib" else "libhonk_settings_accessibility.a" }));
     if (os == .windows) {
+        app.exe.root_module.addWin32ResourceFile(.{
+            .file = b.path("../Assets/UI/honk300-app.rc"),
+            .include_paths = &.{b.path("../Assets/UI")},
+        });
         // Keep Rust's MSVC runtime inside its own DLL. The SDK uses MinGW;
         // crossing only this C ABI avoids mixing C++/compiler runtimes.
         const dll = b.addInstallFileWithDir(bridge_output.path(b, b.fmt("{s}/release/honk_settings_accessibility.dll", .{triple})), .bin, "honk_settings_accessibility.dll");

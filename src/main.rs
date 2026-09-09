@@ -165,7 +165,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Command::Start { options }) => run_start(options),
         #[cfg(windows)]
         Some(Command::WindowsAppRuntime { options }) => run_windows_runtime(options),
-        None => run_start(StartOptions::default()),
+        None => settings::launch(None).map_err(Into::into),
         Some(Command::Stop { .. } | Command::Reload | Command::Status | Command::Do { .. }) => {
             unreachable!()
         }

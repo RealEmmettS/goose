@@ -314,7 +314,7 @@ fn reconcile_linux_autostart(
     reconcile_owned_text_autostart_file(
         &path,
         enabled,
-        &linux_desktop_entry(&identity.program),
+        &linux_desktop_entry(&identity.program, true),
         OWNERSHIP_MARKER,
     )?;
     update_receipt_autostart(identity, enabled)

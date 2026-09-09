@@ -3,13 +3,15 @@
 ## Project and current work
 
 Honk300 is a cross-platform Rust desktop goose with a procedural renderer and Windows,
-macOS, X11, and opt-in reduced Wayland runtimes. `honk300` is the primary binary;
-`honk` and `goose` are its command aliases. The Cargo workspace uses Rust 1.95, edition 2021.
+macOS, X11, and opt-in reduced Wayland runtimes. **Goose** is the user-facing application name and `goose` is the recommended command.
+`honk300` remains the internal primary binary; `honk` and `goose` remain compatible aliases. The Cargo workspace uses Rust 1.95, edition 2021.
 
 Public stable is v1.10.1, source `127cd148e0af0cf76ecd6a7954777c23c156a862`.
 Its publication and fresh-public qualification record is `docs/readiness/v1.10.1-readiness.md`.
-Official installed Windows acceptance remains open: the administrator prompt was not approved,
-so this machine's v1.3.5 installation and protected receipt remain unchanged.
+The user has installed v1.10.1 through the Global MSI. Task #g11 and ADR 0052 track the
+combined v1.11.0 application, icon, leaf and affection update. Its installed Configure failure
+was reproduced and repaired by preserving a stale per-user receipt; real tray Configure/Update
+and native GUI Start/Stop are verified. New-version installed acceptance remains pending.
 
 The approved refinement is published through `.tasks/milestones/refine.md` and ADR 0041:
 the redesigned continuously projected goose, reliability cleanup, Native SDK settings
@@ -34,9 +36,10 @@ the readiness records.
   fixed 120 Hz simulation, planted contacts, and bounds. The engine forbids unsafe code and OS deps.
 - `src/runtime/` shares ordering and bounded rendering across platform adapters. Use one overlay
   per monitor, signed desktop coordinates, on-dirty/rate-capped presentation, and bounded buffers.
-- Shared crates own configuration, TUI, and IPC. `settings/` is a separate pinned Native SDK
-  Zig companion using the bounded versioned Rust settings service. `honk300 settings` and tray
-  Configure launch the GUI; `honk300 config` retains the terminal interface.
+- Shared crates own configuration, TUI, and IPC. `settings/` is the primary graphical control surface, implemented as a separate pinned Native SDK
+  Zig companion using the bounded versioned Rust settings service. Application-menu Goose, bare `goose`, `goose settings`, and tray Configure launch the GUI;
+  `goose config` retains the secondary terminal interface. Explicit start and login startup retain
+  the existing runtime route. ADR 0052 changes entry routing, not shared ownership.
 - `docs/history/` preserves the pre-refinement instructions and their detailed release chronology.
   Historical commands and stage descriptions are evidence, not overriding current instructions.
 - Sibling `qube-machine-report`, `qube-network-diagnostics`, and `qube-workbranch-view` repositories

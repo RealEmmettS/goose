@@ -253,6 +253,7 @@ try {
     if ($RepairedLauncherHash -ne $ExtractedLauncherHash) {
         throw 'MSI repair changed the windowless app launcher'
     }
+    & (Join-Path $PSScriptRoot 'smoke_windows_app_controls.ps1') -InstallRoot (Split-Path -Parent (Split-Path -Parent $Binary)) -EvidenceDirectory (Join-Path $OverlayEvidenceDirectory 'app-controls')
 
     @(
         "target=$TargetTriple",

@@ -104,7 +104,7 @@ def main() -> None:
         # editing; it does not implement the optional EditableText interface.
         windows = subprocess.check_output([
             "xdotool", "search", "--onlyvisible", "--pid", str(process.pid),
-            "--name", "Honk300 settings",
+            "--name", "Goose",
         ], text=True).splitlines()
         if len(windows) != 1:
             raise RuntimeError("Could not identify the single fixture window")

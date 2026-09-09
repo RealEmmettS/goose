@@ -4,6 +4,7 @@
 //! GUI-subsystem companion starts its exact sibling through the private runtime command with no
 //! console or shell, waits for bounded IPC readiness, and then exits. The hidden CLI child owns
 //! the singleton, overlay, IPC, and notification-area controls for the runtime lifetime.
+//! Application-menu activation passes `--settings` to open the verified graphical controls.
 
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
@@ -28,16 +29,23 @@ const BASE_RUNTIME_CREATION_FLAGS: u32 = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_G
 
 #[cfg(windows)]
 fn main() {
-    std::process::exit(run().unwrap_or_else(|code| code));
+    let code = run().unwrap_or_else(|code| {
+        use windows::core::w;
+        use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
+        if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--settings")) {
+            let message = w!("Goose could not open. Please reinstall it using the official installer to repair its application files.");
+            unsafe {
+                MessageBoxW(None, message, w!("Goose"), MB_OK | MB_ICONERROR);
+            }
+        }
+        code
+    });
+    std::process::exit(code);
 }
 
 #[cfg(windows)]
 fn run() -> Result<i32, i32> {
     windows_stdio::prevent_inheritance().map_err(|_| LAUNCH_FAILURE)?;
-
-    if probe_runtime() == RuntimeProbe::Ready {
-        return Ok(0);
-    }
 
     let launcher = std::env::current_exe().map_err(|_| LAUNCH_FAILURE)?;
     let bin = launcher.parent().ok_or(LAUNCH_FAILURE)?;
@@ -47,6 +55,33 @@ fn run() -> Result<i32, i32> {
     }
 
     let forwarded = std::env::args_os().skip(1).collect::<Vec<_>>();
+    // App-menu activation opens the same verified Rust-owned settings route, including when
+    // the goose is stopped or already running. Login and explicit start keep their runtime route.
+    if forwarded.as_slice() == [std::ffi::OsString::from("--settings")] {
+        let mut child = spawn_runtime(&runtime, bin, &forwarded).map_err(|_| LAUNCH_FAILURE)?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(12);
+        loop {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    return if status.success() {
+                        Ok(0)
+                    } else {
+                        Err(LAUNCH_FAILURE)
+                    }
+                }
+                Ok(None) if std::time::Instant::now() < deadline => {
+                    std::thread::sleep(std::time::Duration::from_millis(50))
+                }
+                _ => {
+                    stop_unready_child(&mut child, ChildState::Running);
+                    return Err(LAUNCH_FAILURE);
+                }
+            }
+        }
+    }
+    if probe_runtime() == RuntimeProbe::Ready {
+        return Ok(0);
+    }
     let mut child = spawn_runtime(&runtime, bin, &forwarded).map_err(|_| LAUNCH_FAILURE)?;
 
     let started = std::time::Instant::now();
@@ -121,9 +156,12 @@ fn runtime_command(
     use std::process::Stdio;
 
     let mut command = std::process::Command::new(runtime);
+    if forwarded == [std::ffi::OsString::from("--settings")] {
+        command.arg("settings");
+    } else {
+        command.arg("__windows-app-runtime").args(forwarded);
+    }
     command
-        .arg("__windows-app-runtime")
-        .args(forwarded)
         .current_dir(bin)
         .stdin(Stdio::null())
         .stdout(Stdio::null())

@@ -1,7 +1,7 @@
 <stack>
   <column gap="16" padding="24">
     <row gap="16" cross="center">
-      <text size="heading" grow="1"><span weight="bold">Honk300 settings</span></text>
+      <text size="heading" grow="1"><span weight="bold">Goose</span></text>
       <text>v{versionText}</text>
       <if test="{dirty}"><badge>Unsaved changes</badge></if>
     </row>

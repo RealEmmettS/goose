@@ -87,7 +87,50 @@ fn verify_settings_with_candidates(
     fallback: InstallSource,
 ) -> Result<Vec<File>, DynError> {
     let files = open_settings_files(settings)?;
-    let mut candidates = owned;
+    // Use the same ownership precedence as installer/update detection. A cached
+    // per-user receipt can outlive an installer handoff and must neither veto the
+    // current owned receipt nor provide a fallback for damaged owned evidence.
+    let owned_source = install_receipt_source_from_candidates(&owned, current);
+    let candidates = if owned_source == InstallSourceEvidence::Missing {
+        relevant_external_receipts(current, external)
+    } else {
+        owned
+    };
+    let source = match if owned_source == InstallSourceEvidence::Missing {
+        install_receipt_source_from_candidates(&candidates, current)
+    } else {
+        owned_source
+    } {
+        InstallSourceEvidence::InvalidOrConflicting => {
+            return Err("settings install receipt is invalid or conflicting".into())
+        }
+        InstallSourceEvidence::Valid(source) => source,
+        InstallSourceEvidence::Missing => fallback,
+    };
+    if matches!(source, InstallSource::Unknown | InstallSource::ManualLocal) {
+        return Ok(files);
+    }
+    for path in candidates {
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.into()),
+        };
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return Err("settings install receipt is not a regular file".into());
+        }
+        let receipt: serde_json::Value = serde_json::from_slice(&fs::read(&path)?)?;
+        if validated_receipt_source(&receipt, current) != Some(source) {
+            continue;
+        }
+        verify_files(&receipt, &files, settings)?;
+        return Ok(files);
+    }
+    Err("cannot verify the settings companion against its owned installation receipt".into())
+}
+
+fn relevant_external_receipts(current: &Path, external: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
     for path in external {
         if candidates.contains(&path) {
             continue;
@@ -116,33 +159,7 @@ fn verify_settings_with_candidates(
             candidates.push(path);
         }
     }
-    let source = match install_receipt_source_from_candidates(&candidates, current) {
-        InstallSourceEvidence::InvalidOrConflicting => {
-            return Err("settings install receipt is invalid or conflicting".into())
-        }
-        InstallSourceEvidence::Valid(source) => source,
-        InstallSourceEvidence::Missing => fallback,
-    };
-    if matches!(source, InstallSource::Unknown | InstallSource::ManualLocal) {
-        return Ok(files);
-    }
-    for path in candidates {
-        let metadata = match fs::symlink_metadata(&path) {
-            Ok(metadata) => metadata,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
-            Err(error) => return Err(error.into()),
-        };
-        if !metadata.is_file() || metadata.file_type().is_symlink() {
-            return Err("settings install receipt is not a regular file".into());
-        }
-        let receipt: serde_json::Value = serde_json::from_slice(&fs::read(&path)?)?;
-        if validated_receipt_source(&receipt, current) != Some(source) {
-            continue;
-        }
-        verify_files(&receipt, &files, settings)?;
-        return Ok(files);
-    }
-    Err("cannot verify the settings companion against its owned installation receipt".into())
+    candidates
 }
 
 /// Linux exec resolves this retained descriptor before closing CLOEXEC handles.
@@ -239,6 +256,59 @@ pub(crate) fn verify_receipted_settings(
 mod tests {
     use super::*;
     use sha2::{Digest, Sha256};
+
+    #[test]
+    fn owned_settings_receipt_outranks_stale_external_installer_origin() {
+        let directory = tempfile::tempdir().unwrap();
+        let current = directory.path().join("honk300");
+        let settings = directory.path().join(SETTINGS_NAME);
+        fs::write(&settings, b"settings").unwrap();
+        #[cfg(windows)]
+        fs::write(settings.with_file_name(ACCESSIBILITY_NAME), b"bridge").unwrap();
+        let owned_path = directory.path().join("install-receipt.json");
+        let external_path = directory.path().join("cached-receipt.json");
+        let mut owned = serde_json::json!({
+            "schema": INSTALL_RECEIPT_V2, "install_root": directory.path(),
+            "origin": "msi-global", "installer_family": "msi", "edition": "global",
+            "scope": "machine", "release_track": "stable", "target": "x86_64-pc-windows-msvc",
+            "active_release": "new-release", "artifact": {
+                "name": "honk300-x86_64-pc-windows-msvc.msi", "size": 100,
+                "sha256": "a".repeat(64)
+            },
+            "settings_app": { "name": SETTINGS_NAME, "size": 8,
+                "sha256": format!("{:x}", Sha256::digest(b"settings")),
+                "accessibility": {"name": "honk_settings_accessibility.dll", "size": 6,
+                    "sha256": format!("{:x}", Sha256::digest(b"bridge"))}
+            }
+        });
+        let mut stale = owned.clone();
+        stale["origin"] = "powershell".into();
+        stale["installer_family"] = "powershell".into();
+        stale["active_release"] = "old-release".into();
+        stale.as_object_mut().unwrap().remove("settings_app");
+        fs::write(&owned_path, serde_json::to_vec(&owned).unwrap()).unwrap();
+        fs::write(&external_path, serde_json::to_vec(&stale).unwrap()).unwrap();
+        let verify = || {
+            verify_settings_with_candidates(
+                &current,
+                &settings,
+                vec![owned_path.clone()],
+                vec![external_path.clone()],
+                InstallSource::MsiGlobal,
+            )
+        };
+        assert!(
+            verify().is_ok(),
+            "the current owned receipt must govern settings"
+        );
+
+        // The stale external record cannot rescue modified or malformed owned evidence.
+        owned["settings_app"]["sha256"] = "b".repeat(64).into();
+        fs::write(&owned_path, serde_json::to_vec(&owned).unwrap()).unwrap();
+        assert!(verify().is_err());
+        fs::write(&owned_path, b"invalid owned receipt").unwrap();
+        assert!(verify().is_err());
+    }
 
     #[test]
     fn invalid_receipts_cannot_downgrade_companion_verification_to_unmanaged() {

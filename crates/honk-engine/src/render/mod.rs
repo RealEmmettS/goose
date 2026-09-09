@@ -14,7 +14,9 @@ pub use canvas::DamageCanvas;
 use geom::{disc, ellipse, paint};
 use std::cell::RefCell;
 pub use svg::render_rig_svg;
-use tiny_skia::{Color, FilterQuality, Pixmap, PixmapPaint, Transform};
+use tiny_skia::{
+    Color, FillRule, FilterQuality, PathBuilder, Pixmap, PixmapPaint, Stroke, Transform,
+};
 
 /// Goose raster supersample factor (rendered at 2x, composited down at 0.5x).
 pub const GOOSE_SUPERSAMPLE: f32 = 2.0;
@@ -134,7 +136,7 @@ pub fn render_autumn_leaves(
             );
         }
 
-        for leaf in &pile.leaves {
+        for (index, leaf) in pile.leaves.iter().enumerate() {
             let world = pile.position + leaf.screen_offset() * spawn;
             let leaf_above_goose = world.y >= goose_pos.y;
             if matches!(layer, AutumnRenderLayer::AboveGoose) != leaf_above_goose {
@@ -146,7 +148,114 @@ pub fn render_autumn_leaves(
             }
             let center = world - origin;
             let rgb = leaf_rgb(leaf.color);
-            ellipse(pixmap, center, 3.5, 2.0, &paint(rgb, alpha));
+            // Stable variation is visual only: preserve the simulation's random stream and
+            // the stronger velocity-dependent burst when the goose charges through a pile.
+            // Position-derived tumble settles continuously instead of snapping back on landing.
+            let turn = leaf.planar.magnitude() * 0.025 + leaf.z * 0.015;
+            let angle = index as f32 * 2.399_963 + pile.id.0 as f32 + turn;
+            let size = 0.85 + (index % 4) as f32 * 0.1;
+            render_leaf(pixmap, center, angle, size, index % 3 == 0, rgb, alpha);
+        }
+    }
+}
+
+/// Small pointed and lobed leaves with a stem and central vein. Every rotated shape, including
+/// its antialiased outline, fits inside the existing nine-pixel Autumn damage margin.
+fn render_leaf(
+    pixmap: &mut Pixmap,
+    center: Vec2,
+    angle: f32,
+    size: f32,
+    lobed: bool,
+    rgb: (u8, u8, u8),
+    alpha: u8,
+) {
+    let point = |x: f32, y: f32| {
+        Vec2::new(
+            center.x + (x * angle.cos() - y * angle.sin()) * size,
+            center.y + (x * angle.sin() + y * angle.cos()) * size,
+        )
+    };
+    let mut builder = PathBuilder::new();
+    let outline: &[(f32, f32)] = if lobed {
+        &[
+            (0.0, -6.0),
+            (1.7, -2.8),
+            (3.2, -4.0),
+            (3.0, -1.4),
+            (5.0, -1.8),
+            (3.8, 1.2),
+            (4.4, 2.2),
+            (1.4, 3.0),
+            (0.0, 4.3),
+            (-1.4, 3.0),
+            (-4.4, 2.2),
+            (-3.8, 1.2),
+            (-5.0, -1.8),
+            (-3.0, -1.4),
+            (-3.2, -4.0),
+            (-1.7, -2.8),
+        ]
+    } else {
+        &[
+            (0.0, -6.0),
+            (2.8, -3.0),
+            (3.4, 0.0),
+            (2.2, 2.5),
+            (0.0, 4.5),
+            (-2.2, 2.5),
+            (-3.4, 0.0),
+            (-2.8, -3.0),
+        ]
+    };
+    for (i, &(x, y)) in outline.iter().enumerate() {
+        let p = point(x, y);
+        if i == 0 {
+            builder.move_to(p.x, p.y);
+        } else {
+            builder.line_to(p.x, p.y);
+        }
+    }
+    builder.close();
+    if let Some(path) = builder.finish() {
+        pixmap.fill_path(
+            &path,
+            &paint(rgb, alpha),
+            FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
+        let dark = (
+            rgb.0.saturating_sub(38),
+            rgb.1.saturating_sub(28),
+            rgb.2.saturating_sub(12),
+        );
+        pixmap.stroke_path(
+            &path,
+            &paint(dark, alpha),
+            &Stroke {
+                width: 0.55,
+                ..Stroke::default()
+            },
+            Transform::identity(),
+            None,
+        );
+        let mut vein = PathBuilder::new();
+        let tip = point(0.0, -3.8);
+        let stem = point(0.0, 7.0);
+        vein.move_to(tip.x, tip.y);
+        vein.line_to(stem.x, stem.y);
+        if let Some(path) = vein.finish() {
+            pixmap.stroke_path(
+                &path,
+                &paint(dark, alpha),
+                &Stroke {
+                    width: 0.7,
+                    ..Stroke::default()
+                },
+                Transform::identity(),
+                None,
+            );
         }
     }
 }

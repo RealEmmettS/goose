@@ -84,7 +84,7 @@ class DebianPackagingTests(unittest.TestCase):
             self.assertIn("$alias uninstall", preinst_text)
             self.assertNotIn("rm ", preinst_text)
             desktop = (staging / "usr" / "share" / "applications" / "honk300.desktop").read_text()
-            self.assertIn("Exec=/usr/bin/honk300 start", desktop)
+            self.assertIn("Exec=/usr/bin/goose settings", desktop)
             self.assertIn("Icon=honk300", desktop)
             packaged_icon = (
                 staging

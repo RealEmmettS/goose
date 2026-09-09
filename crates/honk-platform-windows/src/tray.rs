@@ -13,8 +13,9 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
-    Shell_NotifyIconW, NIF_GUID, NIF_ICON, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIM_ADD, NIM_DELETE,
-    NIM_SETFOCUS, NIM_SETVERSION, NIN_SELECT, NOTIFYICONDATAW, NOTIFYICON_VERSION_4,
+    Shell_NotifyIconW, NIF_GUID, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP,
+    NIIF_WARNING, NIM_ADD, NIM_DELETE, NIM_MODIFY, NIM_SETFOCUS, NIM_SETVERSION, NIN_SELECT,
+    NOTIFYICONDATAW, NOTIFYICON_VERSION_4,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyIcon,
@@ -183,6 +184,21 @@ impl StatusTray {
         with_commands(VecDeque::pop_front)
     }
 
+    /// Make an explicit menu-action failure visible without stopping the goose's event loop.
+    pub fn show_action_error(&self, action: &str, error: &std::io::Error) {
+        let mut data = self.notify_data();
+        data.uFlags = NIF_GUID | NIF_INFO;
+        data.dwInfoFlags = NIIF_WARNING;
+        write_utf16(&mut data.szInfoTitle, "Goose");
+        write_utf16(
+            &mut data.szInfo,
+            &format!("{action} could not open: {error}"),
+        );
+        unsafe {
+            let _ = Shell_NotifyIconW(NIM_MODIFY, &data);
+        }
+    }
+
     fn add_to_shell(&mut self) -> windows::core::Result<()> {
         unsafe {
             let mut data = self.notify_data();
@@ -210,7 +226,7 @@ impl StatusTray {
             guidItem: TRAY_ICON_GUID,
             ..Default::default()
         };
-        write_utf16(&mut data.szTip, "Honk300 controls");
+        write_utf16(&mut data.szTip, "Goose controls");
         data
     }
 }
@@ -229,9 +245,11 @@ impl Drop for StatusTray {
 }
 
 fn write_utf16<const N: usize>(target: &mut [u16; N], value: &str) {
+    target.fill(0);
     for (slot, value) in target
         .iter_mut()
-        .zip(value.encode_utf16().chain(std::iter::once(0)))
+        .take(N.saturating_sub(1))
+        .zip(value.encode_utf16())
     {
         *slot = value;
     }
@@ -282,20 +300,20 @@ unsafe fn show_menu(hwnd: HWND, mut point: POINT) {
             menu,
             MF_STRING,
             CONFIGURE_COMMAND_ID,
-            PCWSTR(wide("Configure Honk300…").as_ptr()),
+            PCWSTR(wide("Configure Goose…").as_ptr()),
         )?;
         AppendMenuW(
             menu,
             MF_STRING,
             UPDATE_COMMAND_ID,
-            PCWSTR(wide("Update Honk300…").as_ptr()),
+            PCWSTR(wide("Update Goose…").as_ptr()),
         )?;
         AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null())?;
         AppendMenuW(
             menu,
             MF_STRING,
             QUIT_COMMAND_ID,
-            PCWSTR(wide("Quit Honk300").as_ptr()),
+            PCWSTR(wide("Quit Goose").as_ptr()),
         )?;
         let _ = SetForegroundWindow(hwnd);
         let selected = TrackPopupMenu(

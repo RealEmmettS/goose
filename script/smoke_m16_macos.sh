@@ -36,6 +36,16 @@ fi
 echo "smoke_m16_macos: validating bundle"
 plutil -lint "${APP}/Contents/Info.plist"
 test "$(plutil -extract CFBundleIdentifier raw "${APP}/Contents/Info.plist")" = "dev.emmetts.honk300"
+test "$(plutil -extract CFBundleIconFile raw "${APP}/Contents/Info.plist")" = "Goose.icns"
+test -s "${APP}/Contents/Resources/Goose.icns"
+swift - "${APP}" <<'SWIFT'
+import Foundation
+let path = CommandLine.arguments[1]
+let bundle = Bundle(path: path)!
+precondition(bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String == "Goose")
+precondition(FileManager.default.displayName(atPath: path).replacingOccurrences(of: ".app", with: "") == "Goose")
+print("Finder displays Goose at the preserved managed bundle location")
+SWIFT
 LSUI_ELEMENT="$(plutil -extract LSUIElement raw "${APP}/Contents/Info.plist")"
 case "${LSUI_ELEMENT}" in
   1|true) ;;

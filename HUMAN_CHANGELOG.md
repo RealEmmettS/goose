@@ -3,6 +3,20 @@
 A plain-English account of what changed and why. The [technical changelog](CHANGELOG.md)
 has implementation details; [the README](README.md) describes current features and setup.
 
+## A more welcoming Goose — September 2026
+
+### Improved
+- Find Goose by name in your applications menu and open its graphical controls to start, stop, customize, or update it. Terminal controls remain available when you want them.
+- Enjoy autumn piles that look like real little leaves and fade away on their own. Running through a pile still sends the leaves flying with extra force.
+- Rub the goose for a little while to earn hearts and a friendly waddle after your cursor. It keeps a comfortable distance, leaves your pointer alone, and returns to its usual wandering shortly afterward.
+
+### Fixed
+- Open the graphical controls reliably after changing installers, even when an older installation record was left behind. Keep the current installation and its saved preferences authoritative.
+- Show the goose artwork in application entries, installed-app listings and the settings window. Make failed tray actions visible so a click no longer appears to do nothing.
+
+### Behind the scenes
+- Check the installed application shortcuts, icons and graphical controls during release testing, including upgrades that leave an older installation record behind.
+
 ## Refinement release records — September 2026
 
 ### Behind the scenes

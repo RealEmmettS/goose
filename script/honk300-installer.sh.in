@@ -660,6 +660,9 @@ else
   settings_source="$(dirname "$staged_source")/honk300-settings"
   [ -f "$settings_source" ] && [ ! -L "$settings_source" ] || die "archive has no settings companion beside honk300"
   cp "$settings_source" "$STAGE_ROOT/install/bin/honk300-settings"
+  icon_source="$(dirname "$staged_source")/icon.png"
+  [ -f "$icon_source" ] && [ ! -L "$icon_source" ] || die "archive has no application icon"
+  cp "$icon_source" "$STAGE_ROOT/install/icon.png"
   for notice in NATIVE_SDK_LICENSE.txt NATIVE_SDK_FONT_LICENSE.txt; do
     notice_source="$(dirname "$staged_source")/$notice"
     [ -f "$notice_source" ] && [ ! -L "$notice_source" ] || die "archive has no SDK license notice: $notice"
@@ -700,8 +703,9 @@ else
   cat > "$desktop_temp" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Honk300
-Exec=$INSTALLED_BINARY start
+Name=Goose
+Exec=$INSTALLED_BINARY settings
+Icon=$DEST/current/icon.png
 Terminal=false
 Categories=Utility;
 X-Honk300-Managed=true

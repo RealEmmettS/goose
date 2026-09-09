@@ -123,7 +123,7 @@ PY
   if [ "$OS" = Linux ]; then
     require_file "$DESKTOP"
     grep -F 'X-Honk300-Managed=true' "$DESKTOP" >/dev/null
-    grep -F "Exec=$BINARY start" "$DESKTOP" >/dev/null
+    grep -F "Exec=$BINARY settings" "$DESKTOP" >/dev/null
   else
     codesign --verify --deep --strict "$DEST"
     lipo "$BINARY" -verify_arch x86_64 arm64

@@ -1,9 +1,10 @@
-# honk300
+# Goose
 
-`honk300` is a clean-room, procedural desktop goose for Windows, macOS, and Linux. It walks
+Goose is a clean-room, procedural desktop goose for Windows, macOS, and Linux. It walks
 across real monitor layouts, honks, leaves muddy footprints, reacts to the pointer, and performs
-bounded desktop pranks. Configuration and control stay local through a command-line interface
-and native graphical and terminal settings screens.
+bounded desktop pranks. Open **Goose** from your applications menu to start or stop the goose,
+change settings, and check for updates. The native application is the primary interface;
+the existing Rust services, command line, and terminal editor remain its backend and secondary controls.
 
 **Current stable release:** [v1.10.1](https://github.com/RealEmmettS/goose/releases/tag/v1.10.1),
 published from exact commit `127cd148e0af0cf76ecd6a7954777c23c156a862`.
@@ -20,13 +21,21 @@ capabilities. See [desktop setup](docs/wayland-integrations.md),
 [release evidence](docs/readiness/v1.10.1-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
-`honk300 settings` and tray Configure open the GUI; `honk300 config` retains the TUI.
-Both edit the same Rust-owned configuration. The executable is installed under
-three names—`honk300`, `honk`, and `goose`—so both `honk300 start` and `goose plz` work.
+The desktop-polish update is in qualification for v1.11.0; the stable links above continue
+to serve v1.10.1 until publication. In the updated application, **Goose**, the bare `goose`
+command, `goose settings`, and tray Configure open the graphical controls. `goose start`
+or `goose plz` starts the goose directly; `goose config` opens the secondary terminal editor.
+All routes use the same Rust-owned configuration and lifecycle. The compatible `honk300`
+and `honk` aliases remain.
 
 Earlier releases, fixes and acceptance limits remain in the
 [readiness records](docs/readiness/). Public download verification and hosted native
 checks do not establish physical-device or administrator-prompt acceptance.
+
+Rubbing the goose for about 2½ seconds produces hearts and invites a gentle, 15-second
+follow at a comfortable distance. The **React to petting** preference controls this behavior;
+following never grabs the pointer. Autumn leaves have recognizable shapes, scatter more
+strongly when the goose runs through them, and fade away even without being touched.
 
 ## Install
 
@@ -55,7 +64,7 @@ compatibility.
 
 Slot-aware releases keep each verified Windows payload in an immutable version/target directory
 and move the stable `honk300`, `honk`, and `goose` command paths through a neutral `current`
-selector. `honk300 update` reads the protected installation receipt and delegates to that exact
+selector. `goose update` reads the protected installation receipt and delegates to that exact
 origin—Global/Corporate MSI, Global/Corporate EXE, or PowerShell—while the invoking old executable
 remains untouched and alive. Unknown or conflicting ownership stops with an assisted reinstall
 link instead of guessing Global MSI. A newly run installer, including an intentional downgrade,
@@ -63,7 +72,7 @@ is the user's latest intent and becomes authoritative only after staged verifica
 If that change crosses from a machine-wide install to a per-user Corporate install, Windows may
 require one administrator grant to retire the old machine owner. Cancelling that grant preserves
 the new staged slot but reports `cleanup_pending`; Honk300 does not pretend the older machine PATH
-has stopped winning. Running the new slot's `honk300 update` retries only the validated Honk300
+has stopped winning. Running the new slot's `goose update` retries only the validated Honk300
 registration. The same hidden elevated coordinator removes only that retired root's exact PATH
 and login-start entries, verifies the active PATH, and clears the pending state without a second
 elevation prompt.
@@ -73,16 +82,16 @@ executables cannot self-repair their update-discovery bug; v1.0.3 and later perf
 update checks correctly. Supported installer upgrades preserve settings and user content.
 
 While Honk300 is running, an accessible **Honk300 controls** notification-area icon offers
-**Configure Honk300…**, which opens the matching graphical settings companion;
-**Update Honk300…**, which opens a new terminal and completes the verified update without
-manual typing; and **Quit Honk300**, which sends the goose through its normal full walk-off before
+**Configure Goose…**, which opens the matching graphical settings companion;
+**Update Goose…**, which opens a new terminal and completes the verified update without
+manual typing; and **Quit Goose**, which sends the goose through its normal full walk-off before
 exit. Opening the menu performs no update check. The update terminal stays open with an explicit
 success, no-op, or failure/recovery result until the user closes it.
 The fixed product icon returns after Explorer recreates the taskbar. If an unusual interactive
 session cannot host notification icons, Honk300 reports the limitation and keeps CLI/TUI/IPC
 control available.
 
-On Windows, typing `honk300 start` (or the equivalent `honk`/`goose`, bare, or `plz` spelling)
+On Windows, typing `goose start` (or an explicit `start`/`plz` through a compatible alias)
 uses the branded app launcher and returns the prompt only after the hidden runtime answers its
 readiness check. The PowerShell or terminal window is then only a controller and may be closed;
 the runtime and notification-area icon continue independently. A developer build must include
@@ -115,8 +124,8 @@ Desktop pranks require Accessibility permission.
 
 Launch the installed app by double-clicking `~/Applications/Honk300.app`, or keep that app in
 the Dock as a launcher. While Honk300 is running, an accessible goose menu-bar icon offers
-**Configure Honk300…**, which opens the matching graphical settings companion; **Update Honk300…**,
-which opens the signed bundle's exact update command in Terminal; and **Quit Honk300**, which sends
+**Configure Goose…**, which opens the matching graphical settings companion; **Update Goose…**,
+which opens the signed bundle's exact update command in Terminal; and **Quit Goose**, which sends
 the goose walking fully offscreen before the app exits. The update helper relaunches the verified
 installed app and leaves its final terminal result visible until the user closes it. The item
 exists only while the Mac app is running. The goose runtime remains an agent app without
@@ -191,20 +200,21 @@ reason while overlays, CLI/TUI/IPC, and supported mischief continue independentl
 
 The commands above are product-owned managed installers. Raw `cargo install`, a source-tree
 binary, or a portable copy is an advanced unmanaged path: it cannot retire an MSI/EXE/DMG/DEB
-owner and is not treated as an installation channel by `honk300 update`. Honk300 is intentionally
+owner and is not treated as an installation channel by `goose update`. Honk300 is intentionally
 not published to crates.io.
 
 ## Use
 
 ```text
-honk300 start                 Start the goose (returns after readiness on Windows)
-honk300 status                Show runtime and platform capabilities
-honk300 settings              Open the graphical settings companion
-honk300 config                Open the terminal settings editor
-honk300 reload                Apply reloadable saved settings
-honk300 do honk               Request an action
-honk300 stop                  Stop the running goose
-honk300 stop --force          Stop immediately without the walk-off
+goose                        Open the graphical application
+goose start                  Start the goose (returns after readiness on Windows)
+goose status                Show runtime and platform capabilities
+goose settings              Open the graphical settings companion
+goose config                Open the terminal settings editor
+goose reload                Apply reloadable saved settings
+goose do honk               Request an action
+goose stop                  Stop the running goose
+goose stop --force          Stop immediately without the walk-off
 ```
 
 Friendly aliases include `goose plz`, `honk bad`, `goose no honk`, `goose quit`, and
@@ -228,7 +238,7 @@ cannot restore, focus, type into, or expose a user's editor tabs.
 
 First run materializes schema-current configuration. Existing malformed files and files from a
 newer schema are never replaced automatically. To intentionally reset one, use
-`honk300 setup --reset`; the previous bytes are backed up first.
+`goose setup --reset`; the previous bytes are backed up first.
 
 Default config locations:
 
@@ -238,7 +248,7 @@ Default config locations:
 
 Settings that affect backend selection, including native Wayland mode, require a restart and are
 reported as such. X11/XWayland remains the default Linux path. Native Wayland is an
-explicit reduced mode (`honk300 start --wayland`); optional desktop integrations add only
+explicit reduced mode (`goose start --wayland`); optional desktop integrations add only
 their separately supported observations and actions. KDE window support and temporary
 portal pointer permission are distinct grants. Sway and Hyprland provide observations;
 GNOME's explicit companion uses the compatible XWayland overlay. Follow the
@@ -271,8 +281,8 @@ Windows still uses Add/Remove Programs for graphical removal; update delegates t
 installer family named by the active receipt:
 
 ```text
-honk300 update
-honk300 update --json
+goose update
+goose update --json
 honk300 uninstall
 honk300 uninstall --purge
 ```
@@ -280,7 +290,7 @@ honk300 uninstall --purge
 A normal uninstall preserves user media. `--purge` backs up user media before removing user
 state. Debian package installs update and uninstall through `dpkg` and may request administrator
 approval; per-user macOS/Linux installs do not use `sudo`. Login autostart is opt-in and off by
-default; use **Start on login** in `honk300 config` or set `autostart_on_login = true` under
+default; use **Start on login** in `goose config` or set `autostart_on_login = true` under
 `[lifecycle]`.
 Human update progress is stderr-only. `--json` writes exactly one final stdout object, and exit
 zero means the selected release, receipt, selector, and aliases were activated and verified.

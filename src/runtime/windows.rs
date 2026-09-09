@@ -165,6 +165,9 @@ pub fn run(
                 control_surface::open_update_helper,
             ) {
                 eprintln!("honk300: {action} action could not start ({error})");
+                if let Some(tray) = status_tray.as_ref() {
+                    tray.show_action_error(action, &error);
+                }
             }
         }
 

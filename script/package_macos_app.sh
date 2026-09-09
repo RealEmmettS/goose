@@ -73,6 +73,17 @@ ditto "$ROOT/Assets/UI/honk300-status-goose.svg" \
 ditto "$ROOT/Assets/UI/honk300-status-goose@2x.png" \
   "$RESOURCES_DIR/honk300-status-goose@2x.png"
 
+# Keep the receipt/TCC-owned bundle location while Finder and Spotlight show Goose through
+# the standard localized display name. The icon is sealed with the signed app.
+mkdir -p "$RESOURCES_DIR/en.lproj" "$STAGE_DIR/Goose.iconset"
+printf 'CFBundleDisplayName = "Goose";\nCFBundleName = "Goose";\n' > "$RESOURCES_DIR/en.lproj/InfoPlist.strings"
+for size in 16 32 128 256 512; do
+  sips -z "$size" "$size" "$ROOT/settings/assets/icon.png" --out "$STAGE_DIR/Goose.iconset/icon_${size}x${size}.png" >/dev/null
+  doubled=$((size * 2))
+  sips -z "$doubled" "$doubled" "$ROOT/settings/assets/icon.png" --out "$STAGE_DIR/Goose.iconset/icon_${size}x${size}@2x.png" >/dev/null
+done
+iconutil -c icns "$STAGE_DIR/Goose.iconset" -o "$RESOURCES_DIR/Goose.icns"
+
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -91,6 +102,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <string>6.0</string>
   <key>CFBundleName</key>
   <string>Honk300</string>
+  <key>CFBundleIconFile</key>
+  <string>Goose.icns</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>

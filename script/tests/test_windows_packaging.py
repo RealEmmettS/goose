@@ -216,7 +216,7 @@ class WindowsPackagingTests(unittest.TestCase):
         )
         self.assertIn('1 ICON "honk300-app.ico"', APP_RESOURCE)
         self.assertIn('"Assets/UI/honk300-app.rc"', BUILD_RS)
-        self.assertIn('["honk300-app"]', BUILD_RS)
+        self.assertIn('["honk300", "honk300-app"]', BUILD_RS)
         self.assertIn('ParamsIncludeDirs(["Assets/UI"])', BUILD_RS)
         self.assertIn("manifest_required", BUILD_RS)
         self.assertIn('embed-resource = "3.0.11"', CARGO_TOML)

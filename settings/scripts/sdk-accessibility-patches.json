@@ -44,6 +44,10 @@
       {
         "before": "int native_sdk_windows_request_gpu_surface_frame(",
         "after": "int native_sdk_windows_honk_accessibility(Host *host, uint64_t window_id, const char *label, size_t label_len, const uint8_t *json, size_t json_len) {\n    if (!host) return 0;\n    auto found = host->native_views.find(nativeViewKey(window_id, slice(label, label_len)));\n    if (found == host->native_views.end() || !found->second.honk_accessibility) return 0;\n    return honk_a11y_publish(found->second.honk_accessibility, json, json_len, gpuSurfaceScale(found->second.hwnd));\n}\n\nint native_sdk_windows_request_gpu_surface_frame("
+      },
+      {
+        "before": "    wc.hInstance = host->instance;\n    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);",
+        "after": "    wc.hInstance = host->instance;\n    // Goose: use the icon sealed inside this executable for the taskbar and app switcher.\n    wc.hIcon = LoadIconW(host->instance, MAKEINTRESOURCEW(1));\n    wc.hIconSm = wc.hIcon;\n    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);"
       }
     ]
   },

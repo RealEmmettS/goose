@@ -34,6 +34,8 @@ pub const MAX_WANDERING_TIME: f32 = 40.0;
 
 /// How long the click→charge "hyper" burst lasts, in seconds (M6, plan §5.6 hyper).
 pub const HYPER_DURATION: f64 = 2.5;
+pub const AFFECTION_FOLLOW_SECONDS: f64 = 15.0;
+pub const AFFECTION_FOLLOW_GAP: f32 = 90.0;
 const COLLECT_SPAWN_TIMEOUT: f64 = 3.0;
 const COLLECT_VISIBLE_DWELL: f64 = 4.0;
 const COLLECT_PICKUP_DISTANCE: f32 = 42.0;
@@ -393,6 +395,41 @@ impl Task for WanderTask {
             }
         }
         ctx.now >= self.end_time.unwrap()
+    }
+}
+
+/// A brief, invited walk behind the pointer. This task only moves the goose: it never emits
+/// pointer or window commands and keeps a body-sized gap even when the cursor stops.
+pub struct AffectionFollowTask {
+    ends_at: f64,
+}
+
+impl AffectionFollowTask {
+    pub fn new(now: f64) -> Self {
+        Self {
+            ends_at: now + AFFECTION_FOLLOW_SECONDS,
+        }
+    }
+}
+
+impl Task for AffectionFollowTask {
+    fn id(&self) -> &'static str {
+        "affection_follow"
+    }
+
+    fn run(&mut self, goose: &mut GooseEntity, ctx: &mut TaskCtx) -> bool {
+        goose.current_speed = goose.parameters.walk_speed;
+        goose.current_acceleration = goose.parameters.acceleration_normal;
+        goose.can_decelerate_immediately = true;
+        let delta = ctx.pointer.pos - goose.position;
+        let distance = delta.magnitude();
+        goose.target_pos = if ctx.pointer.present && distance > AFFECTION_FOLLOW_GAP + 4.0 {
+            ctx.layout
+                .clamp_point(ctx.pointer.pos - delta.normalize() * AFFECTION_FOLLOW_GAP)
+        } else {
+            goose.position
+        };
+        !ctx.pointer.present || ctx.pointer.left_down || ctx.now >= self.ends_at
     }
 }
 

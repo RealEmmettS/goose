@@ -201,7 +201,7 @@ fn convert(mut snapshot: Snapshot, scale: f64) -> Option<(TreeUpdate, HashMap<u6
             .push(NodeId(widget.id));
     }
     let mut root = Node::new(Role::Window);
-    root.set_label("Honk300 settings");
+    root.set_label("Goose");
     root.set_children(children.remove(&ROOT).unwrap_or_default());
     let mut nodes = vec![(ROOT, root)];
     let mut actions = HashMap::new();

@@ -11,7 +11,7 @@
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
     <Product
         Id='*'
-        Name='honk300 (Corporate Edition)'
+        Name='Goose (Corporate Edition)'
         UpgradeCode='247D60BB-5DD4-4D99-9F1B-D6AD52FA4FC7'
         Manufacturer='Emmett S'
         Language='1033'
@@ -35,6 +35,9 @@
         <MajorUpgrade
             Schedule='afterInstallExecute'
             AllowDowngrades='yes'/>
+
+        <Icon Id='GooseIcon' SourceFile='$(var.SourceRoot)\Assets\UI\honk300-app.ico'/>
+        <Property Id='ARPPRODUCTICON' Value='GooseIcon'/>
 
         <Media Id='1' Cabinet='media1.cab' EmbedCab='yes'/>
         <Property Id='HONK300AUTOSTART' Value='false' Secure='yes'/>
@@ -98,7 +101,8 @@
                 </Directory>
             </Directory>
             <Directory Id='ProgramMenuFolder'>
-                <Directory Id='ApplicationProgramsFolder' Name='honk300'/>
+                <Directory Id='ApplicationProgramsFolder' Name='Goose'/>
+                <Directory Id='LegacyApplicationProgramsFolder' Name='honk300'/>
             </Directory>
         </Directory>
 
@@ -115,14 +119,19 @@
         </DirectoryRef>
 
         <DirectoryRef Id='ApplicationProgramsFolder'>
-            <Component Id='StartMenuShortcut' Guid='*' Permanent='yes'>
+            <Component Id='GooseStartMenuShortcut' Guid='*' Permanent='yes'>
                 <Shortcut
                     Id='StartMenuShortcut'
-                    Name='Honk300'
+                    Name='Goose'
+                    Arguments='--settings'
+                    Icon='GooseIcon'
+                    IconIndex='0'
                     Target='[APPLICATIONFOLDER]bin\honk300-app.exe'
                     WorkingDirectory='APPLICATIONFOLDER'/>
+                <RemoveFile Id='RemoveLegacyGooseShortcut' Directory='LegacyApplicationProgramsFolder' Name='Honk300.lnk' On='install'/>
+                <RemoveFolder Id='RemoveLegacyApplicationProgramsFolder' Directory='LegacyApplicationProgramsFolder' On='install'/>
                 <RemoveFolder Id='RemoveApplicationProgramsFolder' On='uninstall'/>
-                <RegistryValue Root='HKCU' Key='Software\Honk300' Name='StartMenuShortcut' Type='integer' Value='1' KeyPath='yes'/>
+                <RegistryValue Root='HKCU' Key='Software\Honk300' Name='GooseStartMenuShortcut' Type='integer' Value='1' KeyPath='yes'/>
             </Component>
         </DirectoryRef>
 
@@ -157,7 +166,7 @@
             <ComponentRef Id='NativeSdkFontNotices'/>
             <ComponentRef Id='LegalNotices'/>
             <ComponentRef Id='InstallSourceMarker'/>
-            <ComponentRef Id='StartMenuShortcut'/>
+            <ComponentRef Id='GooseStartMenuShortcut'/>
             <Feature Id='Environment' Title='PATH Environment Variable' Description='Add honk300 to the user PATH.' Level='1' Absent='allow'>
                 <ComponentRef Id='Path'/>
             </Feature>

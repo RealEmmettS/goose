@@ -21,21 +21,22 @@
 #endif
 
 #define MyAppName "honk300"
+#define MyAppDisplayName "Goose"
 #define MyAppPublisher "Emmett S"
 #define MyAppURL "https://github.com/RealEmmettS/goose"
 #define MyAppExeName "honk300.exe"
 
 [Setup]
 AppId={{5A94FBD0-DA02-4F63-9363-7D9CE0E280F5}
-AppName={#MyAppName}
+AppName={#MyAppDisplayName}
 AppVersion={#MyAppVersion}
-AppVerName={#MyAppName} {#MyAppVersion}
+AppVerName={#MyAppDisplayName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}/releases
 DefaultDirName={commonpf}\{#MyAppName}
-DefaultGroupName={#MyAppName}
+DefaultGroupName={#MyAppDisplayName}
 DisableDirPage=auto
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=
@@ -47,13 +48,15 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ChangesEnvironment=yes
-UninstallDisplayName={#MyAppName}
+UninstallDisplayName={#MyAppDisplayName}
+SetupIconFile=..\Assets\UI\honk300-app.ico
+UninstallDisplayIcon={app}\bin\honk300-app.exe,0
 SetupLogging=yes
 CloseApplications=no
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
-Name: "autostart"; Description: "Start honk300 when this user logs in"; GroupDescription: "Startup:"; Flags: unchecked
+Name: "autostart"; Description: "Start Goose when this user logs in"; GroupDescription: "Startup:"; Flags: unchecked
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -71,8 +74,8 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY_ASSETS.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Honk300"; Filename: "{app}\bin\honk300-app.exe"; WorkingDir: "{app}\bin"; Flags: uninsneveruninstall
-Name: "{commondesktop}\Honk300"; Filename: "{app}\bin\honk300-app.exe"; WorkingDir: "{app}\bin"; Tasks: desktopicon; Flags: uninsneveruninstall
+Name: "{group}\Goose"; Filename: "{app}\bin\honk300-app.exe"; Parameters: "--settings"; IconFilename: "{app}\bin\honk300-app.exe"; IconIndex: 0; WorkingDir: "{app}\bin"; Flags: uninsneveruninstall
+Name: "{commondesktop}\Goose"; Filename: "{app}\bin\honk300-app.exe"; Parameters: "--settings"; IconFilename: "{app}\bin\honk300-app.exe"; IconIndex: 0; WorkingDir: "{app}\bin"; Tasks: desktopicon; Flags: uninsneveruninstall
 
 [Code]
 const

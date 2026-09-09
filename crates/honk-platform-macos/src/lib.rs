@@ -306,7 +306,7 @@ mod platform {
             let configure = unsafe {
                 NSMenuItem::initWithTitle_action_keyEquivalent(
                     NSMenuItem::alloc(mtm),
-                    &NSString::from_str("Configure Honk300…"),
+                    &NSString::from_str("Configure Goose…"),
                     Some(sel!(configureHonk300:)),
                     &NSString::from_str(""),
                 )
@@ -320,7 +320,7 @@ mod platform {
             let update = unsafe {
                 NSMenuItem::initWithTitle_action_keyEquivalent(
                     NSMenuItem::alloc(mtm),
-                    &NSString::from_str("Update Honk300…"),
+                    &NSString::from_str("Update Goose…"),
                     Some(sel!(updateHonk300:)),
                     &NSString::from_str(""),
                 )
@@ -336,7 +336,7 @@ mod platform {
             let quit = unsafe {
                 NSMenuItem::initWithTitle_action_keyEquivalent(
                     NSMenuItem::alloc(mtm),
-                    &NSString::from_str("Quit Honk300"),
+                    &NSString::from_str("Quit Goose"),
                     Some(sel!(quitHonk300:)),
                     &NSString::from_str("q"),
                 )

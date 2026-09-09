@@ -1,9 +1,9 @@
 .{
     .id = "dev.emmetts.honk300.settings",
     .name = "honk300-settings",
-    .display_name = "Honk300 Settings",
-    .description = "Native settings for Honk300.",
-    .version = "1.10.1",
+    .display_name = "Goose",
+    .description = "Controls and settings for Goose.",
+    .version = "1.11.0",
     .icons = .{"assets/icon.png"},
     .platforms = .{ "macos", "windows", "linux" },
     .permissions = .{ "view", "command" },
@@ -12,13 +12,13 @@
         .windows = .{
             .{
                 .label = "main",
-                .title = "Honk300 Settings",
+                .title = "Goose",
                 .width = 860,
                 .height = 700,
                 .restore_state = false,
                 .restore_policy = "center_on_primary",
                 .views = .{
-                    .{ .label = "main-canvas", .kind = "gpu_surface", .fill = true, .role = "Settings", .accessibility_label = "Honk300 settings", .gpu_backend = "metal", .gpu_pixel_format = "bgra8_unorm", .gpu_present_mode = "timer", .gpu_alpha_mode = "opaque", .gpu_color_space = "srgb", .gpu_vsync = true },
+                    .{ .label = "main-canvas", .kind = "gpu_surface", .fill = true, .role = "Settings", .accessibility_label = "Goose", .gpu_backend = "metal", .gpu_pixel_format = "bgra8_unorm", .gpu_present_mode = "timer", .gpu_alpha_mode = "opaque", .gpu_color_space = "srgb", .gpu_vsync = true },
                 },
             },
         },

@@ -25,9 +25,9 @@ use crate::rng::{Deck, RandomSource, SplitMix64};
 use crate::schedule::PresenceSnapshot;
 use crate::sound::Sound;
 use crate::task::{
-    AnnoyedReactionTask, AutumnLeafPileTask, CollectWindowTask, EdgeEntryTask, EdgeWrapTask,
-    ExcursionKind, ExcursionTask, FirstUxTask, GracefulExitTask, HyperTask, NabMouseTask,
-    PerchRideTask, PermissionWaitTask, Task, TaskCtx, WanderTask,
+    AffectionFollowTask, AnnoyedReactionTask, AutumnLeafPileTask, CollectWindowTask, EdgeEntryTask,
+    EdgeWrapTask, ExcursionKind, ExcursionTask, FirstUxTask, GracefulExitTask, HyperTask,
+    NabMouseTask, PerchRideTask, PermissionWaitTask, Task, TaskCtx, WanderTask,
 };
 use crate::time::DT;
 use std::collections::VecDeque;
@@ -408,6 +408,12 @@ impl World {
         self.refresh_schedule_state();
         self.rebuild_pickable();
 
+        if !options.interaction.pat_streak {
+            self.pat = PatTracker::new();
+            if self.current.id() == "affection_follow" {
+                self.resume_or_wander();
+            }
+        }
         if self.is_cursor_mischief_active() && !options.mouse_steal.active() {
             self.resume_or_wander();
         }
@@ -821,6 +827,7 @@ impl World {
             || self.is_perch_ride_active()
             || self.is_collect_window_active()
         {
+            self.pat = PatTracker::new();
             self.pointer = pointer;
             self.prev_left_down = pointer.left_down;
             return;
@@ -829,7 +836,7 @@ impl World {
         // Whether the pointer is over the goose at all — this gates the click reaction.
         let on_goose = pointer.present && self.goose_hit(pointer.pos);
         // Patting (hearts/calm) is a separate interaction, gated by the pat-streak toggle.
-        let hovering = self.options.interaction.pat_streak && on_goose;
+        let hovering = self.options.interaction.pat_streak && on_goose && !pointer.left_down;
 
         // Pat = hovering hover-sweeps. Each registered pat spawns a heart above the goose.
         let pats = self.pat.update(hovering, pointer.pos, self.elapsed);
@@ -841,6 +848,20 @@ impl World {
                 self.hearts.add(head + jitter, self.elapsed);
             }
             self.pending_sounds.push(Sound::Pat);
+        }
+
+        if self.pat.take_follow_request()
+            && self.interrupted.is_none()
+            && self.current.id() == "wander"
+            && !self.pending_nab
+            && !self.pending_hyper
+        {
+            let prior = std::mem::replace(
+                &mut self.current,
+                Box::new(AffectionFollowTask::new(self.elapsed)),
+            );
+            self.interrupted = Some(prior);
+            self.goose.anim.pet();
         }
 
         // Click = left-button rising edge while over the goose → a hyper burst on the next tick.
@@ -1053,6 +1074,9 @@ impl World {
         self.elapsed += DT as f64;
         self.refresh_schedule_state();
         let manners_active = self.manners_active();
+        if self.current.id() == "affection_follow" && manners_active {
+            self.resume_or_wander();
+        }
         let permission_waiting = self.permission_waiting();
         let lifecycle_exiting = self.graceful_exit_requested();
         if !lifecycle_exiting {
@@ -1470,6 +1494,7 @@ impl World {
     fn apply_mood_locomotion_modulation(&mut self) {
         if self.graceful_exit_requested()
             || self.permission_waiting()
+            || self.current.id() == "affection_follow"
             || !self.mood.options().dynamic_moods
         {
             return;
@@ -2473,6 +2498,102 @@ mod tests {
         pat_the_goose(&mut w, 12);
         assert_eq!(w.hearts().alive_count(w.now()), 0);
         assert!(!w.is_calm());
+    }
+
+    fn rub_until_following() -> World {
+        let mut world = World::new(bounds(), 42);
+        world.current = Box::new(WanderTask::new());
+        world.goose.position = Vec2::new(500.0, 400.0);
+        world.goose.target_pos = world.goose.position;
+        world.goose.anim = RigAnim::new(world.goose.position, 0.0);
+        world.goose.pose =
+            world
+                .goose
+                .anim
+                .update(&RigInput::static_pose(world.goose.position, 0.0, 0.0));
+        world.goose.rig = world.goose.pose.primary;
+        for frame in 0..360 {
+            world.set_pointer(Pointer {
+                pos: world.goose.rig.body_center
+                    + Vec2::new(if frame % 2 == 0 { 6.0 } else { -6.0 }, 0.0),
+                present: true,
+                left_down: false,
+            });
+            if frame < 300 {
+                assert_ne!(world.current_task(), "affection_follow");
+            }
+            assert!(world.take_cursor_commands().is_empty());
+            world.tick();
+            if world.current_task() == "affection_follow" {
+                break;
+            }
+        }
+        assert_eq!(world.current_task(), "affection_follow");
+        assert!(world.hearts().alive_count(world.now()) > 0);
+        world
+    }
+
+    #[test]
+    fn sustained_rubbing_invites_finite_walking_follow_with_a_gap_and_no_cursor_commands() {
+        let mut world = rub_until_following();
+        let followed_at = world.now();
+        let cursor = world
+            .layout
+            .clamp_point(world.goose.position + Vec2::new(250.0, 100.0));
+        let initial_distance = Vec2::distance(cursor, world.goose.position);
+        while world.now() - followed_at < 5.0 {
+            world.set_pointer(Pointer {
+                pos: cursor,
+                present: true,
+                left_down: false,
+            });
+            world.tick();
+            assert_eq!(world.current_task(), "affection_follow");
+            assert!(world.take_cursor_commands().is_empty());
+            assert!(world.take_collect_window_commands().is_empty());
+            assert!(world.goose.velocity.magnitude() <= world.goose.parameters.walk_speed + 0.01);
+        }
+        let settled_distance = Vec2::distance(cursor, world.goose.position);
+        assert!(settled_distance < initial_distance - 50.0);
+        assert!(
+            (89.0..95.0).contains(&settled_distance),
+            "follow gap: {settled_distance}"
+        );
+        while world.now() - followed_at < crate::task::AFFECTION_FOLLOW_SECONDS + 0.05 {
+            world.tick();
+            assert!(world.take_cursor_commands().is_empty());
+        }
+        assert_eq!(world.current_task(), "wander");
+        assert!(world.interrupted.is_none());
+    }
+
+    #[test]
+    fn affection_follow_cancels_on_pointer_loss_opt_out_manners_and_shutdown() {
+        let mut world = rub_until_following();
+        world.set_pointer(Pointer::default());
+        world.tick();
+        assert_eq!(world.current_task(), "wander");
+
+        let mut world = rub_until_following();
+        let mut options = world.options;
+        options.interaction.pat_streak = false;
+        world.apply_options(options);
+        assert_eq!(world.current_task(), "wander");
+
+        let mut world = rub_until_following();
+        let mut options = world.options;
+        options.appearance.calm_goose = true;
+        world.apply_options(options);
+        world.tick();
+        assert_eq!(world.current_task(), "wander");
+
+        let mut world = rub_until_following();
+        world.enter_permission_wait(Vec2::new(300.0, 300.0));
+        assert_eq!(world.current_task(), "permission_wait");
+        assert!(world.interrupted.is_none());
+        assert!(world.take_cursor_commands().is_empty());
+        world.request_graceful_exit();
+        assert_eq!(world.current_task(), "graceful_exit");
     }
 
     #[test]

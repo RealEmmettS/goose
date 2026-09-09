@@ -155,7 +155,7 @@ function Get-HonkRegistrations {
                             $publisher = [string]$key.GetValue('Publisher', '')
                             $displayName = [string]$key.GetValue('DisplayName', '')
                             if (($publisher -eq 'Emmett S' -and
-                                $displayName -in @('honk300', 'honk300 (Corporate Edition)')) -or
+                                $displayName -in @('honk300', 'honk300 (Corporate Edition)', 'Goose', 'Goose (Corporate Edition)')) -or
                                 $keyName -in $knownInnoKeys) {
                                 $items += [pscustomobject]@{
                                     hive = $hive.Name
@@ -309,6 +309,7 @@ function Assert-Active([string] $Root, [string] $Origin) {
     if ($receipt.app_launcher.path -ne $launcher -or $receipt.app_launcher.sha256 -ne $launcherHash) {
         throw "$Origin receipt did not bind the exact windowless app launcher"
     }
+    & (Join-Path $PSScriptRoot 'smoke_windows_app_controls.ps1') -InstallRoot $Root -EvidenceDirectory (Join-Path $evidence "app-controls-$Origin")
 }
 
 function Assert-PublicPathOwner([string] $Root, [string] $Origin) {

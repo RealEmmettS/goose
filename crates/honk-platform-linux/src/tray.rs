@@ -72,7 +72,7 @@ impl ksni::Tray for LinuxTray {
     fn menu(&self) -> Vec<MenuItem<Self>> {
         vec![
             StandardItem {
-                label: "Configure Honk300…".into(),
+                label: "Configure Goose…".into(),
                 activate: Box::new(|tray: &mut LinuxTray| {
                     tray.emit(ControlSurfaceCommand::Configure)
                 }),
@@ -80,14 +80,14 @@ impl ksni::Tray for LinuxTray {
             }
             .into(),
             StandardItem {
-                label: "Update Honk300…".into(),
+                label: "Update Goose…".into(),
                 activate: Box::new(|tray: &mut LinuxTray| tray.emit(ControlSurfaceCommand::Update)),
                 ..Default::default()
             }
             .into(),
             MenuItem::Separator,
             StandardItem {
-                label: "Quit Honk300".into(),
+                label: "Quit Goose".into(),
                 icon_name: "application-exit".into(),
                 activate: Box::new(|tray: &mut LinuxTray| tray.emit(ControlSurfaceCommand::Quit)),
                 ..Default::default()

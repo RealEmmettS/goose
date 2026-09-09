@@ -27,7 +27,7 @@ use honk_control::LifecycleLease;
 
 const APP_NAME: &str = "honk300";
 #[cfg(windows)]
-const DISPLAY_NAME: &str = "Honk300";
+const DISPLAY_NAME: &str = "Goose";
 #[cfg(windows)]
 const WINDOWS_APP_LAUNCHER_NAME: &str = "honk300-app.exe";
 const MARKER_FILE: &str = "install-source.txt";
@@ -107,11 +107,15 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
         install_owned_unix_alias(&aliases_dir.join(name), &installed, &owned_targets)?;
     }
 
-    let desktop = linux_desktop_entry(&installed);
+    let desktop = linux_desktop_entry(&installed, false);
     let desktop_path = linux_applications_dir()?.join("honk300.desktop");
     write_owned_text_file(&desktop_path, &desktop, OWNERSHIP_MARKER)?;
     if autostart {
-        write_owned_text_file(&linux_autostart_path()?, &desktop, OWNERSHIP_MARKER)?;
+        write_owned_text_file(
+            &linux_autostart_path()?,
+            &linux_desktop_entry(&installed, true),
+            OWNERSHIP_MARKER,
+        )?;
     } else {
         remove_owned_text_file(&linux_autostart_path()?, OWNERSHIP_MARKER)?;
     }
@@ -1658,11 +1662,16 @@ fn windows_registered_owners() -> Result<Vec<WindowsRegisteredOwner>, DynError> 
                 }
                 let candidate = identity.install_location.join("bin").join("honk300.exe");
                 let source = if identity.windows_installer {
-                    if identity.display_name.eq_ignore_ascii_case(DISPLAY_NAME) {
+                    if identity.display_name.eq_ignore_ascii_case(DISPLAY_NAME)
+                        || identity.display_name.eq_ignore_ascii_case("honk300")
+                    {
                         InstallSource::MsiGlobal
                     } else if identity
                         .display_name
                         .eq_ignore_ascii_case("honk300 (Corporate Edition)")
+                        || identity
+                            .display_name
+                            .eq_ignore_ascii_case("Goose (Corporate Edition)")
                     {
                         InstallSource::MsiCorporate
                     } else {
@@ -2163,12 +2172,42 @@ fn remove_windows_slot_integrations(root: &Path, origin: InstallSource) -> Resul
         };
         let group = programs.join("honk300");
         remove_file_if_exists(&group.join("Honk300.lnk"))?;
+        remove_owned_windows_shortcut(&group.join("Goose.lnk"), root)?;
+        let _ = fs::remove_dir(group);
+        let group = programs.join("Goose");
+        remove_owned_windows_shortcut(&group.join("Goose.lnk"), root)?;
         let _ = fs::remove_dir(group);
     }
     if let Some(desktop) = desktop_root {
         remove_file_if_exists(&desktop.join("Honk300.lnk"))?;
+        remove_owned_windows_shortcut(&desktop.join("Goose.lnk"), root)?;
     }
     Ok(())
+}
+
+#[cfg(windows)]
+fn remove_owned_windows_shortcut(shortcut: &Path, root: &Path) -> io::Result<()> {
+    use std::os::windows::process::CommandExt;
+    if !shortcut.try_exists()? {
+        return Ok(());
+    }
+    // Goose is a display name; a same-named shortcut targeting another app is not ours.
+    let script = format!(
+        "$ErrorActionPreference='Stop'; $p='{}'; $w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut($p); if ($s.TargetPath -eq '{}') {{ Remove-Item -LiteralPath $p }}",
+        ps_quote(&shortcut.to_string_lossy()),
+        ps_quote(&root.join("bin").join(WINDOWS_APP_LAUNCHER_NAME).to_string_lossy())
+    );
+    let status = std::process::Command::new(system_windows_powershell_path()?)
+        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .creation_flags(0x0800_0000)
+        .status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other(
+            "could not remove the owned Goose shortcut",
+        ))
+    }
 }
 
 #[cfg(windows)]
@@ -2708,7 +2747,7 @@ fn create_windows_start_menu_shortcut(exe: &Path) -> io::Result<()> {
     let shortcut = windows_start_menu_shortcut_path()?;
     let working_dir = exe.parent().unwrap_or_else(|| Path::new(""));
     let script = format!(
-        "$w = New-Object -ComObject WScript.Shell; $s = $w.CreateShortcut('{}'); $s.TargetPath = '{}'; $s.Arguments = ''; $s.WorkingDirectory = '{}'; $s.WindowStyle = 7; $s.Save()",
+        "$w = New-Object -ComObject WScript.Shell; $s = $w.CreateShortcut('{}'); $s.TargetPath = '{}'; $s.IconLocation = $s.TargetPath + ',0'; $s.Arguments = '--settings'; $s.WorkingDirectory = '{}'; $s.WindowStyle = 1; $s.Save()",
         ps_quote(&shortcut.to_string_lossy()),
         ps_quote(&exe.to_string_lossy()),
         ps_quote(&working_dir.to_string_lossy())
@@ -2820,14 +2859,17 @@ fn validate_windows_uninstall_identity(
     current_exe: &Path,
     identity: &WindowsUninstallIdentity,
 ) -> Option<WindowsManagedUninstall> {
-    let (expected_name, elevated) = match source {
-        InstallSource::MsiGlobal | InstallSource::ExeGlobal => ("honk300", true),
-        InstallSource::MsiCorporate | InstallSource::ExeCorporate => {
-            ("honk300 (Corporate Edition)", false)
-        }
+    let (expected_name, legacy_name, elevated) = match source {
+        InstallSource::MsiGlobal | InstallSource::ExeGlobal => ("Goose", "honk300", true),
+        InstallSource::MsiCorporate | InstallSource::ExeCorporate => (
+            "Goose (Corporate Edition)",
+            "honk300 (Corporate Edition)",
+            false,
+        ),
         _ => return None,
     };
-    if !identity.display_name.eq_ignore_ascii_case(expected_name)
+    if (!identity.display_name.eq_ignore_ascii_case(expected_name)
+        && !identity.display_name.eq_ignore_ascii_case(legacy_name))
         || identity.publisher != "Emmett S"
         || identity.install_location.as_os_str().is_empty()
         || !path_is_within(current_exe, &identity.install_location)
@@ -3453,9 +3495,10 @@ fn linux_autostart_path() -> Result<PathBuf, DynError> {
 }
 
 #[cfg(target_os = "linux")]
-fn linux_desktop_entry(exe: &Path) -> String {
+fn linux_desktop_entry(exe: &Path, autostart: bool) -> String {
+    let operation = if autostart { "start" } else { "settings" };
     format!(
-        "[Desktop Entry]\nType=Application\nName=Honk300\nComment=Desktop goose for your screen\nExec={} start\nTerminal=false\nCategories=Utility;\nStartupNotify=false\nX-GNOME-Autostart-enabled=true\nX-Honk300-Owner={OWNERSHIP_MARKER}\n",
+        "[Desktop Entry]\nType=Application\nName=Goose\nComment=Desktop goose for your screen\nExec={} {operation}\nIcon=honk300\nTerminal=false\nCategories=Utility;\nStartupNotify=false\nX-GNOME-Autostart-enabled=true\nX-Honk300-Owner={OWNERSHIP_MARKER}\n",
         desktop_exec_quote(exe)
     )
 }

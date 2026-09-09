@@ -7,10 +7,10 @@ use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "honk300",
+    name = "goose",
     version,
     about = "A desktop goose for your screen",
-    after_help = "Goose-speak:\n  <name> plz                         Start the goose\n  <name> bad | no | no honk          Walk offscreen, then stop\n  <name> exit | quit                 Walk offscreen, then stop\n  <name> stop | exit | quit --force  Stop immediately\n  <name> do honk                     Poke a honk\n\nInstalled names: honk300, honk, goose."
+    after_help = "Open Goose from your applications menu, or run `goose` to open its controls.\n\nGoose-speak:\n  goose start | plz                  Start the goose\n  goose bad | no | no honk          Walk offscreen, then stop\n  goose exit | quit                 Walk offscreen, then stop\n  goose stop | exit | quit --force  Stop immediately\n  goose do honk                     Poke a honk\n  goose config                      Open the secondary terminal settings\n\nCompatible command names: goose, honk300, honk."
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -208,7 +208,7 @@ impl Cli {
 
     #[cfg(test)]
     pub fn is_start(&self) -> bool {
-        self.command.is_none() || matches!(self.command, Some(Command::Start { .. }))
+        matches!(self.command, Some(Command::Start { .. }))
     }
 
     pub fn is_client_command(&self) -> bool {
@@ -301,9 +301,10 @@ mod tests {
     use clap::CommandFactory;
 
     #[test]
-    fn empty_command_defaults_to_start() {
+    fn empty_command_opens_the_application_without_implying_runtime_start() {
         let cli = Cli::try_parse_normalized(["honk300"]).unwrap();
-        assert!(cli.is_start());
+        assert!(cli.command.is_none());
+        assert!(!cli.is_start());
     }
 
     #[test]
@@ -611,7 +612,8 @@ mod tests {
         let err = Cli::try_parse_normalized(["goose", "--help"]).unwrap_err();
         let help = err.to_string();
         assert!(help.contains("Goose-speak"));
-        assert!(help.contains("<name> plz"));
+        assert!(help.contains("goose start | plz"));
+        assert!(help.contains("applications menu"));
     }
 
     #[test]

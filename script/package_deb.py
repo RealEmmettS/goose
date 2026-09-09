@@ -126,9 +126,9 @@ def build_package_tree(
         root / "usr" / "share" / "applications" / "honk300.desktop",
         "[Desktop Entry]\n"
         "Type=Application\n"
-        "Name=Honk300\n"
+        "Name=Goose\n"
         "Comment=Desktop goose for your screen\n"
-        "Exec=/usr/bin/honk300 start\n"
+        "Exec=/usr/bin/goose settings\n"
         "Icon=honk300\n"
         "Terminal=false\n"
         "Categories=Utility;Game;\n"

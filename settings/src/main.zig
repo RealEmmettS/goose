@@ -18,11 +18,11 @@ const window_height: f32 = 700;
 
 const app_permissions = [_][]const u8{ native_sdk.security.permission_command, native_sdk.security.permission_view };
 const shell_views = [_]native_sdk.ShellView{
-    .{ .label = canvas_label, .kind = .gpu_surface, .fill = true, .role = "Honk300 Settings", .accessibility_label = "Honk300 settings", .gpu_backend = .metal, .gpu_pixel_format = .bgra8_unorm, .gpu_present_mode = .timer, .gpu_alpha_mode = .@"opaque", .gpu_color_space = .srgb, .gpu_vsync = true },
+    .{ .label = canvas_label, .kind = .gpu_surface, .fill = true, .role = "Goose", .accessibility_label = "Goose", .gpu_backend = .metal, .gpu_pixel_format = .bgra8_unorm, .gpu_present_mode = .timer, .gpu_alpha_mode = .@"opaque", .gpu_color_space = .srgb, .gpu_vsync = true },
 };
 const shell_windows = [_]native_sdk.ShellWindow{.{
     .label = "main",
-    .title = "Honk300 Settings",
+    .title = "Goose",
     .width = window_width,
     .height = window_height,
     .restore_state = false,
@@ -34,7 +34,7 @@ const dev = @import("builtin").mode == .Debug;
 pub const Effects = native_sdk.Effects(Msg);
 pub const AppUi = canvas.Ui(Msg);
 pub const app_markup = @embedFile("app.native");
-pub const version = "1.10.1";
+pub const version = "1.11.0";
 const SettingsApp = native_sdk.UiAppWithFeatures(Model, Msg, .{ .runtime_markup = dev });
 const CompiledView = canvas.CompiledMarkupView(Model, Msg, app_markup);
 const body_font: canvas.FontId = canvas.min_registered_font_id;
@@ -656,7 +656,7 @@ pub fn main(init: std.process.Init) !void {
 
     try runner.runWithOptions(app_state.app(), .{
         .app_name = "honk300-settings",
-        .window_title = "Honk300 Settings",
+        .window_title = "Goose",
         .bundle_id = "dev.emmetts.honk300.settings",
         .icon_path = "assets/icon.png",
         .default_frame = geometry.RectF.init(0, 0, window_width, window_height),

@@ -7,6 +7,20 @@ features and installation, and [readiness records](docs/readiness/) for release 
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-09-09
+
+### Added
+- After 2.5 seconds of actual rubbing, invite a 15-second cursor follow at configured walking speed with a 90-pixel gap, one invitation per streak, no cursor/window commands, and cancellation for pointer loss, clicks, petting opt-out, manners, permission withdrawal and shutdown.
+
+### Improved
+- Make the native Goose application the primary interface across platforms. Application-menu entries and bare commands open the existing Rust-owned graphical controls; explicit start/plz and autostart retain their runtime route, and the TUI remains available through goose config. Preserve all binary, installer, receipt, app-bundle and permission identities while supporting the new display names alongside historical installer names.
+- Draw pointed and lobed autumn leaves with stems and continuously settling orientation. Preserve simulation RNG, leaf counts, kick strength, gravity and bounce; expire every pile after 30 seconds with a four-second fade, or sooner through its existing kicked lifetime.
+
+### Fixed
+- Prefer authoritative current-owned settings receipts over stale external installer records, matching updater provenance precedence. Keep malformed/conflicting owned evidence fail-closed and preserve companion size/hash verification and retained Windows file leases.
+- Embed application icons in Windows command and GUI executables, bind the settings window icon, and supply explicit MSI/EXE installed-app and app-menu icons. Qualify actual installed GUI entry points against stale receipt records across installer origins and both native architectures. Include a sealed Mac app icon and localized Goose display name at the existing managed bundle path.
+- Report Windows tray Configure/Update launch failures visibly without blocking the runtime event loop.
+
 ### Behind the scenes
 - Close the complete refinement milestone with final GNOME/presence source, native,
   publication, fresh-public and website evidence; reconcile adapter/gait/readiness/accessibility

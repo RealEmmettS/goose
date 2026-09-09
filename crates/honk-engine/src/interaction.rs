@@ -36,6 +36,9 @@ pub const SWEEP_PER_PAT: f32 = 28.0;
 pub const STREAK_TIMEOUT: f64 = 1.2;
 /// Each registered pat keeps the goose calm for this long (seconds).
 pub const CALM_DURATION: f64 = 4.0;
+/// Actual repeated rubbing needed before the friendly follow invitation.
+pub const AFFECTION_RUB_SECONDS: f64 = 2.5;
+const RUB_PAUSE_SECONDS: f64 = 0.3;
 
 /// Detects pats from successive hovering cursor positions and tracks the happy streak.
 #[derive(Debug, Clone)]
@@ -45,6 +48,10 @@ pub struct PatTracker {
     last_pos: Option<Vec2>,
     last_pat_time: f64,
     calm_until: f64,
+    last_motion_time: f64,
+    rub_seconds: f64,
+    follow_requested: bool,
+    follow_issued: bool,
 }
 
 impl Default for PatTracker {
@@ -55,6 +62,10 @@ impl Default for PatTracker {
             last_pos: None,
             last_pat_time: f64::NEG_INFINITY,
             calm_until: f64::NEG_INFINITY,
+            last_motion_time: f64::NEG_INFINITY,
+            rub_seconds: 0.0,
+            follow_requested: false,
+            follow_issued: false,
         }
     }
 }
@@ -75,9 +86,19 @@ impl PatTracker {
         now < self.calm_until
     }
 
+    /// One invitation per sustained rubbing streak; holding still never starts a follow.
+    pub fn take_follow_request(&mut self) -> bool {
+        std::mem::take(&mut self.follow_requested)
+    }
+
     /// Feed one frame of pointer state. `hovering` is whether the cursor is over the goose.
     /// Returns how many pats were registered this frame (0 normally, ≥1 on a long sweep).
     pub fn update(&mut self, hovering: bool, pos: Vec2, now: f64) -> u32 {
+        if now - self.last_motion_time > RUB_PAUSE_SECONDS {
+            self.rub_seconds = 0.0;
+            self.follow_requested = false;
+            self.follow_issued = false;
+        }
         // Lapse the streak after a quiet spell (the in-progress sweep keeps accumulating —
         // it only resets when the cursor actually leaves the goose, below).
         if now - self.last_pat_time > STREAK_TIMEOUT {
@@ -93,7 +114,19 @@ impl PatTracker {
 
         let mut pats = 0;
         if let Some(prev) = self.last_pos {
-            self.sweep_accum += Vec2::distance(prev, pos);
+            let moved = Vec2::distance(prev, pos);
+            if moved >= 0.25 {
+                let delta = now - self.last_motion_time;
+                if delta <= RUB_PAUSE_SECONDS {
+                    self.rub_seconds += delta.clamp(0.0, 0.05);
+                }
+                self.last_motion_time = now;
+                if self.rub_seconds >= AFFECTION_RUB_SECONDS && !self.follow_issued {
+                    self.follow_requested = true;
+                    self.follow_issued = true;
+                }
+            }
+            self.sweep_accum += moved;
             while self.sweep_accum >= SWEEP_PER_PAT {
                 self.sweep_accum -= SWEEP_PER_PAT;
                 self.streak += 1;
@@ -161,5 +194,40 @@ mod tests {
         sweep(&mut t, Vec2::new(0.0, 0.0), SWEEP_PER_PAT * 1.2, 0.0);
         assert!(t.is_calm(0.0));
         assert!(!t.is_calm(CALM_DURATION + 1.0), "calm wears off");
+    }
+
+    #[test]
+    fn affection_requires_timed_motion_and_only_invites_once_per_streak() {
+        let mut tracker = PatTracker::new();
+        for frame in 0..400 {
+            tracker.update(true, Vec2::ZERO, frame as f64 / 120.0);
+            assert!(!tracker.take_follow_request());
+        }
+        let mut invitations = 0;
+        for frame in 0..600 {
+            tracker.update(
+                true,
+                Vec2::new((frame % 2) as f32 * 10.0, 0.0),
+                4.0 + frame as f64 / 120.0,
+            );
+            let invited = tracker.take_follow_request();
+            if frame < 300 {
+                assert!(!invited);
+            }
+            invitations += usize::from(invited);
+        }
+        assert_eq!(invitations, 1);
+        tracker.update(false, Vec2::ZERO, 10.0);
+        for frame in 0..240 {
+            tracker.update(
+                true,
+                Vec2::new((frame % 2) as f32 * 10.0, 0.0),
+                10.0 + frame as f64 / 120.0,
+            );
+            assert!(
+                !tracker.take_follow_request(),
+                "a new streak must earn its own duration"
+            );
+        }
     }
 }
