@@ -15,6 +15,7 @@ const INFO = 'standard::type,standard::is-symlink,standard::size,unix::uid,unix:
 const decoder = new TextDecoder();
 
 class ConsentRevoked extends Error {}
+class PrivateFileReplaced extends Error {}
 
 function ioAsync(object, method, finish, ...args) {
     return new Promise((resolve, reject) => {
@@ -49,7 +50,20 @@ async function privateInfo(path, cancellable, directory = false) {
     return {file, info};
 }
 
-async function readPrivate(path, limit, cancellable) {
+async function readPrivate(path, limit, cancellable, retryReplacement = false) {
+    try {
+        return await readPrivateOnce(path, limit, cancellable);
+    } catch (error) {
+        if (!retryReplacement || !(error instanceof PrivateFileReplaced) || cancellable.is_cancelled())
+            throw error;
+        // A complete consent record may be renamed between pathname metadata
+        // and stream open. Close that stream, then validate the new pathname
+        // once, within the original request deadline and cancellation scope.
+        return readPrivateOnce(path, limit, cancellable);
+    }
+}
+
+async function readPrivateOnce(path, limit, cancellable) {
     const {file, info} = await privateInfo(path, cancellable);
     if (info.get_size() > limit)
         throw new Error('GNOME consent exceeds its bound');
@@ -57,12 +71,16 @@ async function readPrivate(path, limit, cancellable) {
     try {
         const opened = await ioAsync(stream, 'query_info_async', 'query_info_finish',
             INFO, GLib.PRIORITY_DEFAULT, cancellable);
-        for (const attribute of ['unix::device', 'unix::inode', 'unix::uid', 'unix::mode']) {
+        for (const attribute of ['unix::uid', 'unix::mode']) {
             if (opened.get_attribute_as_string(attribute) !== info.get_attribute_as_string(attribute))
                 throw new Error('GNOME consent changed while opening');
         }
         if (opened.get_file_type() !== Gio.FileType.REGULAR || opened.get_size() > limit)
             throw new Error('GNOME consent changed while opening');
+        for (const attribute of ['unix::device', 'unix::inode']) {
+            if (opened.get_attribute_as_string(attribute) !== info.get_attribute_as_string(attribute))
+                throw new PrivateFileReplaced('GNOME consent changed while opening');
+        }
         const chunks = [];
         let length = 0;
         while (true) {
@@ -115,7 +133,7 @@ export default class Honk300Observations extends Extension {
             () => privateInfo(this.path, cancellable, true),
         ]);
         const [record, script, metadata] = await together(cancellable, [
-            () => readPrivate(`${root}/gnome.json`, 262144, cancellable),
+            () => readPrivate(`${root}/gnome.json`, 262144, cancellable, true),
             () => readPrivate(`${this.path}/extension.js`, 65536, cancellable),
             () => readPrivate(`${this.path}/metadata.json`, 4096, cancellable),
         ]);

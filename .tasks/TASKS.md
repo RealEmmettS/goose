@@ -15,6 +15,7 @@
   - [x] Restore visible petting feedback and add a bounded cursor-follow at a comfortable distance.
   - [ ] Present Goose in platform app menus and recommend the existing goose command without breaking installed identities.
   - [ ] Verify Linux running-window identity and artwork through native GTK, including owned installation and rollback.
+  - [ ] Qualify the atomic GNOME consent-read correction found by the release checks.
   - [ ] Qualify the combined update, publish a new immutable release and verify installed Windows behavior plus public downloads.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.

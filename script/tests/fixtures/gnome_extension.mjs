@@ -87,7 +87,9 @@ function actor(id, width = 300) {
     };
 }
 
-function privateFiles(f, {changedIdentity = false, holdCleanup = false, record = null} = {}) {
+function privateFiles(f, {changedIdentity = false, holdCleanup = false, record = null,
+    recordReplacements = 0, replacementAttributes = {}, holdRecordRetry = false,
+    replacement = consent => JSON.stringify({...consent, phase: 'revoking'})} = {}) {
     const root = '/private/honk300/wayland';
     const extensionPath = '/private/extension';
     const metadata = '{"uuid":"honk300@emmetts.dev"}';
@@ -103,7 +105,9 @@ function privateFiles(f, {changedIdentity = false, holdCleanup = false, record =
     f.context.GLib.build_filenamev = parts => parts.join('/');
     f.extension.path = extensionPath;
     f.extension._consent = f.context.api.Honk300Observations.prototype._consent.bind(f.extension);
-    const state = {open: 0, peak: 0, batches: 0, releaseCleanup: null};
+    const state = {open: 0, peak: 0, batches: 0, recordOpens: 0, releaseCleanup: null};
+    let recordInode = '12';
+    let retryExpected = false;
     let cleanupStarted;
     state.cleanupStarted = new Promise(resolve => { cleanupStarted = resolve; });
     let pending = [];
@@ -116,6 +120,7 @@ function privateFiles(f, {changedIdentity = false, holdCleanup = false, record =
         const directory = content === null;
         const attributes = {'unix::device': '1', 'unix::inode': String([...entries.keys()].indexOf(path) + 10),
             'unix::uid': '1000', 'unix::mode': directory ? '448' : '384'};
+        if (path.endsWith('/gnome.json')) attributes['unix::inode'] = recordInode;
         const info = {...f.info, get_file_type: () => directory ? 2 : 1, get_size: () => bytes.length,
             get_attribute_uint32: name => Number(attributes[name]),
             get_attribute_as_string: name => attributes[name]};
@@ -126,13 +131,33 @@ function privateFiles(f, {changedIdentity = false, holdCleanup = false, record =
             query_info_finish: finish,
             read_async(_priority, cancellable, done) {
                 let offset = 0;
-                const openedInfo = changedIdentity && path.endsWith('/extension.js') ? {...info,
+                let openedBytes = bytes;
+                let isRetry = false;
+                let openedInfo = changedIdentity && path.endsWith('/extension.js') ? {...info,
                     get_attribute_as_string: name => name === 'unix::inode' ? 'unrelated' : attributes[name]} : info;
+                if (path.endsWith('/gnome.json')) {
+                    state.recordOpens++;
+                    isRetry = retryExpected;
+                    retryExpected = false;
+                    if (state.recordOpens <= recordReplacements) {
+                        // The production writer renames a complete private record
+                        // between the provider's pathname stat and stream open.
+                        recordInode = String(Number(recordInode) + 1);
+                        const inode = recordInode;
+                        entries.set(path, replacement(consent));
+                        openedBytes = new TextEncoder().encode(entries.get(path));
+                        const openedAttributes = {...attributes, 'unix::inode': inode, ...replacementAttributes};
+                        openedInfo = {...info, get_size: () => openedBytes.length,
+                            get_attribute_uint32: name => Number(openedAttributes[name]),
+                            get_attribute_as_string: name => openedAttributes[name]};
+                        retryExpected = true;
+                    }
+                }
                 const stream = {
                     query_info_async(_attrs, _priority, cancel, complete) { callback(stream, openedInfo, cancel, complete); },
                     query_info_finish: finish,
                     read_bytes_async(size, _priority, cancel, complete) {
-                        const chunk = bytes.slice(offset, offset + size);
+                        const chunk = openedBytes.slice(offset, offset + size);
                         offset += chunk.length;
                         callback(stream, {get_data: () => chunk}, cancel, complete);
                     },
@@ -153,6 +178,10 @@ function privateFiles(f, {changedIdentity = false, holdCleanup = false, record =
                     callback(file, stream, cancellable, done);
                 };
                 cancellable.listeners.push(deliver);
+                if (isRetry) {
+                    if (!holdRecordRetry) deliver();
+                    return;
+                }
                 pending.push(deliver);
                 // The real _consent must issue all three independent reads;
                 // a serial implementation cannot pass this native-I/O barrier.
@@ -200,6 +229,76 @@ test('changed opened identity cancels and joins other consent reads before relea
     assert.equal(files.open, 0);
     assert.equal(f.extension._requests.size, 0);
     assert(!request.result.message.includes(nonce));
+});
+
+test('a complete atomic revocation replacing the record during open remains a revocation', async () => {
+    const f = fixture([actor(1)]);
+    const files = privateFiles(f, {recordReplacements: 1});
+    const request = f.request();
+    await request.finished;
+    assert.equal(request.result.error, 'dev.emmetts.Honk300.Gnome1.Revoked');
+    assert.equal(request.result.frame, undefined);
+    assert.equal(files.recordOpens, 2);
+    assert.equal(files.open, 0);
+    assert.equal(f.extension._requests.size, 0);
+    assert.equal(f.timers.size, 0);
+});
+
+test('a repeated record replacement stops after one retry without observations', async () => {
+    const f = fixture([actor(1)]);
+    const files = privateFiles(f, {recordReplacements: 2});
+    const request = f.request();
+    await request.finished;
+    assert.equal(request.result.error, 'dev.emmetts.Honk300.Gnome1.Unavailable');
+    assert.equal(request.result.frame, undefined);
+    assert.equal(files.recordOpens, 2);
+    assert.equal(files.open, 0);
+    assert.equal(f.extension._requests.size, 0);
+    assert.equal(f.timers.size, 0);
+});
+
+test('an invalid replacement remains unavailable and a complete equivalent record is revalidated', async () => {
+    for (const invalid of [true, false]) {
+        const f = fixture([actor(1)]);
+        const files = privateFiles(f, {recordReplacements: 1,
+            replacement: consent => invalid ? '{' : JSON.stringify(consent)});
+        const request = f.request();
+        await request.finished;
+        assert.equal(request.result.error, invalid ? 'dev.emmetts.Honk300.Gnome1.Unavailable' : undefined);
+        assert.equal(request.result.frame?.windows.length, invalid ? undefined : 1);
+        assert.equal(files.recordOpens, invalid ? 2 : 3);
+        assert.equal(files.open, 0);
+        assert.equal(f.extension._requests.size, 0);
+        assert.equal(f.timers.size, 0);
+    }
+});
+
+test('unsafe ownership or permissions during replacement are rejected without retry', async () => {
+    for (const replacementAttributes of [{'unix::uid': '1001'}, {'unix::mode': '420'}]) {
+        const f = fixture([actor(1)]);
+        const files = privateFiles(f, {recordReplacements: 1, replacementAttributes});
+        const request = f.request();
+        await request.finished;
+        assert.equal(request.result.error, 'dev.emmetts.Honk300.Gnome1.Unavailable');
+        assert.equal(request.result.frame, undefined);
+        assert.equal(files.recordOpens, 1);
+        assert.equal(files.open, 0);
+        assert.equal(f.extension._requests.size, 0);
+    }
+});
+
+test('a stalled replacement retry shares the original cancellation deadline', async () => {
+    const f = fixture([actor(1)]);
+    const files = privateFiles(f, {recordReplacements: 1, holdRecordRetry: true});
+    const request = f.request();
+    await request.finished;
+    assert.equal(request.result.error, 'dev.emmetts.Honk300.Gnome1.Deadline');
+    assert.equal(request.result.frame, undefined);
+    assert.equal(files.recordOpens, 2);
+    assert(files.peak <= 3);
+    assert.equal(files.open, 0);
+    assert.equal(f.extension._requests.size, 0);
+    assert.equal(f.timers.size, 0);
 });
 
 for (const [label, record, error] of [
