@@ -10,7 +10,8 @@
 - [ ] **Goose desktop polish update** - repair installed Windows controls and icons, refine temporary leaves, add affectionate following and simplify the app name (owner codex) #g11
   - [x] Reproduce and correct installed Configure and verify the real tray Update helper.
   - [ ] Give Windows executables, app-menu shortcuts and installed-app entries a verified icon.
-  - [x] Render recognizable temporary leaves while preserving speed-dependent scattering.
+  - [x] Expire untouched leaf piles while preserving speed-dependent scattering.
+  - [x] Create distinct botanical SVG leaf shapes in the existing colors, integrate their vector geometry and inspect actual desktop-size animation.
   - [x] Restore visible petting feedback and add a bounded cursor-follow at a comfortable distance.
   - [ ] Present Goose in platform app menus and recommend the existing goose command without breaking installed identities.
   - [ ] Qualify the combined update, publish a new immutable release and verify installed Windows behavior plus public downloads.

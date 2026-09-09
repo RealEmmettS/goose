@@ -14,12 +14,13 @@ features and installation, and [readiness records](docs/readiness/) for release 
 
 ### Improved
 - Make the native Goose application the primary interface across platforms. Application-menu entries and bare commands open the existing Rust-owned graphical controls; explicit start/plz and autostart retain their runtime route, and the TUI remains available through goose config. Preserve all binary, installer, receipt, app-bundle and permission identities while supporting the new display names alongside historical installer names.
-- Draw pointed and lobed autumn leaves with stems and continuously settling orientation. Preserve simulation RNG, leaf counts, kick strength, gravity and bounce; expire every pile after 30 seconds with a four-second fade, or sooner through its existing kicked lifetime.
+- Render distinct maple, oak, birch and ginkgo SVG designs in every existing autumn color. Keep source SVGs, sixteen recolors and Rust geometry synchronized, cache bounded supersampled sprites, and vary size, mirroring and continuous rotation independently. Preserve simulation RNG, leaf counts, kick strength, gravity and bounce; expire every pile after 30 seconds with a four-second fade, or sooner through its existing kicked lifetime.
 
 ### Fixed
 - Bind the Global MSI's machine-owned shortcut directory to Windows Installer's standard ProgramMenuFolder before costing, preserving its HKLM component and native ICE validation. The former undefined CommonProgramsFolder resolved to the drive root, leaving the Start menu empty despite successful installation.
 - Prefer authoritative current-owned settings receipts over stale external installer records, matching updater provenance precedence. Keep malformed/conflicting owned evidence fail-closed and preserve companion size/hash verification and retained Windows file leases.
 - Embed application icons in Windows command and GUI executables, bind the settings window icon, and supply explicit MSI/EXE installed-app and app-menu icons. Qualify actual installed GUI entry points against stale receipt records across installer origins and both native architectures. Include a sealed Mac app icon and localized Goose display name at the existing managed bundle path.
+- Preserve MSI icon-table file extensions and verify native ProductIcon artwork instead of requiring an EXE-style registry value. Decode packaged Mac icons with AppKit; use the full application icon for Debian and owned manual Linux application entries.
 - Report Windows tray Configure/Update launch failures visibly without blocking the runtime event loop.
 
 ### Behind the scenes

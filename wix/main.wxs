@@ -39,8 +39,8 @@
             Schedule='afterInstallExecute'
             AllowDowngrades='yes'/>
 
-        <Icon Id='GooseIcon' SourceFile='$(var.SourceRoot)\Assets\UI\honk300-app.ico'/>
-        <Property Id='ARPPRODUCTICON' Value='GooseIcon'/>
+        <Icon Id='GooseIcon.ico' SourceFile='$(var.SourceRoot)\Assets\UI\honk300-app.ico'/>
+        <Property Id='ARPPRODUCTICON' Value='GooseIcon.ico'/>
 
         <Media Id='1' Cabinet='media1.cab' EmbedCab='yes'/>
         <Property Id='ApplicationFolderName' Value='honk300'/>
@@ -129,7 +129,7 @@
                     Id='StartMenuShortcut'
                     Name='Goose'
                     Arguments='--settings'
-                    Icon='GooseIcon'
+                    Icon='GooseIcon.ico'
                     IconIndex='0'
                     Target='[APPLICATIONFOLDER]bin\honk300-app.exe'
                     WorkingDirectory='APPLICATIONFOLDER'/>

@@ -119,6 +119,12 @@ class WindowsPackagingTests(unittest.TestCase):
         for definition in (GLOBAL_WIX, CORPORATE_WIX):
             self.assertEqual(definition.count(MSI_LICENSE_REFERENCE), 1)
 
+    def test_msi_icons_keep_the_real_icon_file_extension(self) -> None:
+        for definition in (GLOBAL_WIX, CORPORATE_WIX):
+            self.assertIn("<Icon Id='GooseIcon.ico'", definition)
+            self.assertIn("Id='ARPPRODUCTICON' Value='GooseIcon.ico'", definition)
+            self.assertIn("Icon='GooseIcon.ico'", definition)
+
     def test_custom_msi_license_preserves_the_authoritative_terms(self) -> None:
         rtf = MSI_LICENSE.read_text(encoding="ascii")
         self.assertTrue(rtf.startswith(r"{\rtf1\ansi\ansicpg1252"))

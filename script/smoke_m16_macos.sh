@@ -40,11 +40,18 @@ test "$(plutil -extract CFBundleIconFile raw "${APP}/Contents/Info.plist")" = "G
 test -s "${APP}/Contents/Resources/Goose.icns"
 swift - "${APP}" <<'SWIFT'
 import Foundation
+import AppKit
 let path = CommandLine.arguments[1]
 let bundle = Bundle(path: path)!
 precondition(bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String == "Goose")
 precondition(FileManager.default.displayName(atPath: path).replacingOccurrences(of: ".app", with: "") == "Goose")
+let iconPath = path + "/Contents/Resources/Goose.icns"
+guard let icon = NSImage(contentsOfFile: iconPath), icon.isValid else {
+    fatalError("The packaged Goose application icon cannot be decoded by AppKit")
+}
+precondition(!icon.representations.isEmpty)
 print("Finder displays Goose at the preserved managed bundle location")
+print("AppKit decodes the packaged application icon with \(icon.representations.count) representations")
 SWIFT
 LSUI_ELEMENT="$(plutil -extract LSUIElement raw "${APP}/Contents/Info.plist")"
 case "${LSUI_ELEMENT}" in

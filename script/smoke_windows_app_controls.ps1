@@ -22,6 +22,14 @@ $receipt=Get-Content -LiteralPath (Join-Path $root 'install-receipt.json') -Raw 
 $binary=Join-Path $root 'bin/honk300.exe'
 $launcher=Join-Path $root 'bin/honk300-app.exe'
 $settings=Join-Path $root 'bin/honk300-settings.exe'
+function Get-VerifiedIconPath([string]$Descriptor) {
+    $iconPath=($Descriptor -replace ',\s*-?\d+$','').Trim('"')
+    if (-not $iconPath -or -not (Test-Path -LiteralPath $iconPath -PathType Leaf) -or
+        [GooseAppIcons]::ExtractIconEx($iconPath,-1,[IntPtr]::Zero,[IntPtr]::Zero,0) -lt 1) {
+        throw 'The registered application icon is missing or cannot be read by Windows'
+    }
+    return $iconPath
+}
 foreach($file in @($binary,$launcher,$settings)) {
     if ([GooseAppIcons]::ExtractIconEx($file,-1,[IntPtr]::Zero,[IntPtr]::Zero,0) -lt 1) { throw "Missing embedded app icon: $file" }
 }
@@ -36,12 +44,39 @@ foreach($programs in @([Environment]::GetFolderPath('CommonPrograms'),[Environme
     }
 }
 if (-not $shortcut) { throw 'No Goose app-menu shortcut with verified controls target and explicit icon' }
+[void](Get-VerifiedIconPath ($shell.CreateShortcut($shortcut).IconLocation))
 $registrations=@(foreach($hive in @('HKLM:','HKCU:')) {
     Get-ChildItem "$hive/Software/Microsoft/Windows/CurrentVersion/Uninstall" -ErrorAction SilentlyContinue |
         Where-Object { $_.GetValue('Publisher','') -eq 'Emmett S' -and ([string]$_.GetValue('InstallLocation','')).TrimEnd('\') -eq $root.TrimEnd('\') -and $_.GetValue('DisplayName','') -in @('Goose','Goose (Corporate Edition)') } |
-        ForEach-Object { [PSCustomObject]@{DisplayName=$_.GetValue('DisplayName','');DisplayIcon=$_.GetValue('DisplayIcon','')} }
+        ForEach-Object { [PSCustomObject]@{Key=$_.PSChildName;DisplayName=$_.GetValue('DisplayName','');DisplayVersion=$_.GetValue('DisplayVersion','');DisplayIcon=$_.GetValue('DisplayIcon','');WindowsInstaller=$_.GetValue('WindowsInstaller',0);VerifiedIcon='';IconSource=''} }
 })
-if (-not $registrations -or @($registrations | Where-Object { -not $_.DisplayIcon }).Count) { throw 'Goose installed-app name or icon is missing' }
+if (-not $registrations) { throw 'Goose installed-app registration is missing' }
+$msi=New-Object -ComObject WindowsInstaller.Installer
+try {
+    foreach($registration in $registrations) {
+        if ($registration.DisplayVersion -ne $receipt.version) { throw 'Installed-app version does not match the protected receipt' }
+        # MSI publishes its primary icon through ProductIcon. DisplayIcon is an EXE
+        # uninstall convention and is not a required Windows Installer registry value.
+        $descriptor=if($registration.WindowsInstaller -eq 1) {
+            $registration.IconSource='Windows Installer ProductIcon'
+            $msi.ProductInfo($registration.Key,'ProductIcon')
+        } else {
+            $registration.IconSource='Uninstall DisplayIcon'
+            $registration.DisplayIcon
+        }
+        $iconPath=Get-VerifiedIconPath $descriptor
+        if ($registration.WindowsInstaller -eq 1) {
+            $expectedIcon=Join-Path $PSScriptRoot '../Assets/UI/honk300-app.ico'
+            if ((Get-FileHash -LiteralPath $iconPath).Hash -ne (Get-FileHash -LiteralPath $expectedIcon).Hash) { throw 'MSI published unexpected application artwork' }
+        } elseif ([IO.Path]::GetFullPath($iconPath) -ne [IO.Path]::GetFullPath($launcher)) {
+            throw 'EXE installed-app icon does not use its owned launcher'
+        }
+        $registration.VerifiedIcon=$iconPath
+    }
+} finally {
+    $registrations | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $evidence 'registered-apps.json') -Encoding utf8
+    [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($msi)
+}
 
 $cache=Join-Path $env:LOCALAPPDATA 'honk300/install-receipt.json'
 [void][IO.Directory]::CreateDirectory((Split-Path -Parent $cache))

@@ -136,15 +136,15 @@ def build_package_tree(
     )
     icon_source = (
         Path(__file__).resolve().parents[1]
-        / "Assets"
-        / "UI"
-        / "honk300-status-goose@2x.png"
+        / "settings"
+        / "assets"
+        / "icon.png"
     )
     icon_destination = (
-        root / "usr" / "share" / "icons" / "hicolor" / "36x36" / "apps" / "honk300.png"
+        root / "usr" / "share" / "icons" / "hicolor" / "512x512" / "apps" / "honk300.png"
     )
     icon_destination.parent.mkdir(parents=True)
-    shutil.copyfile(_regular_file(icon_source, "status icon"), icon_destination)
+    shutil.copyfile(_regular_file(icon_source, "application icon"), icon_destination)
     license_source = Path(__file__).resolve().parents[1] / "LICENSE"
     documentation = root / "usr" / "share" / "doc" / "honk300"
     documentation.mkdir(parents=True)

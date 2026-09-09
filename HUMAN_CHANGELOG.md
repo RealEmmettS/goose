@@ -7,13 +7,14 @@ has implementation details; [the README](README.md) describes current features a
 
 ### Improved
 - Find Goose by name in your applications menu and open its graphical controls to start, stop, customize, or update it. Terminal controls remain available when you want them.
-- Enjoy autumn piles that look like real little leaves and fade away on their own. Running through a pile still sends the leaves flying with extra force.
+- Enjoy a mix of maple, oak, birch and ginkgo leaves in the same warm autumn colors. The piles fade away on their own, and running through one still sends the leaves flying with extra force.
 - Rub the goose for a little while to earn hearts and a friendly waddle after your cursor. It keeps a comfortable distance, leaves your pointer alone, and returns to its usual wandering shortly afterward.
 
 ### Fixed
 - Put the application shortcut in the Windows Start menu so Goose can be found after installation.
 - Open the graphical controls reliably after changing installers, even when an older installation record was left behind. Keep the current installation and its saved preferences authoritative.
 - Show the goose artwork in application entries, installed-app listings and the settings window. Make failed tray actions visible so a click no longer appears to do nothing.
+- Give Linux application entries the full goose artwork and verify that Windows and Mac can read their packaged application icons.
 
 ### Behind the scenes
 - Check the installed application shortcuts, icons and graphical controls during release testing, including upgrades that leave an older installation record behind. Check that shared Windows shortcuts belong to the shared installation.

@@ -23,6 +23,8 @@ pub const MAX_VEL_XY: f32 = 200.0;
 pub const KICK_MIN_VERT_VEL: f32 = 10.0;
 pub const KICK_MAX_VERT_VEL: f32 = 500.0;
 pub const RENDER_Z_SCALE_VERTICAL: f32 = 0.6;
+/// Covers every reviewed SVG shape, size variation, mirror and rotation plus antialiasing.
+pub const LEAF_RENDER_RADIUS: f32 = 18.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AutumnPileId(pub u64);

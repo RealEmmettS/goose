@@ -4,6 +4,37 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 #[test]
+fn linux_application_icon_is_complete_idempotent_and_preserves_foreign_content() {
+    let directory = tempfile::tempdir().unwrap();
+    let icon = directory.path().join("icon.png");
+    write_linux_application_icon(&icon).unwrap();
+    assert_eq!(
+        fs::read(&icon).unwrap().as_slice(),
+        include_bytes!("../../settings/assets/icon.png")
+    );
+    write_linux_application_icon(&icon).unwrap();
+    fs::write(&icon, b"unrelated saved image").unwrap();
+    assert_eq!(
+        write_linux_application_icon(&icon).unwrap_err().kind(),
+        io::ErrorKind::PermissionDenied
+    );
+    assert_eq!(fs::read(&icon).unwrap(), b"unrelated saved image");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn linux_application_and_login_entries_use_the_owned_icon_and_distinct_actions() {
+    let exe = Path::new("/home/goose/install/bin/honk300");
+    let icon = Path::new("/home/goose/install/icon.png");
+    for (autostart, action) in [(false, "settings"), (true, "start")] {
+        let entry = linux_desktop_entry(exe, icon, autostart);
+        assert!(entry.contains("Name=Goose\n"));
+        assert!(entry.contains(&format!("Exec={} {action}\n", exe.display())));
+        assert!(entry.contains("Icon=/home/goose/install/icon.png\n"));
+    }
+}
+
+#[test]
 fn install_source_markers_are_stable() {
     for (marker, source) in [
         ("msi-global", InstallSource::MsiGlobal),

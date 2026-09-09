@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-STATUS_ICON = ROOT / "Assets" / "UI" / "honk300-status-goose@2x.png"
+APP_ICON = ROOT / "settings" / "assets" / "icon.png"
 SCRIPT = ROOT / "script" / "package_deb.py"
 SPEC = importlib.util.spec_from_file_location("package_deb", SCRIPT)
 assert SPEC and SPEC.loader
@@ -92,11 +92,11 @@ class DebianPackagingTests(unittest.TestCase):
                 / "share"
                 / "icons"
                 / "hicolor"
-                / "36x36"
+                / "512x512"
                 / "apps"
                 / "honk300.png"
             )
-            self.assertEqual(packaged_icon.read_bytes(), STATUS_ICON.read_bytes())
+            self.assertEqual(packaged_icon.read_bytes(), APP_ICON.read_bytes())
 
     def test_rejects_mismatched_release_identity_and_unsafe_input(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

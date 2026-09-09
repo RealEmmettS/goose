@@ -43,7 +43,34 @@ fn main() {
     sheet
         .save_png(format!("{directory}/leaves-contact-sheet.png"))
         .unwrap();
+    bench_leaves(&still, center);
     affection(&directory);
+}
+
+fn bench_leaves(autumn: &AutumnState, center: Vec2) {
+    let mut image = Pixmap::new(960, 640).unwrap();
+    let start = std::time::Instant::now();
+    for _ in 0..240 {
+        image.fill(Color::TRANSPARENT);
+        for pile in 0..6 {
+            render_autumn_leaves(
+                &mut image,
+                autumn,
+                11.2,
+                center
+                    - Vec2::new(
+                        140.0 + (pile % 3) as f32 * 320.0,
+                        150.0 + (pile / 3) as f32 * 320.0,
+                    ),
+                Vec2::new(10_000.0, 10_000.0),
+                AutumnRenderLayer::BelowGoose,
+            );
+        }
+    }
+    println!(
+        "Six full SVG leaf piles: {:.3} ms per frame over 240 frames",
+        start.elapsed().as_secs_f64() * 1000.0 / 240.0
+    );
 }
 
 fn affection(directory: &str) {

@@ -5,7 +5,7 @@
 //! [`Deck`](crate::rng::Deck). Tasks set targets/params; [`crate::locomotion`] moves the
 //! goose; the gait + footmark logic here is mechanical.
 
-use crate::autumn::AutumnState;
+use crate::autumn::{AutumnState, LEAF_RENDER_RADIUS};
 use crate::collect_window::{
     CollectWindowCloseEvent, CollectWindowCloseOrigin, CollectWindowCommand, CollectWindowKind,
     CollectWindowSnapshot,
@@ -743,10 +743,11 @@ impl World {
             if 1.0 - pile.fade_out(self.elapsed) <= 0.0 {
                 continue;
             }
-            add(Rect::new(pile.position, pile.position).grow(pile.radius * spawn + 9.0));
+            add(Rect::new(pile.position, pile.position)
+                .grow(pile.radius * spawn + LEAF_RENDER_RADIUS));
             for leaf in &pile.leaves {
                 let pos = pile.position + leaf.screen_offset() * spawn;
-                add(Rect::new(pos, pos).grow(8.0));
+                add(Rect::new(pos, pos).grow(LEAF_RENDER_RADIUS));
             }
         }
         rect.map(Rect::pixel_aligned)

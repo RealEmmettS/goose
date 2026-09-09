@@ -94,6 +94,8 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
     let media = linux_media_root()?;
     ensure_external_media_root(&media)?;
     migrate_legacy_user_media(&bin_dir.join("Assets"), &media, LegacyMigrationMode::Move)?;
+    let icon = root.join("icon.png");
+    write_linux_application_icon(&icon)?;
     let installed = bin_dir.join("honk300");
     copy_current_exe(&installed)?;
     companions::copy_settings_if_present(&bin_dir)?;
@@ -107,13 +109,13 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
         install_owned_unix_alias(&aliases_dir.join(name), &installed, &owned_targets)?;
     }
 
-    let desktop = linux_desktop_entry(&installed, false);
+    let desktop = linux_desktop_entry(&installed, &icon, false);
     let desktop_path = linux_applications_dir()?.join("honk300.desktop");
     write_owned_text_file(&desktop_path, &desktop, OWNERSHIP_MARKER)?;
     if autostart {
         write_owned_text_file(
             &linux_autostart_path()?,
-            &linux_desktop_entry(&installed, true),
+            &linux_desktop_entry(&installed, &icon, true),
             OWNERSHIP_MARKER,
         )?;
     } else {
@@ -3495,12 +3497,46 @@ fn linux_autostart_path() -> Result<PathBuf, DynError> {
 }
 
 #[cfg(target_os = "linux")]
-fn linux_desktop_entry(exe: &Path, autostart: bool) -> String {
+fn linux_desktop_entry(exe: &Path, icon: &Path, autostart: bool) -> String {
     let operation = if autostart { "start" } else { "settings" };
+    let icon = icon
+        .to_string_lossy()
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t");
     format!(
-        "[Desktop Entry]\nType=Application\nName=Goose\nComment=Desktop goose for your screen\nExec={} {operation}\nIcon=honk300\nTerminal=false\nCategories=Utility;\nStartupNotify=false\nX-GNOME-Autostart-enabled=true\nX-Honk300-Owner={OWNERSHIP_MARKER}\n",
+        "[Desktop Entry]\nType=Application\nName=Goose\nComment=Desktop goose for your screen\nExec={} {operation}\nIcon={icon}\nTerminal=false\nCategories=Utility;\nStartupNotify=false\nX-GNOME-Autostart-enabled=true\nX-Honk300-Owner={OWNERSHIP_MARKER}\n",
         desktop_exec_quote(exe)
     )
+}
+
+#[cfg(any(test, target_os = "linux"))]
+fn write_linux_application_icon(path: &Path) -> io::Result<()> {
+    use std::io::Write;
+    let artwork = include_bytes!("../settings/assets/icon.png");
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+    {
+        Ok(mut file) => file.write_all(artwork),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+            let metadata = fs::symlink_metadata(path)?;
+            if metadata.is_file()
+                && !metadata.file_type().is_symlink()
+                && fs::read(path)?.as_slice() == artwork
+            {
+                Ok(())
+            } else {
+                Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "refusing to replace an unrelated application icon",
+                ))
+            }
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]

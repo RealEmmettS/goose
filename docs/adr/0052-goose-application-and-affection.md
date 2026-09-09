@@ -45,6 +45,15 @@ the same original defect. Preserve installation scope and package identities whi
 the shortcut destination. Qualification must inspect the real Start-menu link, target,
 arguments and icon after installation rather than accepting successful MSI exit status.
 
+MSI publishes its primary icon through the documented
+[Windows Installer ProductIcon API](https://learn.microsoft.com/en-us/windows/win32/api/msi/nf-msi-msigetproductinfow).
+Qualification reads that icon and compares the real cached file with the approved artwork.
+The EXE installer continues to use its owned launcher's `DisplayIcon`. A missing
+`DisplayIcon` registry value alone is not proof of a missing MSI icon. Icon-table filenames
+keep their `.ico` extension for shell interpretation. Mac qualification decodes the actual
+ICNS through AppKit; Debian uses the full application image in the 512-pixel hicolor slot,
+and manual Linux entries point to an owned copy of the same image.
+
 The user's protected MSI receipt correctly described the installed app and its settings
 companion. A stale per-user PowerShell receipt for the same root described an older release
 without that companion. Settings launch now follows the updater's existing precedence:
@@ -59,8 +68,15 @@ Start and graceful Stop. This repair did not replace any released executable or 
 
 ## Leaves and affectionate following
 
-Procedural autumn leaves have pointed/lobed silhouettes, stems, varied orientation and
-continuous tumble. Existing leaf counts, spawn behavior, random simulation draws, collision,
+The user rejected generic pointed/lobed shapes and requested distinct botanical SVG designs
+in the existing colors. Four reviewed masters provide maple, oak, birch and ginkgo silhouettes;
+every design has gold, orange, red and brown variants. A deterministic generator keeps the
+editable SVGs, recolors and compiled Rust paths synchronized. The runtime builds sixteen
+fixed supersampled sprites once, using 144 KiB, then varies rotation, mirroring and size
+independently of species and color. All rotated pixels fit the shared 18-pixel damage margin.
+This adds no runtime SVG parser, filesystem access or service dependency.
+
+Existing leaf counts, spawn behavior, random simulation draws, collision,
 gravity, bounce, and velocity-dependent kick strength remain. Every pile expires after
 30 seconds, fading during its final four seconds; a kicked pile can expire sooner through
 the existing ten-second kick lifetime. A late kick cannot extend a pile's life.
@@ -75,7 +91,8 @@ permission withdrawal, or shutdown. Existing terminal protection remains in forc
 
 ## Qualification
 
-Review actual renderer frames, timed input-to-follow behavior, distance/timeout/cancellation,
+Review the SVG family, actual desktop-size renderer frames, bounded rendering cost,
+timed input-to-follow behavior, distance/timeout/cancellation,
 and untouched-pile expiry. Qualify the real native Windows app entry points with a stale
 external receipt present across installer origins and on both native architectures, including
 embedded and actual window icons. Keep ordinary source/CI, installed controls, fresh public
