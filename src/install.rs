@@ -3496,7 +3496,7 @@ fn linux_autostart_path() -> Result<PathBuf, DynError> {
     Ok(xdg_config_home()?.join("autostart").join("honk300.desktop"))
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(test, target_os = "linux"))]
 fn linux_desktop_entry(exe: &Path, icon: &Path, autostart: bool) -> String {
     let operation = if autostart { "start" } else { "settings" };
     let icon = icon
@@ -3642,7 +3642,7 @@ fn home_dir() -> Result<PathBuf, DynError> {
     ))
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(test, target_os = "linux"))]
 fn desktop_exec_quote(path: &Path) -> String {
     let raw = path.to_string_lossy();
     if raw

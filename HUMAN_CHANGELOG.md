@@ -14,7 +14,7 @@ has implementation details; [the README](README.md) describes current features a
 - Put the application shortcut in the Windows Start menu so Goose can be found after installation.
 - Open the graphical controls reliably after changing installers, even when an older installation record was left behind. Keep the current installation and its saved preferences authoritative.
 - Show the goose artwork in application entries, installed-app listings and the settings window. Make failed tray actions visible so a click no longer appears to do nothing.
-- Give Linux application entries the full goose artwork and verify that Windows and Mac can read their packaged application icons.
+- Give Linux application entries the full goose artwork, preserve login startup, and verify that Windows and Mac can read their packaged application icons.
 
 ### Behind the scenes
 - Check the installed application shortcuts, icons and graphical controls during release testing, including upgrades that leave an older installation record behind. Check that shared Windows shortcuts belong to the shared installation.

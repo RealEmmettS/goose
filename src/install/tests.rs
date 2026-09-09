@@ -21,7 +21,6 @@ fn linux_application_icon_is_complete_idempotent_and_preserves_foreign_content()
     assert_eq!(fs::read(&icon).unwrap(), b"unrelated saved image");
 }
 
-#[cfg(target_os = "linux")]
 #[test]
 fn linux_application_and_login_entries_use_the_owned_icon_and_distinct_actions() {
     let exe = Path::new("/home/goose/install/bin/honk300");
@@ -32,6 +31,9 @@ fn linux_application_and_login_entries_use_the_owned_icon_and_distinct_actions()
         assert!(entry.contains(&format!("Exec={} {action}\n", exe.display())));
         assert!(entry.contains("Icon=/home/goose/install/icon.png\n"));
     }
+    let login = linux_desktop_entry(exe, Path::new("honk300"), true);
+    assert!(login.contains("Icon=honk300\n"));
+    assert!(login.contains(" start\n"));
 }
 
 #[test]
