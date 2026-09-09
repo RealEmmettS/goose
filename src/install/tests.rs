@@ -30,6 +30,7 @@ fn linux_application_and_login_entries_use_the_owned_icon_and_distinct_actions()
         assert!(entry.contains("Name=Goose\n"));
         assert!(entry.contains(&format!("Exec={} {action}\n", exe.display())));
         assert!(entry.contains("Icon=/home/goose/install/icon.png\n"));
+        assert!(entry.contains("StartupWMClass=dev.emmetts.honk300.settings\n"));
     }
     let login = linux_desktop_entry(exe, Path::new("honk300"), true);
     assert!(login.contains("Icon=honk300\n"));

@@ -122,8 +122,7 @@ def build_package_tree(
         root / "usr" / "share" / "honk300" / "release.json",
         json.dumps(metadata, indent=2, sort_keys=True) + "\n",
     )
-    _write(
-        root / "usr" / "share" / "applications" / "honk300.desktop",
+    desktop = (
         "[Desktop Entry]\n"
         "Type=Application\n"
         "Name=Goose\n"
@@ -132,8 +131,14 @@ def build_package_tree(
         "Icon=honk300\n"
         "Terminal=false\n"
         "Categories=Utility;Game;\n"
-        "StartupNotify=false\n",
+        "StartupNotify=false\n"
+        "StartupWMClass=dev.emmetts.honk300.settings\n"
     )
+    applications = root / "usr" / "share" / "applications"
+    _write(applications / "honk300.desktop", desktop)
+    # GTK/Wayland uses the stable settings application id to identify running windows.
+    # Keep the existing launcher id and only one visible menu entry.
+    _write(applications / "dev.emmetts.honk300.settings.desktop", desktop + "NoDisplay=true\n")
     icon_source = (
         Path(__file__).resolve().parents[1]
         / "settings"
@@ -145,6 +150,7 @@ def build_package_tree(
     )
     icon_destination.parent.mkdir(parents=True)
     shutil.copyfile(_regular_file(icon_source, "application icon"), icon_destination)
+    icon_destination.with_name("dev.emmetts.honk300.settings.png").symlink_to("honk300.png")
     license_source = Path(__file__).resolve().parents[1] / "LICENSE"
     documentation = root / "usr" / "share" / "doc" / "honk300"
     documentation.mkdir(parents=True)

@@ -20,7 +20,7 @@ ROOT="$(mktemp -d "${TMPDIR:-/tmp}/honk300-deb-smoke.XXXXXX")"
 PACKAGE="$ROOT/honk300-$ARCHITECTURE.deb"
 LATEST_PACKAGE="$ROOT/latest-honk300-$ARCHITECTURE.deb"
 SIDECAR="$ROOT/honk300-$ARCHITECTURE.deb.sha256"
-PACKAGED_TRAY_ICON=/usr/share/icons/hicolor/36x36/apps/honk300.png
+PACKAGED_APP_ICON=/usr/share/icons/hicolor/512x512/apps/honk300.png
 COLLISION_ALIAS=""
 trap 'sudo dpkg --remove honk300 >/dev/null 2>&1 || true; [ -z "$COLLISION_ALIAS" ] || rm -f "$COLLISION_ALIAS"; rm -rf "$ROOT"' EXIT HUP INT TERM
 
@@ -118,7 +118,15 @@ assert receipt['installer_family'] == 'deb'
 assert receipt['release_track'] == 'stable'
 assert receipt['active_release'] == '/usr/lib/honk300'
 PY
-  [ -f "$PACKAGED_TRAY_ICON" ] && [ ! -L "$PACKAGED_TRAY_ICON" ]
+  [ -f "$PACKAGED_APP_ICON" ] && [ ! -L "$PACKAGED_APP_ICON" ]
+  cmp "$PACKAGED_APP_ICON" "$PROJECT_ROOT/settings/assets/icon.png"
+  [ -L /usr/share/icons/hicolor/512x512/apps/dev.emmetts.honk300.settings.png ]
+  [ "$(readlink /usr/share/icons/hicolor/512x512/apps/dev.emmetts.honk300.settings.png)" = honk300.png ]
+  grep -Fx 'NoDisplay=true' /usr/share/applications/dev.emmetts.honk300.settings.desktop >/dev/null
+  xvfb-run -a /usr/bin/python3 "$PROJECT_ROOT/script/verify_linux_app_identity.py" \
+    --expected-icon "$PROJECT_ROOT/settings/assets/icon.png" \
+    --expected-binary /usr/lib/honk300/honk300 \
+    --evidence "$EVIDENCE_DIR/linux-application-identity.json"
   ldd /usr/lib/honk300/honk300 > "$EVIDENCE_DIR/installed-ldd.txt"
   if grep -F 'not found' "$EVIDENCE_DIR/installed-ldd.txt"; then
     printf 'Debian package left a runtime library unresolved\n' >&2
@@ -181,7 +189,9 @@ if dpkg-query --show honk300 >/dev/null 2>&1; then
 fi
 [ -f "$XDG_DATA_HOME/honk300/media/Notes/user-note.txt" ]
 for name in honk300 honk goose; do [ ! -e "/usr/bin/$name" ]; done
-[ ! -e "$PACKAGED_TRAY_ICON" ] && [ ! -L "$PACKAGED_TRAY_ICON" ]
+[ ! -e "$PACKAGED_APP_ICON" ] && [ ! -L "$PACKAGED_APP_ICON" ]
+[ ! -L /usr/share/icons/hicolor/512x512/apps/dev.emmetts.honk300.settings.png ]
+[ ! -e /usr/share/applications/dev.emmetts.honk300.settings.desktop ]
 
 install_and_verify
 /usr/bin/honk300 uninstall --purge
@@ -192,7 +202,9 @@ fi
 [ ! -d "$XDG_DATA_HOME/honk300" ]
 find "$XDG_DATA_HOME/honk300-backups" -type f -name user-note.txt -print -quit | grep -q .
 for name in honk300 honk goose; do [ ! -e "/usr/bin/$name" ]; done
-[ ! -e "$PACKAGED_TRAY_ICON" ] && [ ! -L "$PACKAGED_TRAY_ICON" ]
+[ ! -e "$PACKAGED_APP_ICON" ] && [ ! -L "$PACKAGED_APP_ICON" ]
+[ ! -L /usr/share/icons/hicolor/512x512/apps/dev.emmetts.honk300.settings.png ]
+[ ! -e /usr/share/applications/dev.emmetts.honk300.settings.desktop ]
 
 printf 'published Debian %s %s install, aliases, compositor, update, uninstall, and purge passed\n' \
   "$ARCHITECTURE" "$TAG"

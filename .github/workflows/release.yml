@@ -255,7 +255,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
             dbus grim imagemagick libasound2-dev libgtk-4-1 openbox python3 sway swaybg x11-utils \
-            x11-xserver-utils xcompmgr xvfb
+            x11-xserver-utils xcompmgr xvfb python3-gi gir1.2-gtk-4.0
 
       - name: Install native packages
         run: |
@@ -527,7 +527,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
             grim imagemagick libasound2-dev openbox python3 sway swaybg x11-utils \
-            x11-xserver-utils xcompmgr xvfb
+            x11-xserver-utils xcompmgr xvfb python3-gi gir1.2-gtk-4.0
 
       - name: Prove native package, aliases, compositor, updates, uninstall, and purge
         env:

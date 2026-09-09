@@ -117,6 +117,11 @@ export HONK300_ALLOW_HEADLESS=1
 mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
 
 INSTALLED=/usr/lib/honk300/honk300
+# Check the current-source fixture before replacing it with the older public release.
+/usr/bin/python3 "$PROJECT_ROOT/script/verify_linux_app_identity.py" \
+  --expected-icon "$PROJECT_ROOT/settings/assets/icon.png" \
+  --expected-binary "$INSTALLED" \
+  --evidence "$EVIDENCE_DIR/linux-application-identity.json"
 test "$("$INSTALLED" --version | awk '{ print $NF }')" = "$FIXTURE_VERSION"
 "$INSTALLED" start >"$EVIDENCE_DIR/old-runtime.log" 2>&1 &
 RUNTIME_PID=$!

@@ -255,7 +255,7 @@ jobs:
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y dbus libasound2-dev libgtk-4-dev xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway swaybg grim python3-gi gir1.2-atspi-2.0 at-spi2-core libglib2.0-bin
+          sudo apt-get install -y dbus libasound2-dev libgtk-4-dev xvfb openbox x11-utils x11-xserver-utils imagemagick xcompmgr python3 sway swaybg grim python3-gi gir1.2-gtk-4.0 gir1.2-atspi-2.0 at-spi2-core libglib2.0-bin
       - name: Install Rust targets
         run: rustup target add ${{ matrix.gnu_target }} ${{ matrix.musl_target }}
       - name: Test

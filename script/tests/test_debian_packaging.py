@@ -86,6 +86,9 @@ class DebianPackagingTests(unittest.TestCase):
             desktop = (staging / "usr" / "share" / "applications" / "honk300.desktop").read_text()
             self.assertIn("Exec=/usr/bin/goose settings", desktop)
             self.assertIn("Icon=honk300", desktop)
+            self.assertIn("StartupWMClass=dev.emmetts.honk300.settings", desktop)
+            identity = staging / "usr/share/applications/dev.emmetts.honk300.settings.desktop"
+            self.assertEqual(identity.read_text(), desktop + "NoDisplay=true\n")
             packaged_icon = (
                 staging
                 / "usr"
@@ -97,6 +100,10 @@ class DebianPackagingTests(unittest.TestCase):
                 / "honk300.png"
             )
             self.assertEqual(packaged_icon.read_bytes(), APP_ICON.read_bytes())
+            themed_icon = packaged_icon.with_name("dev.emmetts.honk300.settings.png")
+            self.assertTrue(themed_icon.is_symlink())
+            self.assertEqual(themed_icon.readlink(), Path("honk300.png"))
+            self.assertEqual(themed_icon.read_bytes(), APP_ICON.read_bytes())
 
     def test_rejects_mismatched_release_identity_and_unsafe_input(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -28,6 +28,16 @@ and permission contracts, and uses localized bundle display names for Goose in F
 Spotlight. Both bundle-name keys are localized; their base values match the preserved filename,
 as specified by [Apple's bundle naming documentation](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html).
 
+Linux retains the visible `honk300.desktop` launcher and the Native SDK's existing
+`dev.emmetts.honk300.settings` application identifier. A hidden desktop record with that
+identifier and a matching full-resolution theme icon let the desktop identify the running
+settings window without adding another menu entry. Both records carry `StartupWMClass`.
+This follows [GTK's default application-icon lookup](https://docs.gtk.org/gtk4/class.Application.html)
+and [GIO's desktop-id lookup](https://docs.gtk.org/gio-unix/ctor.DesktopAppInfo.new.html).
+Debian owns the packaged records; shell/manual installation owns only its exact marked
+records and icon link. Rollback restores those integrations and uninstall preserves foreign files.
+The pinned GTK host's stored `icon_path` alone does not apply a window icon.
+
 ## Installed Configure repair
 
 The Global MSI binds Windows Installer's standard `ProgramMenuFolder` to an explicit

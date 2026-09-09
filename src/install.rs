@@ -33,6 +33,8 @@ const WINDOWS_APP_LAUNCHER_NAME: &str = "honk300-app.exe";
 const MARKER_FILE: &str = "install-source.txt";
 const COMMAND_NAMES: &[&str] = &["honk300", "honk", "goose"];
 const OWNERSHIP_MARKER: &str = "honk300.install.v1";
+#[cfg(any(test, target_os = "linux"))]
+const LINUX_APPLICATION_ID: &str = "dev.emmetts.honk300.settings";
 const INSTALL_RECEIPT_V2: &str = "honk300.install.v2";
 #[cfg(any(test, target_os = "linux", target_os = "macos"))]
 const PATH_MARKER_START: &str = "# >>> honk300 managed PATH >>>";
@@ -96,6 +98,10 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
     migrate_legacy_user_media(&bin_dir.join("Assets"), &media, LegacyMigrationMode::Move)?;
     let icon = root.join("icon.png");
     write_linux_application_icon(&icon)?;
+    let themed_icon = linux_application_icon_link()?;
+    fs::create_dir_all(themed_icon.parent().expect("icon theme directory"))?;
+    let slot_icon = root.join("current/icon.png");
+    install_owned_unix_alias(&themed_icon, &icon, &[icon.as_path(), slot_icon.as_path()])?;
     let installed = bin_dir.join("honk300");
     copy_current_exe(&installed)?;
     companions::copy_settings_if_present(&bin_dir)?;
@@ -112,6 +118,11 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
     let desktop = linux_desktop_entry(&installed, &icon, false);
     let desktop_path = linux_applications_dir()?.join("honk300.desktop");
     write_owned_text_file(&desktop_path, &desktop, OWNERSHIP_MARKER)?;
+    write_owned_text_file(
+        &linux_applications_dir()?.join(format!("{LINUX_APPLICATION_ID}.desktop")),
+        &format!("{desktop}NoDisplay=true\n"),
+        OWNERSHIP_MARKER,
+    )?;
     if autostart {
         write_owned_text_file(
             &linux_autostart_path()?,
@@ -331,9 +342,19 @@ pub fn uninstall(purge: bool) -> Result<(), DynError> {
     for name in COMMAND_NAMES {
         remove_owned_unix_alias(&linux_user_alias_dir()?.join(name), &owned_targets)?;
     }
-    remove_owned_text_file(
-        &linux_applications_dir()?.join("honk300.desktop"),
-        OWNERSHIP_MARKER,
+    for name in [
+        "honk300.desktop".to_owned(),
+        format!("{LINUX_APPLICATION_ID}.desktop"),
+    ] {
+        let entry = linux_applications_dir()?.join(name);
+        remove_owned_text_file(&entry, OWNERSHIP_MARKER)?;
+        remove_owned_text_file(&entry, "X-Honk300-Managed=true")?;
+    }
+    let icon = root.join("icon.png");
+    let slot_icon = root.join("current/icon.png");
+    remove_owned_unix_alias(
+        &linux_application_icon_link()?,
+        &[icon.as_path(), slot_icon.as_path()],
     )?;
     remove_owned_text_file(&linux_autostart_path()?, OWNERSHIP_MARKER)?;
     remove_managed_path_blocks_from_profiles(&home_dir()?)?;
@@ -3492,6 +3513,13 @@ fn linux_applications_dir() -> Result<PathBuf, DynError> {
 }
 
 #[cfg(target_os = "linux")]
+fn linux_application_icon_link() -> Result<PathBuf, DynError> {
+    Ok(xdg_data_home()?
+        .join("icons/hicolor/512x512/apps")
+        .join(format!("{LINUX_APPLICATION_ID}.png")))
+}
+
+#[cfg(target_os = "linux")]
 fn linux_autostart_path() -> Result<PathBuf, DynError> {
     Ok(xdg_config_home()?.join("autostart").join("honk300.desktop"))
 }
@@ -3506,7 +3534,7 @@ fn linux_desktop_entry(exe: &Path, icon: &Path, autostart: bool) -> String {
         .replace('\r', "\\r")
         .replace('\t', "\\t");
     format!(
-        "[Desktop Entry]\nType=Application\nName=Goose\nComment=Desktop goose for your screen\nExec={} {operation}\nIcon={icon}\nTerminal=false\nCategories=Utility;\nStartupNotify=false\nX-GNOME-Autostart-enabled=true\nX-Honk300-Owner={OWNERSHIP_MARKER}\n",
+        "[Desktop Entry]\nType=Application\nName=Goose\nComment=Desktop goose for your screen\nExec={} {operation}\nIcon={icon}\nTerminal=false\nCategories=Utility;\nStartupNotify=false\nStartupWMClass={LINUX_APPLICATION_ID}\nX-GNOME-Autostart-enabled=true\nX-Honk300-Owner={OWNERSHIP_MARKER}\n",
         desktop_exec_quote(exe)
     )
 }

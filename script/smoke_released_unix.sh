@@ -56,6 +56,8 @@ case "$OS" in
     RECEIPT="$XDG_DATA_HOME/honk300/install-receipt.json"
     AUTOSTART="$XDG_CONFIG_HOME/autostart/honk300.desktop"
     DESKTOP="$XDG_DATA_HOME/applications/honk300.desktop"
+    IDENTITY_DESKTOP="$XDG_DATA_HOME/applications/dev.emmetts.honk300.settings.desktop"
+    THEMED_ICON="$XDG_DATA_HOME/icons/hicolor/512x512/apps/dev.emmetts.honk300.settings.png"
     ;;
   *) printf 'unsupported smoke host: %s\n' "$OS" >&2; exit 2 ;;
 esac
@@ -124,6 +126,11 @@ PY
     require_file "$DESKTOP"
     grep -F 'X-Honk300-Managed=true' "$DESKTOP" >/dev/null
     grep -F "Exec=$BINARY settings" "$DESKTOP" >/dev/null
+    require_file "$IDENTITY_DESKTOP"
+    grep -Fx 'NoDisplay=true' "$IDENTITY_DESKTOP" >/dev/null
+    grep -F "Exec=$BINARY settings" "$IDENTITY_DESKTOP" >/dev/null
+    [ -L "$THEMED_ICON" ] && [ "$(readlink "$THEMED_ICON")" = "$DEST/current/icon.png" ]
+    cmp "$THEMED_ICON" "$PROJECT_ROOT/settings/assets/icon.png"
   else
     codesign --verify --deep --strict "$DEST"
     lipo "$BINARY" -verify_arch x86_64 arm64
@@ -148,6 +155,8 @@ snapshot_state() {
     done
     if [ "$OS" = Linux ]; then
       printf 'desktop %s\n' "$(file_sha256 "$DESKTOP")"
+      printf 'identity-desktop %s\n' "$(file_sha256 "$IDENTITY_DESKTOP")"
+      printf 'themed-icon %s %s\n' "$(readlink "$THEMED_ICON")" "$(file_sha256 "$THEMED_ICON")"
     else
       printf 'info %s\n' "$(file_sha256 "$DEST/Contents/Info.plist")"
       printf 'signature %s\n' "$(file_sha256 "$DEST/Contents/_CodeSignature/CodeResources")"
@@ -195,6 +204,10 @@ fi
 if [ "$OS" = Linux ] && [ "${HONK300_RUN_LINUX_OVERLAY_SMOKE:-false}" = true ]; then
   EVIDENCE_DIR="${HONK300_LINUX_EVIDENCE_DIR:-}"
   [ -n "$EVIDENCE_DIR" ] || { printf 'Linux overlay evidence directory is required\n' >&2; exit 1; }
+  xvfb-run -a /usr/bin/python3 "$PROJECT_ROOT/script/verify_linux_app_identity.py" \
+    --expected-icon "$PROJECT_ROOT/settings/assets/icon.png" \
+    --expected-binary "$BINARY" \
+    --evidence "$EVIDENCE_DIR/linux-application-identity.json"
   binary_before_overlay="$(file_sha256 "$BINARY")"
   HONK300_BIN="$BINARY" \
   HONK300_EVIDENCE_DIR="$EVIDENCE_DIR" \

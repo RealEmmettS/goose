@@ -29,6 +29,9 @@ PATH_PROFILE_CREATED=0
 DESKTOP_PATH=""
 DESKTOP_BACKUP=""
 DESKTOP_CREATED=0
+IDENTITY_DESKTOP_PATH=""
+IDENTITY_DESKTOP_BACKUP=""
+IDENTITY_DESKTOP_CREATED=0
 RECEIPT=""
 RECEIPT_BACKUP=""
 RECEIPT_CREATED=0
@@ -228,6 +231,13 @@ rollback_integrations() {
       rm -f "$DESKTOP_PATH"
     fi
   fi
+  if [ -n "$IDENTITY_DESKTOP_PATH" ]; then
+    if [ -n "$IDENTITY_DESKTOP_BACKUP" ] && [ -f "$IDENTITY_DESKTOP_BACKUP" ]; then
+      cp -p "$IDENTITY_DESKTOP_BACKUP" "$IDENTITY_DESKTOP_PATH"
+    elif [ "$IDENTITY_DESKTOP_CREATED" -eq 1 ]; then
+      rm -f "$IDENTITY_DESKTOP_PATH"
+    fi
+  fi
   if [ -n "$RECEIPT" ]; then
     if [ -n "$RECEIPT_BACKUP" ] && [ -f "$RECEIPT_BACKUP" ]; then
       cp -p "$RECEIPT_BACKUP" "$RECEIPT"
@@ -278,6 +288,25 @@ safe_link() {
 }$link|$old_target"
   elif [ -e "$link" ]; then
     die "refusing to replace foreign command: $link"
+  else
+    CREATED_LINKS="${CREATED_LINKS}${CREATED_LINKS:+
+}$link"
+  fi
+  rm -f "$link"
+  ln -s "$target" "$link"
+}
+
+safe_icon_link() {
+  link="$1"
+  target="$DEST/current/icon.png"
+  if [ -L "$link" ]; then
+    old_target="$(readlink "$link")"
+    [ "$old_target" = "$target" ] && return 0
+    [ "$old_target" = "$DEST/icon.png" ] || die "refusing to replace foreign icon symlink: $link"
+    REPLACED_LINKS="${REPLACED_LINKS}${REPLACED_LINKS:+
+}$link|$old_target"
+  elif [ -e "$link" ]; then
+    die "refusing to replace foreign application icon: $link"
   else
     CREATED_LINKS="${CREATED_LINKS}${CREATED_LINKS:+
 }$link"
@@ -708,9 +737,28 @@ Exec=$INSTALLED_BINARY settings
 Icon=$DEST/current/icon.png
 Terminal=false
 Categories=Utility;
+StartupWMClass=dev.emmetts.honk300.settings
 X-Honk300-Managed=true
+X-Honk300-Owner=honk300.install.v1
 EOF
   atomic_write "$DESKTOP_PATH" 644 "$desktop_temp"
+  # GTK uses its stable application id for running-window and default-icon lookup.
+  # Retain the existing launcher id and expose only one visible application entry.
+  IDENTITY_DESKTOP_PATH="$applications/dev.emmetts.honk300.settings.desktop"
+  [ ! -L "$IDENTITY_DESKTOP_PATH" ] || die "refusing to replace symlinked application identity: $IDENTITY_DESKTOP_PATH"
+  if [ -e "$IDENTITY_DESKTOP_PATH" ]; then
+    [ -f "$IDENTITY_DESKTOP_PATH" ] || die "application identity is not a regular file: $IDENTITY_DESKTOP_PATH"
+    grep -F 'X-Honk300-Managed=true' "$IDENTITY_DESKTOP_PATH" >/dev/null 2>&1 || die "refusing to replace foreign application identity: $IDENTITY_DESKTOP_PATH"
+    IDENTITY_DESKTOP_BACKUP="$TEMP_ROOT/application-identity-backup.desktop"
+    cp -p "$IDENTITY_DESKTOP_PATH" "$IDENTITY_DESKTOP_BACKUP"
+  else
+    IDENTITY_DESKTOP_CREATED=1
+  fi
+  printf 'NoDisplay=true\n' >> "$desktop_temp"
+  atomic_write "$IDENTITY_DESKTOP_PATH" 644 "$desktop_temp"
+  icon_directory="$DATA_HOME/icons/hicolor/512x512/apps"
+  mkdir -p "$icon_directory"
+  safe_icon_link "$icon_directory/dev.emmetts.honk300.settings.png"
 fi
 
 mkdir -p "$HOME/.local/bin"
@@ -729,7 +777,7 @@ SWAPPED=0
 SLOT_ACTIVATED=0
 
 printf 'honk300 %s installed at %s\n' "$VERSION" "$DEST"
-printf 'Open a new terminal, then run: honk300 start\n'
+printf 'Open Goose from your applications menu, or run: goose\n'
 if [ "$OS" = Darwin ]; then
   printf 'This app is Developer ID-signed, notarized, and stapled for normal macOS verification.\n'
 fi

@@ -44,7 +44,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
             grim imagemagick libasound2-dev libgtk-4-1 openbox python3 sway swaybg x11-utils \
-            x11-xserver-utils xcompmgr xvfb
+            x11-xserver-utils xcompmgr xvfb python3-gi gir1.2-gtk-4.0
       - name: Install twice and prove complete rollback from live assets
         env:
           HONK300_SMOKE_TAG: ${{ inputs.tag }}
@@ -173,7 +173,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
             grim imagemagick libasound2-dev libgtk-4-1 openbox python3 sway swaybg x11-utils \
-            x11-xserver-utils xcompmgr xvfb
+            x11-xserver-utils xcompmgr xvfb python3-gi gir1.2-gtk-4.0
       - name: Prove stable latest package, aliases, compositor, update, uninstall, and purge
         env:
           HONK300_SMOKE_TAG: ${{ inputs.tag }}
