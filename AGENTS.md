@@ -6,12 +6,12 @@ Honk300 is a cross-platform Rust desktop goose with a procedural renderer and Wi
 macOS, X11, and opt-in reduced Wayland runtimes. **Goose** is the user-facing application name and `goose` is the recommended command.
 `honk300` remains the internal primary binary; `honk` and `goose` remain compatible aliases. The Cargo workspace uses Rust 1.95, edition 2021.
 
-Public stable is v1.10.1, source `127cd148e0af0cf76ecd6a7954777c23c156a862`.
-Its publication and fresh-public qualification record is `docs/readiness/v1.10.1-readiness.md`.
-The user has installed v1.10.1 through the Global MSI. Task #g11 and ADR 0052 track the
-combined v1.11.0 application, icon, leaf and affection update. Its installed Configure failure
-was reproduced and repaired by preserving a stale per-user receipt; real tray Configure/Update
-and native GUI Start/Stop are verified. New-version installed acceptance remains pending.
+Public stable is v1.11.0, source `630f754a0ef657172b0a6a7edea65593fa514de5`.
+Its completed publication and fresh-public qualification record is `docs/readiness/v1.11.0-readiness.md`.
+Task #g11 and ADR 0052 track the combined application, icon, leaf and affection update.
+The user's last verified installation is v1.10.1 Global MSI. Its official v1.11.0 update
+was canceled at the Windows administrator prompt; the old installation, saved preferences
+and stopped runtime are verified intact. New-version installed acceptance awaits that grant.
 
 The approved refinement is published through `.tasks/milestones/refine.md` and ADR 0041:
 the redesigned continuously projected goose, reliability cleanup, Native SDK settings

@@ -2,7 +2,7 @@
 
 Date: 2026-09-09
 
-Status: Accepted by the user; implementation and combined release qualification in progress.
+Status: Published in v1.11.0 with complete release and fresh-public qualification. Final acceptance on the user's Windows installation awaits administrator approval.
 
 ## Decision
 

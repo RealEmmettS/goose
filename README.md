@@ -6,25 +6,24 @@ bounded desktop pranks. Open **Goose** from your applications menu to start or s
 change settings, and check for updates. The native application is the primary interface;
 the existing Rust services, command line, and terminal editor remain its backend and secondary controls.
 
-**Current stable release:** [v1.10.1](https://github.com/RealEmmettS/goose/releases/tag/v1.10.1),
-published from exact commit `127cd148e0af0cf76ecd6a7954777c23c156a862`.
-Mac fullscreen manners now use the existing Accessibility permission, and settings
-report fullscreen and do-not-disturb availability separately. Quick delivery turns
-and stops keep the goose's feet close to its body. Mac assistive tools can edit
-and save settings while navigation stays inside an open dialog.
+**Current stable release:** [v1.11.0](https://github.com/RealEmmettS/goose/releases/tag/v1.11.0),
+published from exact commit `630f754a0ef657172b0a6a7edea65593fa514de5`.
+Goose opens its graphical controls from application menus and the bare `goose` command,
+with recognizable application icons and reliable installed Configure actions. Maple,
+oak, birch and ginkgo leaves fade away on their own; sustained rubbing earns hearts
+and a short, gentle follow without grabbing the pointer.
 
 The completed refinement also brings one continuously projected goose, expressive
 motion, bounded rendering resources, native graphical settings, Linux notes and
 pictures, experimental Pi 4/5 64-bit Desktop guidance, and independently qualified
 KDE, Sway, Hyprland and GNOME integrations. Each desktop exposes only its proven
 capabilities. See [desktop setup](docs/wayland-integrations.md),
-[release evidence](docs/readiness/v1.10.1-readiness.md),
+[release evidence](docs/readiness/v1.11.0-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
-The desktop-polish update is in qualification for v1.11.0; the stable links above continue
-to serve v1.10.1 until publication. In the updated application, **Goose**, the bare `goose`
-command, `goose settings`, and tray Configure open the graphical controls. `goose start`
-or `goose plz` starts the goose directly; `goose config` opens the secondary terminal editor.
+**Goose**, the bare `goose` command, `goose settings`, and tray Configure open the
+graphical controls. `goose start` or `goose plz` starts the goose directly;
+`goose config` opens the secondary terminal editor.
 All routes use the same Rust-owned configuration and lifecycle. The compatible `honk300`
 and `honk` aliases remain.
 
@@ -336,7 +335,7 @@ cargo clippy --locked --all-targets --workspace -- -D warnings
 cargo test --locked --workspace
 cargo build --locked --release
 python -m unittest discover -s script/tests
-dist plan --tag=v1.10.1
+dist plan --tag=v1.11.0
 cargo audit --version 0.22.2
 ```
 

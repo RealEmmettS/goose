@@ -2,7 +2,7 @@
 
 Date: 2026-09-09
 
-Status: Implemented; native qualification in progress.
+Status: Published in v1.11.0 with complete source, native, package and fresh-public qualification.
 
 ## Evidence
 

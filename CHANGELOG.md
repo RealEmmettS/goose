@@ -7,6 +7,9 @@ features and installation, and [readiness records](docs/readiness/) for release 
 
 ## [Unreleased]
 
+### Behind the scenes
+- Record the complete v1.11.0 source, candidate, main, publication and fresh-public qualification, exact public asset verification and current installed-acceptance state. Update stable release guidance while preserving the first Linux display failure and its successful unchanged-source rerun.
+
 ## [1.11.0] - 2026-09-09
 
 ### Added
