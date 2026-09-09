@@ -1,7 +1,7 @@
 # Optional Wayland integrations
 
-KDE and Sway have separate release stages. The next candidate adds independently
-qualified Hyprland observations; publication remains ordered after Sway.
+KDE, Sway, Hyprland and GNOME have separately qualified releases. Their supported
+observations and actions differ; each section below describes its own desktop evidence.
 Native owned notes and pictures use normal compositor placement unless the enabled
 desktop adapter supplies safe placement.
 
@@ -100,7 +100,8 @@ unsaved settings in its independent window.
 
 ## Hyprland window and fullscreen observations
 
-The Hyprland candidate qualifies **0.53.3** and **0.55.2**, each on x64 and ARM64.
+Hyprland **0.53.3** and **0.55.2** are qualified on x64 and ARM64 in
+[the Hyprland release](readiness/v1.8.0-readiness.md).
 Start the native Wayland goose from your desktop session, open **Platform & status**,
 choose **Set up Hyprland**, and confirm **Enable Hyprland observations**. A version
 outside that qualified set reports unavailable observations.
@@ -133,8 +134,8 @@ setup, removal and stopping the goose preserve the independent settings draft.
 
 ## GNOME window, fullscreen and user-drag observations
 
-The GNOME candidate targets **GNOME Shell 46.0** and **48.7**, each on x64 and ARM64.
-Its full native qualification is tracked in [the release record](readiness/v1.9.0-readiness.md).
+**GNOME Shell 46.0** and **48.7** are qualified on x64 and ARM64.
+Native and public distribution evidence is in [the GNOME release record](readiness/v1.9.0-readiness.md).
 Other Shell versions report unavailable observations. Start the goose normally in
 your GNOME Wayland session; GNOME uses the compatible XWayland overlay.
 

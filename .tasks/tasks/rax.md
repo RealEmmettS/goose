@@ -16,15 +16,20 @@ Exercise native names, button actions, switch state, focused text editing, modal
 ## Verification
 - [x] Native Intel and Apple Silicon readers operate the actual provider and verify saved configuration.
 - [x] Preserve real failures and correct any demonstrated provider defect without weakening the oracle.
-- [ ] Record final-source evidence and retain native reader coverage in future settings qualification.
+- [x] Record final-source evidence and retain native reader coverage in future settings qualification.
 
 ## Status
-Active. Both actual native Mac readers pass all twelve production-provider checks,
-including dialog isolation, cached-action refusal, real text input and saved
-configuration. Carry the exact shared correction into both pending releases and
-complete their final-source and publication gates before closing this task.
+Done. Independent native Intel and Apple Silicon readers reproduce and
+correct dialog leakage and unapplied native text edits in the Mac settings
+provider. The final production companion passes actual names, actions, switch
+state, focus transfer, saved text, modal isolation and cached-action refusal.
+Both releases retain the native reader in their final-source settings matrix;
+v1.10.1 also verifies its separate presence labels. The correction is published
+and fresh-public verified in v1.9.0 and v1.10.1. Exact-hash preparation, original
+failures and physical screen-reader acceptance remain documented separately.
 
 ## Activity
+- 2026-09-08 — Complete the ordered publication, fresh-public and website gates. See the final records in docs/readiness/v1.9.0-readiness.md and docs/readiness/v1.10.1-readiness.md. Preserve prior failures below as qualification history and keep unavailable physical acceptance separate.
 - 2026-09-08 — Independent run 34292293311 passes all twelve native provider
   checks on Intel and Apple Silicon with automation disabled. Saved text, switch
   values, modal isolation and cached-action refusal are confirmed. Integrate

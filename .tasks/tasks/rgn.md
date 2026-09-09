@@ -35,20 +35,20 @@ sets of native settings, goose, painted note and complete-image captures were in
 ## Verification
 - [x] Real supported Shell versions and x64/ARM64 desktops pass overlay and companion scenarios.
 - [x] Rust and native settings preserve explicit authority, drafts, terminal exclusions and recovery.
-- [ ] Required source, architecture, package, immutable-publication and website checks pass.
+- [x] Required source, architecture, package, immutable-publication and website checks pass.
 
 ## Status
-Active. Production companion, authenticated Rust worker, compatible XWayland capability
-boundary, recoverable consent and native settings are implemented under ADR 0048.
-All 31 standalone gates pass at 22810d6 after the shared startup correction;
-all 48 repeated native deliveries and worst settling sequences are reviewed.
-An independent native Mac reader then exposes modal isolation and unapplied
-text edits. Both corrected production readers now pass under ADR 0051. The
-shared correction is integrated here with explicit focus transfer in the final
-native matrix. Repeat same-source qualification before main, immutable
-publication, fresh-public and website gates. Engine and reviewed art are unchanged.
+Done. The explicit GNOME Shell companion is published in v1.9.0 after
+qualifying Shell 46.0 and 48.7 on x64 and ARM64. Actual native settings,
+authenticated observations, held-ride cancellation, terminal refusal, owned
+props, graceful recovery and visual captures pass. The corrected source passes
+all source, candidate, unchanged-main, public download and website gates.
+The compatible XWayland overlay and independently reported capabilities retain
+their documented limits; GNOME foreign-window movement and pointer grants are
+not advertised.
 
 ## Activity
+- 2026-09-08 — Complete the ordered publication, fresh-public and website gates. See the final records in docs/readiness/v1.9.0-readiness.md and docs/readiness/v1.10.1-readiness.md. Preserve prior failures below as qualification history and keep unavailable physical acceptance separate.
 - 2026-09-08 — Hold the fully source-qualified 22810d6 candidate after an actual
   native Mac settings Accessibility failure. Integrate ADR 0051's shared dialog,
   stale-action and text-input corrections after both native readers pass in

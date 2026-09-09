@@ -25,8 +25,8 @@
 
 | Project | Status | Source |
 |---|---|---|
-| Honk300 | v1.5.0 stable/latest with all eight fresh-public lanes passed. Historical installed Windows acceptance remains open. | `#rr1`, `#rlpi`, `#r136`, `#r137` |
-| Desktop Goose site | Renderer SVGs and native settings are live through PR #6; PR #7 adds verified Linux/Pi guidance and all 22 download mappings. | `C:\Users\hey\git\desktop-goose-site` |
+| Honk300 | v1.10.1 stable/latest; all refinement stages, native/package/public gates and website handoffs complete. Historical Windows installation and physical Mac/Pi acceptance remain open. | `#refine`, `#prs`, `#rgn`, `#r136`, `#r137` |
+| Desktop Goose site | GNOME and final manners guidance are live through PRs #12/#13 with 22 verified download mappings. Preserve the user-restored r6 artwork; renderer exports remain separate. | `C:\Users\hey\git\desktop-goose-site` |
 | Post-v1 hardware verification | Alienware plus hosted/native Mac and Linux defense-in-depth; forward patches only | `#v1a` |
 
 ## Preferences

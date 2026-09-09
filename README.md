@@ -5,42 +5,28 @@ across real monitor layouts, honks, leaves muddy footprints, reacts to the point
 bounded desktop pranks. Configuration and control stay local through a command-line interface
 and native graphical and terminal settings screens.
 
-**New in v1.8.0:** optional Hyprland window and fullscreen observations on separately
-qualified desktops, with explicit setup and immediate revocation. KDE keeps its
-animated owned deliveries and separately requested temporary pointer permission.
-Setup and removal are available through native settings and the command line.
-These changes follow the goose redesign, native graphical settings, Linux notes and
-pictures, and experimental Pi 4/5 64-bit Desktop guidance.
-`honk300 settings` and tray Configure open the GUI; `honk300 config` retains the TUI.
-Both edit the same Rust-owned configuration. Public download identities are independently
-verified; native installation qualification is tracked in the release record.
-See [desktop setup](docs/wayland-integrations.md),
-[current release readiness](docs/readiness/v1.8.0-readiness.md),
+**Current stable release:** [v1.10.1](https://github.com/RealEmmettS/goose/releases/tag/v1.10.1),
+published from exact commit `127cd148e0af0cf76ecd6a7954777c23c156a862`.
+Mac fullscreen manners now use the existing Accessibility permission, and settings
+report fullscreen and do-not-disturb availability separately. Quick delivery turns
+and stops keep the goose's feet close to its body. Mac assistive tools can edit
+and save settings while navigation stays inside an open dialog.
+
+The completed refinement also brings one continuously projected goose, expressive
+motion, bounded rendering resources, native graphical settings, Linux notes and
+pictures, experimental Pi 4/5 64-bit Desktop guidance, and independently qualified
+KDE, Sway, Hyprland and GNOME integrations. Each desktop exposes only its proven
+capabilities. See [desktop setup](docs/wayland-integrations.md),
+[release evidence](docs/readiness/v1.10.1-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
-The executable is installed under three names—`honk300`, `honk`, and `goose`—so both
-`honk300 start` and `goose plz` work.
+`honk300 settings` and tray Configure open the GUI; `honk300 config` retains the TUI.
+Both edit the same Rust-owned configuration. The executable is installed under
+three names—`honk300`, `honk`, and `goose`—so both `honk300 start` and `goose plz` work.
 
-**Current stable release:** [v1.8.0](https://github.com/RealEmmettS/goose/releases/tag/v1.8.0),
-published from exact commit `970cdb20c2e5f75ea3784adbbc35ea2746734bbf`. It includes the
-continuous goose redesign, expressive motion, bounded rendering resources, native
-graphical settings, Linux deliveries, opt-in KDE integration and Sway/Hyprland observations.
-See [release evidence](docs/readiness/v1.8.0-readiness.md).
-
-The immutable v1.2.3 tag failed before publication on a hosted Windows tray observation. v1.2.4
-fixed that qualification boundary; v1.2.5 fixed the subsequent public Mac verifier and published
-successfully. Its public Mac/Linux/Debian lanes passed, while Windows exposed that the bootstrap
-still assumed `Get-FileHash` existed. v1.2.6 replaces that optional dependency with direct .NET
-SHA-256 and passed the complete candidate, same-SHA main, atomic publication, and eight-lane
-fresh-public-byte matrix on Windows, macOS, and Linux. v1.3.0 adds terminal-independent Windows
-start, a branded pinnable launcher icon, singleton-preserving app handoff, and nonblocking tray
-recovery for immediate restarts; v1.3.1 keeps current protected-receipt discovery read-only,
-v1.3.2 hardens bootstrap architecture detection in app-hosted terminals, v1.3.3 detaches the
-hidden runtime from breakaway-permitted integrated-terminal jobs, v1.3.4 gives tray users a
-one-click verified update and restart path, v1.3.5 makes its retained terminal result
-unmistakable, and v1.3.6 calms the default mud cadence. Each published patch completed the required
-cross-platform release gates; the v1.3.6 installed-updater finding is retained honestly and fixed
-forward in v1.3.7.
+Earlier releases, fixes and acceptance limits remain in the
+[readiness records](docs/readiness/). Public download verification and hosted native
+checks do not establish physical-device or administrator-prompt acceptance.
 
 ## Install
 
@@ -87,8 +73,8 @@ executables cannot self-repair their update-discovery bug; v1.0.3 and later perf
 update checks correctly. Supported installer upgrades preserve settings and user content.
 
 While Honk300 is running, an accessible **Honk300 controls** notification-area icon offers
-**Configure Honk300…**, which launches the exact running copy's existing terminal settings
-screen; **Update Honk300…**, which opens a new terminal and completes the verified update without
+**Configure Honk300…**, which opens the matching graphical settings companion;
+**Update Honk300…**, which opens a new terminal and completes the verified update without
 manual typing; and **Quit Honk300**, which sends the goose through its normal full walk-off before
 exit. Opening the menu performs no update check. The update terminal stays open with an explicit
 success, no-op, or failure/recovery result until the user closes it.
@@ -129,12 +115,12 @@ Desktop pranks require Accessibility permission.
 
 Launch the installed app by double-clicking `~/Applications/Honk300.app`, or keep that app in
 the Dock as a launcher. While Honk300 is running, an accessible goose menu-bar icon offers
-**Configure Honk300…**, which opens the existing terminal settings screen; **Update Honk300…**,
+**Configure Honk300…**, which opens the matching graphical settings companion; **Update Honk300…**,
 which opens the signed bundle's exact update command in Terminal; and **Quit Honk300**, which sends
 the goose walking fully offscreen before the app exits. The update helper relaunches the verified
 installed app and leaves its final terminal result visible until the user closes it. The item
-exists only while the Mac app is running. Honk300 remains an agent app with no native settings
-window or running Dock control surface.
+exists only while the Mac app is running. The goose runtime remains an agent app without
+a running Dock control surface. Graphical settings open in their own companion process.
 
 When the exact managed app starts without Accessibility permission, it records a secure
 per-update prompt marker before asking macOS for consent and opening Privacy & Security >
@@ -195,10 +181,10 @@ exact immutable tag and verifies the selected platform artifact's kind, target, 
 before changing an owned installation.
 
 While Honk300 is running, desktops with a StatusNotifier watcher and host show the shared
-**Honk300 controls** item with Configure, Update, and graceful-Quit actions. Configure and Update
-prefer `xdg-terminal-exec` and then known terminal argument-vector interfaces; they pass the exact
-executable and command as literal arguments and never interpolate a shell command. Update runs in
-a terminal, restarts the receipt-owned app after activation, and retains its final result until the
+**Honk300 controls** item with Configure, Update, and graceful-Quit actions. Configure opens
+the matching graphical settings companion. Update prefers `xdg-terminal-exec` and then known
+terminal interfaces, passing the exact executable and command as literal arguments without
+shell interpolation. It restarts the receipt-owned app after activation and retains its result until the
 window is closed. The icon is embedded in portable binaries, and Debian packages also own its
 hicolor-theme copy. Sessions without a compatible host or session bus log the explicit non-fatal
 reason while overlays, CLI/TUI/IPC, and supported mischief continue independently.
@@ -213,6 +199,7 @@ not published to crates.io.
 ```text
 honk300 start                 Start the goose (returns after readiness on Windows)
 honk300 status                Show runtime and platform capabilities
+honk300 settings              Open the graphical settings companion
 honk300 config                Open the terminal settings editor
 honk300 reload                Apply reloadable saved settings
 honk300 do honk               Request an action
@@ -230,7 +217,8 @@ opposite exposed edge. Its deliberate puddle and prank errands always return thr
 departure edge instead. If you personally close a note or meme it opened, there is a roughly 30%
 chance it gets visibly annoyed and then tries its existing bounded mouse-steal prank. That second
 step still obeys your settings, quiet/fullscreen manners, live permission, and platform support;
-program cleanup never triggers it, and Linux currently has no collect windows to close.
+program cleanup never triggers it. Packaged Linux notes and pictures use the same close-reaction
+checks; their placement depends on the active backend and desktop integration.
 
 Collected notes and pictures are fitted to the monitor receiving the goose. Notes remain readable
 without exceeding 48% of either monitor dimension. Pictures preserve their complete source and
@@ -249,11 +237,13 @@ Default config locations:
 - Linux: `${XDG_DATA_HOME:-~/.local/share}/honk300/config.toml`
 
 Settings that affect backend selection, including native Wayland mode, require a restart and are
-reported as such. Native Wayland remains an explicit reduced mode (`honk300 start --wayland`):
-the overlay works, while cursor and foreign-window mischief report unsupported. X11/XWayland is
-the full-mischief Linux default. ADR 0021 records why universal native parity is not a single
-portable protocol feature and defines future opt-in portal/KDE/GNOME/wlroots adapters as separate
-claims. Terminal windows are always protected from focus, typing, dragging, riding, and
+reported as such. X11/XWayland remains the default Linux path. Native Wayland is an
+explicit reduced mode (`honk300 start --wayland`); optional desktop integrations add only
+their separately supported observations and actions. KDE window support and temporary
+portal pointer permission are distinct grants. Sway and Hyprland provide observations;
+GNOME's explicit companion uses the compatible XWayland overlay. Follow the
+[desktop setup guide](docs/wayland-integrations.md) for exact versions and limitations.
+Terminal windows are always protected from focus, typing, dragging, riding, and
 collection. Codex and Visual Studio Code surfaces receive the same conservative protection across
 platforms, including the ChatGPT-titled Codex desktop surface on Windows.
 
@@ -304,12 +294,14 @@ zero means the selected release, receipt, selector, and aliases were activated a
 | Linux X11/XWayland | x64/ARM64, GNU/musl | Full overlay and supported mischief; Configure/Update/Quit when a StatusNotifier host exists |
 | Linux native Wayland | x64/ARM64, GNU/musl | Opt-in reduced overlay mode; independent StatusNotifier control when hosted |
 
-This candidate's packaged Linux companion supplies owned notes and pictures on X11 and
-native Wayland. X11 positions only those owned windows; Wayland leaves placement to the
-compositor. A standalone Rust binary retains CLI/TUI controls and reports props unavailable
-when its companion is absent. KDE/portal and other privileged adapters remain separate,
-unreleased work. Exact signed-app macOS
-Accessibility evidence for first denial, non-nagging relaunch, live grant, and live revocation
+The packaged Linux companion supplies owned notes and pictures on X11 and native Wayland.
+X11/XWayland positions only Honk300-owned props. Native Wayland normally leaves placement
+to the compositor; explicitly enabled KDE support adds bounded owned-prop positioning.
+A standalone Rust binary retains CLI/TUI controls and reports props unavailable when its
+companion is absent. Fullscreen and do-not-disturb observations are reported independently;
+Mac and Linux do-not-disturb observation remains unsupported.
+
+Exact signed-app macOS Accessibility evidence for first denial, non-nagging relaunch, live grant, and live revocation
 remains tracked in the readiness docs; hosted bundle and permission-adapter tests are release
 gates. Native release gates hold exact Windows/Linux binaries unchanged while checking
 body/wing/beak/legs, asymmetric color channels, and transparency after each platform's real
@@ -330,65 +322,23 @@ This is a Rust 1.95 workspace (edition 2021):
 
 ```text
 cargo fmt --all -- --check
-cargo clippy --all-targets --workspace -- -D warnings
-cargo test --workspace
-cargo build --release
-dist plan --tag=v1.5.0
+cargo clippy --locked --all-targets --workspace -- -D warnings
+cargo test --locked --workspace
+cargo build --locked --release
+python -m unittest discover -s script/tests
+dist plan --tag=v1.10.1
 cargo audit --version 0.22.2
 ```
 
-Architecture decisions are under [`docs/adr`](docs/adr/README.md). ADR 0018 defines distribution
-and atomic publication; ADR 0019 defines the v0.3.x configuration, runtime, renderer, and platform
-stabilization contracts; ADR 0020 defines Developer ID signing, notarization, and the per-user
-graphical DMG; ADR 0021 defines native Wayland capability strata; ADR 0022 defines the managed
-macOS Accessibility first-run, non-nagging wait, and live grant/revocation boundary; ADR 0023
-defines stable latest links, exact-tag platform-isolated updates, every-release Mac packaging,
-and native Debian lifecycle ownership; ADR 0024 defines the macOS-only menu-bar bridge to the
-existing terminal TUI and graceful shutdown; ADR 0025 records the first stable v1 release and
-post-release Alienware verification boundary; ADR 0026 defines the narrow GitHub-hosted Windows
-ARM64 compositor-evidence exception without weakening normal paired-DWM proof; and ADR 0027
-records the immutable-tag fix-forward to the public v1.0.1 identity. ADR 0028 defines the shared
-goose control-surface icon and the Configure/TUI plus graceful-Quit parity contract. ADR 0029
-records the Alienware-derived Windows update/lifecycle, Corporate retry, and integrated-terminal
-hardening contract; ADR 0030 implements that contract with native Windows and Linux surfaces and
-explicit unavailable-host boundaries. ADR 0031 supersedes ADR 0029's flat Windows update
-transaction with authoritative provenance receipts, immutable slots, synchronous verification,
-and matching Mac/Linux update ownership. ADR 0032 replaces external Windows Notepad props with
-owned bounded windows and defines monitor-relative image fitting, graceful versus forced stop,
-and the one provenance-owned login-start setting. ADR 0033 makes Windows app/login/background
-launch windowless while preserving normal intentional CLI behavior, and moves every full-desktop
-compositor surface to disposable CI; product startup performs no calibration. ADR 0034 makes the
-official managed commands the recommended fresh install while retaining native-package ownership,
-same-origin updates, authoritative fresh intent, and raw Cargo's unmanaged boundary.
-ADR 0035 permits one narrow hosted x64 observation fallback only when an independent fixed-GUID
-tray probe fails identically; ordinary Windows CI still proves actual registration and recovery.
-ADR 0036 routes typed Windows starts through the branded GUI launcher and a hidden console-free
-runtime, while retaining bounded readiness, exact-sibling ownership, and terminal TUI behavior.
-ADR 0037 adds integrated-terminal Windows job breakaway with an access-denied-only fallback. ADR
-0038 extends the shared control surface with the out-of-process, serialized, terminal-backed
-update helper, receipt-owned relaunch/recovery, and explicit retained result screens. ADR 0039
-supersedes only the original mud timing defaults with a calmer cadence while preserving the
-puddle-hop story, saved user duration, footprint fade, and stable config shape. ADR 0040 makes
-the Windows updater's generated archive-path check safe across PowerShell argument transport
-without relaxing traversal rejection or lifecycle ownership.
-[`docs/readiness/v1.2.2-readiness.md`](docs/readiness/v1.2.2-readiness.md) records the completed
-semantic receipt-verifier fix-forward, candidate, same-SHA main, publication, and public-byte
-qualification. The v1.2.0/v1.2.1 reports preserve their immutable release evidence.
-[`docs/readiness/v1.2.3-readiness.md`](docs/readiness/v1.2.3-readiness.md) preserves the immutable
-failed-before-publication evidence. [`docs/readiness/v1.2.4-readiness.md`](docs/readiness/v1.2.4-readiness.md)
-records the public release and failed Mac verifier assertion.
-[`docs/readiness/v1.2.6-readiness.md`](docs/readiness/v1.2.6-readiness.md) records the completed
-Windows compatibility fix-forward, public-byte matrix, latest-alias audit, and production-site
-qualification. [`docs/readiness/v1.3.0-readiness.md`](docs/readiness/v1.3.0-readiness.md) records
-the detached Windows app-launch handoff, tray-recovery fix-forwards, native x64/ARM64 gates,
-atomic publication, and fresh-public-byte closure. [`docs/readiness/v1.3.3-readiness.md`](docs/readiness/v1.3.3-readiness.md)
-records the integrated-terminal job-breakaway release and installed proof.
-[`docs/readiness/v1.3.4-readiness.md`](docs/readiness/v1.3.4-readiness.md) records the completed
-cross-platform tray updater, immutable publication, public-byte matrix, production site, and
-physical Windows acceptance. [`docs/readiness/v1.3.6-readiness.md`](docs/readiness/v1.3.6-readiness.md)
-tracks the calmer-mud patch through exact candidate, publication, public bytes, and installed
-acceptance. [`docs/readiness/v1.3.7-readiness.md`](docs/readiness/v1.3.7-readiness.md) tracks the
-immutable Windows updater fix-forward and final installed acceptance.
+Build and qualify the separate GUI with `npm test`, `npm run check` and
+`npm run build` in `settings/`; see [its development guide](settings/README.md).
+
+The [architecture decision index](docs/adr/README.md) records the renderer, Native SDK
+accessibility bridge, platform integrations, permissions and installation ownership
+contracts. Later accepted decisions identify exactly which earlier decisions they replace.
+The [release readiness records](docs/readiness/) preserve every candidate, publication,
+fresh-download and installed-acceptance result, including unsuccessful qualifications.
+Current implementation work is tracked on [the task board](.tasks/TASKS.md).
 
 ## License and assets
 

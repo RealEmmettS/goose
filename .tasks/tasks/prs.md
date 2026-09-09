@@ -17,20 +17,19 @@ The functional bar is honest independent fullscreen/DND status and correct manne
 ## Verification
 - [x] Native fullscreen state changes affect the real engine manners path and revert on exit/loss.
 - [x] Any advertised DND support is established by an actual platform signal; unavailable paths remain clearly unsupported.
-- [ ] Settings and runtime status agree after permission loss, reload and unsupported-session selection.
+- [x] Settings and runtime status agree after permission loss, reload and unsupported-session selection.
 
 ## Status
-Active. Source 0ff0ffa passes all 33 source, 45 candidate and 37 unchanged-main
-gates. Final publication 34300623596 then fails the older x64 GNOME suite while
-the fixture truncates and rewrites the live consent file. The runtime withdraws
-observations with an invalid-consent failure, while the fixture expects a complete
-revocation. Preserve the immutable unpublished v1.10.0 tag and the failed evidence.
-Correct the fixture to publish a complete private file atomically, retain every
-native assertion, and repeat the full qualification sequence as v1.10.1. The
-runtime, permission policy, Native SDK behavior and reviewed art are unchanged.
-The complete v1.9.0 public distribution and website remain verified and current.
+Done. Mac fullscreen observation and independent fullscreen/DND status are
+published in v1.10.1. Actual Intel and Apple Silicon fullscreen transitions,
+expired/frozen targets, denied identity, live settings and graceful stop pass.
+Mac/Linux DND remains explicitly unsupported. All source, native settings,
+candidate, unchanged-main, public download and website gates are complete.
+Physical Mac permission and official Windows installation acceptance remain
+separate open records; no user installation was changed.
 
 ## Activity
+- 2026-09-08 — Complete the ordered publication, fresh-public and website gates. See the final records in docs/readiness/v1.9.0-readiness.md and docs/readiness/v1.10.1-readiness.md. Preserve prior failures below as qualification history and keep unavailable physical acceptance separate.
 - 2026-09-08 — Preserve final-publication run 34300623596 and job 102306638180's
   failed GNOME evidence. Cancel the incomplete publication and keep v1.10.0's tag
   unchanged. Production removal already uses a private atomic write; correct the

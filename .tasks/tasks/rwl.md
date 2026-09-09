@@ -24,16 +24,19 @@ Separate GNOME, Sway, Hyprland implementations and exact supported-desktop evide
 The requested behavior runs through its production path and the supporting evidence matches the claimed platform and installation.
 
 ## Verification
-- [ ] Relevant production-path regression tests pass.
-- [ ] Actual behavior or rendered output is inspected in its supported environment.
-- [ ] Integration and required package/release checks pass before publication.
+- [x] Relevant production-path regression tests pass.
+- [x] Actual behavior or rendered output is inspected in its supported environment.
+- [x] Integration and required package/release checks pass before publication.
 
 ## Status
-Active. Sway v1.7.0 and Hyprland v1.8.0 are independently qualified, published and
-fresh-public/website verified. GNOME's actual Shell and runtime suites are implemented;
-its final review corrections and complete publication gates remain open under #rgn.
+Done. Sway v1.7.0, Hyprland v1.8.0 and GNOME v1.9.0 are independently
+qualified, published and verified against freshly downloaded artifacts and
+deployed website guidance. Each desktop retains its exact supported versions
+and separate capability claims. The historical #wlg prototype scope is complete
+through these production implementations; no duplicate prototype effort remains.
 
 ## Activity
+- 2026-09-08 — Complete the ordered publication, fresh-public and website gates. See the final records in docs/readiness/v1.9.0-readiness.md and docs/readiness/v1.10.1-readiness.md. Preserve prior failures below as qualification history and keep unavailable physical acceptance separate.
 - 2026-09-08 — Close the separately qualified Sway and Hyprland public stages; retain GNOME as the remaining compositor gate without extending either published version's claims.
 - 2026-09-08 — Add individual adapter tasks, native premise checks, version boundaries and publication gates after current upstream review; all implementations remain queued behind the KDE stage.
 - 2026-09-07 — created from the user-approved implementation plan (agent: codex).

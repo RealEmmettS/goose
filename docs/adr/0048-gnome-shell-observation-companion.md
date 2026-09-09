@@ -1,6 +1,6 @@
 # ADR 0048: versioned GNOME Shell observations and compatible overlay
 
-Status: accepted; production desktop qualification passed, publication pending.
+Status: accepted; published and fresh-public verified in v1.9.0.
 
 The approved refinement requires separate GNOME evidence. Native run
 [34226098889](https://github.com/RealEmmettS/goose/actions/runs/34226098889)
@@ -84,3 +84,7 @@ are omitted by the provider; every reported target still undergoes strict Rust
 validation. Real held-input tests prove cancellation on configuration change,
 target destruction and extension loss. Full distribution and publication remain
 separate gates in the release readiness record.
+
+## Publication evidence
+
+The final unchanged-source candidate, main, immutable publication, fresh-download and website results are recorded in [the GNOME release](../readiness/v1.9.0-readiness.md) and [the final manners release](../readiness/v1.10.1-readiness.md). Earlier pending statements and cancelled candidates above describe the original qualification sequence. Physical acceptance retains its separate limits.

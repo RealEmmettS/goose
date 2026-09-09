@@ -1,6 +1,6 @@
 # ADR 0051: Native Mac settings modal accessibility
 
-Status: accepted correction; native and release qualification in progress.
+Status: accepted; published and fresh-public verified in v1.9.0 and v1.10.1.
 
 ## Evidence
 
@@ -60,3 +60,7 @@ the exact-source guard during repeated patch preparation; contextual matching
 fixes its reversible recipe without relaxing that hash. This focused native
 result permits integration, while both releases still require complete final-source
 settings, candidate, unchanged-main and fresh-public qualification.
+
+## Publication evidence
+
+The final unchanged-source candidate, main, immutable publication, fresh-download and website results are recorded in [the GNOME release](../readiness/v1.9.0-readiness.md) and [the final manners release](../readiness/v1.10.1-readiness.md). Earlier pending statements and cancelled candidates above describe the original qualification sequence. Physical acceptance retains its separate limits.

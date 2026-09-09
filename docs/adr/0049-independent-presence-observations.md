@@ -1,6 +1,6 @@
 # ADR 0049: independent fullscreen and notification observations
 
-Status: accepted; native Intel/Apple Silicon runtime and denied-identity qualification passed, publication pending.
+Status: accepted; published and fresh-public verified in v1.10.1.
 
 Audit R05 requires effective observations independently from saved manners toggles.
 Add a bounded additive `PRESENCE` control frame with separate fullscreen and DND
@@ -54,3 +54,7 @@ its notification availability categories do not identify a specific Focus mode.
 
 The complete staged-release gates still apply to the resulting change. Hosted
 native evidence does not establish physical Mac permission or Pi acceptance.
+
+## Publication evidence
+
+The final unchanged-source candidate, main, immutable publication, fresh-download and website results are recorded in [the GNOME release](../readiness/v1.9.0-readiness.md) and [the final manners release](../readiness/v1.10.1-readiness.md). Earlier pending statements and cancelled candidates above describe the original qualification sequence. Physical acceptance retains its separate limits.

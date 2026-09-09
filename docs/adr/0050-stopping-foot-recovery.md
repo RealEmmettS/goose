@@ -1,7 +1,7 @@
 # ADR 0050: Keep airborne landings current through stopping and reversal
 
 Date: 2026-09-08
-Status: Accepted; native qualification and publication pending.
+Status: accepted; published and fresh-public verified in v1.9.0 and v1.10.1.
 
 ## Context
 
@@ -85,3 +85,7 @@ following presence release. Candidates 34271545636 and 34271817809 were cancelle
 after the visual finding; their completed jobs do not qualify the changed source.
 Track native review and publication in task #rst and audit R13. Already published
 tags and artifacts remain immutable.
+
+## Publication evidence
+
+The final unchanged-source candidate, main, immutable publication, fresh-download and website results are recorded in [the GNOME release](../readiness/v1.9.0-readiness.md) and [the final manners release](../readiness/v1.10.1-readiness.md). Earlier pending statements and cancelled candidates above describe the original qualification sequence. Physical acceptance retains its separate limits.
