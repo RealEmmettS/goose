@@ -103,7 +103,8 @@
                     </Directory>
                 </Directory>
             </Directory>
-            <Directory Id='CommonProgramsFolder'>
+            <!-- ProgramMenuFolder resolves to the all-users menu for this per-machine MSI. -->
+            <Directory Id='ProgramMenuFolder'>
                 <Directory Id='ApplicationProgramsFolder' Name='Goose'/>
                 <Directory Id='LegacyApplicationProgramsFolder' Name='honk300'/>
             </Directory>

@@ -30,6 +30,15 @@ as specified by [Apple's bundle naming documentation](https://developer.apple.co
 
 ## Installed Configure repair
 
+The Global MSI must use Windows Installer's standard `ProgramMenuFolder`, which resolves
+to the all-users menu for the existing per-machine scope, as documented by
+[Microsoft](https://learn.microsoft.com/en-us/windows/win32/msi/programmenufolder).
+The former undefined `CommonProgramsFolder` resolved to the drive root. A real candidate
+installation wrote `D:\Goose\Goose.lnk`; the user's old `C:\honk300\Honk300.lnk` confirms
+the same original defect. Preserve installation scope and package identities while correcting
+the shortcut destination. Qualification must inspect the real Start-menu link, target,
+arguments and icon after installation rather than accepting successful MSI exit status.
+
 The user's protected MSI receipt correctly described the installed app and its settings
 companion. A stale per-user PowerShell receipt for the same root described an older release
 without that companion. Settings launch now follows the updater's existing precedence:

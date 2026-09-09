@@ -88,7 +88,8 @@ def ico_sizes(path: Path) -> set[tuple[int, int]]:
 class WindowsPackagingTests(unittest.TestCase):
     def test_global_msi_is_machine_owned_and_all_users(self) -> None:
         self.assertIn("InstallScope='perMachine'", GLOBAL_WIX)
-        self.assertIn("Id='CommonProgramsFolder'", GLOBAL_WIX)
+        self.assertIn("Id='ProgramMenuFolder'", GLOBAL_WIX)
+        self.assertNotIn("Id='CommonProgramsFolder'", GLOBAL_WIX)
         self.assertIn("Root='HKLM'", GLOBAL_WIX)
         self.assertIn("System='yes'", GLOBAL_WIX)
         self.assertNotIn("Root='HKCU'", GLOBAL_WIX)
