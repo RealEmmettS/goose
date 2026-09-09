@@ -6,7 +6,7 @@ has implementation details; [the README](README.md) describes current features a
 ## A more welcoming Goose — September 2026
 
 ### Improved
-- Find Goose by name in your applications menu and open its graphical controls to start, stop, customize, or update it. Terminal controls remain available when you want them.
+- Find Goose by name in your applications menu and open its graphical controls to start, stop, customize, or update it. Its package description reflects the same approach. Terminal controls remain available when you want them.
 - Enjoy a mix of maple, oak, birch and ginkgo leaves in the same warm autumn colors. The piles fade away on their own, and running through one still sends the leaves flying with extra force.
 - Rub the goose for a little while to earn hearts and a friendly waddle after your cursor. It keeps a comfortable distance, leaves your pointer alone, and returns to its usual wandering shortly afterward.
 

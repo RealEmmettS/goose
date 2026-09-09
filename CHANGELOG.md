@@ -13,7 +13,7 @@ features and installation, and [readiness records](docs/readiness/) for release 
 - After 2.5 seconds of actual rubbing, invite a 15-second cursor follow at configured walking speed with a 90-pixel gap, one invitation per streak, no cursor/window commands, and cancellation for pointer loss, clicks, petting opt-out, manners, permission withdrawal and shutdown.
 
 ### Improved
-- Make the native Goose application the primary interface across platforms. Application-menu entries and bare commands open the existing Rust-owned graphical controls; explicit start/plz and autostart retain their runtime route, and the TUI remains available through goose config. Preserve all binary, installer, receipt, app-bundle and permission identities while supporting the new display names alongside historical installer names.
+- Make the native Goose application the primary interface across platforms, including the Debian package description. Application-menu entries and bare commands open the existing Rust-owned graphical controls; explicit start/plz and autostart retain their runtime route, and the TUI remains available through goose config. Preserve all binary, installer, receipt, app-bundle and permission identities while supporting the new display names alongside historical installer names.
 - Render distinct maple, oak, birch and ginkgo SVG designs in every existing autumn color. Keep source SVGs, sixteen recolors and Rust geometry synchronized, cache bounded supersampled sprites, and vary size, mirroring and continuous rotation independently. Preserve simulation RNG, leaf counts, kick strength, gravity and bounce; expire every pile after 30 seconds with a four-second fade, or sooner through its existing kicked lifetime.
 
 ### Fixed

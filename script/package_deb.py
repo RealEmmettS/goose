@@ -206,8 +206,8 @@ def build_package_tree(
         f"Depends: {DEPENDENCIES}\n"
         "Homepage: https://thegoose.app\n"
         "Description: cross-platform procedural desktop goose\n"
-        " Honk300 is a playful desktop pet with terminal-first controls and\n"
-        " platform-aware safety boundaries.\n",
+        " Goose is a playful desktop pet with graphical controls and optional\n"
+        " terminal commands.\n",
     )
     return installed
 
