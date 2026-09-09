@@ -106,6 +106,19 @@ jobs:
         run: >-
           python script/verify_settings.py --target ${{ matrix.target }}
           --directory target/settings-release/${{ matrix.target }} --execute
+      - name: Exercise production macOS Accessibility provider
+        if: ${{ runner.os == 'macOS' }}
+        env:
+          AX_TARGET: ${{ matrix.target }}
+        run: |
+          settings_directory="$PWD/target/settings-release/$AX_TARGET"
+          settings_service="$settings_directory/honk300"
+          test ! -e "$settings_service"
+          cp "target/$AX_TARGET/release/honk300" "$settings_service"
+          trap 'rm -f "$settings_service"' EXIT
+          cmp "target/$AX_TARGET/release/honk300" "$settings_service"
+          xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework Cocoa -framework ApplicationServices script/smoke_settings_accessibility_macos.m -o target/settings-native-ax
+          target/settings-native-ax "$settings_directory/honk300-settings" "$PWD/target/settings-ui-evidence/native-ax" --independent-presence
       - name: Exercise shipped GNU props on the oldest supported GTK baseline
         if: ${{ contains(matrix.target, '-linux-gnu') }}
         env:

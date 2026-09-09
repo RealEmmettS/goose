@@ -40,14 +40,20 @@ sets of native settings, goose, painted note and complete-image captures were in
 ## Status
 Active. Production companion, authenticated Rust worker, compatible XWayland capability
 boundary, recoverable consent and native settings are implemented under ADR 0048.
-All 31 standalone gates and the complete 43-job candidate pass at f25e700.
-All 48 repeated native deliveries and worst settling sequences are reviewed;
-the corrected engine resolves #rst. The final-stage candidate then exposes a
-dropped startup connection being rejected by the shared readiness helper.
-Carry its bounded retry correction into both stages and repeat same-source
-qualification before main, immutable publication, fresh-public and website gates.
+All 31 standalone gates pass at 22810d6 after the shared startup correction;
+all 48 repeated native deliveries and worst settling sequences are reviewed.
+An independent native Mac reader then exposes modal isolation and unapplied
+text edits. Both corrected production readers now pass under ADR 0051. The
+shared correction is integrated here with explicit focus transfer in the final
+native matrix. Repeat same-source qualification before main, immutable
+publication, fresh-public and website gates. Engine and reviewed art are unchanged.
 
 ## Activity
+- 2026-09-08 — Hold the fully source-qualified 22810d6 candidate after an actual
+  native Mac settings Accessibility failure. Integrate ADR 0051's shared dialog,
+  stale-action and text-input corrections after both native readers pass in
+  34292293311; retain explicit focus transfer in the final settings matrix.
+  Repeat final-source gates before publication. Engine and art are unchanged.
 - 2026-09-08 — Retain all 43 passing candidate jobs in 34283702176, all 31
   standalone gates, and the four-desktop 48-delivery visual qualification in
   34282484203. Before tagging, integrate R14's shared startup-readiness correction

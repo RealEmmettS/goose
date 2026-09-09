@@ -20,17 +20,20 @@ The functional bar is honest independent fullscreen/DND status and correct manne
 - [ ] Settings and runtime status agree after permission loss, reload and unsupported-session selection.
 
 ## Status
-Active. The retained Mac fullscreen worker and separate CLI/TUI/native settings
-status are implemented. Native Intel and Apple Silicon pass actual fullscreen,
-frozen-target expiry/recovery, live settings, unavailable windows, graceful stop
-and the private denied app. Mac/Linux DND stays explicitly unsupported. The complete
-shared stopping/reversal correction from #rst is integrated and passes the local
-workspace and separate settings checks. All 33 standalone gates pass at 2285eb0,
-including both Mac architectures. Candidate 34284306818 then exposes a transient
-broken IPC connection being treated as permanent startup failure in native Intel
-settings. Correct that readiness policy and repeat final-source qualification.
+Active. All 33 standalone gates pass at b993b89 after the shared startup
+correction, including real Mac fullscreen, frozen-target recovery, denied identity
+and all compositor suites. Mac/Linux DND stays explicitly unsupported. A separate
+native Mac reader then demonstrates settings dialog and text-input defects.
+Both corrected production readers now pass under ADR 0051. Integrate the shared
+GNOME correction and repeat complete final-source, candidate, main, public and
+website gates. Runtime, observer and reviewed art are unchanged.
 
 ## Activity
+- 2026-09-08 — Hold the fully source-qualified b993b89 candidate for the
+  independently reproduced Mac settings provider defects. Integrate f099a2e's
+  shared SDK correction after both native readers pass in 34292293311. Preserve
+  explicit focus transfer and independent presence labels in the final-source
+  matrix; repeat complete qualification and the GNOME-first publication order.
 - 2026-09-08 — Integrate GNOME source 22810d6 so both pending stages include
   R14's shared readiness correction before publication. Production Rust, Native
   SDK, smoke scripts and package configuration are identical to locally qualified

@@ -37,6 +37,7 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Let the Mac goose notice fullscreen apps through its existing desktop permission, while keeping commands responsive if an app stops answering. Show fullscreen and do-not-disturb support separately in every settings interface.
 
 ### Fixed
+- Include the Mac assistive-tool corrections so dialogs keep focus, text edits can be saved and the separate status information remains readable.
 - Include the steadier startup behavior, so a brief connection drop does not make settings give up while the goose is still starting.
 - Include the improved turning and stopping motion so a quick return with a note does not leave a leg stretched behind the goose.
 - Refresh Windows manners availability after a temporary failure recovers, and show Linux fullscreen support according to the desktop integration that is actually connected.
@@ -54,6 +55,20 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 - Check the complete Mac implementation more strictly and keep Linux-only uninstall checks out of the Mac build.
 - Wait for private test desktops and windows to be ready, then verify actual input, fullscreen changes and completion without loosening communication or behavior checks.
 - Bring Linux setup and accessibility guidance up to date, explain the separate status labels, and verify complete public downloads before announcing the update.
+
+## Mac settings accessibility acceptance — September 2026
+
+### Behind the scenes
+- Check what native assistive tools can read and operate in Mac settings,
+  including switches, text fields, dialogs and saved changes. Verify focus can
+  move away from the editor and back before editing its value.
+
+### Fixed
+- Make text changes from Mac assistive tools reach the settings draft so they
+  can be saved, and report the field's actual value and focus afterward. Keep
+  repeated build preparation consistent with the reviewed correction.
+- Keep assistive navigation inside an open settings dialog and prevent older
+  controls from acting after the page or dialog changes.
 
 ## GNOME desktop observations — September 2026
 

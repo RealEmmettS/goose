@@ -8,9 +8,14 @@
 
 
 ## Active
+- [ ] **Mac settings native accessibility acceptance** - query and operate the actual AppKit provider independently of the SDK harness (needs #rgui) (ms #refine) (owner codex) #rax
+  - [x] Exercise named controls, switch state, focused text editing and isolated saves on both native Mac architectures.
+  - [x] Correct any demonstrated provider failure and repeat the unchanged native assertions.
+  - [ ] Record final-source proof and retain future native reader qualification.
 - [ ] **Fullscreen and do-not-disturb observations** - resolve audit R05 with separately proven platform observations and honest fallback (needs #rfnd) (ms #refine) (owner codex) #prs
   - [x] Qualify macOS fullscreen and supported system do-not-disturb observation paths.
-  - [ ] Correct and qualify the native Mac startup-readiness connection failure.
+  - [x] Correct and qualify the native Mac startup-readiness connection failure.
+  - [ ] Qualify the shared Mac native Accessibility correction and independent status labels.
   - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
   - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
   - [ ] Qualify the complete candidate, unchanged main, fresh public distribution and website guidance.
@@ -24,6 +29,7 @@
   - [x] Complete the separately qualified Hyprland implementation (needs #rhy).
   - [ ] Complete the versioned GNOME companion and its desktop qualification (needs #rgn).
 - [ ] **GNOME desktop companion** - versioned explicit Shell integration with proven observation, placement and a compatible overlay path (needs #rkde) (ms #refine) (owner codex) #rgn
+  - [ ] Qualify the shared Mac native Accessibility correction with actual provider checks.
   - [x] Prove the real Shell extension lifecycle, native window API and compatible visible overlay premise.
   - [x] Prove live user-drag observation and automatic movement refusal through actual desktop input.
   - [x] Integrate bounded authenticated Rust operations, guided setup/removal and native settings.
