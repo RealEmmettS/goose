@@ -1307,7 +1307,7 @@ dependencies = [
 
 [[package]]
 name = "honk300"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "base64",
  "clap",

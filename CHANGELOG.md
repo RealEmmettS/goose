@@ -24,7 +24,15 @@ All notable changes to this project are documented here. Format based on
 > release packaging with artifact evidence. A plain-English companion lives in
 > [HUMAN_CHANGELOG.md](./HUMAN_CHANGELOG.md) and must stay in lockstep.
 
-## [1.10.0] - 2026-09-08
+## [1.10.1] - 2026-09-08
+
+### Behind the scenes
+- Preserve the unpublished immutable v1.10.0 tag after its final GNOME qualification failed. Publish the complete external-revocation fixture record through a private flushed temporary file and atomic rename, matching the production writer. Production Shell regressions distinguish truncated/partial consent from complete revocation and require no observations or retained requests in all cases. Repeat all source, candidate, main, publication and fresh-download gates for the complete fullscreen manners stage.
+
+## [1.10.0] - 2026-09-08 (unpublished)
+
+Publication was blocked by the GNOME consent-fixture write race recorded in
+`docs/readiness/v1.10.0-readiness.md`. The features below continue in v1.10.1.
 
 ### Added
 - Add a retained, bounded macOS Accessibility fullscreen observer with live target identity, permission withdrawal and stale-sample expiry. Add independent fullscreen/DND capabilities through an additive bounded IPC frame, CLI, TUI and Native SDK settings; older runtimes remain unprobed.

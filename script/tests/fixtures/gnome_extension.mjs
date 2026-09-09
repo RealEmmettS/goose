@@ -87,7 +87,7 @@ function actor(id, width = 300) {
     };
 }
 
-function privateFiles(f, {changedIdentity = false, holdCleanup = false} = {}) {
+function privateFiles(f, {changedIdentity = false, holdCleanup = false, record = null} = {}) {
     const root = '/private/honk300/wayland';
     const extensionPath = '/private/extension';
     const metadata = '{"uuid":"honk300@emmetts.dev"}';
@@ -96,7 +96,7 @@ function privateFiles(f, {changedIdentity = false, holdCleanup = false} = {}) {
         script, metadata, executable: {device: '1', inode: '2', size: '100', path: '/approved/honk300'}};
     const entries = new Map([
         [root, null], [extensionPath, null],
-        [`${root}/gnome.json`, JSON.stringify(consent)],
+        [`${root}/gnome.json`, record === null ? JSON.stringify(consent) : record(consent)],
         [`${extensionPath}/extension.js`, script], [`${extensionPath}/metadata.json`, metadata],
     ]);
     f.context.GLib.get_user_data_dir = () => '/private';
@@ -201,6 +201,25 @@ test('changed opened identity cancels and joins other consent reads before relea
     assert.equal(f.extension._requests.size, 0);
     assert(!request.result.message.includes(nonce));
 });
+
+for (const [label, record, error] of [
+    ['truncated', () => '', 'Unavailable'],
+    ['partial JSON', consent => JSON.stringify(consent).slice(0, -1), 'Unavailable'],
+    ['complete revocation', consent => JSON.stringify({...consent, phase: 'revoking'}), 'Revoked'],
+]) {
+    test(`production consent distinguishes ${label} without exposing observations`, async () => {
+        const f = fixture([actor(1)]);
+        const files = privateFiles(f, {record});
+        const request = f.request();
+        await request.finished;
+        assert.equal(request.result.error, `dev.emmetts.Honk300.Gnome1.${error}`);
+        assert.equal(request.result.frame, undefined);
+        assert.equal(files.open, 0);
+        assert.equal(f.extension._requests.size, 0);
+        assert.equal(f.timers.size, 0);
+        assert(!request.result.message.includes(nonce));
+    });
+}
 
 test('discard transient actors before enforcing the 64 reported-window bound', async () => {
     const actors = Array.from({length: 64}, (_, i) => actor(i + 1));

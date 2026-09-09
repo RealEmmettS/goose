@@ -20,15 +20,23 @@ The functional bar is honest independent fullscreen/DND status and correct manne
 - [ ] Settings and runtime status agree after permission loss, reload and unsupported-session selection.
 
 ## Status
-Active. All 33 standalone gates pass at b993b89 after the shared startup
-correction, including real Mac fullscreen, frozen-target recovery, denied identity
-and all compositor suites. Mac/Linux DND stays explicitly unsupported. A separate
-native Mac reader then demonstrates settings dialog and text-input defects.
-Both corrected production readers now pass under ADR 0051. Integrate the shared
-GNOME correction and repeat complete final-source, candidate, main, public and
-website gates. Runtime, observer and reviewed art are unchanged.
+Active. Source 0ff0ffa passes all 33 source, 45 candidate and 37 unchanged-main
+gates. Final publication 34300623596 then fails the older x64 GNOME suite while
+the fixture truncates and rewrites the live consent file. The runtime withdraws
+observations with an invalid-consent failure, while the fixture expects a complete
+revocation. Preserve the immutable unpublished v1.10.0 tag and the failed evidence.
+Correct the fixture to publish a complete private file atomically, retain every
+native assertion, and repeat the full qualification sequence as v1.10.1. The
+runtime, permission policy, Native SDK behavior and reviewed art are unchanged.
+The complete v1.9.0 public distribution and website remain verified and current.
 
 ## Activity
+- 2026-09-08 — Preserve final-publication run 34300623596 and job 102306638180's
+  failed GNOME evidence. Cancel the incomplete publication and keep v1.10.0's tag
+  unchanged. Production removal already uses a private atomic write; correct the
+  fixture's truncate/write operation and add production Shell cases distinguishing
+  empty/partial JSON from a completed revocation. All cases deny observations and
+  release bounded request resources. Qualify v1.10.1 through every release gate.
 - 2026-09-08 — Hold the fully source-qualified b993b89 candidate for the
   independently reproduced Mac settings provider defects. Integrate f099a2e's
   shared SDK correction after both native readers pass in 34292293311. Preserve

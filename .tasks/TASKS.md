@@ -18,6 +18,7 @@
   - [ ] Qualify the shared Mac native Accessibility correction and independent status labels.
   - [ ] Reconcile Linux compositor fullscreen support and independently available do-not-disturb observations.
   - [ ] Verify permission loss, unsupported fallbacks and the resulting settings status.
+  - [ ] Correct the external-consent fixture race and qualify the new immutable patch.
   - [ ] Qualify the complete candidate, unchanged main, fresh public distribution and website guidance.
 - [ ] **Stopping foot recovery** - withdraw stale airborne walking lead and qualify actual delivery motion (ms #refine) (owner codex) #rst
   - [x] Reproduce and correct the production gait while preserving planted contacts and timing.

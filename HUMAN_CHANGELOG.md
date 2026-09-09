@@ -31,6 +31,11 @@ For the technical version with file paths and exact details, see CHANGELOG.md.
 
 ---
 
+## Reliable permission-removal checks — September 2026
+
+### Behind the scenes
+- Make the private permission-removal check publish a complete saved change, matching the app. Keep separate checks proving that both a damaged permission record and an intentional removal immediately withhold desktop observations. Hold the update until the full desktop and download checks pass again.
+
 ## Fullscreen manners and clearer status — September 2026
 
 ### Added

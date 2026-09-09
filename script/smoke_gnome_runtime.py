@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import socket
 import subprocess
+import tempfile
 import time
 
 
@@ -66,8 +67,18 @@ preserve = "untouched"
         return json.loads(control('integrations', 'gnome', 'status'))
 
     def expect(state, label):
-        result = wait(lambda: (value if ((value := status()).get('capabilities') or {}).get('windows') == state
-                              and value['capabilities'].get('prop_positioning') == 'supported' else None), label)
+        last = None
+        def current():
+            nonlocal last
+            last = status()
+            caps = last.get('capabilities') or {}
+            return last if caps.get('windows') == state and caps.get('prop_positioning') == 'supported' else None
+        try:
+            result = wait(current, label)
+        except BaseException:
+            (directory / 'failed-status.json').write_text(json.dumps(
+                dict(label=label, expected=state, actual=last), indent=2))
+            raise
         caps = result['capabilities']
         assert caps['fullscreen'] == state, caps
         def independent():
@@ -427,11 +438,25 @@ preserve = "untouched"
         assert not record.exists(), 'Completed native removal retained consent'
         control('integrations', 'gnome', 'setup')
         expect('supported', 'explicit CLI setup')
-        saved_record = record.read_bytes()
-        revoked = json.loads(saved_record)
+        revoked = json.loads(record.read_bytes())
         revoked['phase'] = 'revoking'
         previous_joins = joined_count()
-        record.write_text(json.dumps(revoked))
+        # Model the production durable writer: publish a complete private file
+        # by rename. Truncating the live record tests invalid consent instead.
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8',
+                dir=record.parent, prefix='.gnome-revocation-', delete=False) as staged:
+            temporary = Path(staged.name)
+            try:
+                json.dump(revoked, staged)
+                staged.flush()
+                os.fsync(staged.fileno())
+            except BaseException:
+                temporary.unlink(missing_ok=True)
+                raise
+        try:
+            temporary.replace(record)
+        finally:
+            temporary.unlink(missing_ok=True)
         expect('unsupported', 'external durable consent revocation')
         removed(previous_joins)
         control('integrations', 'gnome', 'remove')

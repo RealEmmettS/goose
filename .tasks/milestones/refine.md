@@ -9,7 +9,10 @@ Reliability and test audit; continuous procedural goose and expressions; Native 
 ## Status
 The first three stages and the separately qualified Sway/Hyprland follow-ons are published,
 each with all eight fresh-public lanes and its deployed website update verified.
-GNOME and the independent fullscreen/status correction remain in progress. The user installation is unchanged.
+GNOME is also published with verified public downloads and website guidance.
+The final fullscreen/status update remains in progress: preserve the failed,
+unpublished v1.10.0 tag and qualify the consent-fixture correction as v1.10.1.
+The user installation is unchanged.
 
 ## Completed
 Reliability foundation, continuously projected goose, native graphical settings,
@@ -19,6 +22,10 @@ guidance match those stages while preserving the user's restored website artwork
 Physical Pi acceptance remains open.
 
 ## Activity
+- 2026-09-08 — Complete GNOME v1.9.0 publication, all eight fresh-public lanes,
+  independent 47-asset verification and deployed website PR 12. Final manners
+  publication then exposes a consent-fixture rewrite race. Keep its tag intact,
+  cancel incomplete publication and repeat every gate for the corrected patch.
 - 2026-09-08 — Complete Hyprland v1.8.0, all eight fresh-public lanes, the independent 47-asset audit and deployed website PR 11 with exact public download readback. GNOME final review qualification and the independently proven Mac fullscreen/status stage remain open.
 - 2026-09-08 — Complete Sway v1.7.0, all eight fresh-public lanes, the independent 47-asset audit and deployed website PR 10. Hyprland final candidate 34241011570 runs from 970cdb2; GNOME's separate native interruption and prop checks remain active.
 - 2026-09-08 — Complete KDE v1.6.0 publication, all eight fresh-public lanes, the independent 47-asset audit and website PR 8 with matching live downloads and platform guidance. Continue independently qualified follow-on adapters.
