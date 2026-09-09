@@ -38,6 +38,10 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **Make the complete installer EULA easy to read** - export the exact license and Great Honk Accord to Downloads and coordinate a footer-only website page (owner codex) (done 2026-09-09) #eul
+  - [x] Extract the published installer text and verify the complete Markdown export.
+  - [x] Save the Markdown file in Downloads and give the website session the exact source.
+  - [x] Verify the published EULA page, complete text and footer-only navigation.
 - [x] **Mac settings native accessibility acceptance** - query and operate the actual AppKit provider independently of the SDK harness (needs #rgui) (ms #refine) (owner codex) (done 2026-09-08) #rax
   - [x] Exercise named controls, switch state, focused text editing and isolated saves on both native Mac architectures.
   - [x] Correct any demonstrated provider failure and repeat the unchanged native assertions.

@@ -19,6 +19,7 @@ has implementation details; [the README](README.md) describes current features a
 - Give Linux application entries the full goose artwork, preserve login startup, and verify that Windows and Mac can read their packaged application icons.
 
 ### Behind the scenes
+- Read or save the complete installer agreement from the website footer, including the real license and the entire Great Honk Accord. Keep the wording identical to the installer.
 - Refresh the release records and current installation guidance, keeping successful download checks separate from the final checks on this computer.
 - Check the installed application shortcuts, icons and graphical controls during release testing, including upgrades that leave an older installation record behind. Check both personal and shared Windows installations, including how Windows locates their artwork.
 - Keep tray descriptions and their checks consistent with the new application name.
