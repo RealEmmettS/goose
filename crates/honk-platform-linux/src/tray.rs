@@ -49,7 +49,7 @@ impl ksni::Tray for LinuxTray {
     }
 
     fn title(&self) -> String {
-        "Honk300 controls".into()
+        "Goose controls".into()
     }
 
     fn icon_name(&self) -> String {
@@ -64,8 +64,8 @@ impl ksni::Tray for LinuxTray {
         ksni::ToolTip {
             icon_name: String::new(),
             icon_pixmap: vec![self.icon.clone()],
-            title: "Honk300 controls".into(),
-            description: "Configure or update Honk300, or send the goose home".into(),
+            title: "Goose controls".into(),
+            description: "Configure or update Goose, or send the goose home".into(),
         }
     }
 

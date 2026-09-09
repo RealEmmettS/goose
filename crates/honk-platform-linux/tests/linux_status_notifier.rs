@@ -163,7 +163,7 @@ fn hosted_protocol_actions_and_watcher_recovery() {
         .expect("StatusNotifierItem proxy");
     assert_eq!(
         item.get_property::<String>("Title").expect("item title"),
-        "Honk300 controls"
+        "Goose controls"
     );
     assert!(item
         .get_property::<String>("IconName")
@@ -180,15 +180,15 @@ fn hosted_protocol_actions_and_watcher_recovery() {
     let (_, layout): (u32, LayoutTuple) = menu
         .call("GetLayout", &(0_i32, -1_i32, Vec::<String>::new()))
         .expect("menu layout");
-    let configure = find_menu_item(layout, "Configure Honk300…").expect("Configure menu item");
+    let configure = find_menu_item(layout, "Configure Goose…").expect("Configure menu item");
     let (_, layout): (u32, LayoutTuple) = menu
         .call("GetLayout", &(0_i32, -1_i32, Vec::<String>::new()))
         .expect("menu layout");
-    let update = find_menu_item(layout, "Update Honk300…").expect("Update menu item");
+    let update = find_menu_item(layout, "Update Goose…").expect("Update menu item");
     let (_, layout): (u32, LayoutTuple) = menu
         .call("GetLayout", &(0_i32, -1_i32, Vec::<String>::new()))
         .expect("menu layout");
-    let quit = find_menu_item(layout, "Quit Honk300").expect("Quit menu item");
+    let quit = find_menu_item(layout, "Quit Goose").expect("Quit menu item");
 
     for (id, expected) in [
         (configure, ControlSurfaceCommand::Configure),

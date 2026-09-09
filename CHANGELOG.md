@@ -22,6 +22,7 @@ features and installation, and [readiness records](docs/readiness/) for release 
 - Report Windows tray Configure/Update launch failures visibly without blocking the runtime event loop.
 
 ### Behind the scenes
+- Update native tray protocol expectations and accessible descriptions for the requested Goose display name, retaining actual action dispatch and watcher-recovery checks.
 - Close the complete refinement milestone with final GNOME/presence source, native,
   publication, fresh-public and website evidence; reconcile adapter/gait/readiness/accessibility
   tasks and audit states, shorten current guidance, archive outdated changelog introductions and preserve historical failures

@@ -298,11 +298,11 @@ mod platform {
                 // Keep unbundled development runs usable if their main bundle has no Resources.
                 button.setTitle(&NSString::from_str("Honk"));
             }
-            button.setAccessibilityLabel(Some(&NSString::from_str("Honk300 controls")));
-            button.setToolTip(Some(&NSString::from_str("Honk300 controls")));
+            button.setAccessibilityLabel(Some(&NSString::from_str("Goose controls")));
+            button.setToolTip(Some(&NSString::from_str("Goose controls")));
 
             let target = StatusMenuTarget::new(mtm);
-            let menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), &NSString::from_str("Honk300"));
+            let menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), &NSString::from_str("Goose"));
             let configure = unsafe {
                 NSMenuItem::initWithTitle_action_keyEquivalent(
                     NSMenuItem::alloc(mtm),
@@ -311,7 +311,7 @@ mod platform {
                     &NSString::from_str(""),
                 )
             };
-            configure.setToolTip(Some(&NSString::from_str("Open Honk300 settings")));
+            configure.setToolTip(Some(&NSString::from_str("Open Goose settings")));
             // SAFETY: NSMenuItem does not retain its target, so StatusMenu retains `target` for
             // strictly longer than the item remains installed in the status bar.
             unsafe { configure.setTarget(Some(&target)) };
@@ -326,7 +326,7 @@ mod platform {
                 )
             };
             update.setToolTip(Some(&NSString::from_str(
-                "Open a terminal and update Honk300",
+                "Open a terminal and update Goose",
             )));
             // SAFETY: See the retained-target invariant above.
             unsafe { update.setTarget(Some(&target)) };
