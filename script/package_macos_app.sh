@@ -68,10 +68,8 @@ chmod 755 "$RESOURCES_DIR/Configure Honk300.command"
 ditto "$ROOT/packaging/macos/Update Honk300.command" \
   "$RESOURCES_DIR/Update Honk300.command"
 chmod 755 "$RESOURCES_DIR/Update Honk300.command"
-ditto "$ROOT/Assets/UI/honk300-status-goose.svg" \
-  "$RESOURCES_DIR/honk300-status-goose.svg"
-ditto "$ROOT/Assets/UI/honk300-status-goose@2x.png" \
-  "$RESOURCES_DIR/honk300-status-goose@2x.png"
+ditto "$ROOT/settings/assets/icon.png" \
+  "$RESOURCES_DIR/Goose-status.png"
 
 # Keep the receipt/TCC-owned bundle location while Finder and Spotlight show Goose through
 # the standard localized display name. The icon is sealed with the signed app.

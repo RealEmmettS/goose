@@ -4,7 +4,7 @@ use ksni::menu::{MenuItem, StandardItem};
 use std::sync::mpsc::{self, Receiver, Sender};
 use tiny_skia::Pixmap;
 
-const STATUS_ICON_PNG: &[u8] = include_bytes!("../../../Assets/UI/honk300-status-goose@2x.png");
+use honk_control::icon::tray_pixmap;
 
 #[derive(Debug)]
 pub enum StatusTrayError {
@@ -144,8 +144,7 @@ impl Drop for StatusTray {
 }
 
 fn status_icon() -> Result<ksni::Icon, StatusTrayError> {
-    let source = Pixmap::decode_png(STATUS_ICON_PNG)
-        .map_err(|error| StatusTrayError::Asset(error.to_string()))?;
+    let source = tray_pixmap().map_err(StatusTrayError::Asset)?;
     Ok(ksni::Icon {
         width: source.width() as i32,
         height: source.height() as i32,
@@ -154,50 +153,27 @@ fn status_icon() -> Result<ksni::Icon, StatusTrayError> {
 }
 
 fn compose_tray_argb(source: &Pixmap) -> Vec<u8> {
-    let width = source.width() as f32;
-    let height = source.height() as f32;
-    let center_x = (width - 1.0) / 2.0;
-    let center_y = (height - 1.0) / 2.0;
-    let radius = width.min(height) * 0.47;
-    let mut output = vec![0; source.data().len()];
-
-    for (index, (input, output)) in source
-        .data()
-        .chunks_exact(4)
-        .zip(output.chunks_exact_mut(4))
-        .enumerate()
-    {
-        let x = (index % source.width() as usize) as f32;
-        let y = (index / source.width() as usize) as f32;
-        let in_background = (x - center_x).hypot(y - center_y) <= radius;
-        let mask = input[3] as u16;
-        if in_background {
-            let inverse = 255 - mask;
-            output[0] = 255;
-            output[1] = ((255 * mask + 24 * inverse) / 255) as u8;
-            output[2] = ((255 * mask + 75 * inverse) / 255) as u8;
-            output[3] = ((255 * mask + 110 * inverse) / 255) as u8;
-        } else if mask > 0 {
-            output[0] = mask as u8;
-            output[1] = mask as u8;
-            output[2] = mask as u8;
-            output[3] = mask as u8;
-        }
-    }
-    output
+    // StatusNotifier IconPixmap uses straight-alpha ARGB in network byte order.
+    source
+        .pixels()
+        .iter()
+        .flat_map(|pixel| {
+            let p = pixel.demultiply();
+            [p.alpha(), p.red(), p.green(), p.blue()]
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{compose_tray_argb, status_icon, LinuxTray, STATUS_ICON_PNG};
+    use super::{compose_tray_argb, status_icon, tray_pixmap, LinuxTray};
     use honk_control::ControlSurfaceCommand;
     use ksni::Tray;
     use std::sync::mpsc;
-    use tiny_skia::Pixmap;
 
     #[test]
     fn status_icon_is_valid_contrasting_argb() {
-        let source = Pixmap::decode_png(STATUS_ICON_PNG).expect("valid canonical runtime PNG");
+        let source = tray_pixmap().expect("valid application tray artwork");
         let icon = status_icon().expect("valid embedded status icon");
         assert_eq!((icon.width, icon.height), (36, 36));
         assert_eq!(icon.data, compose_tray_argb(&source));
@@ -205,7 +181,21 @@ mod tests {
         assert!(icon
             .data
             .chunks_exact(4)
-            .any(|pixel| pixel[0] == 255 && pixel[1] < pixel[3]));
+            .any(|pixel| pixel[0] == 255 && pixel[1] > 220 && pixel[3] < 80));
+    }
+
+    #[test]
+    fn status_notifier_pixels_keep_straight_alpha_and_network_channel_order() {
+        let mut source = tiny_skia::Pixmap::new(2, 1).unwrap();
+        source
+            .data_mut()
+            .copy_from_slice(&[100, 50, 25, 128, 0, 0, 0, 0]);
+        let output = compose_tray_argb(&source);
+        assert_eq!(output[0], 128);
+        for (actual, expected) in output[1..4].iter().zip([200u8, 100, 50]) {
+            assert!(actual.abs_diff(expected) <= 1);
+        }
+        assert_eq!(&output[4..], &[0, 0, 0, 0]);
     }
 
     #[test]

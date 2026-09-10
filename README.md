@@ -27,6 +27,10 @@ graphical controls. `goose start` or `goose plz` starts the goose directly;
 All routes use the same Rust-owned configuration and lifecycle. The compatible `honk300`
 and `honk` aliases remain.
 
+The settings-navigation update in development makes the selected tab persistent,
+keeps scrolling short and smooth, limits the Wayland switch to Linux, and uses the
+application artwork in native trays and menus. See [ADR 0054](docs/adr/0054-settings-navigation-and-shared-artwork.md).
+
 Earlier releases, fixes and acceptance limits remain in the
 [readiness records](docs/readiness/). Public download verification and hosted native
 checks do not establish physical-device or administrator-prompt acceptance.

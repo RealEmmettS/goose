@@ -9,9 +9,9 @@ macOS, X11, and opt-in reduced Wayland runtimes. **Goose** is the user-facing ap
 Public stable is v1.11.0, source `630f754a0ef657172b0a6a7edea65593fa514de5`.
 Its completed publication and fresh-public qualification record is `docs/readiness/v1.11.0-readiness.md`.
 Task #g11 and ADR 0052 track the combined application, icon, leaf and affection update.
-The user's last verified installation is v1.10.1 Global MSI. Its official v1.11.0 update
-was canceled at the Windows administrator prompt; the old installation, saved preferences
-and stopped runtime are verified intact. New-version installed acceptance awaits that grant.
+The user confirms that the installed v1.11.0 Windows application now displays its logo
+and opens the graphical controls. The installed command and active immutable slot agree.
+Task #g12 and ADR 0054 track the next settings-navigation and shared tray-artwork update.
 
 The approved refinement is published through `.tasks/milestones/refine.md` and ADR 0041:
 the redesigned continuously projected goose, reliability cleanup, Native SDK settings

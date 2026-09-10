@@ -322,6 +322,7 @@ pub(super) const FIELDS: &[FieldSpec] = &[
         label: "Autumn leaves",
         help: "",
     },
+    #[cfg(target_os = "linux")]
     FieldSpec {
         page: "Platform & status",
         key: "platform.wayland",

@@ -2,7 +2,7 @@
 
 Date: 2026-09-09
 
-Status: Published in v1.11.0 with complete release and fresh-public qualification. Final acceptance on the user's Windows installation awaits administrator approval.
+Status: Published in v1.11.0 with complete release and fresh-public qualification. The user confirms the installed Windows application, logo and graphical controls work; protected receipt and companion hashes agree with the published source. Follow-up settings and tray refinements are in ADR 0054.
 
 ## Decision
 

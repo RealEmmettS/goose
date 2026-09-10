@@ -10,7 +10,7 @@ The stdio protocol uses one request per child, version 1, an increasing request 
 
 Update discovery is read-only. Update now opens the established retained terminal helper, which owns installation, cancellation/failure recovery, and receipt-owned relaunch independently of this window.
 
-The two embedded Makira faces use Light for body text and Bold for headings. A pinned patch connects the registered bold face to both measurement and painting. Native theme, high contrast, and reduced motion remain active.
+The two embedded Makira faces use Light for body text and Bold for headings. A pinned patch connects the registered bold face to both measurement and painting. Native theme, high contrast, and reduced motion remain active. The current tab has a persistent secondary fill. Wheel input uses a small step and short damped tail; reduced motion uses direct steps. The Wayland switch appears only in Linux builds, and other saved configuration remains intact (ADR 0054).
 
 The pinned AccessKit bridge forwards the existing semantics to Windows UI Automation and Linux AT-SPI (ADR 0042); macOS uses the SDK's AppKit provider with the exact-hash dialog and text-input corrections in [ADR 0051](../docs/adr/0051-native-mac-settings-modal-accessibility.md). On Windows, keep `honk_settings_accessibility.dll` beside the executable. The release build helper records and verifies both payload identities and includes dependency notices. Independent native UIA, AT-SPI and Mac Accessibility clients exercise real names, controls, text, focus, modal isolation and isolated saves. The production Mac companion is checked on Intel and Apple Silicon with automation disabled. These hosted provider checks remain distinct from physical screen-reader user acceptance.
 

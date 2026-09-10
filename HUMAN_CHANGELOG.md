@@ -3,6 +3,18 @@
 A plain-English account of what changed and why. The [technical changelog](CHANGELOG.md)
 has implementation details; [the README](README.md) describes current features and setup.
 
+## Clearer controls — September 2026
+
+### Improved
+- See which settings tab is open even after moving the pointer away. Scroll in short, smooth steps that stop promptly, with direct movement when reduced motion is enabled.
+- Recognize the same Goose artwork in the application and system tray. The Mac menu-bar version follows the system's light or dark appearance.
+
+### Fixed
+- Show the Wayland switch only on Linux, keeping saved preferences intact when using other operating systems.
+
+### Behind the scenes
+- Confirm the Windows application now opens its graphical controls and shows its logo, then check the follow-up changes across the supported desktops and installers.
+
 ## A more welcoming Goose — September 2026
 
 ### Improved

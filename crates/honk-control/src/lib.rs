@@ -4,6 +4,7 @@
 //! goose instance. The engine stays below this layer and only receives closed,
 //! platform-neutral command data.
 
+pub mod icon;
 mod platform;
 mod presence;
 mod protocol;

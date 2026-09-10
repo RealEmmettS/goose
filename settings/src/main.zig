@@ -34,7 +34,7 @@ const dev = @import("builtin").mode == .Debug;
 pub const Effects = native_sdk.Effects(Msg);
 pub const AppUi = canvas.Ui(Msg);
 pub const app_markup = @embedFile("app.native");
-pub const version = "1.11.0";
+pub const version = "1.11.1";
 const SettingsApp = native_sdk.UiAppWithFeatures(Model, Msg, .{ .runtime_markup = dev });
 const CompiledView = canvas.CompiledMarkupView(Model, Msg, app_markup);
 const body_font: canvas.FontId = canvas.min_registered_font_id;
@@ -261,12 +261,33 @@ pub const Model = struct {
         const rows = arena.alloc(Field, m.field_count) catch return &.{};
         var count: usize = 0;
         for (m.fields[0..m.field_count]) |f| {
+            // Also protect older service responses that list this Linux-only field.
+            if (@import("builtin").os.tag != .linux and std.mem.eql(u8, f.key(), "platform.wayland")) continue;
             if (f.page == m.page) {
                 rows[count] = f;
                 count += 1;
             }
         }
         return rows[0..count];
+    }
+
+    pub fn generalTabVariant(m: *const Model) []const u8 {
+        return m.tabVariant(.general);
+    }
+    pub fn appearanceTabVariant(m: *const Model) []const u8 {
+        return m.tabVariant(.appearance);
+    }
+    pub fn behaviorTabVariant(m: *const Model) []const u8 {
+        return m.tabVariant(.behavior);
+    }
+    pub fn soundTabVariant(m: *const Model) []const u8 {
+        return m.tabVariant(.sound);
+    }
+    pub fn platformTabVariant(m: *const Model) []const u8 {
+        return m.tabVariant(.platform);
+    }
+    fn tabVariant(m: *const Model, page: Page) []const u8 {
+        return if (m.page == page) "secondary" else "ghost";
     }
 };
 
@@ -594,7 +615,7 @@ fn appearanceChanged(appearance: native_sdk.Appearance) ?Msg {
     return .{ .system_appearance = appearance };
 }
 
-fn designTokens(model: *const Model) canvas.DesignTokens {
+pub fn designTokens(model: *const Model) canvas.DesignTokens {
     const appearance = model.system_appearance;
     const scheme: canvas.ColorScheme = if (appearance.color_scheme == .dark) .dark else .light;
     var tokens = canvas.DesignTokens.theme(.{
@@ -608,6 +629,15 @@ fn designTokens(model: *const Model) canvas.DesignTokens {
     tokens.typography.font_id = body_font;
     tokens.typography.bold_font_id = heading_font;
     tokens.typography.button_font_id = body_font;
+    // A Windows notch arrives as 40 logical pixels. Start with a small step,
+    // then settle the short tail in about a quarter second. SDK defaults decay
+    // by only 14% PER SECOND, which sends a single notch to the page boundary.
+    tokens.scroll = .{
+        .wheel_multiplier = if (appearance.reduce_motion) 1 else 0.25,
+        .wheel_velocity_scale = if (appearance.reduce_motion) 0 else 80,
+        .deceleration_per_second = 0.00000001523, // exp(-18), independent of frame rate.
+        .stop_velocity = 8,
+    };
     return tokens;
 }
 

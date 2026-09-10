@@ -1,28 +1,25 @@
 use honk_control::ControlSurfaceCommand;
 use std::collections::VecDeque;
-use std::ffi::{c_void, OsStr};
+use std::ffi::OsStr;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
-use tiny_skia::Pixmap;
 use windows::core::{w, Error, PCWSTR};
-use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
-use windows::Win32::Graphics::Gdi::{
-    CreateBitmap, CreateDIBSection, DeleteObject, GetDC, ReleaseDC, BITMAPINFO, BITMAPINFOHEADER,
-    BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ,
-};
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::HiDpi::{GetDpiForWindow, GetSystemMetricsForDpi};
 use windows::Win32::UI::Shell::{
     Shell_NotifyIconW, NIF_GUID, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP,
     NIIF_WARNING, NIM_ADD, NIM_DELETE, NIM_MODIFY, NIM_SETFOCUS, NIM_SETVERSION, NIN_SELECT,
     NOTIFYICONDATAW, NOTIFYICON_VERSION_4,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyIcon,
-    DestroyMenu, DestroyWindow, EndMenu, GetCursorPos, PostMessageW, RegisterClassExW,
-    RegisterWindowMessageW, SetForegroundWindow, TrackPopupMenu, ICONINFO, MF_SEPARATOR, MF_STRING,
-    TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_CONTEXTMENU, WM_DESTROY, WM_NULL, WM_USER, WNDCLASSEXW,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
+    AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyIcon, DestroyMenu,
+    DestroyWindow, EndMenu, GetCursorPos, LoadImageW, PostMessageW, RegisterClassExW,
+    RegisterWindowMessageW, SetForegroundWindow, TrackPopupMenu, HICON, IMAGE_ICON,
+    LR_DEFAULTCOLOR, MF_SEPARATOR, MF_STRING, SM_CXSMICON, SM_CYSMICON, TPM_RETURNCMD,
+    TPM_RIGHTBUTTON, WM_CONTEXTMENU, WM_DESTROY, WM_NULL, WM_USER, WNDCLASSEXW, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW, WS_POPUP,
 };
 
 const TRAY_CALLBACK_MESSAGE: u32 = WM_USER + 0x300;
@@ -36,7 +33,6 @@ const ADD_FAILURE_NOTICE_AFTER: Duration = Duration::from_secs(3);
 const DEGRADED_ADD_RETRY_DELAY: Duration = Duration::from_secs(1);
 const TRAY_ICON_GUID: windows::core::GUID =
     windows::core::GUID::from_u128(0x1282_821f_82b6_42e2_945b_ef2f_e8d9_fbda);
-const STATUS_ICON_PNG: &[u8] = include_bytes!("../../../Assets/UI/honk300-status-goose@2x.png");
 
 static TASKBAR_CREATED_MESSAGE: AtomicU32 = AtomicU32::new(0);
 static SMOKE_TRAY_QUIT_MESSAGE: AtomicU32 = AtomicU32::new(0);
@@ -108,7 +104,7 @@ impl StatusTray {
                 instance,
                 None,
             )?;
-            let icon = match create_status_icon() {
+            let icon = match create_status_icon(hwnd) {
                 Ok(icon) => icon,
                 Err(error) => {
                     let _ = DestroyWindow(hwnd);
@@ -405,90 +401,26 @@ fn wide(value: &str) -> Vec<u16> {
     value.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-fn create_status_icon() -> windows::core::Result<windows::Win32::UI::WindowsAndMessaging::HICON> {
-    let source = Pixmap::decode_png(STATUS_ICON_PNG)
-        .map_err(|error| failure(format!("invalid embedded tray PNG: {error}")))?;
-    let width = source.width() as i32;
-    let height = source.height() as i32;
-    let bgra = compose_tray_bgra(&source);
-
+fn create_status_icon(hwnd: HWND) -> windows::core::Result<HICON> {
+    // Resource 1 is the same multi-resolution ICO embedded in the app, CLI and
+    // settings window. Ask Windows for the native small-icon size and retain
+    // our own handle so the existing DestroyIcon lifecycle stays authoritative.
     unsafe {
-        let screen = GetDC(None);
-        if screen.0.is_null() {
-            return Err(Error::from_win32());
+        let module = GetModuleHandleW(None)?;
+        let dpi = GetDpiForWindow(hwnd);
+        if dpi == 0 {
+            return Err(failure("could not determine tray icon DPI"));
         }
-        let mut bits: *mut c_void = std::ptr::null_mut();
-        let info = BITMAPINFO {
-            bmiHeader: BITMAPINFOHEADER {
-                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-                biWidth: width,
-                biHeight: -height,
-                biPlanes: 1,
-                biBitCount: 32,
-                biCompression: BI_RGB.0,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let color = CreateDIBSection(screen, &info, DIB_RGB_COLORS, &mut bits, None, 0);
-        let _ = ReleaseDC(None, screen);
-        let color = color?;
-        if bits.is_null() {
-            let _ = DeleteObject(HGDIOBJ(color.0));
-            return Err(failure("tray DIB returned no writable pixels"));
-        }
-        std::ptr::copy_nonoverlapping(bgra.as_ptr(), bits.cast::<u8>(), bgra.len());
-
-        let mask = CreateBitmap(width, height, 1, 1, None);
-        if mask.0.is_null() {
-            let _ = DeleteObject(HGDIOBJ(color.0));
-            return Err(Error::from_win32());
-        }
-        let icon_info = ICONINFO {
-            fIcon: BOOL(1),
-            hbmMask: HBITMAP(mask.0),
-            hbmColor: HBITMAP(color.0),
-            ..Default::default()
-        };
-        let icon = CreateIconIndirect(&icon_info);
-        let _ = DeleteObject(HGDIOBJ(mask.0));
-        let _ = DeleteObject(HGDIOBJ(color.0));
-        icon
+        let handle = LoadImageW(
+            HINSTANCE(module.0),
+            PCWSTR(std::ptr::without_provenance(1)), // MAKEINTRESOURCEW(1), never dereferenced.
+            IMAGE_ICON,
+            GetSystemMetricsForDpi(SM_CXSMICON, dpi),
+            GetSystemMetricsForDpi(SM_CYSMICON, dpi),
+            LR_DEFAULTCOLOR,
+        )?;
+        Ok(HICON(handle.0))
     }
-}
-
-fn compose_tray_bgra(source: &Pixmap) -> Vec<u8> {
-    let width = source.width() as f32;
-    let height = source.height() as f32;
-    let center_x = (width - 1.0) / 2.0;
-    let center_y = (height - 1.0) / 2.0;
-    let radius = width.min(height) * 0.47;
-    let mut output = vec![0; source.data().len()];
-
-    for (index, (input, output)) in source
-        .data()
-        .chunks_exact(4)
-        .zip(output.chunks_exact_mut(4))
-        .enumerate()
-    {
-        let x = (index % source.width() as usize) as f32;
-        let y = (index / source.width() as usize) as f32;
-        let in_background = (x - center_x).hypot(y - center_y) <= radius;
-        let mask = input[3] as u16;
-        if in_background {
-            let inverse = 255 - mask;
-            output[0] = ((255 * mask + 110 * inverse) / 255) as u8;
-            output[1] = ((255 * mask + 75 * inverse) / 255) as u8;
-            output[2] = ((255 * mask + 24 * inverse) / 255) as u8;
-            output[3] = 255;
-        } else if mask > 0 {
-            output[0] = mask as u8;
-            output[1] = mask as u8;
-            output[2] = mask as u8;
-            output[3] = mask as u8;
-        }
-    }
-    output
 }
 
 fn failure(message: impl AsRef<str>) -> Error {
@@ -498,30 +430,13 @@ fn failure(message: impl AsRef<str>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::{
-        command_for_menu_selection, compose_tray_bgra, point_from_callback,
-        smoke_tray_quit_message_name, write_utf16, ADD_FAILURE_NOTICE_AFTER, ADD_RETRY_DELAY,
-        CONFIGURE_COMMAND_ID, DEGRADED_ADD_RETRY_DELAY, QUIT_COMMAND_ID, STATUS_ICON_PNG,
-        UPDATE_COMMAND_ID,
+        command_for_menu_selection, point_from_callback, smoke_tray_quit_message_name, write_utf16,
+        ADD_FAILURE_NOTICE_AFTER, ADD_RETRY_DELAY, CONFIGURE_COMMAND_ID, DEGRADED_ADD_RETRY_DELAY,
+        QUIT_COMMAND_ID, UPDATE_COMMAND_ID,
     };
     use honk_control::ControlSurfaceCommand;
     use std::ffi::OsStr;
-    use tiny_skia::Pixmap;
     use windows::Win32::Foundation::WPARAM;
-
-    #[test]
-    fn embedded_goose_icon_is_valid_contrasting_argb_source() {
-        let source = Pixmap::decode_png(STATUS_ICON_PNG).expect("valid canonical runtime PNG");
-        assert_eq!((source.width(), source.height()), (36, 36));
-        let output = compose_tray_bgra(&source);
-        assert_eq!(output.len(), 36 * 36 * 4);
-        assert!(output.chunks_exact(4).any(|pixel| pixel[3] == 255));
-        assert!(output
-            .chunks_exact(4)
-            .any(|pixel| pixel[3] == 255 && pixel[0] > pixel[2]));
-        assert!(output
-            .chunks_exact(4)
-            .any(|pixel| pixel[3] == 255 && pixel[0] == 255 && pixel[1] == 255));
-    }
 
     #[test]
     fn initial_registration_retry_is_nonblocking_and_reports_bounded_degradation() {

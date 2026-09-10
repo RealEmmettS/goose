@@ -62,3 +62,6 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0049 — Independent Presence Observations](./0049-independent-presence-observations.md)
 - [0050 — Stopping Foot Recovery](./0050-stopping-foot-recovery.md)
 - [0051 — Native Mac Settings Modal Accessibility](./0051-native-mac-settings-modal-accessibility.md)
+- [0052 — Goose Application Entry Points And Desktop Interaction Polish](./0052-goose-application-and-affection.md)
+- [0053 — Atomic GNOME Consent Reads](./0053-atomic-gnome-consent-reads.md)
+- [0054 — Settings Navigation And Shared Application Artwork](./0054-settings-navigation-and-shared-artwork.md)

@@ -2,6 +2,66 @@ const std = @import("std");
 const main = @import("main.zig");
 const sdk = @import("native_sdk");
 
+test "settings wheel motion settles locally, reverses, clamps and honors reduced motion" {
+    const tokens = main.designTokens(&.{});
+    inline for (.{ @as(f32, 1000.0 / 30.0), @as(f32, 1000.0 / 60.0), @as(f32, 1000.0 / 120.0) }) |dt| {
+        var state = sdk.canvas.ScrollState{ .viewport_extent = 400, .content_extent = 4000 };
+        state = state.applyWheelClamped(40, tokens.scroll);
+        const first = state.offset;
+        try std.testing.expect(first > 0 and first < 20);
+        var elapsed: f32 = 0;
+        while (state.needsKineticStep(tokens.scroll) and elapsed < 500) : (elapsed += dt) {
+            const next = state.stepKinetic(dt, tokens.scroll);
+            try std.testing.expect(next.offset >= state.offset);
+            try std.testing.expect(next.offset - state.offset < 30);
+            state = next;
+        }
+        try std.testing.expect(!state.needsKineticStep(tokens.scroll));
+        try std.testing.expect(elapsed < 350);
+        try std.testing.expect(state.offset > 45 and state.offset < 85);
+        const settled = state.offset;
+        state = state.stepKinetic(1000, tokens.scroll);
+        try std.testing.expectEqual(settled, state.offset);
+
+        state = state.applyWheelClamped(120, tokens.scroll);
+        state = state.stepKinetic(dt, tokens.scroll);
+        const before_reverse = state.offset;
+        state = state.applyWheelClamped(-40, tokens.scroll).stepKinetic(dt, tokens.scroll);
+        try std.testing.expect(state.offset < before_reverse);
+        try std.testing.expect(state.velocity < 0);
+        state = state.applyWheelClamped(-10000, tokens.scroll);
+        try std.testing.expectEqual(@as(f32, 0), state.offset);
+        try std.testing.expectEqual(@as(f32, 0), state.velocity);
+        state = state.applyWheelClamped(100000, tokens.scroll);
+        try std.testing.expectEqual(state.maxOffset(), state.offset);
+        try std.testing.expectEqual(@as(f32, 0), state.velocity);
+    }
+    const reduced = main.designTokens(&.{ .system_appearance = .{ .reduce_motion = true } });
+    const still = (sdk.canvas.ScrollState{ .viewport_extent = 400, .content_extent = 4000 }).applyWheelClamped(40, reduced.scroll);
+    try std.testing.expectEqual(@as(f32, 40), still.offset);
+    try std.testing.expect(!still.needsKineticStep(reduced.scroll));
+    try std.testing.expectEqual(still.offset, still.stepKinetic(500, reduced.scroll).offset);
+}
+
+test "older service Wayland values remain stored but only Linux displays the control" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var model = main.Model{};
+    model.request_id = 1;
+    try main.acceptResponse(&model, @embedFile("fixtures/read.json"));
+    model.page = .platform;
+    var stored: usize = 0;
+    for (model.fields[0..model.field_count]) |f| {
+        if (std.mem.eql(u8, f.key(), "platform.wayland")) stored += 1;
+    }
+    var visible: usize = 0;
+    for (model.visible(arena.allocator())) |f| {
+        if (std.mem.eql(u8, f.key(), "platform.wayland")) visible += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 1), stored);
+    try std.testing.expectEqual(@as(usize, if (@import("builtin").os.tag == .linux) 1 else 0), visible);
+}
+
 test "native accessibility activates an offscreen button through actual scrolling and keyboard routing" {
     const App = struct {
         activations: usize = 0,

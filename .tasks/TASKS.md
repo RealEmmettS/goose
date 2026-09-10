@@ -7,16 +7,13 @@
 
 
 ## Active
-- [ ] **Goose desktop polish update** - repair installed Windows controls and icons, refine temporary leaves, add affectionate following and simplify the app name (owner codex) #g11
-  - [x] Reproduce and correct installed Configure and verify the real tray Update helper.
-  - [ ] Give Windows executables, app-menu shortcuts and installed-app entries a verified icon.
-  - [x] Expire untouched leaf piles while preserving speed-dependent scattering.
-  - [x] Create distinct botanical SVG leaf shapes in the existing colors, integrate their vector geometry and inspect actual desktop-size animation.
-  - [x] Restore visible petting feedback and add a bounded cursor-follow at a comfortable distance.
-  - [ ] Present Goose in platform app menus and recommend the existing goose command without breaking installed identities.
-  - [x] Verify Linux running-window identity and artwork through native GTK, including owned installation and rollback.
-  - [x] Qualify the atomic GNOME consent-read correction found by the release checks.
-  - [ ] Qualify the combined update, publish a new immutable release and verify installed Windows behavior plus public downloads.
+- [ ] **Polish settings navigation and shared app icons** - selected tabs, controlled smooth scrolling, Linux-only Wayland controls and consistent tray/menu artwork in one update (owner codex) #g12
+  - [x] Reproduce installed behavior and record the user's Windows logo and settings acceptance.
+  - [x] Make selected tabs distinct and scrolling smooth, bounded and respectful of reduced motion.
+  - [x] Show the Wayland switch only on supported Linux builds while preserving saved values.
+  - [ ] Use consistent application artwork in Windows/Linux tray icons and verify the Mac menu-bar treatment.
+  - [ ] Validate native behavior, all required source/candidate/main gates and the complete immutable update.
+  - [ ] Verify fresh public downloads and coordinate the website release guidance.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
@@ -38,6 +35,16 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **Goose desktop polish update** - repair installed Windows controls and icons, refine temporary leaves, add affectionate following and simplify the app name (owner codex) (done 2026-09-09) #g11
+  - [x] Reproduce and correct installed Configure and verify the real tray Update helper.
+  - [x] Give Windows executables, app-menu shortcuts and installed-app entries a verified icon.
+  - [x] Expire untouched leaf piles while preserving speed-dependent scattering.
+  - [x] Create distinct botanical SVG leaf shapes in the existing colors, integrate their vector geometry and inspect actual desktop-size animation.
+  - [x] Restore visible petting feedback and add a bounded cursor-follow at a comfortable distance.
+  - [x] Present Goose in platform app menus and recommend the existing goose command without breaking installed identities.
+  - [x] Verify Linux running-window identity and artwork through native GTK, including owned installation and rollback.
+  - [x] Qualify the atomic GNOME consent-read correction found by the release checks.
+  - [x] Qualify the combined update, publish a new immutable release and verify installed Windows behavior plus public downloads.
 - [x] **Make the complete installer EULA easy to read** - export the exact license and Great Honk Accord to Downloads and coordinate a footer-only website page (owner codex) (done 2026-09-09) #eul
   - [x] Extract the published installer text and verify the complete Markdown export.
   - [x] Save the Markdown file in Downloads and give the website session the exact source.

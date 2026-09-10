@@ -174,6 +174,17 @@ fn hosted_protocol_actions_and_watcher_recovery() {
         .expect("embedded icon pixmap");
     assert_eq!((pixmaps[0].0, pixmaps[0].1), (36, 36));
     assert_eq!(pixmaps[0].2.len(), 36 * 36 * 4);
+    // Assert the actual published D-Bus payload, including alpha and channel order.
+    let expected_icon = honk_control::icon::tray_pixmap().unwrap();
+    let expected_argb: Vec<u8> = expected_icon
+        .pixels()
+        .iter()
+        .flat_map(|pixel| {
+            let p = pixel.demultiply();
+            [p.alpha(), p.red(), p.green(), p.blue()]
+        })
+        .collect();
+    assert_eq!(pixmaps[0].2, expected_argb);
 
     let menu = Proxy::new(&client, service_name.as_str(), MENU_PATH, MENU_INTERFACE)
         .expect("dbusmenu proxy");

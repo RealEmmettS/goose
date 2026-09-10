@@ -6,11 +6,11 @@
       <if test="{dirty}"><badge>Unsaved changes</badge></if>
     </row>
     <row gap="6">
-      <button variant="ghost" selected="{page == 'general'}" on-press="general">General</button>
-      <button variant="ghost" selected="{page == 'appearance'}" on-press="appearance">Appearance</button>
-      <button variant="ghost" selected="{page == 'behavior'}" on-press="behavior">Behavior</button>
-      <button variant="ghost" selected="{page == 'sound'}" on-press="sound">Sound & manners</button>
-      <button variant="ghost" selected="{page == 'platform'}" on-press="platform">Platform & status</button>
+      <button variant="{generalTabVariant}" selected="{page == 'general'}" on-press="general">General</button>
+      <button variant="{appearanceTabVariant}" selected="{page == 'appearance'}" on-press="appearance">Appearance</button>
+      <button variant="{behaviorTabVariant}" selected="{page == 'behavior'}" on-press="behavior">Behavior</button>
+      <button variant="{soundTabVariant}" selected="{page == 'sound'}" on-press="sound">Sound & manners</button>
+      <button variant="{platformTabVariant}" selected="{page == 'platform'}" on-press="platform">Platform & status</button>
     </row>
     <text size="lg"><span weight="bold">{heading}</span></text>
     <scroll grow="1" key="settings-scroll">

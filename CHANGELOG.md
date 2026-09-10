@@ -7,7 +7,17 @@ features and installation, and [readiness records](docs/readiness/) for release 
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-09-09
+
+### Improved
+- Keep the current native settings tab visibly selected and bound wheel momentum to a short damped tail, with immediate reversal, clamped edges and direct steps under reduced motion.
+- Load the Windows tray icon from the exact application resource at native small-icon size. Use the Linux application's artwork with correct StatusNotifier channel/alpha conversion, and package the Mac application's source for its menu-bar template before signing with exact-byte verification.
+
+### Fixed
+- Expose the Wayland settings switch only on Linux builds, including defensive filtering of older service responses. Preserve its saved value when other preferences change on unsupported platforms.
+
 ### Behind the scenes
+- Record the user's successful installed Windows logo and graphical-controls acceptance, and qualify the settings and icon follow-up through the complete release gates.
 - Record a complete Markdown export of the Windows installer EULA, verified against all four published MSI license controls and Windows native RTF decoding. Coordinate and verify the complete footer-only website page, identical downloadable Markdown and final website CI/deployment evidence.
 - Record the complete v1.11.0 source, candidate, main, publication and fresh-public qualification, exact public asset verification and current installed-acceptance state. Update stable release guidance while preserving the first Linux display failure and its successful unchanged-source rerun.
 

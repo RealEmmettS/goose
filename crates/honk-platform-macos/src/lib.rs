@@ -177,7 +177,7 @@ mod platform {
     const MAX_DISPLAYS: usize = 16;
     const DISPLAY_REFRESH_INTERVAL: Duration = Duration::from_millis(500);
     const APPKIT_EVENT_PUMP_INTERVAL: Duration = Duration::from_nanos(16_666_667);
-    const STATUS_ICON_RESOURCE: &str = "honk300-status-goose@2x";
+    const STATUS_ICON_RESOURCE: &str = "Goose-status";
     const STATUS_ICON_EXTENSION: &str = "png";
     const STATUS_ICON_SIZE: f64 = 18.0;
 
@@ -1963,7 +1963,7 @@ mod platform {
         #[test]
         fn shared_status_icon_decodes_as_an_appkit_template() {
             let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../Assets/UI/honk300-status-goose@2x.png");
+                .join("../../settings/assets/icon.png");
             let image = NSImage::initWithContentsOfFile(
                 NSImage::alloc(),
                 &NSString::from_str(&path.to_string_lossy()),

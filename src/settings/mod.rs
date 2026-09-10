@@ -479,6 +479,9 @@ mod tests {
                 continue;
             }
             for name in value.as_object().unwrap().keys() {
+                if !cfg!(target_os = "linux") && section == "platform" && name == "wayland" {
+                    continue;
+                }
                 keys.insert(format!("{section}.{name}"));
             }
         }
@@ -505,6 +508,28 @@ mod tests {
             BTreeMap::from([("speeds.walk_speed".into(), json!(-1))])
         )
         .is_err());
+    }
+
+    #[test]
+    fn wayland_visibility_is_platform_specific_and_other_edits_preserve_its_value() {
+        let mut config = Config::default();
+        config.platform.wayland = true;
+        let fields = serde_json::to_value(schema::fields(&config)).unwrap();
+        assert_eq!(
+            fields
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|field| field["key"] == "platform.wayland"),
+            cfg!(target_os = "linux")
+        );
+        let edited = apply_patch(
+            &config,
+            BTreeMap::from([("audio.enabled".into(), json!(false))]),
+        )
+        .unwrap();
+        assert!(edited.platform.wayland);
+        assert!(!edited.audio.enabled);
     }
 
     #[test]

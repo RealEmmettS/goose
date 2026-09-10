@@ -1245,6 +1245,7 @@ dependencies = [
  "libc",
  "rustix",
  "socket2",
+ "tiny-skia",
  "windows 0.58.0",
 ]
 
@@ -1307,7 +1308,7 @@ dependencies = [
 
 [[package]]
 name = "honk300"
-version = "1.11.0"
+version = "1.11.1"
 dependencies = [
  "base64",
  "clap",
