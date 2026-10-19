@@ -46,6 +46,8 @@
         <Property Id='ApplicationFolderName' Value='honk300'/>
         <Property Id='HONK300ORIGIN' Value='msi-global' Secure='yes'/>
         <Property Id='HONK300AUTOSTART' Value='false' Secure='yes'/>
+        <Property Id='HONK300STARTUPPREPARED' Secure='yes'/>
+        <Property Id='Honk300StartupScope' Value='machine'/>
         <!-- Bind the contextual standard path to this package's machine-owned menu component. -->
         <SetDirectory Id='MachineProgramMenuFolder' Value='[ProgramMenuFolder]' />
 
@@ -181,9 +183,15 @@
         </Feature>
 
         <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
-        <SetProperty Id='HONK300AUTOSTART' Value='true' After='CostFinalize'>&amp;Autostart=3</SetProperty>
+        <CustomAction Id='CaptureStartupOff' Property='HONK300AUTOSTART' Value='false'/>
+        <CustomAction Id='CaptureStartupOn' Property='HONK300AUTOSTART' Value='true'/>
         <Property Id='ARPHELPLINK' Value='https://github.com/RealEmmettS/goose'/>
 
+        <Binary Id='Honk300StartupAction' SourceFile='$(var.CargoTargetBinDir)\honk300-startup-action.dll'/>
+        <CustomAction Id='PrepareGooseStartup' BinaryKey='Honk300StartupAction' DllEntry='PrepareGooseStartup' Execute='immediate' Return='check'/>
+        <InstallUISequence>
+            <Custom Action='PrepareGooseStartup' After='MigrateFeatureStates'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+        </InstallUISequence>
         <Binary Id='Honk300SlotHelper' SourceFile='$(var.CargoTargetBinDir)\honk300.exe'/>
         <CustomAction
             Id='RollbackWindowsSlot'
@@ -209,6 +217,9 @@
             Return='check'/>
         <CustomAction Id='UninstallWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='__windows-slot-uninstall --root &quot;[APPLICATIONFOLDER]\&quot; --origin &quot;msi-global&quot;' Execute='deferred' Impersonate='no' Return='check'/>
         <InstallExecuteSequence>
+            <Custom Action='PrepareGooseStartup' After='MigrateFeatureStates'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+            <Custom Action='CaptureStartupOff' After='InstallValidate'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+            <Custom Action='CaptureStartupOn' After='CaptureStartupOff'>NOT REMOVE~=&quot;ALL&quot; AND &amp;Autostart=3</Custom>
             <Custom Action='RollbackWindowsSlot' After='RemoveExistingProducts'>NOT REMOVE~=&quot;ALL&quot;</Custom>
             <Custom Action='ActivateWindowsSlot' After='RollbackWindowsSlot'>NOT REMOVE~=&quot;ALL&quot;</Custom>
             <Custom Action='CommitWindowsSlot' After='ActivateWindowsSlot'>NOT REMOVE~=&quot;ALL&quot;</Custom>

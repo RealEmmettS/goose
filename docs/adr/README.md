@@ -67,3 +67,4 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0054 — Settings Navigation And Shared Application Artwork](./0054-settings-navigation-and-shared-artwork.md)
 - [0055 — Opt-in Seasons And Intentional Petting](./0055-opt-in-seasons-and-intentional-petting.md)
 - [0056 — Windows Bitmap Reuse And Performance Qualification](./0056-windows-bitmap-reuse-and-performance-qualification.md)
+- [0057 — Current Login Startup Installer Selection](./0057-current-login-startup-installer-selection.md)

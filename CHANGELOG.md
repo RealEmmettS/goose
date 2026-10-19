@@ -7,6 +7,9 @@ features and installation, and [readiness records](docs/readiness/) for release 
 
 ## [Unreleased]
 
+### Fixed
+- Initialize Windows MSI and EXE login startup from the current owned Run entry instead of stale installer feature/task history, preserving default-off installation, app opt-out, explicit installer choices and unrelated options. Capture the final MSI choice after feature validation so the receipt agrees with installation.
+
 ### Behind the scenes
 - Add native Windows installer regression coverage for default-off startup and opt-out preservation across an upgrade; preserve the observed v1.11.1 failure and exact restored configuration.
 - Record the complete v1.11.1 publication, all eight fresh-public lanes, independent 47-asset audit and exact website deployment. Preserve the canceled Windows administrator-prompt attempt and verified unchanged v1.11.0 state; leave installed-public acceptance, extended performance qualification and the original black-rectangle investigation open.

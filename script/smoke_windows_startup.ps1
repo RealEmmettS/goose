@@ -1,10 +1,12 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)] [string] $PreviousMsi,
-    [Parameter(Mandatory)] [string] $CandidateMsi,
+    [Parameter(Mandatory)] [Alias('PreviousMsi')] [string] $PreviousInstaller,
+    [Parameter(Mandatory)] [Alias('CandidateMsi')] [string] $CandidateInstaller,
+    [ValidateSet('msi', 'exe')] [string] $Family = 'msi',
     [Parameter(Mandatory)] [ValidateSet('global', 'corporate')] [string] $Edition,
     [Parameter(Mandatory)] [string] $ExpectedVersion,
     [string] $EvidenceDirectory = 'target/windows-startup-evidence',
+    [switch] $ExerciseWizard,
     [switch] $AllowMachineMutation
 )
 
@@ -13,8 +15,8 @@ Set-StrictMode -Version Latest
 if (-not $AllowMachineMutation -or $env:CI -ne 'true') {
     throw 'Startup installer qualification is restricted to an explicitly authorized disposable CI runner.'
 }
-$previous = (Resolve-Path -LiteralPath $PreviousMsi).Path
-$candidate = (Resolve-Path -LiteralPath $CandidateMsi).Path
+$previous = (Resolve-Path -LiteralPath $PreviousInstaller).Path
+$candidate = (Resolve-Path -LiteralPath $CandidateInstaller).Path
 $evidence = [IO.Path]::GetFullPath((Join-Path (Get-Location) $EvidenceDirectory))
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 $root = if ($Edition -eq 'global') { Join-Path $env:ProgramFiles 'honk300' } else { Join-Path $env:LOCALAPPDATA 'Programs/honk300' }
@@ -25,8 +27,10 @@ $hive = if ($Edition -eq 'global') { [Microsoft.Win32.RegistryHive]::LocalMachin
 $msiexec = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) 'msiexec.exe'
 $records = [Collections.Generic.List[object]]::new()
 $failure = $null
+$activePackage = $null
+$installer = New-Object -ComObject WindowsInstaller.Installer
 
-function Invoke-Msi([string] $Package, [string] $Label, [string[]] $Extra = @(), [switch] $Uninstall) {
+function Invoke-Msi([string] $Package, [string] $Label, [string[]] $Extra = @(), [switch] $Uninstall, [switch] $ExpectFailure) {
     $operation = if ($Uninstall) { '/x' } else { '/i' }
     $log = Join-Path $evidence "$Label.msi.log"
     # /passive matches the already-published updater. Its command line supplies no feature list.
@@ -38,8 +42,50 @@ function Invoke-Msi([string] $Package, [string] $Label, [string[]] $Extra = @(),
             & taskkill.exe /PID $process.Id /T /F | Out-Null
             throw "$Label exceeded 180 seconds; see $log"
         }
-        if ($process.ExitCode -ne 0) { throw "$Label failed with MSI exit $($process.ExitCode); see $log" }
+        if ($ExpectFailure) {
+            if ($process.ExitCode -ne 1603) { throw "$Label expected MSI failure 1603, got $($process.ExitCode); see $log" }
+        } elseif ($process.ExitCode -ne 0) { throw "$Label failed with MSI exit $($process.ExitCode); see $log" }
     } finally { $process.Dispose() }
+    if (-not $ExpectFailure) { $script:activePackage = if ($Uninstall) { $null } else { $Package } }
+}
+
+function Invoke-Installer([string] $Package, [string] $Label, [string[]] $Extra = @(), [switch] $Uninstall, [switch] $ExpectFailure) {
+    if ($Family -eq 'msi') {
+        Invoke-Msi $Package $Label $Extra -Uninstall:$Uninstall -ExpectFailure:$ExpectFailure
+        return
+    }
+    $file = $Package
+    if ($Uninstall) {
+        $uninstallers = @(Get-ChildItem -LiteralPath $root -Filter 'unins*.exe' -File)
+        if ($uninstallers.Count -ne 1) { throw 'Expected one owned EXE uninstaller.' }
+        $file = $uninstallers[0].FullName
+    }
+    $log = Join-Path $evidence "$Label.inno.log"
+    $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$log`"") + $Extra
+    Write-Host "Startup qualification: $Label"
+    $process = Start-Process -FilePath $file -ArgumentList $arguments -WindowStyle Hidden -PassThru
+    try {
+        if (-not $process.WaitForExit(180000)) {
+            & taskkill.exe /PID $process.Id /T /F | Out-Null
+            throw "$Label exceeded 180 seconds; see $log"
+        }
+        if ($ExpectFailure) {
+            if ($process.ExitCode -eq 0) { throw "$Label unexpectedly succeeded; see $log" }
+        } elseif ($process.ExitCode -ne 0) { throw "$Label failed with EXE exit $($process.ExitCode); see $log" }
+    } finally { $process.Dispose() }
+}
+
+function Feature-State([string] $Feature) {
+    if ($Family -ne 'msi' -or $null -eq $activePackage) { return $null }
+    $database = $installer.OpenDatabase($activePackage, 0)
+    $view = $database.OpenView('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductCode''')
+    try {
+        $view.Execute()
+        $record = $view.Fetch()
+        if ($null -eq $record) { throw 'MSI product identity is missing.' }
+        $productCode = $record.StringData(1)
+        return $installer.FeatureState($productCode, $Feature)
+    } finally { $view.Close() }
 }
 
 function Invoke-Settings([object] $Command) {
@@ -87,6 +133,8 @@ function Read-State([string] $Label) {
         version = $receipt.version
         receipt_autostart = $receipt.autostart.enabled
         run = $run
+        startup_feature = Feature-State 'Autostart'
+        path_feature = Feature-State 'Environment'
         config_sha256 = if (Test-Path -LiteralPath $configPath) { (Get-FileHash -LiteralPath $configPath).Hash } else { $null }
         at = [DateTime]::UtcNow.ToString('o')
     }
@@ -102,19 +150,90 @@ function Assert-Startup([object] $State, [bool] $Enabled) {
     }
 }
 
+function Set-RunFixture([object] $Value, [Microsoft.Win32.RegistryValueKind] $Kind = 'String') {
+    # Test fixtures only: this script is restricted to an authorized disposable runner.
+    $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive, [Microsoft.Win32.RegistryView]::Registry64)
+    try {
+        $key = $base.CreateSubKey('Software\Microsoft\Windows\CurrentVersion\Run')
+        try {
+            if ($null -eq $Value) { $key.DeleteValue('Honk300', $false) }
+            else { $key.SetValue('Honk300', $Value, $Kind) }
+        } finally { $key.Dispose() }
+    } finally { $base.Dispose() }
+}
+
+function Assert-RefusesForeignStartup([string[]] $ExplicitArguments) {
+    $before = Read-State 'before-foreign-fixtures'
+    $receiptHash = (Get-FileHash -LiteralPath $receiptPath).Hash
+    foreach ($fixture in @(
+        @{name='foreign-command';value='"C:\Unrelated\application.exe"';kind='String';message='belongs to another command'},
+        @{name='unsupported-type';value=123;kind='DWord';message='unsupported type or encoding'}
+    )) {
+        try {
+            Set-RunFixture $fixture.value $fixture.kind
+            Invoke-Installer $candidate $fixture.name $ExplicitArguments -ExpectFailure
+            $after = Read-State $fixture.name
+            if ($after.run -ne $fixture.value -or (Get-FileHash -LiteralPath $receiptPath).Hash -ne $receiptHash -or
+                $after.config_sha256 -ne $before.config_sha256) {
+                throw "$($fixture.name): refused installation changed startup, receipt or configuration."
+            }
+            $suffix = if ($Family -eq 'msi') { 'msi' } else { 'inno' }
+            $log = Get-Content -LiteralPath (Join-Path $evidence "$($fixture.name).$suffix.log") -Raw
+            if (-not $log.Contains($fixture.message)) { throw "$($fixture.name): refusal did not report its ownership failure." }
+        } finally { Set-RunFixture $before.run }
+    }
+}
+
+function New-RollbackProbe {
+    $path = Join-Path $evidence 'startup-forced-rollback.msi'
+    Copy-Item -LiteralPath $candidate -Destination $path
+    $database = $installer.OpenDatabase($path, 1)
+    try {
+        # Deferred EXE failure occurs after Run-value writes have actually executed.
+        # This modifies a private test copy, never the candidate or public MSI.
+        $actionType = if ($Edition -eq 'global') { 3106 } else { 1058 }
+        foreach ($sql in @(
+            ('INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) VALUES (''GooseStartupRollbackProbe'', ' + $actionType + ', ''SystemFolder'', ''"[SystemFolder]WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "[GOOSESTARTUPPROBESCRIPT]" -OutputPath "[GOOSESTARTUPPROBEOUTPUT]"'')'),
+            'INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) VALUES (''GooseStartupRollbackProbe'', ''NOT REMOVE~="ALL"'', 5100)'
+        )) {
+            $view = $database.OpenView($sql)
+            try { $view.Execute() } finally { $view.Close() }
+        }
+        $database.Commit()
+    } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database) }
+    $probeScript = @'
+param([string] $OutputPath)
+$ErrorActionPreference = 'Stop'
+$base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::__HIVE__, [Microsoft.Win32.RegistryView]::Registry64)
+try {
+    $key = $base.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Run')
+    try { $run = if ($null -eq $key) { $null } else { $key.GetValue('Honk300', $null) } }
+    finally { if ($null -ne $key) { $key.Dispose() } }
+} finally { $base.Dispose() }
+@{run=$run;at=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content -LiteralPath $OutputPath -Encoding utf8
+exit 1
+'@
+    $probeScript.Replace('__HIVE__', $hive.ToString()) | Set-Content -LiteralPath (Join-Path $evidence 'rollback-probe.ps1') -Encoding utf8
+    return $path
+}
+
 try {
     if (Test-Path -LiteralPath $receiptPath) { throw 'Disposable runner already has a Goose installation.' }
-    Invoke-Msi $previous 'fresh-default'
+    Invoke-Installer $candidate 'fresh-default'
     $fresh = Read-State 'fresh-default'
     Assert-Startup $fresh $false
-    Invoke-Msi $previous 'remove-fresh' -Uninstall
-    Invoke-Msi $previous 'explicit-enable' @('ADDLOCAL=Binaries,Environment,Autostart')
+    Invoke-Installer $candidate 'remove-fresh' -Uninstall
+    $enableArguments = if ($Family -eq 'msi') { @('ADDLOCAL=Binaries,Autostart', 'REMOVE=Environment') } else { @('/TASKS=autostart') }
+    Invoke-Installer $previous 'explicit-enable' $enableArguments
     Invoke-Settings @{op='read'} | Out-Null
     Assert-Startup (Read-State 'explicit-enable') $true
     Set-Startup $false
     $before = Read-State 'app-disabled'
     Assert-Startup $before $false
-    Invoke-Msi $candidate 'upgrade-after-app-disabled'
+    if ($Family -eq 'msi' -and ($before.startup_feature -ne 3 -or $before.path_feature -ne 2)) {
+        throw 'The stale startup/PATH feature fixture was not established.'
+    }
+    Invoke-Installer $candidate 'upgrade-after-app-disabled'
     $afterInstall = Read-State 'after-upgrade-before-read'
     # Capture the settings import too, even when the installer already left the Run value wrong.
     Invoke-Settings @{op='read'} | Out-Null
@@ -123,10 +242,105 @@ try {
     Assert-Startup $afterRead $false
     if ($afterRead.version -ne $ExpectedVersion) { throw 'Candidate version was not activated.' }
     if ($before.config_sha256 -ne $afterRead.config_sha256) { throw 'Upgrade/settings read changed the disabled saved preference.' }
+    if ($Family -eq 'msi' -and $afterRead.path_feature -ne $before.path_feature) { throw 'Startup correction changed the unrelated PATH selection.' }
+
+    # The reverse drift also matters: settings can opt in when MSI remembers absent.
+    Set-Startup $true
+    $enabled = Read-State 'app-enabled'
+    $repairArguments = if ($Family -eq 'msi') { @('REINSTALL=ALL', 'REINSTALLMODE=vomus') } else { @('/MERGETASKS=desktopicon') }
+    Invoke-Installer $candidate 'repair-preserves-enabled' $repairArguments
+    Invoke-Settings @{op='read'} | Out-Null
+    $enabledRepair = Read-State 'after-enabled-repair'
+    Assert-Startup $enabledRepair $true
+    if ($enabled.config_sha256 -ne $enabledRepair.config_sha256) { throw 'Repair changed the enabled saved preference.' }
+    Set-Startup $false
+    $disabled = Read-State 'disabled-before-repair'
+    Invoke-Installer $candidate 'repair-preserves-disabled' $repairArguments
+    Invoke-Settings @{op='read'} | Out-Null
+    $disabledRepair = Read-State 'after-disabled-repair'
+    Assert-Startup $disabledRepair $false
+    if ($disabled.config_sha256 -ne $disabledRepair.config_sha256) { throw 'Repair changed the disabled saved preference.' }
+
+    # Explicit installer intent still wins over the current preference.
+    Invoke-Installer $candidate 'candidate-explicit-enable' $enableArguments
+    Invoke-Settings @{op='read'} | Out-Null
+    Assert-Startup (Read-State 'candidate-explicit-enable') $true
+    $disableArguments = if ($Family -eq 'msi') { @('REMOVE=Autostart') } else { @('/TASKS=desktopicon') }
+    Invoke-Installer $candidate 'candidate-explicit-disable' $disableArguments
+    Invoke-Settings @{op='read'} | Out-Null
+    Assert-Startup (Read-State 'candidate-explicit-disable') $false
+    if ($Family -eq 'exe') {
+        Invoke-Installer $candidate 'candidate-starred-enable' @('/MERGETASKS=*autostart')
+        Invoke-Settings @{op='read'} | Out-Null
+        Assert-Startup (Read-State 'candidate-starred-enable') $true
+        Invoke-Installer $candidate 'candidate-merged-disable' @('/MERGETASKS=!autostart')
+        Invoke-Settings @{op='read'} | Out-Null
+        Assert-Startup (Read-State 'candidate-merged-disable') $false
+    }
+    Assert-RefusesForeignStartup $disableArguments
+
+    # Use another real two-generation upgrade for app opt-in, with an unrelated option.
+    Invoke-Installer $candidate 'remove-before-enabled-upgrade' -Uninstall
+    Invoke-Installer $previous 'previous-default-off'
+    Set-Startup $true
+    $beforeEnabledUpgrade = Read-State 'enabled-before-upgrade'
+    $unrelatedArguments = if ($Family -eq 'msi') { @('ADDLOCAL=Binaries,Environment') } else { @('/MERGETASKS=desktopicon') }
+    Invoke-Installer $candidate 'upgrade-preserves-enabled' $unrelatedArguments
+    Invoke-Settings @{op='read'} | Out-Null
+    $afterEnabledUpgrade = Read-State 'enabled-after-upgrade'
+    Assert-Startup $afterEnabledUpgrade $true
+    if ($beforeEnabledUpgrade.config_sha256 -ne $afterEnabledUpgrade.config_sha256) { throw 'Upgrade changed the enabled saved preference.' }
+    if ($Family -eq 'msi') {
+        $rollbackProbe = New-RollbackProbe
+        foreach ($enabledBefore in @($true, $false)) {
+            Set-Startup $enabledBefore
+            $label = if ($enabledBefore) { 'rollback-enabled' } else { 'rollback-disabled' }
+            $beforeRollback = Read-State "before-$label"
+            $receiptHash = (Get-FileHash -LiteralPath $receiptPath).Hash
+            $oppositeArguments = if ($enabledBefore) { $disableArguments } else { $enableArguments }
+            $probeOutput = Join-Path $evidence "$label-during-transaction.json"
+            $oppositeArguments += @('GOOSESTARTUPPROBESCRIPT="' + (Join-Path $evidence 'rollback-probe.ps1') + '"', 'GOOSESTARTUPPROBEOUTPUT="' + $probeOutput + '"')
+            Invoke-Installer $rollbackProbe $label $oppositeArguments -ExpectFailure
+            $log = Get-Content -LiteralPath (Join-Path $evidence "$label.msi.log") -Raw
+            if ($log -notmatch 'GooseStartupRollbackProbe.*returned actual error code 1') {
+                throw "$label did not execute the intended deferred failure."
+            }
+            $duringRollback = Get-Content -LiteralPath $probeOutput -Raw | ConvertFrom-Json
+            $oppositeRun = if ($enabledBefore) { $null } else { '"' + (Join-Path $root 'bin\honk300-app.exe') + '"' }
+            if ($duringRollback.run -ne $oppositeRun) { throw "$label never applied the opposite Run state before failing." }
+            $afterRollback = Read-State "after-$label"
+            Assert-Startup $afterRollback $enabledBefore
+            if ((Get-FileHash -LiteralPath $receiptPath).Hash -ne $receiptHash -or
+                $afterRollback.config_sha256 -ne $beforeRollback.config_sha256) {
+                throw "$label did not restore the receipt/configuration."
+            }
+        }
+    }
+    if ($ExerciseWizard) {
+        if ($Family -ne 'msi') { throw 'Full wizard qualification currently targets MSI.' }
+        Set-Startup $false
+        foreach ($choice in @('enable', 'disable')) {
+            & (Join-Path $PSScriptRoot 'exercise_windows_startup_wizard.ps1') -Package $candidate -Choice $choice `
+                -EvidenceDirectory (Join-Path $evidence "wizard-$choice") -AllowMachineMutation
+            Invoke-Settings @{op='read'} | Out-Null
+            Assert-Startup (Read-State "wizard-$choice") ($choice -eq 'enable')
+        }
+        Invoke-Installer $candidate 'before-wizard-repair-enable' $enableArguments
+        Invoke-Settings @{op='read'} | Out-Null
+        Set-Startup $false
+        $beforeWizardRepair = Read-State 'before-wizard-repair'
+        if ($beforeWizardRepair.startup_feature -ne 3) { throw 'Full-UI repair fixture did not retain a stale installed feature.' }
+        & (Join-Path $PSScriptRoot 'exercise_windows_startup_wizard.ps1') -Package $candidate -Choice repair `
+            -EvidenceDirectory (Join-Path $evidence 'wizard-repair') -AllowMachineMutation
+        Invoke-Settings @{op='read'} | Out-Null
+        $afterWizardRepair = Read-State 'after-wizard-repair'
+        Assert-Startup $afterWizardRepair $false
+        if ($beforeWizardRepair.config_sha256 -ne $afterWizardRepair.config_sha256) { throw 'Wizard repair changed the saved preference.' }
+    }
 } catch {
     $failure = $_.Exception.Message
 } finally {
-    [ordered]@{edition=$Edition;expected_version=$ExpectedVersion;failure=$failure;states=@($records.ToArray())} |
+    [ordered]@{family=$Family;edition=$Edition;expected_version=$ExpectedVersion;failure=$failure;states=@($records.ToArray())} |
         ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $evidence 'result.json') -Encoding utf8
 }
 if ($failure) { throw $failure }

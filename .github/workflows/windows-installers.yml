@@ -239,6 +239,7 @@ jobs:
           if (-not (Test-Path $candle)) { throw "candle.exe not found at $candle" }
           if (-not (Test-Path $light))  { throw "light.exe not found at $light" }
           $binDir = "target\${{ matrix.triple }}\release"
+          ./script/build_windows_startup_action.ps1 -TargetTriple '${{ matrix.triple }}' -OutputDirectory $binDir
           $sourceRoot = (Get-Location).Path
           $payloadSha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk300.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
           $launcherSha256 = (Get-FileHash -LiteralPath (Join-Path $binDir 'honk300-app.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -510,6 +511,65 @@ jobs:
           path: target/release-artifacts/*
           if-no-files-found: error
           retention-days: 7
+
+  qualify-startup-preferences:
+    name: ${{ matrix.triple }} ${{ matrix.family }} ${{ matrix.edition }} startup preferences
+    needs: build-windows-installers
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { triple: x86_64-pc-windows-msvc, runner: windows-2022, family: msi, edition: global }
+          - { triple: x86_64-pc-windows-msvc, runner: windows-2022, family: msi, edition: corporate }
+          - { triple: x86_64-pc-windows-msvc, runner: windows-2022, family: exe, edition: global }
+          - { triple: x86_64-pc-windows-msvc, runner: windows-2022, family: exe, edition: corporate }
+          - { triple: aarch64-pc-windows-msvc, runner: windows-11-arm, family: msi, edition: global }
+          - { triple: aarch64-pc-windows-msvc, runner: windows-11-arm, family: msi, edition: corporate }
+          - { triple: aarch64-pc-windows-msvc, runner: windows-11-arm, family: exe, edition: global }
+          - { triple: aarch64-pc-windows-msvc, runner: windows-11-arm, family: exe, edition: corporate }
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v6
+        with:
+          name: release-windows-${{ matrix.triple }}
+          path: target/startup-candidate
+      - name: Download the immutable predecessor and verify its hash
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $suffix = if ('${{ matrix.edition }}' -eq 'corporate') { '-corporate' } else { '' }
+          $extension = if ('${{ matrix.family }}' -eq 'msi') { '.msi' } else { '-setup.exe' }
+          $name = 'honk300-${{ matrix.triple }}' + $suffix + $extension
+          gh release download v1.11.1 --repo $env:GITHUB_REPOSITORY --pattern $name --pattern "$name.sha256" --dir target/startup-previous
+          if ($LASTEXITCODE -ne 0) { throw 'Predecessor download failed.' }
+          $expected = (Get-Content -LiteralPath "target/startup-previous/$name.sha256" -Raw).Split(' ')[0].Trim()
+          if ($expected -notmatch '^[0-9a-fA-F]{64}$' -or (Get-FileHash -LiteralPath "target/startup-previous/$name").Hash -ne $expected) {
+            throw 'Predecessor installer hash mismatch.'
+          }
+          "STARTUP_INSTALLER_NAME=$name" >> $env:GITHUB_ENV
+      - name: Qualify default-off, saved choices, upgrades and repairs
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          $wizard = '${{ matrix.triple }}' -eq 'x86_64-pc-windows-msvc' -and '${{ matrix.family }}' -eq 'msi'
+          ./script/smoke_windows_startup.ps1 `
+            -PreviousMsi "target/startup-previous/$env:STARTUP_INSTALLER_NAME" `
+            -CandidateMsi "target/startup-candidate/$env:STARTUP_INSTALLER_NAME" `
+            -Edition '${{ matrix.edition }}' -Family '${{ matrix.family }}' `
+            -ExpectedVersion ('${{ inputs.tag }}' -replace '^v', '') `
+            -ExerciseWizard:$wizard `
+            -AllowMachineMutation
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: qualification-startup-${{ matrix.triple }}-${{ matrix.family }}-${{ matrix.edition }}
+          path: target/windows-startup-evidence
+          if-no-files-found: error
 
   qualify-windows-arm64-native:
     name: aarch64-pc-windows-msvc native compositor qualification

@@ -3,6 +3,11 @@
 A plain-English account of what changed and why. The [technical changelog](CHANGELOG.md)
 has implementation details; [the README](README.md) describes current features and setup.
 
+## Remembering startup choices — October 2026
+
+### Fixed
+- Keep login startup off on a new installation and remember when you turn it off later, so an update does not quietly enable it again. You can still choose to start Goose when you sign in.
+
 ## Clearer controls — October 2026
 
 ### Behind the scenes

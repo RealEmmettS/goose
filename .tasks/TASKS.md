@@ -21,7 +21,7 @@
 ## Active
 - [ ] **Keep login startup off unless chosen** - correct stale installer startup selections and preserve the current owned preference (owner codex) #g15
   - [x] Capture the installed failure and restore the user's exact disabled preference.
-  - [ ] Reproduce stale installer selection with native disposable-runner checks.
+  - [x] Reproduce stale installer selection with native disposable-runner checks.
   - [ ] Correct Global and Corporate installer preference handling and record the decision.
   - [ ] Verify fresh default-off, intentional opt-in, later opt-out, upgrade and repair behavior.
   - [ ] Qualify and deliver the fix without changing existing release assets.

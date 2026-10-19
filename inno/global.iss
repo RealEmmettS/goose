@@ -80,6 +80,9 @@ Name: "{commondesktop}\Goose"; Filename: "{app}\bin\honk300-app.exe"; Parameters
 [Code]
 const
   EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
+  StartupHive = HKEY_LOCAL_MACHINE;
+
+#include "startup.iss"
 
 procedure EnvAddPath(Path: string);
 var

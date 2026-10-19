@@ -41,6 +41,8 @@
 
         <Media Id='1' Cabinet='media1.cab' EmbedCab='yes'/>
         <Property Id='HONK300AUTOSTART' Value='false' Secure='yes'/>
+        <Property Id='HONK300STARTUPPREPARED' Secure='yes'/>
+        <Property Id='Honk300StartupScope' Value='user'/>
 
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='LocalAppDataFolder'>
@@ -176,15 +178,24 @@
         </Feature>
 
         <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
-        <SetProperty Id='HONK300AUTOSTART' Value='true' After='CostFinalize'>&amp;Autostart=3</SetProperty>
+        <CustomAction Id='CaptureStartupOff' Property='HONK300AUTOSTART' Value='false'/>
+        <CustomAction Id='CaptureStartupOn' Property='HONK300AUTOSTART' Value='true'/>
         <Property Id='ARPHELPLINK' Value='https://github.com/RealEmmettS/goose'/>
 
+        <Binary Id='Honk300StartupAction' SourceFile='$(var.CargoTargetBinDir)\honk300-startup-action.dll'/>
+        <CustomAction Id='PrepareGooseStartup' BinaryKey='Honk300StartupAction' DllEntry='PrepareGooseStartup' Execute='immediate' Return='check'/>
+        <InstallUISequence>
+            <Custom Action='PrepareGooseStartup' After='MigrateFeatureStates'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+        </InstallUISequence>
         <Binary Id='Honk300SlotHelper' SourceFile='$(var.CargoTargetBinDir)\honk300.exe'/>
         <CustomAction Id='RollbackWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='__windows-slot-rollback --root &quot;[APPLICATIONFOLDER]\&quot;' Execute='rollback' Impersonate='yes' Return='ignore'/>
         <CustomAction Id='ActivateWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='__wsa -r &quot;[APPLICATIONFOLDER]\&quot; -o &quot;msi-corporate&quot; -c &quot;$(var.Commit)&quot; -a &quot;[OriginalDatabase]&quot; -l &quot;$(var.LauncherSha256)&quot; -s &quot;$(var.SettingsSha256)&quot; -b &quot;$(var.AccessibilitySha256)&quot; -u &quot;[HONK300AUTOSTART]&quot;' Execute='deferred' Impersonate='yes' Return='check' HideTarget='yes'/>
         <CustomAction Id='CommitWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='__windows-slot-commit --root &quot;[APPLICATIONFOLDER]\&quot;' Execute='commit' Impersonate='yes' Return='check'/>
         <CustomAction Id='UninstallWindowsSlot' BinaryKey='Honk300SlotHelper' ExeCommand='__windows-slot-uninstall --root &quot;[APPLICATIONFOLDER]\&quot; --origin &quot;msi-corporate&quot;' Execute='deferred' Impersonate='yes' Return='check'/>
         <InstallExecuteSequence>
+            <Custom Action='PrepareGooseStartup' After='MigrateFeatureStates'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+            <Custom Action='CaptureStartupOff' After='InstallValidate'>NOT REMOVE~=&quot;ALL&quot;</Custom>
+            <Custom Action='CaptureStartupOn' After='CaptureStartupOff'>NOT REMOVE~=&quot;ALL&quot; AND &amp;Autostart=3</Custom>
             <Custom Action='RollbackWindowsSlot' After='RemoveExistingProducts'>NOT REMOVE~=&quot;ALL&quot;</Custom>
             <Custom Action='ActivateWindowsSlot' After='RollbackWindowsSlot'>NOT REMOVE~=&quot;ALL&quot;</Custom>
             <Custom Action='CommitWindowsSlot' After='ActivateWindowsSlot'>NOT REMOVE~=&quot;ALL&quot;</Custom>

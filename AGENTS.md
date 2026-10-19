@@ -22,6 +22,12 @@ without waiting for repeated comparisons and packaged endurance; do not claim th
 Preserve exact viewport sizes while reusing bounded Windows bitmap capacity. Task #g14
 retains the separate, unresolved transparency investigation.
 
+Task #g15 and ADR 0057 correct Windows installers restoring an obsolete login-startup
+selection after an app opt-out. The failure is reproduced in both published MSI editions.
+Fresh startup stays default-off; installer migration must use the current owned preference
+and preserve explicit choices. The installed v1.11.1 preference has been restored to off;
+v1.11.2 qualification is in progress, with existing release assets unchanged.
+
 The approved refinement is published through `.tasks/milestones/refine.md` and ADR 0041:
 the redesigned continuously projected goose, reliability cleanup, Native SDK settings
 with retained TUI, Linux owned props, experimental Pi guidance, and separately qualified
