@@ -29,14 +29,20 @@ and `honk` aliases remain.
 
 The settings-navigation update in development makes the selected tab persistent,
 keeps scrolling short and smooth, limits the Wayland switch to Linux, and uses the
-application artwork in native trays and menus. See [ADR 0054](docs/adr/0054-settings-navigation-and-shared-artwork.md).
+application artwork in native trays and menus. It also puts both seasonal switches on
+Appearance, defaults seasonal effects off, and requires about 2½ seconds of active
+rubbing before the first petting reaction. Existing saved seasonal choices are retained.
+See [ADR 0054](docs/adr/0054-settings-navigation-and-shared-artwork.md) and
+[ADR 0055](docs/adr/0055-opt-in-seasons-and-intentional-petting.md).
 
 Earlier releases, fixes and acceptance limits remain in the
 [readiness records](docs/readiness/). Public download verification and hosted native
 checks do not establish physical-device or administrator-prompt acceptance.
 
-Rubbing the goose for about 2½ seconds produces hearts and invites a gentle, 15-second
-follow at a comfortable distance. The **React to petting** preference controls this behavior;
+Rubbing the goose produces hearts and, after about 2½ seconds, invites a gentle, 15-second
+follow at a comfortable distance. The update in development also delays the first hearts
+and petting animation until that rubbing threshold; quick swipes and stationary hovering
+do not qualify. The **React to petting** preference controls this behavior;
 following never grabs the pointer. Autumn leaves have recognizable shapes, scatter more
 strongly when the goose runs through them, and fade away even without being touched.
 

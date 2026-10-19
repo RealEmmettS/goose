@@ -7,16 +7,22 @@ features and installation, and [readiness records](docs/readiness/) for release 
 
 ## [Unreleased]
 
-## [1.11.1] - 2026-09-09
+## [1.11.1] - 2026-10-19
 
 ### Improved
+- Reuse bounded Windows DIB capacity and copy checked monitor rows directly from the shared render canvas, preserving exact window dimensions and premultiplied alpha while removing the per-frame crop allocation.
 - Keep the current native settings tab visibly selected and bound wheel momentum to a short damped tail, with immediate reversal, clamped edges and direct steps under reduced motion.
+- Put Seasonal effects and Autumn leaves on Appearance. Default the seasonal master switch off for new or missing settings, preserve existing explicit choices, and clear active leaves immediately when either switch is disabled.
+- Require 2.5 seconds of active rubbing before the first petting animation, heart, pat sound, calming effect or invited follow. Reset unearned progress on pointer departure or a motion pause, and discard pre-threshold movement instead of bursting queued reactions.
 - Load the Windows tray icon from the exact application resource at native small-icon size. Use the Linux application's artwork with correct StatusNotifier channel/alpha conversion, and package the Mac application's source for its menu-bar template before signing with exact-byte verification.
 
 ### Fixed
+- Advance native settings wheel decay using measured frame timestamps, with bounded integration after delayed frames and a wheel-specific clock that unrelated pointer input cannot reset. Preserve nominal frame cadence for input-latency accounting.
+- Publish updated native accessibility bounds after wheel input stops at a boundary or uses reduced motion; retain post-presentation batching and unchanged-layout deduplication.
 - Expose the Wayland settings switch only on Linux builds, including defensive filtering of older service responses. Preserve its saved value when other preferences change on unsupported platforms.
 
 ### Behind the scenes
+- Add opt-in bounded Windows frame profiling, isolated process/compositor sampling and deterministic leaf benchmarks. Record the operator's explicit deferral of repeated-performance and packaged-endurance qualification; keep the intermittent black-rectangle investigation open after its bounded unreproduced outcome.
 - Record the user's successful installed Windows logo and graphical-controls acceptance, and qualify the settings and icon follow-up through the complete release gates.
 - Record a complete Markdown export of the Windows installer EULA, verified against all four published MSI license controls and Windows native RTF decoding. Coordinate and verify the complete footer-only website page, identical downloadable Markdown and final website CI/deployment evidence.
 - Record the complete v1.11.0 source, candidate, main, publication and fresh-public qualification, exact public asset verification and current installed-acceptance state. Update stable release guidance while preserving the first Linux display failure and its successful unchanged-source rerun.

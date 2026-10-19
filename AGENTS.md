@@ -12,6 +12,15 @@ Task #g11 and ADR 0052 track the combined application, icon, leaf and affection 
 The user confirms that the installed v1.11.0 Windows application now displays its logo
 and opens the graphical controls. The installed command and active immutable slot agree.
 Task #g12 and ADR 0054 track the next settings-navigation and shared tray-artwork update.
+ADR 0055 adds default-off seasonal effects, Appearance leaf switches and intentional
+petting: 2.5 seconds of active rubbing before the first petting reaction. Preserve saved
+seasonal choices. A user-reported intermittent Windows black rectangle remains under
+investigation; a clean rerun is not a demonstrated renderer fix.
+ADR 0056 and task #g13 retain the original native performance budgets and unfinished
+extended qualification. On 2026-10-19 the operator explicitly authorized publication
+without waiting for repeated comparisons and packaged endurance; do not claim they passed.
+Preserve exact viewport sizes while reusing bounded Windows bitmap capacity. Task #g14
+retains the separate, unresolved transparency investigation.
 
 The approved refinement is published through `.tasks/milestones/refine.md` and ADR 0041:
 the redesigned continuously projected goose, reliability cleanup, Native SDK settings

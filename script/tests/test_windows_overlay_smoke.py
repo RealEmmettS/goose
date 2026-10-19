@@ -704,7 +704,8 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
         self.assertNotIn("$env:RUNNER_ENVIRONMENT -ne 'self-hosted'", smoke)
         self.assertIn('std::env::var("HONK300_WINDOWS_SMOKE_PRESENT")', windows_backend)
         self.assertIn("HONK300_LAYERED_BGRA_V1", windows_backend)
-        self.assertIn("file.write_all(bytes)", windows_backend)
+        self.assertIn("file.write_all(&bytes[start..start + width * 4])", windows_backend)
+        self.assertIn("let start = row * dib.width as usize * 4", windows_backend)
         self.assertIn("fs::rename(&temporary, path)", windows_backend)
         self.assertNotIn("pixmap.save_png", windows_backend)
         self.assertIn("$captureMode = 'paired-dwm'", smoke)
@@ -718,7 +719,7 @@ class WindowsOverlaySmokeContractTests(unittest.TestCase):
         overlay_window = windows_backend[windows_backend.index("impl OverlayWindow") :]
         overlay_present = overlay_window[: overlay_window.index("fn hide(&mut self)")]
         self.assertLess(
-            overlay_present.index("present_layered("),
+            overlay_present.index("present_layered_region("),
             overlay_present.index("maybe_write_presented_smoke_frame("),
         )
 

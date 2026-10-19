@@ -305,7 +305,7 @@ impl Default for ScheduleConfig {
             quiet_start: "22:00".into(),
             quiet_end: "08:00".into(),
             dnd_respect: true,
-            seasonal: true,
+            seasonal: false,
             autumn: true,
         }
     }
@@ -1414,6 +1414,35 @@ mod tests {
         assert_eq!(c.mouse.grab_distance, 60.0);
         assert_eq!(c.mud.duration_to_track_seconds, 10.0);
         assert!(!c.lifecycle.autostart_on_login);
+        assert!(!c.schedule.seasonal);
+    }
+
+    #[test]
+    fn seasonal_effects_default_off_and_preserve_an_existing_choice() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        for saved in [
+            "[schedule]\nautumn = true\n",
+            "[schedule]\nseasonal = true\n",
+        ] {
+            fs::write(&path, saved).unwrap();
+            let config = Config::load_existing(&path).unwrap();
+            let enabled = saved.contains("seasonal = true");
+            assert_eq!(config.schedule.seasonal, enabled);
+            assert_eq!(
+                config
+                    .effective_options(backend(), CliOverrides::default())
+                    .world
+                    .schedule
+                    .seasonal,
+                enabled
+            );
+            config.save_atomic(&path).unwrap();
+            assert_eq!(
+                Config::load_existing(&path).unwrap().schedule.seasonal,
+                enabled
+            );
+        }
     }
 
     #[test]
@@ -1559,6 +1588,7 @@ mod tests {
         assert_eq!(effective.world.schedule.quiet_end.minutes(), 8 * 60);
         assert!(effective.world.schedule.dnd_respect);
         assert!(effective.world.schedule.pause_on_fullscreen);
+        assert!(!effective.world.schedule.seasonal);
         assert!(effective.world.schedule.autumn);
         assert!(!effective
             .world

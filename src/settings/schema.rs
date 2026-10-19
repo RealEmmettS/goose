@@ -54,6 +54,18 @@ pub(super) const FIELDS: &[FieldSpec] = &[
     },
     FieldSpec {
         page: "Appearance",
+        key: "schedule.seasonal",
+        label: "Seasonal effects",
+        help: "Off by default. Enable optional decorations for the season.",
+    },
+    FieldSpec {
+        page: "Appearance",
+        key: "schedule.autumn",
+        label: "Autumn leaves",
+        help: "Requires seasonal effects. Turning this off clears existing leaves.",
+    },
+    FieldSpec {
+        page: "Appearance",
         key: "behavior.use_custom_colors",
         label: "Custom colors",
         help: "Saved colors are retained while this is off.",
@@ -158,7 +170,7 @@ pub(super) const FIELDS: &[FieldSpec] = &[
         page: "Behavior",
         key: "interaction.pat_streak",
         label: "React to petting",
-        help: "",
+        help: "Rub the goose for about 2½ seconds to earn hearts and a gentle follow.",
     },
     FieldSpec {
         page: "Behavior",
@@ -309,18 +321,6 @@ pub(super) const FIELDS: &[FieldSpec] = &[
         key: "safety.pause_on_fullscreen",
         label: "Pause for fullscreen apps",
         help: "Depends on desktop session support; see Platform & status.",
-    },
-    FieldSpec {
-        page: "Sound & manners",
-        key: "schedule.seasonal",
-        label: "Seasonal effects",
-        help: "",
-    },
-    FieldSpec {
-        page: "Sound & manners",
-        key: "schedule.autumn",
-        label: "Autumn leaves",
-        help: "",
     },
     #[cfg(target_os = "linux")]
     FieldSpec {

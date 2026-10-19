@@ -14,6 +14,7 @@
 
 #![cfg(windows)]
 
+mod surface;
 mod tray;
 
 pub use tray::StatusTray;
@@ -33,6 +34,7 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
+use std::time::Instant;
 use tiny_skia::Pixmap;
 use windows::core::{w, Error, Result, PCWSTR};
 use windows::Win32::Foundation::{
@@ -873,26 +875,83 @@ fn present_layered(
     dest_x: i32,
     dest_y: i32,
 ) -> Result<()> {
-    let width = pixmap.width() as i32;
-    let height = pixmap.height() as i32;
-    if width == 0 || height == 0 {
-        return Ok(());
-    }
+    present_layered_region(
+        hwnd,
+        dib,
+        pixmap,
+        surface::Region::whole(pixmap.width(), pixmap.height()),
+        dest_x,
+        dest_y,
+        None,
+    )
+}
+
+/// Opt-in developer measurement of the actual presenter, never enabled by ordinary startup.
+#[derive(Default, Debug, Clone, Copy)]
+pub struct PresentationProfile {
+    pub allocation_us: f64,
+    pub copy_us: f64,
+    pub update_us: f64,
+    pub bitmap_allocations: u64,
+    pub pixels: u64,
+}
+
+fn present_layered_region(
+    hwnd: HWND,
+    dib: &mut Option<Dib>,
+    pixmap: &Pixmap,
+    region: surface::Region,
+    dest_x: i32,
+    dest_y: i32,
+    mut profile: Option<&mut PresentationProfile>,
+) -> Result<()> {
+    region
+        .validate(pixmap.width(), pixmap.height())
+        .map_err(error_from_message)?;
+    let next = surface::capacity(
+        dib.as_ref().map(|d| (d.width as u32, d.height as u32)),
+        region.width,
+        region.height,
+    )
+    .map_err(error_from_message)?;
 
     unsafe {
+        let mut stage_start = profile.as_ref().map(|_| Instant::now());
         if dib
             .as_ref()
-            .map(|d| d.width != width || d.height != height)
+            .map(|d| d.width as u32 != next.0 || d.height as u32 != next.1)
             .unwrap_or(true)
         {
-            *dib = Some(Dib::new(width, height)?);
+            *dib = Some(Dib::new(next.0 as i32, next.1 as i32)?);
+            if let Some(metrics) = profile.as_mut() {
+                metrics.bitmap_allocations += 1;
+            }
         }
         let dib = dib.as_ref().expect("dib just set");
+        if let Some(metrics) = profile.as_mut() {
+            metrics.allocation_us +=
+                stage_start.expect("profile clock").elapsed().as_secs_f64() * 1e6;
+            stage_start = Some(Instant::now());
+        }
 
-        let src = pixmap.data();
-        let count = (width * height) as usize;
-        let dst = std::slice::from_raw_parts_mut(dib.bits, count * 4);
-        copy_premultiplied_rgba_to_bgra(src, dst);
+        let length =
+            surface::byte_len(dib.width as u32, dib.height as u32).map_err(error_from_message)?;
+        let dst = std::slice::from_raw_parts_mut(dib.bits, length);
+        surface::copy_region(
+            pixmap.data(),
+            pixmap.width(),
+            pixmap.height(),
+            region,
+            dst,
+            dib.width as u32,
+            dib.height as u32,
+        )
+        .map_err(error_from_message)?;
+        if let Some(metrics) = profile.as_mut() {
+            metrics.copy_us += stage_start.expect("profile clock").elapsed().as_secs_f64() * 1e6;
+            stage_start = Some(Instant::now());
+            metrics.pixels += u64::from(region.width) * u64::from(region.height);
+        }
 
         let screen = GetDC(None);
         let dest = POINT {
@@ -900,8 +959,8 @@ fn present_layered(
             y: dest_y,
         };
         let size = SIZE {
-            cx: width,
-            cy: height,
+            cx: region.width as i32,
+            cy: region.height as i32,
         };
         let src_pt = POINT { x: 0, y: 0 };
         let blend = BLENDFUNCTION {
@@ -922,15 +981,19 @@ fn present_layered(
             ULW_ALPHA,
         );
         ReleaseDC(None, screen);
+        if let Err(error) = &result {
+            if let Ok(path) = std::env::var("HONK300_WINDOWS_SMOKE_PRESENT") {
+                if !path.trim().is_empty() {
+                    let _ = fs::write(Path::new(path.trim()).with_extension("error.txt"), format!(
+                        "hwnd=0x{:X}\nx={dest_x}\ny={dest_y}\nwidth={}\nheight={}\ncapacity_width={}\ncapacity_height={}\nerror={error}\n",
+                        hwnd_key(hwnd), region.width, region.height, dib.width, dib.height));
+                }
+            }
+        }
+        if let Some(metrics) = profile {
+            metrics.update_us += stage_start.expect("profile clock").elapsed().as_secs_f64() * 1e6;
+        }
         result
-    }
-}
-
-fn copy_premultiplied_rgba_to_bgra(src: &[u8], dst: &mut [u8]) {
-    assert_eq!(src.len(), dst.len());
-    assert_eq!(src.len() % 4, 0);
-    for (rgba, bgra) in src.chunks_exact(4).zip(dst.chunks_exact_mut(4)) {
-        bgra.copy_from_slice(&[rgba[2], rgba[1], rgba[0], rgba[3]]);
     }
 }
 
@@ -954,9 +1017,16 @@ struct Dib {
 impl Dib {
     /// Create a `width`×`height` premultiplied-BGRA DIB selected into a memory DC.
     unsafe fn new(width: i32, height: i32) -> Result<Dib> {
+        if width <= 0 || height <= 0 {
+            return Err(error_from_message("invalid layered bitmap dimensions"));
+        }
+        let length = surface::byte_len(width as u32, height as u32).map_err(error_from_message)?;
         let screen = GetDC(None);
         let hdc = CreateCompatibleDC(screen);
         ReleaseDC(None, screen);
+        if hdc.0.is_null() {
+            return Err(Error::from_win32());
+        }
 
         let bmi = BITMAPINFO {
             bmiHeader: BITMAPINFOHEADER {
@@ -972,8 +1042,26 @@ impl Dib {
         };
 
         let mut bits: *mut c_void = std::ptr::null_mut();
-        let bitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &mut bits, None, 0)?;
+        let bitmap = match CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &mut bits, None, 0) {
+            Ok(bitmap) => bitmap,
+            Err(error) => {
+                let _ = DeleteDC(hdc);
+                return Err(error);
+            }
+        };
+        if bits.is_null() {
+            let _ = DeleteObject(HGDIOBJ(bitmap.0));
+            let _ = DeleteDC(hdc);
+            return Err(error_from_message("layered bitmap has no pixel storage"));
+        }
         let old = SelectObject(hdc, HGDIOBJ(bitmap.0));
+        if old.0.is_null() || old.0 as isize == -1 {
+            let error = Error::from_win32();
+            let _ = DeleteObject(HGDIOBJ(bitmap.0));
+            let _ = DeleteDC(hdc);
+            return Err(error);
+        }
+        std::slice::from_raw_parts_mut(bits as *mut u8, length).fill(0);
 
         Ok(Dib {
             hdc,
@@ -1050,7 +1138,12 @@ impl OverlayWindow {
         })
     }
 
-    fn present(&mut self, dirty: Rect, pixmap: &Pixmap) -> Result<()> {
+    fn present(
+        &mut self,
+        dirty: Rect,
+        pixmap: &Pixmap,
+        profile: Option<&mut PresentationProfile>,
+    ) -> Result<()> {
         let Some(intersection) = dirty.intersection(self.bounds).map(Rect::pixel_aligned) else {
             self.hide();
             return Ok(());
@@ -1059,14 +1152,19 @@ impl OverlayWindow {
         let src_y = (intersection.min.y - dirty.min.y).round().max(0.0) as u32;
         let width = intersection.width().round().max(1.0) as u32;
         let height = intersection.height().round().max(1.0) as u32;
-        let cropped = crop_pixmap(pixmap, src_x, src_y, width, height)
-            .ok_or_else(|| error_from_message("could not allocate monitor crop"))?;
-        present_layered(
+        present_layered_region(
             self.hwnd,
             &mut self.dib,
-            &cropped,
+            pixmap,
+            surface::Region {
+                x: src_x,
+                y: src_y,
+                width,
+                height,
+            },
             intersection.min.x as i32,
             intersection.min.y as i32,
+            profile,
         )?;
         if let Some(dib) = self.dib.as_ref() {
             maybe_write_presented_smoke_frame(
@@ -1074,6 +1172,8 @@ impl OverlayWindow {
                 dib,
                 intersection.min.x as i32,
                 intersection.min.y as i32,
+                width,
+                height,
             );
         }
         if !self.visible {
@@ -1274,21 +1374,44 @@ impl Overlay {
             return Ok(());
         }
         for window in &mut self.windows {
-            window.present(dirty, pixmap)?;
+            window.present(dirty, pixmap, None)?;
         }
         Ok(())
+    }
+
+    /// Identical production path, with explicit per-stage clocks for an isolated profile run.
+    pub fn present_profiled(
+        &mut self,
+        dirty: Rect,
+        pixmap: &Pixmap,
+    ) -> Result<PresentationProfile> {
+        let dirty = dirty.pixel_aligned();
+        let mut profile = PresentationProfile::default();
+        if dirty.width() > 0.0 && dirty.height() > 0.0 {
+            for window in &mut self.windows {
+                window.present(dirty, pixmap, Some(&mut profile))?;
+            }
+        }
+        Ok(profile)
     }
 }
 
 /// Preserve the exact premultiplied-BGRA DIB accepted by `UpdateLayeredWindow` when a native
 /// smoke requests it.
 ///
-/// This is called only after the real per-monitor crop, RGBA-to-BGRA bridge, and successful native
+/// This is called only after the real per-monitor row copy, RGBA-to-BGRA bridge, and successful native
 /// present. The path is intentionally write-once: the harness removes the completed record only
 /// after its pose delay, and the next successful present writes through a sibling temporary before
 /// renaming. The custom record retains the raw DIB bytes plus the exact HWND/rectangle instead of
 /// passing through PNG's straight-alpha conversion.
-fn maybe_write_presented_smoke_frame(hwnd: HWND, dib: &Dib, dest_x: i32, dest_y: i32) {
+fn maybe_write_presented_smoke_frame(
+    hwnd: HWND,
+    dib: &Dib,
+    dest_x: i32,
+    dest_y: i32,
+    width: u32,
+    height: u32,
+) {
     let Ok(path) = std::env::var("HONK300_WINDOWS_SMOKE_PRESENT") else {
         return;
     };
@@ -1298,7 +1421,14 @@ fn maybe_write_presented_smoke_frame(hwnd: HWND, dib: &Dib, dest_x: i32, dest_y:
     }
     let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
     let _ = fs::remove_file(&temporary);
-    if write_presented_smoke_frame(&temporary, hwnd, dib, dest_x, dest_y)
+    if write_presented_smoke_frame(&temporary, hwnd, dib, dest_x, dest_y, width, height)
+        .and_then(|()| {
+            // Publish the bounded companion before the completed pixel record appears.
+            // Keep the strict pixel format compatible with earlier analyzers.
+            fs::write(path.with_extension("metadata.txt"), format!(
+                "hwnd=0x{:X}\nbitmap=0x{:X}\ncapacity_width={}\ncapacity_height={}\nvisible_width={width}\nvisible_height={height}\nx={dest_x}\ny={dest_y}\nresult=UpdateLayeredWindow-success\n",
+                hwnd_key(hwnd), dib.bitmap.0 as usize, dib.width, dib.height))
+        })
         .and_then(|()| fs::rename(&temporary, path))
         .is_err()
     {
@@ -1312,46 +1442,42 @@ fn write_presented_smoke_frame(
     dib: &Dib,
     dest_x: i32,
     dest_y: i32,
+    active_width: u32,
+    active_height: u32,
 ) -> std::io::Result<()> {
-    let width = usize::try_from(dib.width).map_err(std::io::Error::other)?;
-    let height = usize::try_from(dib.height).map_err(std::io::Error::other)?;
+    let width = active_width as usize;
+    let height = active_height as usize;
+    if active_width > dib.width as u32 || active_height > dib.height as u32 {
+        return Err(std::io::Error::other(
+            "presented viewport exceeds bitmap capacity",
+        ));
+    }
     let byte_count = width
         .checked_mul(height)
         .and_then(|pixels| pixels.checked_mul(4))
         .ok_or_else(|| std::io::Error::other("presented surface is too large"))?;
-    // SAFETY: `Dib::new` allocates exactly width * height * four bytes and keeps that allocation
+    // SAFETY: `Dib::new` allocates capacity width * capacity height * four bytes and keeps that allocation
     // alive until `dib` is dropped. This read occurs synchronously while the immutable borrow is
     // live, after UpdateLayeredWindow has accepted the same selected DIB.
-    let bytes = unsafe { std::slice::from_raw_parts(dib.bits, byte_count) };
+    let capacity_bytes =
+        surface::byte_len(dib.width as u32, dib.height as u32).map_err(std::io::Error::other)?;
+    let bytes = unsafe { std::slice::from_raw_parts(dib.bits, capacity_bytes) };
     let header = format!(
         "HONK300_LAYERED_BGRA_V1\nhwnd=0x{:X}\nx={dest_x}\ny={dest_y}\nwidth={}\nheight={}\nstride={}\nbytes={byte_count}\n\n",
         hwnd_key(hwnd),
-        dib.width,
-        dib.height,
+        active_width,
+        active_height,
         width * 4,
     );
     let mut file = fs::File::create(path)?;
     file.write_all(header.as_bytes())?;
-    file.write_all(bytes)?;
+    // The existing capture format describes exactly the logical viewport accepted by Windows,
+    // not unused retained capacity. Pack its rows without including the DIB's padded stride.
+    for row in 0..height {
+        let start = row * dib.width as usize * 4;
+        file.write_all(&bytes[start..start + width * 4])?;
+    }
     file.sync_all()
-}
-
-fn crop_pixmap(pixmap: &Pixmap, src_x: u32, src_y: u32, width: u32, height: u32) -> Option<Pixmap> {
-    if src_x.checked_add(width)? > pixmap.width() || src_y.checked_add(height)? > pixmap.height() {
-        return None;
-    }
-    let mut cropped = Pixmap::new(width, height)?;
-    let src_stride = pixmap.width() as usize * 4;
-    let dst_stride = width as usize * 4;
-    let src = pixmap.data();
-    let dst = cropped.data_mut();
-    for row in 0..height as usize {
-        let src_start = (src_y as usize + row) * src_stride + src_x as usize * 4;
-        let dst_start = row * dst_stride;
-        dst[dst_start..dst_start + dst_stride]
-            .copy_from_slice(&src[src_start..src_start + dst_stride]);
-    }
-    Some(cropped)
 }
 
 fn enumerate_monitor_bounds() -> Vec<MonitorBounds> {
@@ -1571,9 +1697,108 @@ mod tests {
         let rgba = [17_u8, 83, 149, 211, 7, 61, 203, 0];
         let mut bgra = [0_u8; 8];
 
-        copy_premultiplied_rgba_to_bgra(&rgba, &mut bgra);
+        surface::copy_region(&rgba, 2, 1, surface::Region::whole(2, 1), &mut bgra, 2, 1).unwrap();
 
         assert_eq!(bgra, [149, 83, 17, 211, 203, 61, 7, 0]);
+    }
+
+    #[test]
+    fn actual_layered_bitmap_reuses_capacity_without_expanding_the_window() {
+        // Hidden HWND: exercises the real GDI allocation/copy/presentation path without
+        // obscuring the operator's desktop or introducing a calibration background.
+        let overlay = Overlay::new().unwrap();
+        let hwnd = overlay.windows[0].hwnd;
+        let mut dib = None;
+        let mut image = Pixmap::new(300, 200).unwrap();
+        image.fill(tiny_skia::Color::from_rgba8(80, 40, 20, 128));
+        let mut metrics = PresentationProfile::default();
+        present_layered_region(
+            hwnd,
+            &mut dib,
+            &image,
+            surface::Region {
+                x: 5,
+                y: 7,
+                width: 257,
+                height: 129,
+            },
+            -713,
+            -111,
+            Some(&mut metrics),
+        )
+        .unwrap();
+        let first = dib.as_ref().unwrap().bitmap;
+        assert_eq!(
+            (dib.as_ref().unwrap().width, dib.as_ref().unwrap().height),
+            (288, 160)
+        );
+        let rect = window_rect(hwnd).unwrap();
+        assert_eq!(
+            rect,
+            Rect::new(Vec2::new(-713.0, -111.0), Vec2::new(-456.0, 18.0))
+        );
+        let capture = std::env::temp_dir().join(format!(
+            "honk300-padded-present-{}-{}.bgra",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        write_presented_smoke_frame(&capture, hwnd, dib.as_ref().unwrap(), -713, -111, 257, 129)
+            .unwrap();
+        let captured = fs::read(&capture).unwrap();
+        fs::remove_file(&capture).unwrap();
+        let header_end = captured
+            .windows(2)
+            .position(|bytes| bytes == b"\n\n")
+            .unwrap()
+            + 2;
+        let header = std::str::from_utf8(&captured[..header_end]).unwrap();
+        assert!(header.contains("width=257\nheight=129\nstride=1028\nbytes=132612\n"));
+        let payload = &captured[header_end..];
+        assert_eq!(payload.len(), 257 * 129 * 4);
+        assert!(payload
+            .chunks_exact(4)
+            .all(|pixel| pixel == [10, 20, 40, 128]));
+        image.fill(tiny_skia::Color::TRANSPARENT);
+        present_layered_region(
+            hwnd,
+            &mut dib,
+            &image,
+            surface::Region::whole(250, 120),
+            -710,
+            -110,
+            Some(&mut metrics),
+        )
+        .unwrap();
+        assert_eq!(dib.as_ref().unwrap().bitmap, first);
+        present_layered_region(
+            hwnd,
+            &mut dib,
+            &image,
+            surface::Region::whole(280, 150),
+            -700,
+            -100,
+            Some(&mut metrics),
+        )
+        .unwrap();
+        assert_eq!(dib.as_ref().unwrap().bitmap, first);
+        assert_eq!(metrics.bitmap_allocations, 1);
+        let bitmap = dib.as_ref().unwrap();
+        let bytes = unsafe {
+            std::slice::from_raw_parts(bitmap.bits, (bitmap.width * bitmap.height * 4) as usize)
+        };
+        for row in 0..150 {
+            assert!(bytes[row * 288 * 4..row * 288 * 4 + 280 * 4]
+                .iter()
+                .all(|&n| n == 0));
+        }
+        assert!(!unsafe { IsWindowVisible(hwnd) }.as_bool());
+        let handle = hwnd;
+        drop(dib);
+        drop(overlay);
+        assert!(!unsafe { IsWindow(handle) }.as_bool());
     }
 
     #[test]

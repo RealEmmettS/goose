@@ -45,10 +45,10 @@
   <nav class="workspace-toolbar" aria-label="Workspace">
     <div class="toolbar-start">
       <div class="view-toggle" id="mainTabToggle">
-        <button id="tasksTabBtn" class="active">Tasks</button><button id="memoryTabBtn">Memory</button>
+        <button id="tasksTabBtn" class="active" aria-pressed="true">Tasks</button><button id="memoryTabBtn" aria-pressed="false">Memory</button>
       </div>
       <div class="view-toggle" id="taskViewToggle" aria-label="Task layout">
-        <button id="boardViewBtn" class="active">Board</button><button id="listViewBtn">List</button>
+        <button id="boardViewBtn" class="active" aria-pressed="true">Board</button><button id="listViewBtn" aria-pressed="false">List</button>
       </div>
     </div>
     <div class="toolbar-end buttons">
@@ -59,6 +59,21 @@
 
   <!-- TASKS TAB PANEL -->
   <main class="tab-panel active" id="tasksPanel" tabindex="-1">
+    <div class="task-tools" id="taskTools" hidden>
+      <div class="task-search"><label class="sr-only" for="taskSearch">Search tasks</label><input id="taskSearch" type="search" placeholder="Search tasks, people, or #id" autocomplete="off" aria-keyshortcuts="/"></div>
+      <label class="sr-only" for="taskFilter">Show tasks</label>
+      <select id="taskFilter"><option value="all">All tasks</option><option value="open">Open</option><option value="active">Active</option><option value="blocked">Blocked</option><option value="completed">Completed</option></select>
+      <label class="sr-only" for="ownerFilter">Filter by owner</label><select id="ownerFilter"><option value="">All owners</option></select>
+      <button id="newTaskBtn" class="primary" aria-expanded="false" aria-controls="taskComposer" aria-keyshortcuts="n">New task</button>
+    </div>
+    <form class="task-composer" id="taskComposer" hidden>
+      <label class="sr-only" for="newTaskTitle">New task title</label><input id="newTaskTitle" placeholder="What needs to be done?" required autocomplete="off">
+      <label class="sr-only" for="newTaskSection">New task status</label><select id="newTaskSection"></select>
+      <button type="submit" class="primary">Add task</button><button type="button" id="cancelNewTask">Cancel</button>
+      <span id="newTaskContext" class="composer-context"></span>
+    </form>
+    <div class="task-results" id="taskResults" hidden><span id="taskResultCount" role="status" aria-live="polite"></span><button id="clearTaskFilters" hidden>Clear filters</button></div>
+    <div class="filter-empty" id="filterEmpty" hidden>No tasks match. Try another search or clear your filters.</div>
     <div class="milestone-rail" id="milestoneRail" style="display: none;"></div>
     <div class="list-view" id="listView" style="display: none;"></div>
     <div class="board" id="board">
@@ -76,7 +91,7 @@
     <div id="memoryEmptyState" class="empty-state">
       <shaughv-mark aria-label="SHAUGHV" style="display:block; height: 88px; width: 88px; color: var(--accent); margin: 0 auto 28px;"></shaughv-mark>
       <p style="margin-bottom: 8px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.02em; font-size: 20px; color: var(--text-primary);">Workplace memory</p>
-      <p style="margin-bottom: 24px; font-size: 15px; color: var(--text-muted);">Select your project folder to browse what I know.</p>
+      <p style="margin-bottom: 24px; font-size: 15px; color: var(--text-muted);">Select your project folder to browse its people, terms, and notes.</p>
       <button id="openMemoryBtnLarge">Select Folder</button>
     </div>
     <div id="memoryMainContent" style="display: none; flex-direction: column; min-height: 0; flex: 1;">
@@ -92,7 +107,7 @@
     <div class="modal">
       <div class="modal-header">
         <h3 id="modalTitle">Edit</h3>
-        <button class="modal-close" id="modalClose">&times;</button>
+        <button class="modal-close" id="modalClose" aria-label="Close memory editor">&times;</button>
       </div>
       <div class="modal-body" id="modalBody"></div>
       <div class="modal-footer">
@@ -118,7 +133,8 @@
       <div class="modal-body" id="tmBody"></div>
       <div class="modal-footer">
         <button class="tm-btn" id="tmDelete" style="margin-right:auto; color:var(--danger); border-color:var(--danger);">Delete task</button>
-        <button id="tmDoneBtn" class="primary">Close</button>
+        <button id="tmHandoff" class="tm-btn" title="Copy this task and its saved notes to continue in Codex or ChatGPT">Copy handoff</button>
+        <button id="tmDoneBtn">Close</button><button id="tmCompleteBtn" class="primary">Mark complete</button>
       </div>
     </div>
   </div>
@@ -133,7 +149,7 @@
         </div>
         <div style="display:flex; align-items:center; gap:14px; flex-shrink:0;">
           <span class="tm-id" id="msId"></span>
-          <button class="modal-close" id="msClose">&times;</button>
+          <button class="modal-close" id="msClose" aria-label="Close milestone details">&times;</button>
         </div>
       </div>
       <div class="modal-body" id="msBody"></div>
@@ -144,7 +160,7 @@
     </div>
   </div>
 
-  <footer class="workspace-footer"><div id="filePath" class="file-path"></div><span class="footer-label">Tasks / SHAUGHV</span></footer>
+  <footer class="workspace-footer"><div id="filePath" class="file-path"></div><span id="boardSaveState" role="status" aria-live="polite"></span><span class="footer-label">Tasks / SHAUGHV</span></footer>
   <div class="status-bar" id="status" role="status" aria-live="polite"></div>
 
   <script>
@@ -239,10 +255,12 @@
       updateSourceDisplay();
     }
 
+    let statusTimeout;
     function showStatus(msg) {
       statusEl.textContent = msg;
       statusEl.classList.add('visible');
-      setTimeout(() => statusEl.classList.remove('visible'), 2000);
+      clearTimeout(statusTimeout);
+      statusTimeout = setTimeout(() => statusEl.classList.remove('visible'), 6000);
     }
 
     // ===== INLINE LUCIDE ICONS (ISC) — the brand allows Lucide only, never emoji =====
@@ -279,6 +297,8 @@
 
       tasksTabBtn.classList.toggle('active', tab === 'tasks');
       memoryTabBtn.classList.toggle('active', tab === 'memory');
+      tasksTabBtn.setAttribute('aria-pressed', String(tab === 'tasks'));
+      memoryTabBtn.setAttribute('aria-pressed', String(tab === 'memory'));
 
       tasksPanel.classList.toggle('active', tab === 'tasks');
       memoryPanel.classList.toggle('active', tab === 'memory');
@@ -307,8 +327,10 @@
     let tasks = {};
     let hasChanges = false;
     let currentView = 'board';
-    let quickAddSection = null;
     let taskBoardReloadDeferred = false;
+    let taskSearch = '';
+    let taskFilter = 'all';
+    let ownerFilter = '';
 
     const board = document.getElementById('board');
     const listView = document.getElementById('listView');
@@ -483,7 +505,7 @@
       let currentSection = null;
       let currentSectionId = null;
 
-      const lines = content.split('\n');
+      const lines = content.split(/\r?\n/);
       let currentTask = null;
       let currentSubtask = null;
 
@@ -651,7 +673,7 @@
 
     function parseMilestoneMarkdown(content) {
       const out = [];
-      for (const line of (content || '').split('\n')) {
+      for (const line of (content || '').split(/\r?\n/)) {
         const m = line.match(/^- \[([ xX])\]\s*(.*)$/);
         if (!m) continue;
         const checked = m[1] !== ' ';
@@ -718,8 +740,101 @@
     // tasks surface (board, list, counts) renders through.
     function visibleTasks(sectionId) {
       const arr = tasks[sectionId] || [];
-      return activeMilestoneFilter ? arr.filter(t => t.milestoneId === activeMilestoneFilter) : arr;
+      return arr.filter(t => {
+        if (activeMilestoneFilter && t.milestoneId !== activeMilestoneFilter) return false;
+        if (ownerFilter && (ownerFilter === '__unassigned__' ? Boolean(t.owner) : t.owner !== ownerFilter)) return false;
+        if (taskFilter === 'open' && t.checked) return false;
+        if (taskFilter === 'completed' && !t.checked) return false;
+        if (taskFilter === 'active' && (t.checked || sectionId !== 'active')) return false;
+        if (taskFilter === 'blocked' && (t.checked || !isBlocked(t))) return false;
+        const haystack = [t.title, t.note, '#' + t.id, t.owner, milestoneById(t.milestoneId)?.title,
+          ...(t.subtasks || []).flatMap(s => [s.text, s.description])].join(' ').toLowerCase();
+        return taskSearch.toLowerCase().split(/\s+/).every(word => haystack.includes(word));
+      });
     }
+
+    function allTasks() { return sections.flatMap(s => tasks[s.id] || []); }
+
+    function resetTaskFilters() {
+      taskSearch = ''; taskFilter = 'all'; ownerFilter = ''; activeMilestoneFilter = null;
+      document.getElementById('taskSearch').value = '';
+      document.getElementById('taskFilter').value = 'all';
+      renderTasks();
+    }
+
+    function refreshTaskTools() {
+      const available = Boolean(taskFileName || taskFileHandle);
+      document.getElementById('taskTools').hidden = !available;
+      document.getElementById('taskResults').hidden = !available;
+      const all = allTasks();
+      const visible = sections.flatMap(s => visibleTasks(s.id));
+      const filtered = Boolean(taskSearch || taskFilter !== 'all' || ownerFilter || activeMilestoneFilter);
+      const ownerSelect = document.getElementById('ownerFilter');
+      const owners = [...new Set(all.map(t => t.owner).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+      if (ownerFilter && ownerFilter !== '__unassigned__' && !owners.includes(ownerFilter)) owners.push(ownerFilter);
+      const options = '<option value="">All owners</option><option value="__unassigned__">Unassigned</option>'
+        + owners.map(owner => `<option value="${escapeHtml(owner)}">${escapeHtml(owner)}</option>`).join('');
+      if (ownerSelect.innerHTML !== options) ownerSelect.innerHTML = options;
+      ownerSelect.value = ownerFilter;
+      const milestone = milestoneById(activeMilestoneFilter);
+      document.getElementById('taskResultCount').textContent = filtered
+        ? `${visible.length} of ${all.length} tasks${milestone ? ' · ' + milestone.title : ''}`
+        : all.length ? `${all.length} tasks · ${all.filter(t => !t.checked && t.section === 'active').length} active · ${all.filter(t => !t.checked && isBlocked(t)).length} blocked`
+          : 'A clear place to start. Add your first task.';
+      document.getElementById('clearTaskFilters').hidden = !filtered;
+      document.getElementById('filterEmpty').hidden = !available || !filtered || visible.length > 0;
+    }
+
+    function showTaskComposer(sectionId) {
+      const composer = document.getElementById('taskComposer');
+      const select = document.getElementById('newTaskSection');
+      const openSections = sections.filter(s => !isCompletionSection(s.id));
+      select.innerHTML = openSections.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+      select.value = openSections.some(s => s.id === sectionId) ? sectionId
+        : (openSections.some(s => s.id === 'to-do') ? 'to-do' : openSections[0]?.id || '');
+      document.getElementById('newTaskContext').textContent = activeMilestoneFilter
+        ? 'Milestone: ' + (milestoneById(activeMilestoneFilter)?.title || activeMilestoneFilter) : '';
+      composer.hidden = false;
+      document.getElementById('newTaskBtn').setAttribute('aria-expanded', 'true');
+      document.getElementById('newTaskTitle').focus();
+    }
+    function hideTaskComposer() {
+      document.getElementById('taskComposer').hidden = true;
+      document.getElementById('taskComposer').reset();
+      document.getElementById('newTaskBtn').setAttribute('aria-expanded', 'false');
+      document.getElementById('newTaskBtn').focus();
+    }
+    document.getElementById('newTaskBtn').addEventListener('click', () => showTaskComposer());
+    document.getElementById('cancelNewTask').addEventListener('click', hideTaskComposer);
+    document.getElementById('taskComposer').addEventListener('keydown', e => {
+      if (e.key === 'Escape') { e.stopPropagation(); hideTaskComposer(); }
+    });
+    document.getElementById('taskComposer').addEventListener('submit', e => {
+      e.preventDefault();
+      const title = document.getElementById('newTaskTitle').value.trim();
+      const section = document.getElementById('newTaskSection').value;
+      if (!title || !tasks[section] || sourceMismatch) return;
+      const task = { id: genTaskId(usedIds()), title, section, needs: [], subtasks: [], checked: false,
+        note: '', milestoneId: activeMilestoneFilter, owner: ownerFilter && ownerFilter !== '__unassigned__' ? ownerFilter : null };
+      tasks[section].unshift(task);
+      markChanged();
+      hideTaskComposer();
+      // Reveal the new task even when the previous search or completion filter excluded it.
+      resetTaskFilters();
+      document.querySelector(`[data-task-id="${task.id}"]`)?.focus();
+      showStatus('Task added');
+    });
+    document.getElementById('taskSearch').addEventListener('input', e => { taskSearch = e.target.value.trim(); renderTasks(); });
+    document.getElementById('taskFilter').addEventListener('change', e => { taskFilter = e.target.value; renderTasks(); });
+    document.getElementById('ownerFilter').addEventListener('change', e => { ownerFilter = e.target.value; renderTasks(); });
+    document.getElementById('clearTaskFilters').addEventListener('click', () => { resetTaskFilters(); document.getElementById('taskSearch').focus(); });
+    document.addEventListener('keydown', e => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing || activeMainTab !== 'tasks'
+          || tmTask || msTask || operatorDialogPending || !taskFileName
+          || e.target.closest('input,textarea,select,[contenteditable="true"],dialog')) return;
+      if (e.key === '/') { e.preventDefault(); document.getElementById('taskSearch').focus(); }
+      if (e.key.toLowerCase() === 'n') { e.preventDefault(); showTaskComposer(); }
+    });
 
     async function loadMilestonesFromServer() {
       if (!SERVER_MODE) return;
@@ -816,7 +931,7 @@
 
       const unmet = unmetNeeds(task);
       const blocked = unmet.length > 0;
-      if (blocked) card.style.opacity = '0.6';
+      if (blocked) card.classList.add('blocked');
 
       const subDone = task.subtasks.filter(s => s.checked).length;
       const subTotal = task.subtasks.length;
@@ -834,6 +949,7 @@
       }
 
       const metaBits = [];
+      if ((task.needs || []).some(id => !taskById(id))) metaBits.push('<span class="chip warn">Missing prerequisite</span>');
       if (subTotal) metaBits.push(`<span title="subtasks done" style="display:inline-flex; align-items:center; gap:4px;">${icon('check-square', 12)}${subDone}/${subTotal}</span>`);
       if (blocked) metaBits.push(`<span style="color: var(--accent); display:inline-flex; align-items:center; gap:4px;" title="Blocked until prerequisites are done">${icon('lock', 12)}needs ${unmet.map(id => '#' + id).join(', ')}</span>`);
       if (task.milestoneId) {
@@ -1129,7 +1245,7 @@
       });
 
       col.querySelector(`[data-add="${id}"]`).addEventListener('click', () => {
-        addNewTask(id, col.querySelector('.cards'));
+        showTaskComposer(id);
       });
 
       return col;
@@ -1213,18 +1329,10 @@
         return;
       }
       if (isCompletionSection(toSectionId) && fromSectionId !== toSectionId) {
-        const destinationName = sections.find(section => section.id === toSectionId)?.name || 'Completed';
-        const unmet = unmetNeeds(task);
-        if (unmet.length) {
-          showStatus(`Blocked — finish ${unmet.map(id => '#' + id).join(', ')} before moving this to ${destinationName}`);
-          renderTasks(); // snap the card back
-          return;
-        }
-        if (openSubtasks(task).length) {
-          showStatus(`Blocked — finish or remove open subtasks before moving this to ${destinationName}`);
-          renderTasks(); // snap the card back
-          return;
-        }
+        renderTasks();
+        openTaskModal(task);
+        showStatus('Review the completion checks, then choose Mark complete.');
+        return;
       }
 
       tasks[fromSectionId].splice(fromIdx, 1);
@@ -1326,9 +1434,17 @@
     let lastBoardRevision = '';
     let watchInterval = null;
     let isSaving = false;
+    let boardEditVersion = 0;
+    function setBoardSaveState(text, error = false) {
+      const el = document.getElementById('boardSaveState');
+      el.textContent = text; el.classList.toggle('save-error', error);
+      if (error) saveBtn.style.display = activeMainTab === 'tasks' ? 'inline-flex' : 'none';
+    }
 
     function markChanged() {
       hasChanges = true;
+      boardEditVersion += 1;
+      setBoardSaveState('Task list: unsaved changes');
       saveBtn.disabled = false;
       markBoardUpdated();              // any edit resets the freshness clock to "live"
       if (saveTimeout) clearTimeout(saveTimeout);
@@ -1336,24 +1452,31 @@
     }
 
     async function autoSave() {
+      saveTimeout = null;
       if (!hasChanges) return;
       if (SERVER_MODE) { await saveTasksToServer(); return; }
       if (!taskFileHandle || isSaving) return;
       isSaving = true;
+      const savingVersion = boardEditVersion;
+      const content = toMarkdown();
+      setBoardSaveState('Saving task list…');
       try {
         const writable = await taskFileHandle.createWritable();
-        const content = toMarkdown();
         await writable.write(content);
         await writable.close();
         const file = await taskFileHandle.getFile();
         lastModified = file.lastModified;
-        hasChanges = false;
-        saveBtn.disabled = true;
+        hasChanges = boardEditVersion !== savingVersion;
+        saveBtn.disabled = !hasChanges;
+        setBoardSaveState(hasChanges ? 'Task list: unsaved changes' : 'Task list saved');
         showStatus('Saved');
       } catch (e) {
         showStatus('Save failed: ' + e.message);
+        setBoardSaveState('Task list not saved. Use Save to retry.', true);
+      } finally {
+        isSaving = false;
+        if (hasChanges && boardEditVersion !== savingVersion && !saveTimeout) saveTimeout = setTimeout(autoSave, 500);
       }
-      isSaving = false;
     }
 
     // ===== SERVER MODE: live task I/O via board-server.mjs (fetch + SSE) =====
@@ -1416,7 +1539,12 @@
         hasChanges = false;
         saveBtn.disabled = true;
         updateSourceDisplay();
-        if (initial) switchTaskView('board'); else renderTasks();
+        if (initial) {
+          let savedView;
+          try { savedView = localStorage.getItem('shaughv-tasks-view:' + (serverBoardId || location.pathname)); } catch (_) {}
+          switchTaskView(savedView === 'list' || (!savedView && matchMedia('(max-width: 640px)').matches) ? 'list' : 'board');
+        } else renderTasks();
+        setBoardSaveState('Task list saved');
         markBoardUpdated();             // an agent (or reload) just refreshed the board
         showStatus(initial ? 'Live board connected' : 'Reloaded');
       } catch (e) { showStatus('Board load failed: ' + e.message); }
@@ -1425,6 +1553,8 @@
     async function saveTasksToServer() {
       if (isSaving) return;
       isSaving = true;
+      const savingVersion = boardEditVersion;
+      setBoardSaveState('Saving task list…');
       try {
         const res = await fetch('/api/tasks', {
           method: 'POST',
@@ -1443,6 +1573,7 @@
           const result = parseTaskMarkdown(latest);
           if (!applyTaskSnapshot(result)) {
             taskBoardReloadDeferred = true;
+            setBoardSaveState('Board changed. Close this task to reload.', true);
             showStatus('Board changed on disk while this task has unsaved detail work — close it to reload');
             return;
           }
@@ -1452,18 +1583,22 @@
           saveBtn.disabled = true;
           renderTasks();
           showStatus('Board changed on disk — reloaded. Re-apply your edit.');
+          setBoardSaveState('Board changed. Re-apply your last edit.', true);
           return;
         }
         if (!res.ok) throw new Error(`task save returned ${res.status}`);
         lastModified = Number(res.headers.get('X-Board-Mtime')) || lastModified;
         lastBoardRevision = res.headers.get('X-Board-Revision') || lastBoardRevision;
-        hasChanges = false;
-        saveBtn.disabled = true;
+        hasChanges = boardEditVersion !== savingVersion;
+        saveBtn.disabled = !hasChanges;
+        setBoardSaveState(hasChanges ? 'Task list: unsaved changes' : 'Task list saved');
         showStatus('Saved');
       } catch (e) {
         showStatus('Save failed: ' + e.message);
+        setBoardSaveState('Task list not saved. Use Save to retry.', true);
       } finally {
         isSaving = false;
+        if (hasChanges && boardEditVersion !== savingVersion && !taskBoardReloadDeferred && !saveTimeout) saveTimeout = setTimeout(autoSave, 500);
       }
     }
 
@@ -1482,10 +1617,25 @@
       }
 
       if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+      const savingVersion = boardEditVersion;
       const priorChecked = task.checked;
+      const priorSection = task.section;
+      const priorIndex = (tasks[priorSection] || []).indexOf(task);
+      const completionSection = sections.find(section => isCompletionSection(section.id))?.id || priorSection;
+      const relocate = (sectionId, index = -1) => {
+        for (const list of Object.values(tasks)) {
+          const at = list.indexOf(task);
+          if (at >= 0) list.splice(at, 1);
+        }
+        task.section = sectionId;
+        const list = tasks[sectionId] ||= [];
+        if (index >= 0) list.splice(index, 0, task); else list.push(task);
+      };
       task.checked = true;
+      relocate(completionSection);
       const body = toMarkdown();
       task.checked = priorChecked;
+      relocate(priorSection, priorIndex);
       isSaving = true;
       try {
         const res = await fetch('/api/tasks', {
@@ -1516,10 +1666,12 @@
         if (!res.ok) throw new Error(`completion save returned ${res.status}`);
 
         task.checked = true;
+        relocate(completionSection);
         lastModified = Number(res.headers.get('X-Board-Mtime')) || lastModified;
         lastBoardRevision = res.headers.get('X-Board-Revision') || lastBoardRevision;
-        hasChanges = false;
-        saveBtn.disabled = true;
+        hasChanges = boardEditVersion !== savingVersion;
+        saveBtn.disabled = !hasChanges;
+        setBoardSaveState(hasChanges ? 'Task list: unsaved changes' : 'Task list saved');
         markBoardUpdated();
         renderTasks();
         if (tmTask === task) tmCheckboxEl.className = 'checkbox checked';
@@ -1608,6 +1760,8 @@
     }
 
     function renderTasks() {
+      document.querySelectorAll('.flip-ghost').forEach(ghost => ghost.getAnimations().forEach(animation => animation.cancel()));
+      refreshTaskTools();
       if (currentView === 'board') {
         // FLIP: snapshot card positions BEFORE the DOM is rebuilt, then animate the deltas.
         const prevRects = (board && board.children.length > 0) ? captureCardRects() : null;
@@ -1643,50 +1797,6 @@
 
     function renderList() {
       listView.innerHTML = '';
-
-      if (!quickAddSection && sections.length > 0) {
-        quickAddSection = sections[0].id;
-      }
-
-      // Quick add at top
-      const quickAdd = document.createElement('div');
-      quickAdd.className = 'quick-add';
-      quickAdd.style.cssText = 'border-bottom: 2px solid var(--border); margin-bottom: 24px; padding-bottom: 16px;';
-
-      const sectionName = sections.find(s => s.id === quickAddSection)?.name || 'Select section';
-      quickAdd.innerHTML = `
-        <span class="checkbox" style="opacity: 0.3;"></span>
-        <input type="text" class="quick-add-input" placeholder="Add a task..." id="quickAddInput">
-        <button class="quick-add-section" id="quickAddSectionBtn" aria-label="Choose column">${escapeHtml(sectionName)}</button>
-      `;
-      listView.appendChild(quickAdd);
-
-      const quickInput = document.getElementById('quickAddInput');
-      const sectionBtn = document.getElementById('quickAddSectionBtn');
-
-      quickInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && quickInput.value.trim()) {
-          const title = quickInput.value.trim();
-          if (!tasks[quickAddSection]) tasks[quickAddSection] = [];
-          tasks[quickAddSection].unshift({
-            id: genTaskId(usedIds()),
-            needs: [],
-            milestoneId: activeMilestoneFilter || null,
-            owner: null,
-            title,
-            note: '',
-            checked: false,
-            subtasks: [],
-            section: quickAddSection
-          });
-          quickInput.value = '';
-          markChanged();
-          renderTasks();
-          setTimeout(() => document.getElementById('quickAddInput')?.focus(), 10);
-        }
-      });
-
-      sectionBtn.addEventListener('click', (e) => { showSectionPicker(e.target); });
 
       // Render each section
       sections.forEach(section => {
@@ -1911,6 +2021,7 @@
       const metaRow = document.createElement('div');
       metaRow.style.cssText = 'font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;';
       const bits = ['<span>#' + task.id + '</span>'];
+      if ((task.needs || []).some(id => !taskById(id))) bits.push('<span class="chip warn">Missing prerequisite</span>');
       if (task.subtasks.length) bits.push(`<span style="display:inline-flex; align-items:center; gap:3px;">${icon('check-square', 11)}${subDone}/${task.subtasks.length}</span>`);
       if (unmet.length) bits.push(`<span style="display:inline-flex; align-items:center; gap:3px; color: var(--accent);">${icon('lock', 11)}needs ${unmet.map(id => '#' + id).join(', ')}</span>`);
       if (task.milestoneId) {
@@ -2041,39 +2152,13 @@
       input.addEventListener('blur', saveEdit);
     }
 
-    function showSectionPicker(anchorEl) {
-      document.querySelectorAll('.section-picker').forEach(el => el.remove());
-      const picker = document.createElement('div');
-      picker.className = 'section-picker';
-      const rect = anchorEl.getBoundingClientRect();
-      picker.style.top = (rect.bottom + 4) + 'px';
-      picker.style.right = (window.innerWidth - rect.right) + 'px';
 
-      sections.forEach(section => {
-        const btn = document.createElement('button');
-        btn.textContent = section.name;
-        btn.addEventListener('click', () => {
-          quickAddSection = section.id;
-          picker.remove();
-          renderTasks();
-          setTimeout(() => document.getElementById('quickAddInput')?.focus(), 10);
-        });
-        picker.appendChild(btn);
-      });
-
-      document.body.appendChild(picker);
-      setTimeout(() => {
-        document.addEventListener('click', function closeHandler(e) {
-          if (!picker.contains(e.target)) {
-            picker.remove();
-            document.removeEventListener('click', closeHandler);
-          }
-        });
-      }, 10);
-    }
 
     function switchTaskView(view) {
       currentView = view;
+      listViewBtn.setAttribute('aria-pressed', String(view === 'list'));
+      boardViewBtn.setAttribute('aria-pressed', String(view === 'board'));
+      try { localStorage.setItem('shaughv-tasks-view:' + (serverBoardId || location.pathname), view); } catch (_) {}
       if (view === 'list') {
         listView.style.display = 'block';
         board.style.display = 'none';
@@ -2086,6 +2171,9 @@
         boardViewBtn.classList.add('active');
       }
       renderTasks();
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        (view === 'list' ? listView : board).animate([{ opacity: .5 }, { opacity: 1 }], { duration: 150, easing: 'ease-out' });
+      }
     }
 
     listViewBtn.addEventListener('click', () => switchTaskView('list'));
@@ -2126,6 +2214,8 @@
     }
 
     async function openTaskFile() {
+      if (isSaving) { showStatus('Wait for the task list to finish saving before reloading.'); return; }
+      if (hasChanges && !await boardDialog('Reload and discard unsaved task-list changes?')) return;
       if (SERVER_MODE) { await loadTasksFromServer(true); return; }
       try {
         [taskFileHandle] = await window.showOpenFilePicker({
@@ -2137,9 +2227,9 @@
         const result = parseTaskMarkdown(content);
         sections = result.sections;
         tasks = result.tasks;
-        switchTaskView('board');
-        startWatching();
         taskFileName = file.name;
+        switchTaskView(matchMedia('(max-width: 640px)').matches ? 'list' : 'board');
+        startWatching();
         let folderWarning = '';
         if (memoryDirHandle) {
           try {
@@ -2160,20 +2250,12 @@
     document.getElementById('openBtnLarge')?.addEventListener('click', openTaskFile);
 
     saveBtn.addEventListener('click', async () => {
-      if (SERVER_MODE) { await saveTasksToServer(); return; }
-      if (!taskFileHandle) return;
-      try {
-        const writable = await taskFileHandle.createWritable();
-        await writable.write(toMarkdown());
-        await writable.close();
-        hasChanges = false;
-        saveBtn.disabled = true;
-        showStatus('Saved');
-      } catch (e) { showStatus('Error: ' + e.message); }
+      if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+      await autoSave();
     });
 
     window.addEventListener('beforeunload', (e) => {
-      if (hasChanges) { e.preventDefault(); e.returnValue = ''; }
+      if (hasChanges || tmDescDirty || tmDetailMutationPending || [...tmDetailPersistence.values()].some(s => s.pending)) { e.preventDefault(); e.returnValue = ''; }
     });
 
     // ============================================================
@@ -3310,10 +3392,13 @@
     taskPanelBreakpoint.addEventListener('change', syncPanelModality);
     function hideTaskPanel() {
       taskModalOverlay.classList.remove('visible');
+      taskModalOverlay.inert = true;
       document.body.classList.remove('task-panel-open');
       document.querySelectorAll('[data-task-id][aria-current]').forEach(el => el.removeAttribute('aria-current'));
       syncPanelModality();
-      if (taskPanelReturnFocus?.isConnected) taskPanelReturnFocus.focus();
+      const returnTarget = taskPanelReturnFocus?.isConnected ? taskPanelReturnFocus
+        : document.querySelector(`[data-task-id="${tmTask?.id}"]`) || document.getElementById('newTaskBtn');
+      returnTarget?.focus();
     }
     taskModalOverlay.addEventListener('keydown', event => {
       if (event.key !== 'Tab' || !taskPanelBreakpoint.matches) return;
@@ -3343,6 +3428,7 @@
       tmTitleEl.value = task.title;
       tmIdEl.textContent = '#' + task.id;
       tmCheckboxEl.className = 'checkbox ' + (task.checked ? 'checked' : '');
+      taskModalOverlay.inert = false;
       taskModalOverlay.classList.add('visible');
       document.body.classList.add('task-panel-open');
       syncPanelModality();
@@ -3398,6 +3484,7 @@
       const body = serializeDetail(detail);
       const state = detailPersistenceState(taskId);
       state.pending += 1;
+      if (tmTask?.id === taskId) refreshTaskSaveState();
       const operation = state.queue.then(async () => {
         const persisted = await writeTaskDetail(
           taskId,
@@ -3425,6 +3512,7 @@
         return false;
       }).finally(() => {
         state.pending = Math.max(0, state.pending - 1);
+        if (tmTask?.id === taskId) refreshTaskSaveState();
       });
       state.queue = operation;
       return operation;
@@ -3500,9 +3588,14 @@
       if (!task) return;
       const contractLocked = task.checked || tmCompletionPending || tmDeletionPending;
       tmTitleEl.disabled = contractLocked;
-      tmBodyEl.inert = contractLocked;
-      tmBodyEl.style.pointerEvents = contractLocked ? 'none' : '';
-      tmBodyEl.style.opacity = contractLocked ? '0.72' : '';
+      tmBodyEl.inert = tmCompletionPending || tmDeletionPending;
+      tmBodyEl.style.pointerEvents = '';
+      tmBodyEl.style.opacity = '';
+      tmCheckboxEl.setAttribute('aria-pressed', String(task.checked));
+      tmCheckboxEl.setAttribute('aria-label', task.checked ? 'Reopen task' : 'Mark task complete');
+      const completeButton = document.getElementById('tmCompleteBtn');
+      completeButton.textContent = task.checked ? 'Reopen task' : 'Mark complete';
+      completeButton.disabled = tmCompletionPending || tmDeletionPending;
       if (tmCompletionPending || tmDeletionPending) tmBodyEl.setAttribute('aria-busy', 'true');
       else tmBodyEl.removeAttribute('aria-busy');
 
@@ -3515,7 +3608,6 @@
             return '#' + id + (t ? ' (' + escapeHtml(t.title) + ')' : '');
           }).join(', ')}</div>`
         : '';
-      const needsStr = (task.needs || []).map(n => '#' + n).join(', ');
       const detailsAvailable = SERVER_MODE || staticTasksFolderVerified;
       const detailsReady = detailsAvailable && tmDetailLoaded;
       const detailsUnavailable = ' <span style="text-transform:none; letter-spacing:0; color:var(--text-muted); font-weight:normal;">— select the matching .tasks folder</span>';
@@ -3530,14 +3622,16 @@
           <div class="tm-property"><label for="tmSection">Status</label><select id="tmSection" class="tm-note-input">${sectionOptions}</select></div>
           <div class="tm-property"><label for="tmOwner">Owner</label><input id="tmOwner" class="tm-note-input" placeholder="Unassigned" value="${escapeHtml(task.owner || '')}"></div>
           <div class="tm-property wide"><label for="tmNote">Context</label><input id="tmNote" class="tm-note-input" placeholder="One-line context" value="${escapeHtml(task.note || '')}"></div>
-          <div class="tm-property"><label for="tmNeeds">Prerequisites</label><input id="tmNeeds" class="tm-note-input" placeholder="#a3f, #k2p" value="${escapeHtml(needsStr)}"></div>
           ${SERVER_MODE ? `<div class="tm-property"><label for="tmMilestone">Milestone</label><select id="tmMilestone" class="tm-note-input">${msOptions}</select></div>` : ''}
+          <div class="tm-property wide"><label for="tmNeeds">Prerequisites</label><div id="tmPrerequisites"></div><select id="tmNeeds" class="tm-note-input"><option value="">Add a prerequisite…</option></select></div>
         </div>
         ${blockedLine}
+        <p class="completion-summary" id="tmCompletionSummary" role="status"></p>
+        <p class="tm-persistence" id="tmSaveState" role="status"></p>
 
         <div class="tm-section-label tm-row-between"><span>Description${detailsAvailable ? (detailsReady ? '' : detailsLoading) : detailsUnavailable}</span>${detailsReady ? `<button class="tm-btn" id="tmDescToggle">${tmDescEditing ? 'Preview' : 'Edit'}</button>` : ''}</div>
         <div id="tmDescArea"></div>
-        <div id="tmRecordSections"></div>
+        <div id="tmCurrentSections"></div>
 
         <div class="tm-section-label">${icon('check-square', 12)} Subtasks <span class="tm-count-badge" id="tmSubCount"></span></div>
         <div id="tmSubtasks"></div>
@@ -3545,19 +3639,20 @@
         ${detailsAvailable ? `<div class="tm-section-label">${icon('shield-check', 12)} Verification${detailsReady ? '' : detailsLoading} <span class="tm-count-badge" id="tmVerifyCount"></span></div>
         <div id="tmVerification"></div>` : ''}
 
-        <div class="tm-section-label">Activity</div>
-        <ul class="tm-activity" id="tmActivity"></ul>
+        <div id="tmRecordSections"></div>
+        <details class="task-record-section"><summary>Activity</summary><ul class="tm-activity" id="tmActivity"></ul></details>
       `;
 
       renderTmDesc();
       if (descriptionDraft !== undefined) { const draft = document.querySelector('#tmDescArea textarea'); if (draft) draft.value = descriptionDraft; }
       const records = document.getElementById('tmRecordSections');
       if (detailsReady) for (const block of tmDetail.blocks.filter(block => block.kind === 'other')) {
-        const section = document.createElement('details'); section.className = 'task-record-section'; section.open = true;
+        const current = /^(status|current status|next actions?|plan)$/i.test(block.name);
+        const section = document.createElement('details'); section.className = 'task-record-section'; section.open = current;
         const heading = document.createElement('summary'); heading.textContent = block.name;
         const content = document.createElement('div'); content.className = 'tm-desc-rendered';
         content.innerHTML = renderMarkdownToHtml(block.lines.join('\n'));
-        section.append(heading, content); records.append(section);
+        section.append(heading, content); (current ? document.getElementById('tmCurrentSections') : records).append(section);
       }
       renderTmSubtasks();
       renderTmVerification();
@@ -3581,14 +3676,34 @@
       });
 
       const needsInput = document.getElementById('tmNeeds');
+      function wouldCycle(candidate, seen = new Set()) {
+        if (candidate.id === task.id) return true;
+        if (seen.has(candidate.id)) return false;
+        seen.add(candidate.id);
+        return (candidate.needs || []).some(id => { const next = taskById(id); return next && wouldCycle(next, seen); });
+      }
+      for (const candidate of allTasks()) {
+        if ((task.needs || []).includes(candidate.id) || wouldCycle(candidate)) continue;
+        const option = document.createElement('option'); option.value = candidate.id;
+        option.textContent = candidate.title + ' · #' + candidate.id + (candidate.checked ? ' · complete' : '');
+        needsInput.append(option);
+      }
+      for (const id of task.needs || []) {
+        const prerequisite = taskById(id);
+        const row = document.createElement('div'); row.className = 'prerequisite-row';
+        const name = document.createElement(prerequisite ? 'button' : 'span');
+        name.textContent = prerequisite ? `${prerequisite.title}${prerequisite.checked ? ' · complete' : ''}` : `Missing task #${id}`;
+        if (prerequisite) { name.type = 'button'; name.dataset.readAction = 'true'; name.addEventListener('click', () => openTaskModal(prerequisite)); }
+        else name.className = 'save-error';
+        const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×';
+        remove.setAttribute('aria-label', 'Remove prerequisite ' + (prerequisite?.title || id));
+        remove.addEventListener('click', () => { task.needs = task.needs.filter(n => n !== id); commitBoard(); renderTaskModalBody(); document.getElementById('tmNeeds').focus(); });
+        row.append(name, remove); document.getElementById('tmPrerequisites').append(row);
+      }
       needsInput.addEventListener('change', () => {
-        const ids = [...new Set((needsInput.value.match(/[0-9a-z]{2,}/gi) || [])
-          .map(s => s.toLowerCase()).filter(id => id !== task.id))];   // no self-dependency
-        if (JSON.stringify(ids) !== JSON.stringify(task.needs || [])) {
-          task.needs = ids;
-          commitBoard();
-          renderTaskModalBody();             // refresh the blocked-line
-        }
+        if (!needsInput.value) return;
+        task.needs = [...(task.needs || []), needsInput.value];
+        commitBoard(); renderTaskModalBody(); document.getElementById('tmNeeds').focus();
       });
 
       const msSel = document.getElementById('tmMilestone');
@@ -3608,6 +3723,7 @@
           commitBoard();
         }
       });
+      if (contractLocked) tmBodyEl.querySelectorAll('input,textarea,select,button:not([data-read-action])').forEach(el => { el.disabled = true; });
     }
 
     // Zero-padded mono progress readouts for the modal section labels — subtasks and
@@ -3629,6 +3745,30 @@
           ? `<span class="done">${pad2(settled)}</span>/${pad2(list.length)}${waived ? ' · ' + waived + ' waived' : ''}`
           : '';
       }
+      const summary = document.getElementById('tmCompletionSummary');
+      if (summary) {
+        const pending = [];
+        const needs = unmetNeeds(tmTask).length, subs = openSubtasks(tmTask).length;
+        const checks = (tmDetail?.verification || []).filter(v => v.state === 'open').length;
+        if (needs) pending.push(`${needs} prerequisite${needs === 1 ? '' : 's'}`);
+        if (subs) pending.push(`${subs} subtask${subs === 1 ? '' : 's'}`);
+        if (checks) pending.push(`${checks} check${checks === 1 ? '' : 's'}`);
+        summary.textContent = tmTask.checked ? 'Completed. Reopen to make changes.'
+          : !tmDetailLoaded ? 'Task checks are not loaded yet.'
+          : pending.length ? 'Before completing: ' + pending.join(' · ')
+          : 'No open checks. Completion will verify the saved task.';
+      }
+      refreshTaskSaveState();
+    }
+
+    function refreshTaskSaveState() {
+      const el = document.getElementById('tmSaveState');
+      if (!el || !tmTask) return;
+      const state = detailPersistenceState(tmTask.id);
+      el.dataset.error = String(Boolean(state.error));
+      el.textContent = state.pending ? 'Saving task notes…' : state.error
+        ? 'Task notes were not saved. Review the error and retry, or reopen to load the saved file.'
+        : tmDetailLoaded ? 'Task notes loaded from file.' : 'Loading task notes…';
     }
 
     // Mount a read-only rendered description that collapses when it's tall, with an
@@ -3737,14 +3877,15 @@
         const row = document.createElement('div');
         row.className = 'tm-sub';
         const cb = document.createElement('button');
-        cb.type = 'button'; cb.setAttribute('aria-label', 'Toggle check');
+        cb.type = 'button'; cb.setAttribute('aria-label', st.text); cb.setAttribute('aria-pressed', String(st.checked));
         cb.className = 'checkbox ' + (st.checked ? 'checked' : '');
         cb.style.flexShrink = '0';
-        cb.addEventListener('click', () => { st.checked = !st.checked; commitBoard(); renderTmSubtasks(); refreshTmCounts(); });
+        cb.addEventListener('click', () => { st.checked = !st.checked; commitBoard(); renderTmSubtasks(); refreshTmCounts(); wrap.querySelectorAll('.checkbox')[idx]?.focus(); });
         const txt = document.createElement('input');
         txt.type = 'text';
         txt.className = 'tm-sub-text' + (st.checked ? ' checked' : '');
         txt.value = st.text;
+        txt.setAttribute('aria-label', 'Subtask title');
         txt.addEventListener('change', () => {
           const v = txt.value.trim();
           if (!v) { tmTask.subtasks.splice(idx, 1); commitBoard(); renderTmSubtasks(); }
@@ -3753,12 +3894,14 @@
         const del = document.createElement('button');
         del.className = 'tm-sub-del';
         del.title = 'Remove subtask';
+        del.setAttribute('aria-label', 'Remove subtask ' + st.text);
         del.textContent = '×';
         del.addEventListener('click', () => { tmTask.subtasks.splice(idx, 1); commitBoard(); renderTmSubtasks(); });
         const desc = document.createElement('textarea');
         desc.className = 'tm-sub-desc';
         desc.placeholder = 'Subtask description or handoff note...';
         desc.value = st.description || '';
+        desc.setAttribute('aria-label', 'Description for ' + st.text);
         desc.addEventListener('change', () => {
           const v = desc.value.trim();
           if (v !== (st.description || '')) { st.description = v; commitBoard(); }
@@ -3818,7 +3961,7 @@
         const row = document.createElement('div');
         row.className = 'tm-verify-row' + (v.state === 'passed' ? ' passed' : v.state === 'waived' ? ' waived' : '');
         const cb = document.createElement('button');
-        cb.type = 'button'; cb.setAttribute('aria-label', 'Toggle check');
+        cb.type = 'button'; cb.setAttribute('aria-label', v.text); cb.setAttribute('aria-pressed', String(v.state === 'passed'));
         cb.className = 'checkbox ' + (v.state === 'passed' ? 'checked' : '');
         cb.style.flexShrink = '0';
         if (v.state === 'waived') cb.style.opacity = '0.35';
@@ -3845,6 +3988,7 @@
         const txt = document.createElement('input');
         txt.type = 'text';
         txt.className = 'tm-verify-text';
+        txt.setAttribute('aria-label', 'Verification criterion ' + (idx + 1));
         txt.value = v.text;
         txt.addEventListener('change', async () => {
           if (tmDetailMutationPending || tmCompletionPending) {
@@ -3894,6 +4038,7 @@
         const waive = document.createElement('button');
         waive.className = 'tm-waive-btn';
         waive.textContent = v.state === 'waived' ? 'waived' : 'waive';
+        waive.setAttribute('aria-label', (v.state === 'waived' ? 'Un-waive ' : 'Waive ') + v.text);
         waive.title = v.state === 'waived' ? 'Un-waive (back to open)' : 'Waive this check — authorized reason required';
         waive.addEventListener('click', async () => {
           if (tmDetailMutationPending || tmCompletionPending) {
@@ -3922,6 +4067,7 @@
         const del = document.createElement('button');
         del.className = 'tm-sub-del';
         del.title = 'Remove check — authorized reason required';
+        del.setAttribute('aria-label', 'Remove verification criterion ' + (idx + 1));
         del.textContent = '×';
         del.addEventListener('click', async () => {
           if (tmDetailMutationPending || tmCompletionPending) {
@@ -4148,6 +4294,14 @@
         if (tmTask !== task || completionEpoch !== tmCompletionEpoch) return;
         if (task.checked) {
           task.checked = false;
+          if (isCompletionSection(task.section)) {
+            const destination = sections.find(section => section.id === 'to-do') || sections.find(section => !isCompletionSection(section.id));
+            if (destination) {
+              tasks[task.section] = (tasks[task.section] || []).filter(candidate => candidate !== task);
+              task.section = destination.id;
+              (tasks[task.section] ||= []).push(task);
+            }
+          }
           commitBoard();
           renderTaskModalBody();
         } else {
@@ -4158,11 +4312,11 @@
           tmCompletionPending = false;
           const contractLocked = !!task.checked;
           tmTitleEl.disabled = contractLocked;
-          tmBodyEl.inert = contractLocked;
+          tmBodyEl.inert = false;
           tmBodyEl.removeAttribute('aria-busy');
-          tmBodyEl.style.pointerEvents = contractLocked ? 'none' : '';
-          tmBodyEl.style.opacity = contractLocked ? '0.72' : '';
-          if (tmTask === task) renderTmVerification();
+          tmBodyEl.style.pointerEvents = '';
+          tmBodyEl.style.opacity = '';
+          if (tmTask === task) renderTaskModalBody();
         }
       }
     });
@@ -4174,6 +4328,33 @@
     });
     document.getElementById('tmClose').addEventListener('click', closeTaskModal);
     document.getElementById('tmDoneBtn').addEventListener('click', closeTaskModal);
+    document.getElementById('tmCompleteBtn').addEventListener('click', () => tmCheckboxEl.click());
+    document.getElementById('tmHandoff').addEventListener('click', async event => {
+      const task = tmTask;
+      if (!task || !tmDetailLoaded || tmDescDirty || tmDetailMutationPending || tmCompletionPending || tmDeletionPending) {
+        showStatus('Save your task notes before copying a handoff.'); return;
+      }
+      const button = event.currentTarget; button.disabled = true;
+      try {
+        if (hasChanges) await autoSave();
+        if (hasChanges || isSaving || !await taskDetailIsPersisted(task.id)) throw new Error('Some changes are still unsaved. Try again after saving.');
+        const detail = await readTaskDetail(task.id);
+        if (tmTask !== task) return;
+        const status = sections.find(s => s.id === task.section)?.name || task.section;
+        const lines = [`# ${task.title} (#${task.id})`, '', `Project: ${boardTitle}`, `Status: ${status}; ${task.checked ? 'completed' : 'open'}`,
+          task.owner ? `Owner: ${task.owner}` : '', task.note ? `Context: ${task.note}` : '',
+          task.milestoneId ? `Milestone: ${milestoneById(task.milestoneId)?.title || '#' + task.milestoneId}` : '',
+          (task.needs || []).length ? 'Prerequisites: ' + task.needs.map(id => `${taskById(id)?.title || 'Missing task'} (#${id})`).join(', ') : '',
+          '', '## Subtasks', ...(task.subtasks || []).map(s => `- [${s.checked ? 'x' : ' '}] ${s.text}${s.description ? '\n  ' + s.description.replace(/\n/g, '\n  ') : ''}`),
+          '', '## Saved task notes', detail.body || 'No additional notes.', '',
+          `Snapshot copied ${new Date().toISOString()}. Source: .tasks/TASKS.md and .tasks/tasks/${task.id}.md.`,
+          'Re-read the current project files before applying changes. If you cannot access them, propose updates for review; do not claim the live board changed.'];
+        await navigator.clipboard.writeText(lines.join('\n'));
+        button.textContent = 'Copied'; showStatus('Handoff copied. Paste it into Codex or ChatGPT to continue.');
+        setTimeout(() => { button.textContent = 'Copy handoff'; }, 1800);
+      } catch (error) { showStatus('Could not copy handoff: ' + error.message); }
+      finally { button.disabled = false; }
+    });
     document.getElementById('tmDelete').addEventListener('click', async () => {
       if (!tmTask) return;
       if (tmDetailMutationPending || tmCompletionPending || tmDeletionPending) {
@@ -4963,7 +5144,8 @@
           // glides over the gap between columns without being clipped by overflow.
           const ghost = card.cloneNode(true);
           ghost.classList.add('flip-ghost');
-          ghost.style.cssText += `position:fixed; margin:0; left:${prev.left}px; top:${prev.top}px; width:${prev.width}px; height:${prev.height}px; z-index:9000; pointer-events:none;`;
+          ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
+          ghost.style.cssText += `position:fixed; margin:0; left:${prev.left}px; top:${prev.top}px; width:${prev.width}px; height:${prev.height}px; z-index:90; pointer-events:none;`;
           document.body.appendChild(ghost);
           card.style.visibility = 'hidden';
           const anim = ghost.animate(

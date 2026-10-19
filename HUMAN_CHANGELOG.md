@@ -3,16 +3,22 @@
 A plain-English account of what changed and why. The [technical changelog](CHANGELOG.md)
 has implementation details; [the README](README.md) describes current features and setup.
 
-## Clearer controls — September 2026
+## Clearer controls — October 2026
 
 ### Improved
+- Avoid repeatedly rebuilding temporary drawing buffers as the goose moves, while keeping the space around it transparent.
 - See which settings tab is open even after moving the pointer away. Scroll in short, smooth steps that stop promptly, with direct movement when reduced motion is enabled.
+- Choose seasonal decorations and autumn leaves from Appearance. Seasonal effects start off unless you have already enabled them, and turning either switch off clears the leaves already on screen.
+- Rub the goose for a couple of seconds before it reacts with hearts and a pleased expression. A passing swipe or a still pointer no longer starts petting.
 - Recognize the same Goose artwork in the application and system tray. The Mac menu-bar version follows the system's light or dark appearance.
 
 ### Fixed
+- Keep scrolling brief when the computer is busy, without a large jump after a pause or a longer tail when the pointer moves.
+- Keep the positions reported to accessibility tools in step with the controls after scrolling stops at the edge of a page.
 - Show the Wayland switch only on Linux, keeping saved preferences intact when using other operating systems.
 
 ### Behind the scenes
+- Add tools for measuring the goose and its controls, preserve the initial results, and record the remaining extended checks. Keep the reported black rectangle under investigation until there is evidence of its cause.
 - Confirm the Windows application now opens its graphical controls and shows its logo, then check the follow-up changes across the supported desktops and installers.
 
 ## A more welcoming Goose — September 2026

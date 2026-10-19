@@ -36,7 +36,7 @@ pub const SWEEP_PER_PAT: f32 = 28.0;
 pub const STREAK_TIMEOUT: f64 = 1.2;
 /// Each registered pat keeps the goose calm for this long (seconds).
 pub const CALM_DURATION: f64 = 4.0;
-/// Actual repeated rubbing needed before the friendly follow invitation.
+/// Actual repeated rubbing needed before petting reactions and the friendly follow invitation.
 pub const AFFECTION_RUB_SECONDS: f64 = 2.5;
 const RUB_PAUSE_SECONDS: f64 = 0.3;
 
@@ -92,15 +92,15 @@ impl PatTracker {
     }
 
     /// Feed one frame of pointer state. `hovering` is whether the cursor is over the goose.
-    /// Returns how many pats were registered this frame (0 normally, ≥1 on a long sweep).
+    /// Returns pats only after sustained rubbing has earned the first petting reaction.
     pub fn update(&mut self, hovering: bool, pos: Vec2, now: f64) -> u32 {
         if now - self.last_motion_time > RUB_PAUSE_SECONDS {
             self.rub_seconds = 0.0;
+            self.sweep_accum = 0.0;
             self.follow_requested = false;
             self.follow_issued = false;
         }
-        // Lapse the streak after a quiet spell (the in-progress sweep keeps accumulating —
-        // it only resets when the cursor actually leaves the goose, below).
+        // Let the visible happy streak expire after the last earned pat.
         if now - self.last_pat_time > STREAK_TIMEOUT {
             self.streak = 0;
         }
@@ -109,6 +109,10 @@ impl PatTracker {
             // Off the goose: drop the baseline and the partial sweep so re-entry starts clean.
             self.last_pos = None;
             self.sweep_accum = 0.0;
+            self.rub_seconds = 0.0;
+            self.last_motion_time = f64::NEG_INFINITY;
+            self.follow_requested = false;
+            self.follow_issued = false;
             return 0;
         }
 
@@ -124,7 +128,14 @@ impl PatTracker {
                 if self.rub_seconds >= AFFECTION_RUB_SECONDS && !self.follow_issued {
                     self.follow_requested = true;
                     self.follow_issued = true;
+                    // Start with one visible reaction when intentional rubbing is earned.
+                    // Earlier movement must never accumulate a burst of deferred hearts.
+                    self.sweep_accum = SWEEP_PER_PAT;
                 }
+            }
+            if self.rub_seconds < AFFECTION_RUB_SECONDS {
+                self.last_pos = Some(pos);
+                return 0;
             }
             self.sweep_accum += moved;
             while self.sweep_accum >= SWEEP_PER_PAT {
@@ -144,20 +155,83 @@ impl PatTracker {
 mod tests {
     use super::*;
 
-    /// Drag the cursor a total of `dist` px across the goose in one straight sweep.
-    fn sweep(t: &mut PatTracker, start: Vec2, dist: f32, now: f64) -> u32 {
-        // Prime the baseline position (first hovering frame moves nothing).
-        t.update(true, start, now);
-        t.update(true, start + Vec2::new(dist, 0.0), now)
+    fn rub(t: &mut PatTracker, start: f64, frames: usize) -> u32 {
+        (0..frames)
+            .map(|frame| {
+                t.update(
+                    true,
+                    Vec2::new((frame % 2) as f32 * 10.0, 0.0),
+                    start + frame as f64 / 120.0,
+                )
+            })
+            .sum()
     }
 
     #[test]
-    fn sweeping_over_goose_builds_streak_and_calms() {
+    fn sustained_rubbing_builds_streak_and_calms() {
         let mut t = PatTracker::new();
-        let pats = sweep(&mut t, Vec2::new(0.0, 0.0), SWEEP_PER_PAT * 1.5, 0.0);
-        assert!(pats >= 1, "a long hover-sweep should register a pat");
+        let pats = rub(&mut t, 0.0, 360);
+        assert!(pats >= 1, "sustained rubbing should register pats");
         assert!(t.streak() >= 1);
-        assert!(t.is_calm(0.0), "patting calms the goose");
+        assert!(t.is_calm(3.0), "patting calms the goose");
+    }
+
+    #[test]
+    fn quick_swipes_and_stationary_hover_never_start_petting() {
+        let mut tracker = PatTracker::new();
+        for frame in 0..120 {
+            assert_eq!(
+                tracker.update(
+                    true,
+                    Vec2::new(frame as f32 * 30.0, 0.0),
+                    frame as f64 / 120.0
+                ),
+                0
+            );
+        }
+        for frame in 120..720 {
+            assert_eq!(
+                tracker.update(true, Vec2::new(3570.0, 0.0), frame as f64 / 120.0),
+                0
+            );
+        }
+        assert_eq!(tracker.streak(), 0);
+        assert!(!tracker.is_calm(6.0));
+        assert!(!tracker.take_follow_request());
+    }
+
+    #[test]
+    fn first_pet_requires_two_and_a_half_seconds_at_supported_poll_rates() {
+        for hz in [30, 60, 120, 144] {
+            let mut tracker = PatTracker::new();
+            let mut first_pat = None;
+            for frame in 0..hz * 3 {
+                let now = frame as f64 / hz as f64;
+                let pats = tracker.update(true, Vec2::new((frame % 2) as f32 * 10.0, 0.0), now);
+                if pats > 0 {
+                    first_pat = Some(now);
+                    assert!(pats <= 1, "no backlog of unearned pats");
+                    break;
+                }
+                assert_eq!(tracker.streak(), 0);
+                assert!(!tracker.is_calm(now));
+            }
+            let first_pat = first_pat.expect("intentional rubbing earns a reaction");
+            assert!((2.5..2.6).contains(&first_pat), "{hz} Hz: {first_pat}");
+        }
+    }
+
+    #[test]
+    fn leaving_the_goose_or_pausing_requires_a_fresh_rub() {
+        for leave in [false, true] {
+            let mut tracker = PatTracker::new();
+            assert_eq!(rub(&mut tracker, 0.0, 240), 0);
+            tracker.update(!leave, Vec2::new(10.0, 0.0), if leave { 2.0 } else { 2.5 });
+            assert_eq!(rub(&mut tracker, 2.6, 240), 0);
+            assert_eq!(tracker.streak(), 0);
+            assert!(!tracker.take_follow_request());
+            assert!(rub(&mut tracker, 4.6, 120) > 0);
+        }
     }
 
     #[test]
@@ -181,19 +255,19 @@ mod tests {
     #[test]
     fn streak_resets_after_timeout() {
         let mut t = PatTracker::new();
-        sweep(&mut t, Vec2::new(0.0, 0.0), SWEEP_PER_PAT * 1.2, 0.0);
+        rub(&mut t, 0.0, 360);
         assert!(t.streak() >= 1);
         // Long pause with no pats → the streak lapses.
-        t.update(false, Vec2::new(0.0, 0.0), STREAK_TIMEOUT + 0.5);
+        t.update(false, Vec2::new(0.0, 0.0), 3.0 + STREAK_TIMEOUT + 0.5);
         assert_eq!(t.streak(), 0, "streak should lapse after the timeout");
     }
 
     #[test]
     fn calm_window_expires() {
         let mut t = PatTracker::new();
-        sweep(&mut t, Vec2::new(0.0, 0.0), SWEEP_PER_PAT * 1.2, 0.0);
-        assert!(t.is_calm(0.0));
-        assert!(!t.is_calm(CALM_DURATION + 1.0), "calm wears off");
+        rub(&mut t, 0.0, 360);
+        assert!(t.is_calm(3.0));
+        assert!(!t.is_calm(3.0 + CALM_DURATION + 1.0), "calm wears off");
     }
 
     #[test]

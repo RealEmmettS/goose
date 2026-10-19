@@ -105,7 +105,7 @@ impl Default for ScheduleOptions {
             quiet_end: LocalMinute::new(8, 0).expect("valid default quiet end"),
             dnd_respect: true,
             pause_on_fullscreen: true,
-            seasonal: true,
+            seasonal: false,
             autumn: true,
         }
     }
@@ -212,10 +212,24 @@ mod tests {
 
     #[test]
     fn autumn_uses_meteorological_window() {
-        let schedule = ScheduleOptions::default();
+        let schedule = ScheduleOptions {
+            seasonal: true,
+            ..ScheduleOptions::default()
+        };
         assert!(!schedule.autumn_active(Some(local(12, 0, 8))));
         assert!(schedule.autumn_active(Some(local(12, 0, 9))));
         assert!(schedule.autumn_active(Some(local(12, 0, 11))));
         assert!(!schedule.autumn_active(Some(local(12, 0, 12))));
+    }
+
+    #[test]
+    fn seasonal_effects_require_explicit_enablement() {
+        assert!(!ScheduleOptions::default().autumn_active(Some(local(12, 0, 9))));
+        let schedule = ScheduleOptions {
+            seasonal: true,
+            autumn: false,
+            ..ScheduleOptions::default()
+        };
+        assert!(!schedule.autumn_active(Some(local(12, 0, 9))));
     }
 }

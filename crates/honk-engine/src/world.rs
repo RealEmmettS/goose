@@ -1858,8 +1858,8 @@ mod tests {
         assert!(dirty.contains(Vec2::new(900.0, 700.0)));
     }
 
-    /// Sweep the cursor back and forth over the goose `strokes` times, hovering throughout.
-    fn pat_the_goose(w: &mut World, strokes: usize) {
+    /// Rub the static test pose over timed pointer samples without advancing locomotion.
+    fn pat_the_goose(w: &mut World, frames: usize) {
         let anchor = w.goose.rig.body_center;
         // Baseline frame so the first real move has a previous position to measure from.
         w.set_pointer(Pointer {
@@ -1867,7 +1867,8 @@ mod tests {
             present: true,
             left_down: false,
         });
-        for i in 0..strokes {
+        for i in 0..frames {
+            w.elapsed += DT as f64;
             let dx = if i % 2 == 0 { 6.0 } else { -6.0 };
             w.set_pointer(Pointer {
                 pos: anchor + Vec2::new(dx, 0.0),
@@ -2211,7 +2212,9 @@ mod tests {
         let left = Rect::new(Vec2::new(0.0, 0.0), Vec2::new(100.0, 100.0));
         let right = Rect::new(Vec2::new(900.0, 0.0), Vec2::new(1000.0, 100.0));
         let layout = DesktopLayout::new(vec![left, right]).expect("valid layout");
-        let mut w = World::with_layout(layout.clone(), 424);
+        let mut options = WorldOptions::default();
+        options.schedule.seasonal = true;
+        let mut w = World::with_layout_and_options(layout.clone(), 424, options);
         w.set_local_time(LocalTime {
             day: 20260901,
             hour: 12,
@@ -2478,7 +2481,7 @@ mod tests {
     #[test]
     fn hovering_sweeps_pat_the_goose_spawning_hearts_and_calm() {
         let mut w = World::new(bounds(), 1);
-        pat_the_goose(&mut w, 12);
+        pat_the_goose(&mut w, 360);
         assert!(
             w.hearts().alive_count(w.now()) >= 1,
             "patting spawns heart particles"
@@ -2496,7 +2499,7 @@ mod tests {
                 ..WorldOptions::default()
             },
         );
-        pat_the_goose(&mut w, 12);
+        pat_the_goose(&mut w, 360);
         assert_eq!(w.hearts().alive_count(w.now()), 0);
         assert!(!w.is_calm());
     }
@@ -2522,6 +2525,10 @@ mod tests {
             });
             if frame < 300 {
                 assert_ne!(world.current_task(), "affection_follow");
+                assert_eq!(world.hearts().alive_count(world.now()), 0);
+                assert_eq!(world.goose.pose.primary.pleased, 0.0);
+                assert!(!world.is_calm());
+                assert!(!world.take_sounds().contains(&Sound::Pat));
             }
             assert!(world.take_cursor_commands().is_empty());
             world.tick();
@@ -3374,12 +3381,12 @@ mod tests {
     #[test]
     fn permission_wait_blocks_pats_and_clears_pat_visuals_and_sound() {
         let mut world = World::new(bounds(), 33);
-        pat_the_goose(&mut world, 12);
+        pat_the_goose(&mut world, 360);
         assert!(world.is_calm());
         assert!(world.hearts().alive_count(world.now()) > 0);
         assert!(world.take_sounds().contains(&Sound::Pat));
 
-        pat_the_goose(&mut world, 12);
+        pat_the_goose(&mut world, 360);
         world.sleepies.add(world.goose.rig.neck_head, world.now());
         world.enter_permission_wait(Vec2::new(700.0, 500.0));
 
@@ -3388,7 +3395,7 @@ mod tests {
         assert_eq!(world.sleepies().alive_count(world.now()), 0);
         assert!(world.take_sounds().is_empty());
 
-        pat_the_goose(&mut world, 24);
+        pat_the_goose(&mut world, 720);
         assert!(!world.is_calm());
         assert_eq!(world.hearts().alive_count(world.now()), 0);
         assert!(world.take_sounds().is_empty());
@@ -3396,7 +3403,9 @@ mod tests {
 
     #[test]
     fn permission_wait_clears_and_suppresses_mud_autumn_and_queued_sound() {
-        let mut world = World::new(bounds(), 34);
+        let mut options = WorldOptions::default();
+        options.schedule.seasonal = true;
+        let mut world = World::with_options(bounds(), 34, options);
         world.set_local_time(LocalTime {
             day: 20260915,
             hour: 12,
@@ -3920,7 +3929,9 @@ mod tests {
 
     #[test]
     fn autumn_spawns_only_inside_autumn_window() {
-        let mut w = World::new(bounds(), 264);
+        let mut options = WorldOptions::default();
+        options.schedule.seasonal = true;
+        let mut w = World::with_options(bounds(), 264, options);
         w.set_local_time(LocalTime {
             day: 20260831,
             hour: 12,
@@ -3942,6 +3953,45 @@ mod tests {
             w.tick();
         }
         assert!(!w.autumn().piles().is_empty());
+    }
+
+    #[test]
+    fn disabling_either_seasonal_switch_clears_leaves_until_enabled_again() {
+        for disable_master in [true, false] {
+            let mut options = WorldOptions::default();
+            options.schedule.seasonal = true;
+            let mut world = World::with_options(bounds(), 265, options);
+            world.set_local_time(LocalTime {
+                day: 20260915,
+                hour: 12,
+                minute: 0,
+                second: 0,
+            });
+            for _ in 0..1_300 {
+                world.tick();
+            }
+            assert!(!world.autumn().piles().is_empty());
+
+            if disable_master {
+                options.schedule.seasonal = false;
+            } else {
+                options.schedule.autumn = false;
+            }
+            world.apply_options(options);
+            assert!(world.autumn().piles().is_empty());
+            for _ in 0..1_300 {
+                world.tick();
+            }
+            assert!(world.autumn().piles().is_empty());
+
+            options.schedule.seasonal = true;
+            options.schedule.autumn = true;
+            world.apply_options(options);
+            for _ in 0..1_300 {
+                world.tick();
+            }
+            assert!(!world.autumn().piles().is_empty());
+        }
     }
 
     #[test]

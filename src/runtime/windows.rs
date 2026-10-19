@@ -127,6 +127,7 @@ pub fn run(
     let mut collect_controller = CollectWindowController::new(primary_bounds);
     let mut core = RuntimeCore::new();
     let mut damage_canvas = DamageCanvas::default();
+    let mut frame_profile = super::windows_profile::FrameProfile::from_env();
     const PRESENCE_POLL_INTERVAL: f64 = 0.5;
     const AUDIO_RETRY_INTERVAL: f64 = 5.0;
     let mut warned_cursor_warp = false;
@@ -551,6 +552,7 @@ pub fn run(
         }
 
         if let Some(dirty) = core.damage(&world, frame) {
+            let profile_start = frame_profile.as_ref().map(|_| std::time::Instant::now());
             let width = dirty.width().ceil().max(1.0) as u32;
             let height = dirty.height().ceil().max(1.0) as u32;
             let origin = dirty.min;
@@ -581,7 +583,14 @@ pub fn run(
             );
             render_hearts(canvas, world.hearts(), world.now(), origin);
             render_sleepies(canvas, world.sleepies(), world.now(), origin);
-            overlay.present(dirty, canvas)?;
+            if let Some(profile) = frame_profile.as_mut() {
+                let start = profile_start.expect("profile clock");
+                let render_us = start.elapsed().as_secs_f64() * 1e6;
+                let native = overlay.present_profiled(dirty, canvas)?;
+                profile.record(start, render_us, native);
+            } else {
+                overlay.present(dirty, canvas)?;
+            }
             core.acknowledge_present();
         }
 

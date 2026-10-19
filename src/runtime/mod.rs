@@ -1,6 +1,9 @@
 #[cfg(windows)]
 pub mod windows;
 
+#[cfg(windows)]
+mod windows_profile;
+
 #[cfg(target_os = "macos")]
 pub mod macos;
 

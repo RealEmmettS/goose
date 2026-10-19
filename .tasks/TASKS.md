@@ -1,19 +1,35 @@
 # Tasks
 
 ## Backlog
+- [ ] **Qualify lightweight Windows rendering and settings** - retain extended comparisons and endurance follow-up after the operator authorized publication (owner codex) #g13
+  - [ ] Capture the installed and stopped baselines with isolated profiles and tracked tooling.
+  - [x] Remove per-frame crop allocations and reuse bounded bitmap capacity without changing visible pixels.
+  - [x] Extend deterministic leaf and large-region benchmarks and pin rendering regressions.
+  - [x] Verify native incremental scrolling, fractional input, resizing and reduced motion.
+  - [ ] Pass repeated baseline/candidate performance comparisons and the approved budgets.
+  - [ ] Pass the packaged endurance test and repeated runtime/settings lifecycle cycles.
+  - [ ] Record the evidence and complete required local and hosted qualification.
 - [ ] **Default-OFF spicy behaviors** - clipboard honk, fake-photo flash, gaggle cameo, easter eggs, goose gifts, speech bubbles (plan §5.12); generate any needed image assets with the image-gen tool using the project's clumsy MS-Paint base prompt (see `b9e.md`); preserve terminal-window protection absolutely #b9e
+- [ ] **Investigate intermittent Windows black backgrounds** - original symptom remains unreproduced after the agreed bounded trials; retain evidence and capture a future recurrence (owner codex) #g14
+  - [x] Run three five-minute isolated scenarios covering leaves, region changes and display boundaries.
+  - [x] Run ten start/stop cycles and verify cleanup of owned windows.
+  - [x] Preserve correlated evidence and record the bounded unresolved outcome.
+  - [ ] Capture a recurrence and correct only an evidence-backed cause.
 
 ## To-Do
 
-
 ## Active
-- [ ] **Polish settings navigation and shared app icons** - selected tabs, controlled smooth scrolling, Linux-only Wayland controls and consistent tray/menu artwork in one update (owner codex) #g12
+- [ ] **Polish settings navigation and shared app icons** - selected tabs, controlled scrolling, seasonal and petting refinements, consistent artwork and the fully qualified update (owner codex) #g12
   - [x] Reproduce installed behavior and record the user's Windows logo and settings acceptance.
   - [x] Make selected tabs distinct and scrolling smooth, bounded and respectful of reduced motion.
   - [x] Show the Wayland switch only on supported Linux builds while preserving saved values.
+  - [x] Put seasonal and leaf switches on Appearance, default seasonal effects off, and verify live clearing.
+  - [ ] Require intentional rubbing before the first petting reaction and verify the visible timing.
+  - [x] Investigate the reported intermittent black rectangles and retain the exact acceptance limits.
   - [ ] Use consistent application artwork in Windows/Linux tray icons and verify the Mac menu-bar treatment.
   - [ ] Validate native behavior, all required source/candidate/main gates and the complete immutable update.
   - [ ] Verify fresh public downloads and coordinate the website release guidance.
+
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
