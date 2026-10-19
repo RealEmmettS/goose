@@ -6,12 +6,12 @@ Honk300 is a cross-platform Rust desktop goose with a procedural renderer and Wi
 macOS, X11, and opt-in reduced Wayland runtimes. **Goose** is the user-facing application name and `goose` is the recommended command.
 `honk300` remains the internal primary binary; `honk` and `goose` remain compatible aliases. The Cargo workspace uses Rust 1.95, edition 2021.
 
-Public stable is v1.11.0, source `630f754a0ef657172b0a6a7edea65593fa514de5`.
-Its completed publication and fresh-public qualification record is `docs/readiness/v1.11.0-readiness.md`.
+Public stable is v1.11.1, source `91a31cedcdf621f6b067557b1ebf1750514c6454`.
+Its publication and qualification record is `docs/readiness/v1.11.1-readiness.md`.
 Task #g11 and ADR 0052 track the combined application, icon, leaf and affection update.
 The user confirms that the installed v1.11.0 Windows application now displays its logo
 and opens the graphical controls. The installed command and active immutable slot agree.
-Task #g12 and ADR 0054 track the next settings-navigation and shared tray-artwork update.
+Task #g12 and ADR 0054 track the published settings-navigation and shared tray-artwork update.
 ADR 0055 adds default-off seasonal effects, Appearance leaf switches and intentional
 petting: 2.5 seconds of active rubbing before the first petting reaction. Preserve saved
 seasonal choices. A user-reported intermittent Windows black rectangle remains under

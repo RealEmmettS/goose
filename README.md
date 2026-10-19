@@ -6,8 +6,8 @@ bounded desktop pranks. Open **Goose** from your applications menu to start or s
 change settings, and check for updates. The native application is the primary interface;
 the existing Rust services, command line, and terminal editor remain its backend and secondary controls.
 
-**Current stable release:** [v1.11.0](https://github.com/RealEmmettS/goose/releases/tag/v1.11.0),
-published from exact commit `630f754a0ef657172b0a6a7edea65593fa514de5`.
+**Current stable release:** [v1.11.1](https://github.com/RealEmmettS/goose/releases/tag/v1.11.1),
+published from exact commit `91a31cedcdf621f6b067557b1ebf1750514c6454`.
 Goose opens its graphical controls from application menus and the bare `goose` command,
 with recognizable application icons and reliable installed Configure actions. Maple,
 oak, birch and ginkgo leaves fade away on their own; sustained rubbing earns hearts
@@ -18,7 +18,7 @@ motion, bounded rendering resources, native graphical settings, Linux notes and
 pictures, experimental Pi 4/5 64-bit Desktop guidance, and independently qualified
 KDE, Sway, Hyprland and GNOME integrations. Each desktop exposes only its proven
 capabilities. See [desktop setup](docs/wayland-integrations.md),
-[release evidence](docs/readiness/v1.11.0-readiness.md),
+[release evidence](docs/readiness/v1.11.1-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
 **Goose**, the bare `goose` command, `goose settings`, and tray Configure open the
@@ -27,7 +27,7 @@ graphical controls. `goose start` or `goose plz` starts the goose directly;
 All routes use the same Rust-owned configuration and lifecycle. The compatible `honk300`
 and `honk` aliases remain.
 
-The settings-navigation update in development makes the selected tab persistent,
+The settings-navigation update keeps the current tab visibly highlighted,
 keeps scrolling short and smooth, limits the Wayland switch to Linux, and uses the
 application artwork in native trays and menus. It also puts both seasonal switches on
 Appearance, defaults seasonal effects off, and requires about 2½ seconds of active
@@ -39,10 +39,9 @@ Earlier releases, fixes and acceptance limits remain in the
 [readiness records](docs/readiness/). Public download verification and hosted native
 checks do not establish physical-device or administrator-prompt acceptance.
 
-Rubbing the goose produces hearts and, after about 2½ seconds, invites a gentle, 15-second
-follow at a comfortable distance. The update in development also delays the first hearts
-and petting animation until that rubbing threshold; quick swipes and stationary hovering
-do not qualify. The **React to petting** preference controls this behavior;
+Actively rubbing the goose for about 2½ seconds earns its first petting reaction and hearts,
+and can invite a gentle, 15-second follow at a comfortable distance. Quick swipes and
+stationary hovering do not qualify. The **React to petting** preference controls this behavior;
 following never grabs the pointer. Autumn leaves have recognizable shapes, scatter more
 strongly when the goose runs through them, and fade away even without being touched.
 
@@ -345,7 +344,7 @@ cargo clippy --locked --all-targets --workspace -- -D warnings
 cargo test --locked --workspace
 cargo build --locked --release
 python -m unittest discover -s script/tests
-dist plan --tag=v1.11.0
+dist plan --tag=v1.11.1
 cargo audit --version 0.22.2
 ```
 

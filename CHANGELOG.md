@@ -7,6 +7,9 @@ features and installation, and [readiness records](docs/readiness/) for release 
 
 ## [Unreleased]
 
+### Behind the scenes
+- Record the complete v1.11.1 publication, all eight fresh-public lanes, independent 47-asset audit and exact website deployment. Preserve the canceled Windows administrator-prompt attempt and verified unchanged v1.11.0 state; leave installed-public acceptance, extended performance qualification and the original black-rectangle investigation open.
+
 ## [1.11.1] - 2026-10-19
 
 ### Improved

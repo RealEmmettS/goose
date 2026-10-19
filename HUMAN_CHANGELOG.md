@@ -18,6 +18,7 @@ has implementation details; [the README](README.md) describes current features a
 - Show the Wayland switch only on Linux, keeping saved preferences intact when using other operating systems.
 
 ### Behind the scenes
+- Verify the published downloads and website guidance, and preserve the existing installation and preferences when Windows approval is canceled. Keep the remaining installed checks clearly separate from the completed release checks.
 - Add tools for measuring the goose and its controls, preserve the initial results, and record the remaining extended checks. Keep the reported black rectangle under investigation until there is evidence of its cause.
 - Confirm the Windows application now opens its graphical controls and shows its logo, then check the follow-up changes across the supported desktops and installers.
 

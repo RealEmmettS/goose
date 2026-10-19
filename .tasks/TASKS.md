@@ -24,11 +24,12 @@
   - [x] Make selected tabs distinct and scrolling smooth, bounded and respectful of reduced motion.
   - [x] Show the Wayland switch only on supported Linux builds while preserving saved values.
   - [x] Put seasonal and leaf switches on Appearance, default seasonal effects off, and verify live clearing.
-  - [ ] Require intentional rubbing before the first petting reaction and verify the visible timing.
+  - [x] Require intentional rubbing before the first petting reaction and verify the visible timing.
   - [x] Investigate the reported intermittent black rectangles and retain the exact acceptance limits.
-  - [ ] Use consistent application artwork in Windows/Linux tray icons and verify the Mac menu-bar treatment.
-  - [ ] Validate native behavior, all required source/candidate/main gates and the complete immutable update.
-  - [ ] Verify fresh public downloads and coordinate the website release guidance.
+  - [x] Use consistent application artwork in Windows/Linux tray icons and verify the Mac menu-bar treatment.
+  - [x] Validate native behavior, all required source/candidate/main gates and the complete immutable update.
+  - [ ] Verify the installed public Windows runtime and settings while preserving saved preferences and stopped state.
+  - [x] Verify fresh public downloads and coordinate the website release guidance.
 
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
