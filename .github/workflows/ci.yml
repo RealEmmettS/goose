@@ -6,11 +6,20 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      diagnose_published_startup:
+        description: Reproduce the historical startup opt-out regression using published installers
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  published-startup-regression:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnose_published_startup }}
+    uses: ./.github/workflows/windows-startup-regression.yml
+
   same-sha-plan:
     name: Resolve same-SHA installer identity
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}

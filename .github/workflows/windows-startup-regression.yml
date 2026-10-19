@@ -1,6 +1,14 @@
 name: Windows startup regression
 
 on:
+  workflow_call:
+    inputs:
+      previous_tag:
+        type: string
+        default: v1.11.0
+      candidate_tag:
+        type: string
+        default: v1.11.1
   workflow_dispatch:
     inputs:
       previous_tag:
