@@ -5,6 +5,9 @@ has implementation details; [the README](README.md) describes current features a
 
 ## Clearer controls — October 2026
 
+### Behind the scenes
+- Add installation checks to catch updates that turn login startup back on after it has been disabled.
+
 ### Improved
 - Avoid repeatedly rebuilding temporary drawing buffers as the goose moves, while keeping the space around it transparent.
 - See which settings tab is open even after moving the pointer away. Scroll in short, smooth steps that stop promptly, with direct movement when reduced motion is enabled.

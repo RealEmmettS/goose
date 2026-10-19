@@ -1,0 +1,68 @@
+name: Windows startup regression
+
+on:
+  workflow_dispatch:
+    inputs:
+      previous_tag:
+        description: Previously published installer
+        required: true
+        default: v1.11.0
+      candidate_tag:
+        description: Published installer under test
+        required: true
+        default: v1.11.1
+
+permissions:
+  contents: read
+
+jobs:
+  published-startup:
+    name: Published ${{ matrix.edition }} startup preference
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [global, corporate]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Download exact published MSI bytes
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_TAG: ${{ inputs.previous_tag }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: |
+          $suffix = if ('${{ matrix.edition }}' -eq 'corporate') { '-corporate' } else { '' }
+          $name = "honk300-x86_64-pc-windows-msvc$suffix.msi"
+          foreach ($tag in @($env:PREVIOUS_TAG, $env:CANDIDATE_TAG)) {
+            if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Expected an immutable stable tag.' }
+            $destination = "target/startup-input/$tag"
+            gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --pattern "$name.sha256" --dir $destination
+            if ($LASTEXITCODE -ne 0) { throw 'Public installer download failed.' }
+            $expected = (Get-Content -LiteralPath "$destination/$name.sha256" -Raw).Split(' ')[0].Trim()
+            if ($expected -notmatch '^[0-9a-fA-F]{64}$' -or (Get-FileHash -LiteralPath "$destination/$name").Hash -ne $expected) {
+              throw 'Published installer hash mismatch.'
+            }
+          }
+      - name: Exercise real installation, settings opt-out and upgrade
+        shell: pwsh
+        env:
+          PREVIOUS_TAG: ${{ inputs.previous_tag }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: |
+          $suffix = if ('${{ matrix.edition }}' -eq 'corporate') { '-corporate' } else { '' }
+          $name = "honk300-x86_64-pc-windows-msvc$suffix.msi"
+          ./script/smoke_windows_startup.ps1 `
+            -PreviousMsi "target/startup-input/$env:PREVIOUS_TAG/$name" `
+            -CandidateMsi "target/startup-input/$env:CANDIDATE_TAG/$name" `
+            -Edition '${{ matrix.edition }}' `
+            -ExpectedVersion ($env:CANDIDATE_TAG -replace '^v', '') `
+            -AllowMachineMutation
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: startup-regression-${{ matrix.edition }}
+          path: target/windows-startup-evidence
+          if-no-files-found: error

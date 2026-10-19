@@ -19,6 +19,12 @@
 ## To-Do
 
 ## Active
+- [ ] **Keep login startup off unless chosen** - correct stale installer startup selections and preserve the current owned preference (owner codex) #g15
+  - [x] Capture the installed failure and restore the user's exact disabled preference.
+  - [ ] Reproduce stale installer selection with native disposable-runner checks.
+  - [ ] Correct Global and Corporate installer preference handling and record the decision.
+  - [ ] Verify fresh default-off, intentional opt-in, later opt-out, upgrade and repair behavior.
+  - [ ] Qualify and deliver the fix without changing existing release assets.
 - [ ] **Polish settings navigation and shared app icons** - selected tabs, controlled scrolling, seasonal and petting refinements, consistent artwork and the fully qualified update (owner codex) #g12
   - [x] Reproduce installed behavior and record the user's Windows logo and settings acceptance.
   - [x] Make selected tabs distinct and scrolling smooth, bounded and respectful of reduced motion.
@@ -29,6 +35,7 @@
   - [x] Use consistent application artwork in Windows/Linux tray icons and verify the Mac menu-bar treatment.
   - [x] Validate native behavior, all required source/candidate/main gates and the complete immutable update.
   - [ ] Verify the installed public Windows runtime and settings while preserving saved preferences and stopped state.
+    > Login preference preservation requires the installer correction in #g15.
   - [x] Verify fresh public downloads and coordinate the website release guidance.
 
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
