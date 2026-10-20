@@ -50,6 +50,7 @@ $actions = [Collections.Generic.List[string]]::new()
 $selected = $false
 $window = $null
 $failure = $null
+$failureLocation = $null
 
 function Find-Control([object] $Parent, [string] $Name) {
     # The native MSI provider exposes some named controls as Pane, including buttons.
@@ -126,8 +127,15 @@ try {
         $windows = [Windows.Automation.AutomationElement]::RootElement.FindAll(
             [Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)
         $matches = @($windows | Where-Object {
-            $owner = Get-Process -Id $_.Current.ProcessId -ErrorAction SilentlyContinue
-            $_.Current.Name -match '^(Goose|honk300).*Setup$' -and
+            # A native window may disappear between enumeration and inspection.
+            # Read its identity once and never pass an absent PID to Get-Process.
+            if ($null -eq $_) { return $false }
+            try { $current = $_.Current }
+            catch [Windows.Automation.ElementNotAvailableException] { return $false }
+            if ($null -eq $current -or $current.ProcessId -le 0 -or $current.Name -notmatch '^(Goose|honk300).*Setup$') {
+                return $false
+            }
+            $owner = Get-Process -Id $current.ProcessId -ErrorAction SilentlyContinue
             $null -ne $owner -and $owner.ProcessName -eq 'msiexec'
         })
         if ($matches.Count -gt 1) { throw 'Multiple installer wizard windows are ambiguous.' }
@@ -240,13 +248,14 @@ try {
     if (-not $selected) { throw 'The wizard completed without exercising the requested selection.' }
 } catch {
     $failure = $_.Exception.Message
+    $failureLocation = $_.ScriptStackTrace
     try { Save-Tree 'failure-tree' } catch { }
 } finally {
     if (-not $process.HasExited) {
         & taskkill.exe /PID $process.Id /T /F | Out-Null
         [void]$process.WaitForExit(5000)
     }
-    [ordered]@{choice=$Choice;failure=$failure;actions=@($actions.ToArray())} | ConvertTo-Json -Depth 4 |
+    [ordered]@{choice=$Choice;failure=$failure;failure_location=$failureLocation;actions=@($actions.ToArray())} | ConvertTo-Json -Depth 4 |
         Set-Content -LiteralPath (Join-Path $evidence 'result.json') -Encoding utf8
     $process.Dispose()
 }
