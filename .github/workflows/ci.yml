@@ -11,6 +11,14 @@ on:
         description: Reproduce the historical startup opt-out regression using published installers
         type: boolean
         default: false
+      startup_candidate_run:
+        description: Optional Windows Installers run to diagnose with the current startup harness
+        type: string
+        default: ''
+      startup_candidate_tag:
+        description: Candidate version for a diagnostic artifact run
+        type: string
+        default: v1.11.2
 
 permissions:
   contents: read
@@ -19,6 +27,13 @@ jobs:
   published-startup-regression:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnose_published_startup }}
     uses: ./.github/workflows/windows-startup-regression.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      previous_tag: ${{ inputs.startup_candidate_run != '' && 'v1.11.1' || 'v1.11.0' }}
+      candidate_tag: ${{ inputs.startup_candidate_run != '' && inputs.startup_candidate_tag || 'v1.11.1' }}
+      candidate_run: ${{ inputs.startup_candidate_run || '' }}
 
   same-sha-plan:
     name: Resolve same-SHA installer identity

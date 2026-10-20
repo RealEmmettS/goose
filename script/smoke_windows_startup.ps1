@@ -81,12 +81,12 @@ function Feature-State([string] $Feature) {
     $database = $installer.OpenDatabase($activePackage, 0)
     $view = $database.OpenView('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductCode''')
     try {
-        $view.Execute()
+        [void]$view.Execute()
         $record = $view.Fetch()
         if ($null -eq $record) { throw 'MSI product identity is missing.' }
         $productCode = $record.StringData(1)
         return $installer.FeatureState($productCode, $Feature)
-    } finally { $view.Close() }
+    } finally { [void]$view.Close() }
 }
 
 function Invoke-Settings([object] $Command) {
@@ -198,9 +198,9 @@ function New-RollbackProbe {
             'INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) VALUES (''GooseStartupRollbackProbe'', ''NOT REMOVE~="ALL"'', 5100)'
         )) {
             $view = $database.OpenView($sql)
-            try { $view.Execute() } finally { $view.Close() }
+            try { [void]$view.Execute() } finally { [void]$view.Close() }
         }
-        $database.Commit()
+        [void]$database.Commit()
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database) }
     $probeScript = @'
 param([string] $OutputPath)

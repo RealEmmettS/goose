@@ -9,6 +9,9 @@ on:
       candidate_tag:
         type: string
         default: v1.11.1
+      candidate_run:
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       previous_tag:
@@ -19,13 +22,18 @@ on:
         description: Published installer under test
         required: true
         default: v1.11.1
+      candidate_run:
+        description: Optional existing Windows Installers artifact run; diagnostic only
+        required: false
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   published-startup:
-    name: Published ${{ matrix.edition }} startup preference
+    name: Diagnose ${{ matrix.edition }} startup preference
     runs-on: windows-2022
     strategy:
       fail-fast: false
@@ -41,10 +49,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PREVIOUS_TAG: ${{ inputs.previous_tag }}
           CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run }}
         run: |
           $suffix = if ('${{ matrix.edition }}' -eq 'corporate') { '-corporate' } else { '' }
           $name = "honk300-x86_64-pc-windows-msvc$suffix.msi"
-          foreach ($tag in @($env:PREVIOUS_TAG, $env:CANDIDATE_TAG)) {
+          $tags = @($env:PREVIOUS_TAG)
+          if ([string]::IsNullOrEmpty($env:CANDIDATE_RUN)) { $tags += $env:CANDIDATE_TAG }
+          foreach ($tag in $tags) {
             if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Expected an immutable stable tag.' }
             $destination = "target/startup-input/$tag"
             gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $name --pattern "$name.sha256" --dir $destination
@@ -54,11 +65,33 @@ jobs:
               throw 'Published installer hash mismatch.'
             }
           }
+      - name: Record diagnostic candidate provenance
+        if: inputs.candidate_run != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: |
+          if ($env:CANDIDATE_RUN -notmatch '^[0-9]+$' -or $env:CANDIDATE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Invalid diagnostic candidate identity.' }
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:CANDIDATE_RUN" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $run.name -ne 'Windows Installers' -or $run.head_sha -notmatch '^[0-9a-f]{40}$') { throw 'Unexpected candidate workflow identity.' }
+          New-Item -ItemType Directory -Force -Path target/windows-startup-evidence | Out-Null
+          @{candidate_run=$env:CANDIDATE_RUN;candidate_source=$run.head_sha;harness_source=(git rev-parse HEAD);qualification='diagnostic only; final release requires one unchanged source'} |
+            ConvertTo-Json | Set-Content target/windows-startup-evidence/candidate-provenance.json
+      - uses: actions/download-artifact@v6
+        if: inputs.candidate_run != ''
+        with:
+          name: release-windows-x86_64-pc-windows-msvc
+          path: target/startup-input/${{ inputs.candidate_tag }}
+          run-id: ${{ inputs.candidate_run }}
+          github-token: ${{ github.token }}
       - name: Exercise real installation, settings opt-out and upgrade
         shell: pwsh
         env:
           PREVIOUS_TAG: ${{ inputs.previous_tag }}
           CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run }}
         run: |
           $suffix = if ('${{ matrix.edition }}' -eq 'corporate') { '-corporate' } else { '' }
           $name = "honk300-x86_64-pc-windows-msvc$suffix.msi"
@@ -67,6 +100,7 @@ jobs:
             -CandidateMsi "target/startup-input/$env:CANDIDATE_TAG/$name" `
             -Edition '${{ matrix.edition }}' `
             -ExpectedVersion ($env:CANDIDATE_TAG -replace '^v', '') `
+            -ExerciseWizard:(-not [string]::IsNullOrEmpty($env:CANDIDATE_RUN)) `
             -AllowMachineMutation
       - uses: actions/upload-artifact@v7
         if: always()
