@@ -199,20 +199,56 @@ function New-RollbackProbe {
     Copy-Item -LiteralPath $candidate -Destination $path
     $database = $installer.OpenDatabase($path, 1)
     try {
-        # Deferred EXE failure occurs after Run-value writes have actually executed.
+        # Fail after the old product is retired and the new slot/Run state is active,
+        # while the MSI transaction and slot rollback action can still restore it.
         # This modifies a private test copy, never the candidate or public MSI.
+        $sequences = @{}
+        foreach ($action in @('ActivateWindowsSlot', 'CommitWindowsSlot', 'InstallFinalize')) {
+            $view = $database.OpenView('SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action` = ''' + $action + '''')
+            $record = $null
+            try {
+                [void]$view.Execute()
+                $record = $view.Fetch()
+                if ($null -eq $record) { throw "Missing rollback-boundary action: $action" }
+                $sequences[$action] = $record.IntegerData(1)
+            } finally {
+                if ($null -ne $record) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record) }
+                [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view)
+            }
+        }
+        $probeSequence = $sequences.CommitWindowsSlot + 1
+        if ($probeSequence -le $sequences.ActivateWindowsSlot -or $probeSequence -ge $sequences.InstallFinalize) {
+            throw 'No valid post-activation rollback probe boundary.'
+        }
+        $view = $database.OpenView('SELECT `Action` FROM `InstallExecuteSequence` WHERE `Sequence` = ' + $probeSequence)
+        $record = $null
+        try {
+            [void]$view.Execute()
+            $record = $view.Fetch()
+            if ($null -ne $record) { throw 'Rollback probe sequence is already occupied.' }
+        } finally {
+            if ($null -ne $record) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record) }
+            [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view)
+        }
         $actionType = if ($Edition -eq 'global') { 3106 } else { 1058 }
         foreach ($sql in @(
-            ('INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) VALUES (''GooseStartupRollbackProbe'', ' + $actionType + ', ''SystemFolder'', ''"[SystemFolder]WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "[GOOSESTARTUPPROBESCRIPT]" -OutputPath "[GOOSESTARTUPPROBEOUTPUT]"'')'),
-            'INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) VALUES (''GooseStartupRollbackProbe'', ''NOT REMOVE~="ALL"'', 5100)'
+            ('INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) VALUES (''GooseStartupRollbackProbe'', ' + $actionType + ', ''SystemFolder'', ''"[SystemFolder]WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "[GOOSESTARTUPPROBESCRIPT]" -OutputPath "[GOOSESTARTUPPROBEOUTPUT]" -ReceiptPath "[APPLICATIONFOLDER]install-receipt.json"'')'),
+            ('INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) VALUES (''GooseStartupRollbackProbe'', ''NOT REMOVE~="ALL"'', ' + $probeSequence + ')')
         )) {
             $view = $database.OpenView($sql)
             try { [void]$view.Execute() } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
         }
+        # Changed MSI bytes need a different package code even in a private fixture.
+        $summary = $database.SummaryInformation(1)
+        try {
+            $probePackageCode = [Guid]::NewGuid().ToString('B').ToUpperInvariant()
+            [void]$summary.GetType().InvokeMember('Property', [Reflection.BindingFlags]::SetProperty, $null, $summary, @(9, $probePackageCode))
+            [void]$summary.Persist()
+        } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($summary) }
         [void]$database.Commit()
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database) }
     $probeScript = @'
-param([string] $OutputPath)
+param([string] $OutputPath, [string] $ReceiptPath)
 $ErrorActionPreference = 'Stop'
 $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::__HIVE__, [Microsoft.Win32.RegistryView]::Registry64)
 try {
@@ -220,7 +256,9 @@ try {
     try { $run = if ($null -eq $key) { $null } else { $key.GetValue('Honk300', $null) } }
     finally { if ($null -ne $key) { $key.Dispose() } }
 } finally { $base.Dispose() }
-@{run=$run;at=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content -LiteralPath $OutputPath -Encoding utf8
+$receipt = Get-Content -LiteralPath $ReceiptPath -Raw | ConvertFrom-Json
+@{run=$run;version=$receipt.version;commit=$receipt.commit;at=[DateTime]::UtcNow.ToString('o')} |
+    ConvertTo-Json | Set-Content -LiteralPath $OutputPath -Encoding utf8
 exit 1
 '@
     $probeScript.Replace('__HIVE__', $hive.ToString()) | Set-Content -LiteralPath (Join-Path $evidence 'rollback-probe.ps1') -Encoding utf8
@@ -301,17 +339,18 @@ try {
     Assert-Startup $afterEnabledUpgrade $true
     if ($beforeEnabledUpgrade.config_sha256 -ne $afterEnabledUpgrade.config_sha256) { throw 'Upgrade changed the enabled saved preference.' }
     if ($Family -eq 'msi') {
+        if ($afterEnabledUpgrade.commit -notmatch '^[0-9a-f]{40}$') { throw 'Candidate receipt commit is missing or invalid.' }
         $rollbackProbe = New-RollbackProbe
         Invoke-Installer $candidate 'remove-before-rollback-upgrades' -Uninstall
         foreach ($enabledBefore in @($true, $false)) {
             $label = if ($enabledBefore) { 'rollback-enabled' } else { 'rollback-disabled' }
-            [string[]]$beforeArguments = if ($enabledBefore) { $enableArguments } else { $disableArguments }
+            [string[]]$beforeArguments = if ($enabledBefore) { $enableArguments } else { @('ADDLOCAL=Binaries,Environment', 'REMOVE=Autostart') }
             Invoke-Installer $previous "prepare-$label" $beforeArguments
             Set-Startup $enabledBefore
             $beforeRollback = Read-State "before-$label"
             Assert-Startup $beforeRollback $enabledBefore
             $receiptHash = (Get-FileHash -LiteralPath $receiptPath).Hash
-            [string[]]$oppositeArguments = if ($enabledBefore) { $disableArguments } else { $enableArguments }
+            [string[]]$oppositeArguments = if ($enabledBefore) { @('ADDLOCAL=Binaries', 'REMOVE=Autostart') } else { $enableArguments }
             $probeOutput = Join-Path $evidence ("$label-during-transaction-" + [Guid]::NewGuid().ToString('N') + '.json')
             $oppositeArguments += @(
                 ('GOOSESTARTUPPROBESCRIPT="' + (Join-Path $evidence 'rollback-probe.ps1') + '"'),
@@ -325,6 +364,9 @@ try {
             $duringRollback = Get-Content -LiteralPath $probeOutput -Raw | ConvertFrom-Json
             $oppositeRun = if ($enabledBefore) { $null } else { '"' + (Join-Path $root 'bin\honk300-app.exe') + '"' }
             if ($duringRollback.run -ne $oppositeRun) { throw "$label never applied the opposite Run state before failing." }
+            if ($duringRollback.version -ne $ExpectedVersion -or $duringRollback.commit -ne $afterEnabledUpgrade.commit) {
+                throw "$label did not reach the candidate slot before failing."
+            }
             $afterRollback = Read-State "after-$label"
             Assert-Startup $afterRollback $enabledBefore
             if ((Get-FileHash -LiteralPath $receiptPath).Hash -ne $receiptHash -or
