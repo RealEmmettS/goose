@@ -173,6 +173,35 @@ try {
                     $pattern = if ($Choice -eq 'enable') { '^Will be installed on local hard drive' } else { '^Entire feature will be unavailable' }
                     $options = @($menus | Where-Object { $_.Current.Name -match $pattern })
                     if ($options.Count -eq 1) { $menuItem = $options[0]; break }
+                    # MSI draws this popup itself: the native UIA provider can expose
+                    # four invokable items with empty names. The retained CI screenshot
+                    # establishes local-install first and unavailable last. Require that
+                    # exact owned, visible layout; final Run/receipt assertions still apply.
+                    $popups = @($menus | Where-Object {
+                        $_.Current.ControlType -eq [Windows.Automation.ControlType]::Menu -and
+                        $_.Current.ClassName -eq '#32768' -and -not $_.Current.IsOffscreen
+                    })
+                    if ($popups.Count -eq 1) {
+                        $popupItems = @($popups[0].FindAll([Windows.Automation.TreeScope]::Children,
+                            [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::MenuItem)) |
+                            Sort-Object { $_.Current.BoundingRectangle.Top })
+                        $available = @($popupItems | Where-Object {
+                            $_.Current.ProcessId -eq $window.Current.ProcessId -and
+                            $_.Current.Name -eq '' -and $_.Current.IsEnabled -and -not $_.Current.IsOffscreen -and
+                            $_.Current.BoundingRectangle.Width -gt 0 -and $_.Current.BoundingRectangle.Height -gt 0
+                        })
+                        if ($popupItems.Count -eq 4 -and $available.Count -eq 4) {
+                            for ($itemIndex = 1; $itemIndex -lt 4; $itemIndex++) {
+                                if ($popupItems[$itemIndex].Current.BoundingRectangle.Top -lt $popupItems[$itemIndex - 1].Current.BoundingRectangle.Bottom) {
+                                    throw 'The unnamed native feature menu has overlapping items.'
+                                }
+                            }
+                            Save-MenuDiagnostic
+                            $menuItem = if ($Choice -eq 'enable') { $popupItems[0] } else { $popupItems[3] }
+                            $actions.Add('verified-unnamed-feature-menu')
+                            break
+                        }
+                    }
                     Start-Sleep -Milliseconds 100
                 } while ([DateTime]::UtcNow -lt $menuDeadline)
                 if ($null -eq $menuItem) { Save-Tree 'missing-feature-menu'; Save-MenuDiagnostic; throw 'The native feature selection menu was not exposed.' }
