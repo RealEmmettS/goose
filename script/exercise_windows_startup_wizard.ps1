@@ -12,14 +12,26 @@ if (-not $AllowMachineMutation -or $env:CI -ne 'true') {
 }
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type -AssemblyName UIAutomationClientsideProviders
 Add-Type -AssemblyName System.Windows.Forms
 if (-not ('GooseInstallerWizardInput' -as [type])) {
-Add-Type -TypeDefinition @'
+$automationReferences = @([Windows.Automation.AutomationElement].Assembly.Location,
+    [Windows.Automation.ClientSideProviderDescription].Assembly.Location,
+    [UIAutomationClientsideProviders.UIAutomationClientSideProviders].Assembly.Location)
+Add-Type -ReferencedAssemblies $automationReferences -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 public static class GooseInstallerWizardInput {
+    // UIA's default proxy loader walks reflected stack frames. A PowerShell dynamic
+    // frame has no reflected type, so initialize from a non-inlined typed frame.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    public static void InitializeProviders() {
+        System.Windows.Automation.ClientSettings.RegisterClientSideProviders(
+            UIAutomationClientsideProviders.UIAutomationClientSideProviders.ClientSideProviderDescriptionTable);
+    }
     [StructLayout(LayoutKind.Sequential)] public struct Point { public int X; public int Y; }
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(Point point);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
     [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
@@ -27,6 +39,7 @@ public static class GooseInstallerWizardInput {
 }
 '@
 }
+[GooseInstallerWizardInput]::InitializeProviders()
 $packagePath = (Resolve-Path -LiteralPath $Package).Path
 $evidence = [IO.Path]::GetFullPath($EvidenceDirectory)
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
@@ -125,6 +138,12 @@ try {
                     $selection.Select()
                     $startup[0].SetFocus()
                 } else { Click-Control $startup[0] }
+                [uint32]$keyboardOwner = 0
+                [void][GooseInstallerWizardInput]::GetWindowThreadProcessId([GooseInstallerWizardInput]::GetForegroundWindow(), [ref]$keyboardOwner)
+                $focused = [Windows.Automation.AutomationElement]::FocusedElement
+                if ($keyboardOwner -ne $window.Current.ProcessId -or $null -eq $focused -or $focused.Current.ProcessId -ne $window.Current.ProcessId) {
+                    throw 'The installer does not own keyboard focus for feature selection.'
+                }
                 [Windows.Forms.SendKeys]::SendWait(' ')
                 $menuDeadline = [DateTime]::UtcNow.AddSeconds(5)
                 $menuItem = $null
