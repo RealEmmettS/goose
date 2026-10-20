@@ -7,6 +7,8 @@ features and installation, and [readiness records](docs/readiness/) for release 
 
 ## [Unreleased]
 
+## [1.11.2] - 2026-10-19
+
 ### Fixed
 - Initialize Windows MSI and EXE login startup from the current owned Run entry instead of stale installer feature/task history, preserving default-off installation, app opt-out, explicit installer choices and unrelated options. Capture the final MSI choice after feature validation so the receipt agrees with installation.
 
