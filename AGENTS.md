@@ -6,8 +6,9 @@ Honk300 is a cross-platform Rust desktop goose with a procedural renderer and Wi
 macOS, X11, and opt-in reduced Wayland runtimes. **Goose** is the user-facing application name and `goose` is the recommended command.
 `honk300` remains the internal primary binary; `honk` and `goose` remain compatible aliases. The Cargo workspace uses Rust 1.95, edition 2021.
 
-Public stable is v1.11.2, source `d5b898e9f0bc0e751dffe6b6068a35026b2b082f`.
-Its publication and qualification record is `docs/readiness/v1.11.2-readiness.md`.
+Public stable is v1.11.3, source `c36d8e92847045d8b931618e014ae46cbd5228ab`.
+Its publication and qualification record is `docs/readiness/v1.11.3-readiness.md`.
+All required publication and fresh-public checks pass; all 47 public assets are independently verified.
 Task #g11 and ADR 0052 track the combined application, icon, leaf and affection update.
 The user confirmed that the installed v1.11.0 Windows application displays its logo
 and opens the graphical controls; preserve that historical acceptance record.
@@ -23,16 +24,17 @@ Preserve exact viewport sizes while reusing bounded Windows bitmap capacity. Tas
 retains the separate, unresolved transparency investigation.
 
 Task #g15 and ADR 0057 correct Windows installers restoring an obsolete login-startup
-selection after an app opt-out. The failure is reproduced in both published MSI editions.
-Fresh startup stays default-off; installer migration must use the current owned preference
-and preserve explicit choices. All required source, candidate, main, publication and fresh-public
-checks pass for v1.11.2, with all 47 public assets independently verified. After an initial
-canceled administrator prompt, the operator approved the retry: the official installed
-v1.11.2 payloads, startup-off preservation, scrolling and runtime lifecycle pass.
-Direct settings commands can still fail their input-idle check despite a responsive window.
-Task #g16 and ADR 0058 prepare v1.11.3 with bounded readiness for the exact child window,
-retained verified file leases and enforced normal DLL imports. Complete installed entry-route
-acceptance remains open. Existing release assets remain unchanged.
+selection after an app opt-out. Fresh startup stays default-off; migration uses the current
+owned preference and preserves explicit choices. The v1.11.2 publication, exact installed
+payloads, startup-off preservation, scrolling and runtime lifecycle passed; its failed direct
+settings-controller checks remain recorded in `docs/readiness/v1.11.2-readiness.md`.
+Task #g16 and ADR 0058 replace input-idle recognition with a bounded response from the exact
+child window, retaining verified file leases, kill-and-wait cleanup and normal DLL imports.
+The approved official v1.11.3 update, all six public-MSI payload comparisons, all four real installed settings routes, fifty native scroll traces and runtime lifecycle checks pass. Independent final readback preserves the exact original configuration, startup off in the receipt and both Run hives, and the stopped state.
+Tasks #g16, #g15 and #g12 are complete with their required evidence retained; #g13 remains deferred and #g14 remains unresolved.
+The original input-idle scheduling cause and first candidate UI Automation failure remain
+unknown. Preserve their failed evidence and unchanged successful retries. Existing release
+tags and assets remain unchanged.
 
 The approved refinement is published through `.tasks/milestones/refine.md` and ADR 0041:
 the redesigned continuously projected goose, reliability cleanup, Native SDK settings

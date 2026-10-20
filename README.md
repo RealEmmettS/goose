@@ -6,8 +6,9 @@ bounded desktop pranks. Open **Goose** from your applications menu to start or s
 change settings, and check for updates. The native application is the primary interface;
 the existing Rust services, command line, and terminal editor remain its backend and secondary controls.
 
-**Current stable release:** [v1.11.2](https://github.com/RealEmmettS/goose/releases/tag/v1.11.2),
-published from exact commit `d5b898e9f0bc0e751dffe6b6068a35026b2b082f`.
+**Current stable release:** [v1.11.3](https://github.com/RealEmmettS/goose/releases/tag/v1.11.3),
+published from exact commit `c36d8e92847045d8b931618e014ae46cbd5228ab`.
+All required publication and fresh-public checks pass; all 47 public assets are independently verified.
 Goose opens its graphical controls from application menus and the bare `goose` command,
 with recognizable application icons and installed Configure actions. Maple,
 oak, birch and ginkgo leaves fade away on their own; sustained rubbing earns hearts
@@ -18,7 +19,7 @@ motion, bounded rendering resources, native graphical settings, Linux notes and
 pictures, experimental Pi 4/5 64-bit Desktop guidance, and independently qualified
 KDE, Sway, Hyprland and GNOME integrations. Each desktop exposes only its proven
 capabilities. See [desktop setup](docs/wayland-integrations.md),
-[release evidence](docs/readiness/v1.11.2-readiness.md),
+[release evidence](docs/readiness/v1.11.3-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
 **Goose**, the bare `goose` command, `goose settings`, and tray Configure open the
@@ -27,9 +28,9 @@ graphical controls. `goose start` or `goose plz` starts the goose directly;
 All routes use the same Rust-owned configuration and lifecycle. The compatible `honk300`
 and `honk` aliases remain.
 
-The current Windows release has an observed startup timeout on direct settings commands;
-the application-menu and registered-shortcut routes pass the installed check. The bounded
-readiness correction is being qualified in [v1.11.3](docs/readiness/v1.11.3-readiness.md).
+Windows settings startup now recognizes a response from its own verified window within
+the existing deadline. All four installed entry routes pass with loaded native controls and successful controllers in 491-695 ms, while saved preferences remain unchanged.
+See [the qualification record](docs/readiness/v1.11.3-readiness.md).
 
 The settings-navigation update keeps the current tab visibly highlighted,
 keeps scrolling short and smooth, limits the Wayland switch to Linux, and uses the
@@ -353,7 +354,7 @@ cargo clippy --locked --all-targets --workspace -- -D warnings
 cargo test --locked --workspace
 cargo build --locked --release
 python -m unittest discover -s script/tests
-dist plan --tag=v1.11.2
+dist plan --tag=v1.11.3
 cargo audit --version 0.22.2
 ```
 

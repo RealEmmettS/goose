@@ -9,6 +9,7 @@ has implementation details; [the README](README.md) describes current features a
 - Keep the settings window open once it responds, instead of closing working controls because Windows has not reported an idle moment.
 
 ### Behind the scenes
+- Verify the published downloads, installed settings and goose controls while keeping saved settings and the login startup choice unchanged. Retain earlier failed attempts and keep the remaining investigations visible.
 - Check that startup recognizes only its own working window, safely stops failed launches and keeps the verified application files protected until they are loaded.
 
 ## Remembering startup choices — October 2026
