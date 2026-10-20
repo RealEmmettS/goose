@@ -193,7 +193,9 @@ function Assert-RefusesForeignStartup([string[]] $ExplicitArguments) {
 }
 
 function New-RollbackProbe {
-    $path = Join-Path $evidence 'startup-forced-rollback.msi'
+    $probeDirectory = Join-Path $evidence 'rollback-input'
+    New-Item -ItemType Directory -Force -Path $probeDirectory | Out-Null
+    $path = Join-Path $probeDirectory ([IO.Path]::GetFileName($candidate))
     Copy-Item -LiteralPath $candidate -Destination $path
     $database = $installer.OpenDatabase($path, 1)
     try {
@@ -300,14 +302,21 @@ try {
     if ($beforeEnabledUpgrade.config_sha256 -ne $afterEnabledUpgrade.config_sha256) { throw 'Upgrade changed the enabled saved preference.' }
     if ($Family -eq 'msi') {
         $rollbackProbe = New-RollbackProbe
+        Invoke-Installer $candidate 'remove-before-rollback-upgrades' -Uninstall
         foreach ($enabledBefore in @($true, $false)) {
-            Set-Startup $enabledBefore
             $label = if ($enabledBefore) { 'rollback-enabled' } else { 'rollback-disabled' }
+            [string[]]$beforeArguments = if ($enabledBefore) { $enableArguments } else { $disableArguments }
+            Invoke-Installer $previous "prepare-$label" $beforeArguments
+            Set-Startup $enabledBefore
             $beforeRollback = Read-State "before-$label"
+            Assert-Startup $beforeRollback $enabledBefore
             $receiptHash = (Get-FileHash -LiteralPath $receiptPath).Hash
             [string[]]$oppositeArguments = if ($enabledBefore) { $disableArguments } else { $enableArguments }
             $probeOutput = Join-Path $evidence ("$label-during-transaction-" + [Guid]::NewGuid().ToString('N') + '.json')
-            $oppositeArguments += @('GOOSESTARTUPPROBESCRIPT="' + (Join-Path $evidence 'rollback-probe.ps1') + '"', 'GOOSESTARTUPPROBEOUTPUT="' + $probeOutput + '"')
+            $oppositeArguments += @(
+                ('GOOSESTARTUPPROBESCRIPT="' + (Join-Path $evidence 'rollback-probe.ps1') + '"'),
+                ('GOOSESTARTUPPROBEOUTPUT="' + $probeOutput + '"')
+            )
             Invoke-Installer $rollbackProbe $label $oppositeArguments -ExpectFailure
             $log = Get-Content -LiteralPath (Join-Path $evidence "$label.msi.log") -Raw
             if ($log -notmatch 'GooseStartupRollbackProbe.*returned actual error code 1') {
@@ -322,7 +331,9 @@ try {
                 $afterRollback.config_sha256 -ne $beforeRollback.config_sha256) {
                 throw "$label did not restore the receipt/configuration."
             }
+            Invoke-Installer $previous "remove-after-$label" -Uninstall
         }
+        Invoke-Installer $candidate 'restore-candidate-after-rollback'
     }
     if ($ExerciseWizard) {
         if ($Family -ne 'msi') { throw 'Full wizard qualification currently targets MSI.' }
