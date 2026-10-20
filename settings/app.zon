@@ -3,7 +3,7 @@
     .name = "honk300-settings",
     .display_name = "Goose",
     .description = "Controls and settings for Goose.",
-    .version = "1.11.1",
+    .version = "1.11.2",
     .icons = .{"assets/icon.png"},
     .platforms = .{ "macos", "windows", "linux" },
     .permissions = .{ "view", "command" },

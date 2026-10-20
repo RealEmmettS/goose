@@ -8,6 +8,9 @@ has implementation details; [the README](README.md) describes current features a
 ### Fixed
 - Keep login startup off on a new installation and remember when you turn it off later, so an update does not quietly enable it again. You can still choose to start Goose when you sign in.
 
+### Behind the scenes
+- Check that the settings app matches its installer and that failed-installation checks use fresh evidence.
+
 ## Clearer controls — October 2026
 
 ### Behind the scenes

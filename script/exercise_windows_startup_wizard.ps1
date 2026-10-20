@@ -54,8 +54,9 @@ try {
         $windows = [Windows.Automation.AutomationElement]::RootElement.FindAll(
             [Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)
         $matches = @($windows | Where-Object {
+            $owner = Get-Process -Id $_.Current.ProcessId -ErrorAction SilentlyContinue
             $_.Current.Name -match '^(Goose|honk300).*Setup$' -and
-            (Get-Process -Id $_.Current.ProcessId -ErrorAction SilentlyContinue).ProcessName -eq 'msiexec'
+            $null -ne $owner -and $owner.ProcessName -eq 'msiexec'
         })
         if ($matches.Count -gt 1) { throw 'Multiple installer wizard windows are ambiguous.' }
         if ($matches.Count -eq 0) { Start-Sleep -Milliseconds 150; continue }

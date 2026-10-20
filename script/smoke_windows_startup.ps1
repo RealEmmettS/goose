@@ -34,7 +34,8 @@ function Invoke-Msi([string] $Package, [string] $Label, [string[]] $Extra = @(),
     $operation = if ($Uninstall) { '/x' } else { '/i' }
     $log = Join-Path $evidence "$Label.msi.log"
     # /passive matches the already-published updater. Its command line supplies no feature list.
-    $arguments = @($operation, "`"$Package`"", '/passive', '/norestart', '/l*v', "`"$log`"") + $Extra
+    $ui = if ($ExpectFailure) { '/qn' } else { '/passive' }
+    $arguments = @($operation, "`"$Package`"", $ui, '/norestart', '/l*v', "`"$log`"") + $Extra
     Write-Host "Startup qualification: $Label"
     $process = Start-Process -FilePath $msiexec -ArgumentList $arguments -WindowStyle Hidden -PassThru
     try {
@@ -298,7 +299,7 @@ try {
             $beforeRollback = Read-State "before-$label"
             $receiptHash = (Get-FileHash -LiteralPath $receiptPath).Hash
             $oppositeArguments = if ($enabledBefore) { $disableArguments } else { $enableArguments }
-            $probeOutput = Join-Path $evidence "$label-during-transaction.json"
+            $probeOutput = Join-Path $evidence ("$label-during-transaction-" + [Guid]::NewGuid().ToString('N') + '.json')
             $oppositeArguments += @('GOOSESTARTUPPROBESCRIPT="' + (Join-Path $evidence 'rollback-probe.ps1') + '"', 'GOOSESTARTUPPROBEOUTPUT="' + $probeOutput + '"')
             Invoke-Installer $rollbackProbe $label $oppositeArguments -ExpectFailure
             $log = Get-Content -LiteralPath (Join-Path $evidence "$label.msi.log") -Raw
