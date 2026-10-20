@@ -79,14 +79,20 @@ function Invoke-Installer([string] $Package, [string] $Label, [string[]] $Extra 
 function Feature-State([string] $Feature) {
     if ($Family -ne 'msi' -or $null -eq $activePackage) { return $null }
     $database = $installer.OpenDatabase($activePackage, 0)
-    $view = $database.OpenView('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductCode''')
+    $view = $null
+    $record = $null
     try {
+        $view = $database.OpenView('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductCode''')
         [void]$view.Execute()
         $record = $view.Fetch()
         if ($null -eq $record) { throw 'MSI product identity is missing.' }
         $productCode = $record.StringData(1)
         return $installer.FeatureState($productCode, $Feature)
-    } finally { [void]$view.Close() }
+    } finally {
+        if ($null -ne $record) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record) }
+        if ($null -ne $view) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
+        [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database)
+    }
 }
 
 function Invoke-Settings([object] $Command) {
@@ -132,6 +138,7 @@ function Read-State([string] $Label) {
     $state = [ordered]@{
         label = $Label
         version = $receipt.version
+        commit = $receipt.commit
         receipt_autostart = $receipt.autostart.enabled
         run = $run
         startup_feature = Feature-State 'Autostart'
@@ -198,7 +205,7 @@ function New-RollbackProbe {
             'INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) VALUES (''GooseStartupRollbackProbe'', ''NOT REMOVE~="ALL"'', 5100)'
         )) {
             $view = $database.OpenView($sql)
-            try { [void]$view.Execute() } finally { [void]$view.Close() }
+            try { [void]$view.Execute() } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
         }
         [void]$database.Commit()
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database) }
