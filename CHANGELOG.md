@@ -11,12 +11,9 @@ features and installation, and [readiness records](docs/readiness/) for release 
 - Initialize Windows MSI and EXE login startup from the current owned Run entry instead of stale installer feature/task history, preserving default-off installation, app opt-out, explicit installer choices and unrelated options. Capture the final MSI choice after feature validation so the receipt agrees with installation.
 
 ### Behind the scenes
-- Initialize native MSI control providers through a typed stack frame, drive the wizard through actual accessible names and verified owned window bounds, and verify installer keyboard focus before feature selection. Retain the disposable desktop's menu/focus evidence and handle its observed four-item unnamed native popup with strict ownership/layout checks.
-- Anchor the rollback probe to an authored MSI directory so the native failure action can launch.
-- Release installer-database handles before executing private rollback probes, preserve one-item argument arrays when adding probe properties, and test predecessor upgrade rollback after verified new-slot activation without cached maintenance-package substitution. Distinguish diagnostic workflow revisions from the actual installed payload commit.
-- Keep MSI feature-state diagnostics scalar and allow isolated harness diagnosis against a recorded candidate artifact, retaining final same-source release qualification.
-- Keep the settings manifests and binary version aligned with the patch package, and isolate expected-failure installer probes from modal dialogs and stale evidence.
-- Add native Windows installer regression coverage for default-off startup and opt-out preservation across an upgrade; preserve the observed v1.11.1 failure and exact restored configuration.
+- Add eight native Windows installer startup lanes covering fresh defaults, app/installer drift, explicit choices, repair and ownership refusal. Exercise MSI upgrade rollback after verified candidate activation and full wizard feature selection/repair, retaining original failures and exact configuration restoration.
+- Initialize native MSI accessibility providers from a typed helper and verify wizard ownership, selection, focus and menu geometry. Retain disposable desktop evidence for owner-drawn menu items without accessible names; isolate expected-failure probes from modal dialogs, cached package substitution and retained COM handles.
+- Align settings/package identity and record diagnostic harness, workflow and installed payload revisions separately. Reused candidate artifacts support diagnosis; release gates still rebuild and qualify one unchanged source.
 - Record the complete v1.11.1 publication, all eight fresh-public lanes, independent 47-asset audit and exact website deployment. Preserve the canceled Windows administrator-prompt attempt and verified unchanged v1.11.0 state; leave installed-public acceptance, extended performance qualification and the original black-rectangle investigation open.
 
 ## [1.11.1] - 2026-10-19

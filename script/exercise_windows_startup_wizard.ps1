@@ -157,6 +157,9 @@ try {
                     $selection.Select()
                     $startup[0].SetFocus()
                 } else { Click-Control $startup[0] }
+                if ($null -eq $selection -or -not $selection.Current.IsSelected) {
+                    throw 'Login Autostart was not selected before opening its feature menu.'
+                }
                 [uint32]$keyboardOwner = 0
                 [void][GooseInstallerWizardInput]::GetWindowThreadProcessId([GooseInstallerWizardInput]::GetForegroundWindow(), [ref]$keyboardOwner)
                 $focused = [Windows.Automation.AutomationElement]::FocusedElement
@@ -182,15 +185,28 @@ try {
                         $_.Current.ClassName -eq '#32768' -and -not $_.Current.IsOffscreen
                     })
                     if ($popups.Count -eq 1) {
+                        $popupBounds = $popups[0].Current.BoundingRectangle
                         $popupItems = @($popups[0].FindAll([Windows.Automation.TreeScope]::Children,
                             [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::MenuItem)) |
                             Sort-Object { $_.Current.BoundingRectangle.Top })
                         $available = @($popupItems | Where-Object {
+                            $invokePattern = $null
+                            $itemBounds = $_.Current.BoundingRectangle
                             $_.Current.ProcessId -eq $window.Current.ProcessId -and
                             $_.Current.Name -eq '' -and $_.Current.IsEnabled -and -not $_.Current.IsOffscreen -and
-                            $_.Current.BoundingRectangle.Width -gt 0 -and $_.Current.BoundingRectangle.Height -gt 0
+                            $itemBounds.Width -gt 0 -and $itemBounds.Height -gt 0 -and
+                            $popupBounds.Contains($itemBounds) -and
+                            $_.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$invokePattern)
                         })
                         if ($popupItems.Count -eq 4 -and $available.Count -eq 4) {
+                            $popupIdentity = [string]::Join(',', $popups[0].GetRuntimeId())
+                            $focus = [Windows.Automation.AutomationElement]::FocusedElement
+                            $popupFocused = $false
+                            for ($ancestor = 0; $ancestor -lt 4 -and $null -ne $focus; $ancestor++) {
+                                if ([string]::Join(',', $focus.GetRuntimeId()) -eq $popupIdentity) { $popupFocused = $true; break }
+                                $focus = [Windows.Automation.TreeWalker]::RawViewWalker.GetParent($focus)
+                            }
+                            if (-not $popupFocused) { throw 'The native feature popup does not own the current focus.' }
                             for ($itemIndex = 1; $itemIndex -lt 4; $itemIndex++) {
                                 if ($popupItems[$itemIndex].Current.BoundingRectangle.Top -lt $popupItems[$itemIndex - 1].Current.BoundingRectangle.Bottom) {
                                     throw 'The unnamed native feature menu has overlapping items.'
@@ -211,6 +227,9 @@ try {
                 Save-Tree 'after-feature-choice'
             } elseif (Invoke-Button 'Change') { Start-Sleep -Milliseconds 150; continue }
         }
+        # VerifyReadyDlg uses Change for maintenance feature edits, as well as
+        # MaintenanceTypeDlg's earlier Change button. Commit only after selection.
+        if ($selected -and $Choice -ne 'repair' -and (Invoke-Button 'Change')) { Start-Sleep -Milliseconds 150; continue }
         if (Invoke-Button 'Finish') { Start-Sleep -Milliseconds 150; continue }
         if (Invoke-Button 'Install') { Start-Sleep -Milliseconds 150; continue }
         [void](Invoke-Button 'Next')

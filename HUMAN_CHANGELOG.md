@@ -9,16 +9,11 @@ has implementation details; [the README](README.md) describes current features a
 - Keep login startup off on a new installation and remember when you turn it off later, so an update does not quietly enable it again. You can still choose to start Goose when you sign in.
 
 ### Behind the scenes
-- Load Windows' graphical installer controls correctly for automated checks, verify which window receives each action, and retain the screen when Windows omits the menu labels.
-- Correct the temporary test location used to check recovery from a failed update.
-- Let failed-update checks release their temporary files promptly, keep each requested option separate, fail after a real update has taken effect, and record exactly which application they tested.
-- Improve installation checks so they report startup choices correctly and can investigate a failure without rebuilding every download.
-- Check that the settings app matches its installer and that failed-installation checks use fresh evidence.
+- Check startup choices across every Windows installer, including the graphical setup, repairs and recovery from failed updates.
+- Verify which installer window and menu receive each automated action, and retain the failed screen and original settings for diagnosis.
+- Check that the settings app matches its installer and verify the complete release again after an installation issue is corrected.
 
 ## Clearer controls — October 2026
-
-### Behind the scenes
-- Add installation checks to catch updates that turn login startup back on after it has been disabled.
 
 ### Improved
 - Avoid repeatedly rebuilding temporary drawing buffers as the goose moves, while keeping the space around it transparent.
