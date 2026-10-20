@@ -130,12 +130,15 @@ try {
             # A native window may disappear between enumeration and inspection.
             # Read its identity once and never pass an absent PID to Get-Process.
             if ($null -eq $_) { return $false }
-            try { $current = $_.Current }
+            try {
+                $windowPid = [int]$_.Current.ProcessId
+                $windowTitle = [string]$_.Current.Name
+            }
             catch [Windows.Automation.ElementNotAvailableException] { return $false }
-            if ($null -eq $current -or $current.ProcessId -le 0 -or $current.Name -notmatch '^(Goose|honk300).*Setup$') {
+            if ($windowPid -le 0 -or $windowTitle -notmatch '^(Goose|honk300).*Setup$') {
                 return $false
             }
-            $owner = Get-Process -Id $current.ProcessId -ErrorAction SilentlyContinue
+            $owner = Get-Process -Id $windowPid -ErrorAction SilentlyContinue
             $null -ne $owner -and $owner.ProcessName -eq 'msiexec'
         })
         if ($matches.Count -gt 1) { throw 'Multiple installer wizard windows are ambiguous.' }

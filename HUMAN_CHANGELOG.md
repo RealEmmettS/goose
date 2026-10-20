@@ -10,7 +10,7 @@ has implementation details; [the README](README.md) describes current features a
 
 ### Behind the scenes
 - Check startup choices across every Windows installer, including the graphical setup, repairs and recovery from failed updates.
-- Verify which installer window and menu receive each automated action, handle windows closing during checks, and retain the failed screen and original settings for diagnosis.
+- Verify which installer window and menu receive each automated action, read each window's identity once before it can close, and retain the failed screen and original settings for diagnosis.
 - Check that the settings app matches its installer and verify the complete release again after an installation issue is corrected.
 
 ## Clearer controls — October 2026

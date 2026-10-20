@@ -14,7 +14,7 @@ features and installation, and [readiness records](docs/readiness/) for release 
 
 ### Behind the scenes
 - Add eight native Windows installer startup lanes covering fresh defaults, app/installer drift, explicit choices, repair and ownership refusal. Exercise MSI upgrade rollback after verified candidate activation and full wizard feature selection/repair, retaining original failures and exact configuration restoration.
-- Initialize native MSI accessibility providers from a typed helper and verify wizard ownership, selection, focus and menu geometry. Handle disappearing native windows and retain disposable desktop evidence for owner-drawn menu items without accessible names; isolate expected-failure probes from modal dialogs, cached package substitution and retained COM handles.
+- Initialize native MSI accessibility providers from a typed helper and verify wizard ownership, selection, focus and menu geometry. Snapshot native window identity as scalars, handle disappearing windows and retain disposable desktop evidence for owner-drawn menu items without accessible names; isolate expected-failure probes from modal dialogs, cached package substitution and retained COM handles.
 - Align settings/package identity and record diagnostic harness, workflow and installed payload revisions separately. Reused candidate artifacts support diagnosis; release gates still rebuild and qualify one unchanged source.
 - Record the complete v1.11.1 publication, all eight fresh-public lanes, independent 47-asset audit and exact website deployment. Preserve the canceled Windows administrator-prompt attempt and verified unchanged v1.11.0 state; leave installed-public acceptance, extended performance qualification and the original black-rectangle investigation open.
 
