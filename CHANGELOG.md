@@ -11,7 +11,7 @@ features and installation, and [readiness records](docs/readiness/) for release 
 - Initialize Windows MSI and EXE login startup from the current owned Run entry instead of stale installer feature/task history, preserving default-off installation, app opt-out, explicit installer choices and unrelated options. Capture the final MSI choice after feature validation so the receipt agrees with installation.
 
 ### Behind the scenes
-- Release installer-database handles before executing private rollback probes, and distinguish diagnostic workflow revisions from the actual installed payload commit.
+- Release installer-database handles before executing private rollback probes, preserve one-item argument arrays when adding probe properties, and distinguish diagnostic workflow revisions from the actual installed payload commit.
 - Keep MSI feature-state diagnostics scalar and allow isolated harness diagnosis against a recorded candidate artifact, retaining final same-source release qualification.
 - Keep the settings manifests and binary version aligned with the patch package, and isolate expected-failure installer probes from modal dialogs and stale evidence.
 - Add native Windows installer regression coverage for default-off startup and opt-out preservation across an upgrade; preserve the observed v1.11.1 failure and exact restored configuration.

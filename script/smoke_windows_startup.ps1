@@ -305,7 +305,7 @@ try {
             $label = if ($enabledBefore) { 'rollback-enabled' } else { 'rollback-disabled' }
             $beforeRollback = Read-State "before-$label"
             $receiptHash = (Get-FileHash -LiteralPath $receiptPath).Hash
-            $oppositeArguments = if ($enabledBefore) { $disableArguments } else { $enableArguments }
+            [string[]]$oppositeArguments = if ($enabledBefore) { $disableArguments } else { $enableArguments }
             $probeOutput = Join-Path $evidence ("$label-during-transaction-" + [Guid]::NewGuid().ToString('N') + '.json')
             $oppositeArguments += @('GOOSESTARTUPPROBESCRIPT="' + (Join-Path $evidence 'rollback-probe.ps1') + '"', 'GOOSESTARTUPPROBEOUTPUT="' + $probeOutput + '"')
             Invoke-Installer $rollbackProbe $label $oppositeArguments -ExpectFailure
