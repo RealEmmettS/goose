@@ -232,7 +232,7 @@ function New-RollbackProbe {
         }
         $actionType = if ($Edition -eq 'global') { 3106 } else { 1058 }
         foreach ($sql in @(
-            ('INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) VALUES (''GooseStartupRollbackProbe'', ' + $actionType + ', ''SystemFolder'', ''"[SystemFolder]WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "[GOOSESTARTUPPROBESCRIPT]" -OutputPath "[GOOSESTARTUPPROBEOUTPUT]" -ReceiptPath "[APPLICATIONFOLDER]install-receipt.json"'')'),
+            ('INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) VALUES (''GooseStartupRollbackProbe'', ' + $actionType + ', ''APPLICATIONFOLDER'', ''"[SystemFolder]WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "[GOOSESTARTUPPROBESCRIPT]" -OutputPath "[GOOSESTARTUPPROBEOUTPUT]" -ReceiptPath "[APPLICATIONFOLDER]install-receipt.json"'')'),
             ('INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) VALUES (''GooseStartupRollbackProbe'', ''NOT REMOVE~="ALL"'', ' + $probeSequence + ')')
         )) {
             $view = $database.OpenView($sql)
