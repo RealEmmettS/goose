@@ -13,6 +13,7 @@ features and installation, and [readiness records](docs/readiness/) for release 
 - Recognize Windows settings startup through a bounded response from the exact spawned window, retaining verified executable/DLL leases and the ten-second readiness deadline instead of rejecting a responsive window whose input queue does not become idle. Preserve kill-and-wait cleanup before releasing those leases.
 
 ### Behind the scenes
+- Record complete v1.11.3 source/candidate/main/publication qualification, independent public-byte verification, approved installed settings/scroll/runtime acceptance and the website handoff. Preserve failed attempts and unchanged successful retries without assigning an unproven cause. Final receipt: `target/v1.11.3-delivery-evidence.json`.
 - Require the Windows settings accessibility DLL as a normal PE import, validate bounded import descriptors and thunk tables, reject unsupported bound/delay imports, and exercise native readiness, process ownership, liveness and failure cleanup with real child-window fixtures.
 - Record complete v1.11.2 qualification, independent public assets and website delivery, then the approved installed update with exact payload/configuration and startup-off preservation. Retain canceled/failed attempts and the separate direct-settings readiness failure alongside passed native scrolling and runtime lifecycle.
 

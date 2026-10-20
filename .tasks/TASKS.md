@@ -19,34 +19,6 @@
 ## To-Do
 
 ## Active
-- [ ] **Recognize responsive Windows settings startup** - replace the input-idle gate while retaining verified payload leases, bounded recognition and failed-child cleanup (owner codex) #g16
-  - [x] Capture the actual installed timeout, live child and responsive window without changing published bytes.
-  - [x] Recognize dispatch readiness for the exact child and retain the ten-second deadline.
-  - [x] Verify responsive, busy, hung, hidden, foreign-window and exited-child behavior with native fixtures.
-  - [x] Require the accessibility DLL as a normal import in Windows settings packages.
-  - [x] Pass three consecutive isolated rounds of all four candidate settings launch routes.
-  - [ ] Qualify and publish the complete immutable patch with fresh public-byte verification.
-  - [ ] Verify the installed public entry routes, runtime and unchanged saved startup preference.
-- [ ] **Keep login startup off unless chosen** - correct stale installer startup selections and preserve the current owned preference (needs #g16) (owner codex) #g15
-  - [x] Capture the installed failure and restore the user's exact disabled preference.
-  - [x] Reproduce stale installer selection with native disposable-runner checks.
-  - [x] Correct Global and Corporate installer preference handling and record the decision.
-  - [x] Verify fresh default-off, intentional opt-in, later opt-out, upgrade and repair behavior.
-  - [x] Qualify and publish the complete fix, verify fresh public bytes, and preserve existing release assets.
-  - [ ] Verify the installed public update, native settings and runtime with unchanged configuration and startup off.
-- [ ] **Polish settings navigation and shared app icons** - selected tabs, controlled scrolling, seasonal and petting refinements, consistent artwork and the fully qualified update (needs #g15, #g16) (owner codex) #g12
-  - [x] Reproduce installed behavior and record the user's Windows logo and settings acceptance.
-  - [x] Make selected tabs distinct and scrolling smooth, bounded and respectful of reduced motion.
-  - [x] Show the Wayland switch only on supported Linux builds while preserving saved values.
-  - [x] Put seasonal and leaf switches on Appearance, default seasonal effects off, and verify live clearing.
-  - [x] Require intentional rubbing before the first petting reaction and verify the visible timing.
-  - [x] Investigate the reported intermittent black rectangles and retain the exact acceptance limits.
-  - [x] Use consistent application artwork in Windows/Linux tray icons and verify the Mac menu-bar treatment.
-  - [x] Validate native behavior, all required source/candidate/main gates and the complete immutable update.
-  - [ ] Verify the installed public Windows runtime and settings while preserving saved preferences and stopped state.
-    > Login preference preservation passes with #g15; direct Windows settings startup requires #g16.
-  - [x] Verify fresh public downloads and coordinate the website release guidance.
-
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
@@ -68,6 +40,34 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **Recognize responsive Windows settings startup** - replace the input-idle gate while retaining verified payload leases, bounded recognition and failed-child cleanup (owner codex) (done 2026-10-20) #g16
+  - [x] Capture the actual installed timeout, live child and responsive window without changing published bytes.
+  - [x] Recognize dispatch readiness for the exact child and retain the ten-second deadline.
+  - [x] Verify responsive, busy, hung, hidden, foreign-window and exited-child behavior with native fixtures.
+  - [x] Require the accessibility DLL as a normal import in Windows settings packages.
+  - [x] Pass three consecutive isolated rounds of all four candidate settings launch routes.
+  - [x] Qualify and publish the complete immutable patch with fresh public-byte verification.
+  - [x] Verify the installed public entry routes, runtime and unchanged saved startup preference.
+- [x] **Keep login startup off unless chosen** - correct stale installer startup selections and preserve the current owned preference (needs #g16) (owner codex) (done 2026-10-20) #g15
+  - [x] Capture the installed failure and restore the user's exact disabled preference.
+  - [x] Reproduce stale installer selection with native disposable-runner checks.
+  - [x] Correct Global and Corporate installer preference handling and record the decision.
+  - [x] Verify fresh default-off, intentional opt-in, later opt-out, upgrade and repair behavior.
+  - [x] Qualify and publish the complete fix, verify fresh public bytes, and preserve existing release assets.
+  - [x] Verify the installed public update, native settings and runtime with unchanged configuration and startup off.
+- [x] **Polish settings navigation and shared app icons** - selected tabs, controlled scrolling, seasonal and petting refinements, consistent artwork and the fully qualified update (needs #g15, #g16) (owner codex) (done 2026-10-20) #g12
+  - [x] Reproduce installed behavior and record the user's Windows logo and settings acceptance.
+  - [x] Make selected tabs distinct and scrolling smooth, bounded and respectful of reduced motion.
+  - [x] Show the Wayland switch only on supported Linux builds while preserving saved values.
+  - [x] Put seasonal and leaf switches on Appearance, default seasonal effects off, and verify live clearing.
+  - [x] Require intentional rubbing before the first petting reaction and verify the visible timing.
+  - [x] Investigate the reported intermittent black rectangles and retain the exact acceptance limits.
+  - [x] Use consistent application artwork in Windows/Linux tray icons and verify the Mac menu-bar treatment.
+  - [x] Validate native behavior, all required source/candidate/main gates and the complete immutable update.
+  - [x] Verify the installed public Windows runtime and settings while preserving saved preferences and stopped state.
+    > Final installed acceptance: `target/v1.11.3-installed/installed-verification-20261020T085247887Z-c732bec13bab400b8d52ebce592b81f9/installed-verification.json`; earlier failures remain in the task history.
+  - [x] Verify fresh public downloads and coordinate the website release guidance.
+
 - [x] **Goose desktop polish update** - repair installed Windows controls and icons, refine temporary leaves, add affectionate following and simplify the app name (owner codex) (done 2026-09-09) #g11
   - [x] Reproduce and correct installed Configure and verify the real tray Update helper.
   - [x] Give Windows executables, app-menu shortcuts and installed-app entries a verified icon.

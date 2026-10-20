@@ -1,6 +1,6 @@
 # ADR 0058: Recognize responsive Windows settings startup
 
-Status: accepted for implementation and qualification in v1.11.3.
+Status: accepted and delivered in v1.11.3; see the [qualification record](../readiness/v1.11.3-readiness.md).
 
 ## Context
 
