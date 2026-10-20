@@ -95,8 +95,27 @@ function Save-Tree([string] $Name) {
     if ($null -eq $window) { return }
     $tree = $window.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)
     @($tree | ForEach-Object {
-        [ordered]@{name=$_.Current.Name;type=$_.Current.ControlType.ProgrammaticName;class=$_.Current.ClassName;id=$_.Current.AutomationId;enabled=$_.Current.IsEnabled;patterns=@($_.GetSupportedPatterns() | ForEach-Object { $_.ProgrammaticName })}
+        [ordered]@{name=$_.Current.Name;type=$_.Current.ControlType.ProgrammaticName;class=$_.Current.ClassName;id=$_.Current.AutomationId;enabled=$_.Current.IsEnabled;process=$_.Current.ProcessId;bounds=$_.Current.BoundingRectangle.ToString();patterns=@($_.GetSupportedPatterns() | ForEach-Object { $_.ProgrammaticName })}
     }) | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $evidence "$Name.json") -Encoding utf8
+}
+
+function Save-MenuDiagnostic {
+    $focused = [Windows.Automation.AutomationElement]::FocusedElement
+    $elements = [Windows.Automation.AutomationElement]::RootElement.FindAll(
+        [Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)
+    [ordered]@{
+        focused = if ($null -eq $focused) { $null } else { [ordered]@{name=$focused.Current.Name;class=$focused.Current.ClassName;process=$focused.Current.ProcessId} }
+        elements = @($elements | ForEach-Object {
+            [ordered]@{name=$_.Current.Name;type=$_.Current.ControlType.ProgrammaticName;class=$_.Current.ClassName;process=$_.Current.ProcessId;bounds=$_.Current.BoundingRectangle.ToString();patterns=@($_.GetSupportedPatterns() | ForEach-Object { $_.ProgrammaticName })}
+        })
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $evidence 'feature-menu-desktop.json') -Encoding utf8
+    $screen = [Windows.Forms.SystemInformation]::VirtualScreen
+    $bitmap = [Drawing.Bitmap]::new($screen.Width, $screen.Height)
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $graphics.CopyFromScreen($screen.Left, $screen.Top, 0, 0, $bitmap.Size)
+        $bitmap.Save((Join-Path $evidence 'feature-menu-desktop.png'), [Drawing.Imaging.ImageFormat]::Png)
+    } finally { $graphics.Dispose(); $bitmap.Dispose() }
 }
 
 try {
@@ -156,7 +175,7 @@ try {
                     if ($options.Count -eq 1) { $menuItem = $options[0]; break }
                     Start-Sleep -Milliseconds 100
                 } while ([DateTime]::UtcNow -lt $menuDeadline)
-                if ($null -eq $menuItem) { Save-Tree 'missing-feature-menu'; throw 'The native feature selection menu was not exposed.' }
+                if ($null -eq $menuItem) { Save-Tree 'missing-feature-menu'; Save-MenuDiagnostic; throw 'The native feature selection menu was not exposed.' }
                 Invoke-Control $menuItem
                 $actions.Add("startup-$Choice")
                 $selected = $true
