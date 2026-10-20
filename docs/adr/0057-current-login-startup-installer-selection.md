@@ -1,6 +1,6 @@
 # ADR 0057: Initialize installer startup choices from the current owned mechanism
 
-Status: accepted for implementation, native qualification pending
+Status: accepted, implemented and published in v1.11.2; native and fresh-public qualification passed
 
 ## Context
 
@@ -52,6 +52,15 @@ preservation, interactive selection/repair, foreign startup refusal and rollback
 Open settings afterward and compare config, receipt and owned Run state. Cover Global/Corporate
 MSI and EXE on x64 and ARM64. Preserve all existing source, packaging, release and fresh-public
 gates; publish a new immutable patch and never replace existing tagged assets.
+
+All eight native startup lanes, complete exact-source release qualification and all eight
+fresh-public installation lanes pass for the immutable patch. The independently audited
+public asset set is complete. After an initial canceled Windows prompt, the operator approved
+the official local update. Exact installed payloads, unchanged configuration, startup off,
+native scrolling and runtime lifecycle pass. Direct settings-controller readiness fails
+independently and is tracked by ADR 0058; complete installed entry-route acceptance remains open.
+See the [readiness record](../readiness/v1.11.2-readiness.md) for the original regression,
+retained failed attempts, unchanged passing retry and acceptance boundaries.
 
 ## References
 

@@ -19,13 +19,22 @@
 ## To-Do
 
 ## Active
-- [ ] **Keep login startup off unless chosen** - correct stale installer startup selections and preserve the current owned preference (owner codex) #g15
+- [ ] **Recognize responsive Windows settings startup** - replace the input-idle gate while retaining verified payload leases, bounded recognition and failed-child cleanup (owner codex) #g16
+  - [x] Capture the actual installed timeout, live child and responsive window without changing published bytes.
+  - [x] Recognize dispatch readiness for the exact child and retain the ten-second deadline.
+  - [x] Verify responsive, busy, hung, hidden, foreign-window and exited-child behavior with native fixtures.
+  - [x] Require the accessibility DLL as a normal import in Windows settings packages.
+  - [x] Pass three consecutive isolated rounds of all four candidate settings launch routes.
+  - [ ] Qualify and publish the complete immutable patch with fresh public-byte verification.
+  - [ ] Verify the installed public entry routes, runtime and unchanged saved startup preference.
+- [ ] **Keep login startup off unless chosen** - correct stale installer startup selections and preserve the current owned preference (needs #g16) (owner codex) #g15
   - [x] Capture the installed failure and restore the user's exact disabled preference.
   - [x] Reproduce stale installer selection with native disposable-runner checks.
   - [x] Correct Global and Corporate installer preference handling and record the decision.
-  - [ ] Verify fresh default-off, intentional opt-in, later opt-out, upgrade and repair behavior.
-  - [ ] Qualify and deliver the fix without changing existing release assets.
-- [ ] **Polish settings navigation and shared app icons** - selected tabs, controlled scrolling, seasonal and petting refinements, consistent artwork and the fully qualified update (owner codex) #g12
+  - [x] Verify fresh default-off, intentional opt-in, later opt-out, upgrade and repair behavior.
+  - [x] Qualify and publish the complete fix, verify fresh public bytes, and preserve existing release assets.
+  - [ ] Verify the installed public update, native settings and runtime with unchanged configuration and startup off.
+- [ ] **Polish settings navigation and shared app icons** - selected tabs, controlled scrolling, seasonal and petting refinements, consistent artwork and the fully qualified update (needs #g15, #g16) (owner codex) #g12
   - [x] Reproduce installed behavior and record the user's Windows logo and settings acceptance.
   - [x] Make selected tabs distinct and scrolling smooth, bounded and respectful of reduced motion.
   - [x] Show the Wayland switch only on supported Linux builds while preserving saved values.
@@ -35,7 +44,7 @@
   - [x] Use consistent application artwork in Windows/Linux tray icons and verify the Mac menu-bar treatment.
   - [x] Validate native behavior, all required source/candidate/main gates and the complete immutable update.
   - [ ] Verify the installed public Windows runtime and settings while preserving saved preferences and stopped state.
-    > Login preference preservation requires the installer correction in #g15.
+    > Login preference preservation passes with #g15; direct Windows settings startup requires #g16.
   - [x] Verify fresh public downloads and coordinate the website release guidance.
 
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137

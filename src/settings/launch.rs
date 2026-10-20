@@ -5,6 +5,12 @@ use std::{
     process::{Command, Stdio},
 };
 
+#[cfg(windows)]
+#[path = "windows_ready.rs"]
+mod windows_ready;
+#[cfg(windows)]
+use windows_ready::await_settings_start;
+
 pub(crate) fn launch(config: Option<PathBuf>) -> io::Result<()> {
     let executable = std::env::current_exe()?;
     let settings = sibling(&executable)?;
@@ -23,6 +29,8 @@ pub(crate) fn launch(config: Option<PathBuf>) -> io::Result<()> {
         .map_err(io::Error::other)?;
     #[cfg(windows)]
     {
+        // Retain both exact, verified payloads until the child's real settings
+        // window responds, or until failed-start cleanup has stopped the child.
         let _verified = verified;
         use std::os::windows::process::CommandExt;
         const BASE: u32 = 0x0800_0000 | 0x0000_0200;
@@ -53,24 +61,6 @@ pub(crate) fn launch(config: Option<PathBuf>) -> io::Result<()> {
         let _verified = verified;
         command(&settings, config.as_deref()).spawn().map(|_| ())
     }
-}
-
-#[cfg(windows)]
-fn await_settings_start(mut child: std::process::Child) -> io::Result<()> {
-    use std::os::windows::io::AsRawHandle;
-    use windows::Win32::{Foundation::HANDLE, System::Threading::WaitForInputIdle};
-    // Imported DLLs load after CreateProcess returns. Retain both verified file
-    // leases until the GUI has initialized its message loop and mapped them.
-    if unsafe { WaitForInputIdle(HANDLE(child.as_raw_handle()), 10_000) } == 0
-        && matches!(child.try_wait(), Ok(None))
-    {
-        return Ok(());
-    }
-    let _ = child.kill();
-    let _ = child.wait();
-    Err(io::Error::other(
-        "the settings application did not initialize within ten seconds",
-    ))
 }
 
 fn sibling(executable: &Path) -> io::Result<PathBuf> {

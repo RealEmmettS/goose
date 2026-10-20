@@ -6,10 +6,10 @@ bounded desktop pranks. Open **Goose** from your applications menu to start or s
 change settings, and check for updates. The native application is the primary interface;
 the existing Rust services, command line, and terminal editor remain its backend and secondary controls.
 
-**Current stable release:** [v1.11.1](https://github.com/RealEmmettS/goose/releases/tag/v1.11.1),
-published from exact commit `91a31cedcdf621f6b067557b1ebf1750514c6454`.
+**Current stable release:** [v1.11.2](https://github.com/RealEmmettS/goose/releases/tag/v1.11.2),
+published from exact commit `d5b898e9f0bc0e751dffe6b6068a35026b2b082f`.
 Goose opens its graphical controls from application menus and the bare `goose` command,
-with recognizable application icons and reliable installed Configure actions. Maple,
+with recognizable application icons and installed Configure actions. Maple,
 oak, birch and ginkgo leaves fade away on their own; sustained rubbing earns hearts
 and a short, gentle follow without grabbing the pointer.
 
@@ -18,7 +18,7 @@ motion, bounded rendering resources, native graphical settings, Linux notes and
 pictures, experimental Pi 4/5 64-bit Desktop guidance, and independently qualified
 KDE, Sway, Hyprland and GNOME integrations. Each desktop exposes only its proven
 capabilities. See [desktop setup](docs/wayland-integrations.md),
-[release evidence](docs/readiness/v1.11.1-readiness.md),
+[release evidence](docs/readiness/v1.11.2-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
 **Goose**, the bare `goose` command, `goose settings`, and tray Configure open the
@@ -27,6 +27,10 @@ graphical controls. `goose start` or `goose plz` starts the goose directly;
 All routes use the same Rust-owned configuration and lifecycle. The compatible `honk300`
 and `honk` aliases remain.
 
+The current Windows release has an observed startup timeout on direct settings commands;
+the application-menu and registered-shortcut routes pass the installed check. The bounded
+readiness correction is being qualified in [v1.11.3](docs/readiness/v1.11.3-readiness.md).
+
 The settings-navigation update keeps the current tab visibly highlighted,
 keeps scrolling short and smooth, limits the Wayland switch to Linux, and uses the
 application artwork in native trays and menus. It also puts both seasonal switches on
@@ -34,6 +38,11 @@ Appearance, defaults seasonal effects off, and requires about 2½ seconds of act
 rubbing before the first petting reaction. Existing saved seasonal choices are retained.
 See [ADR 0054](docs/adr/0054-settings-navigation-and-shared-artwork.md) and
 [ADR 0055](docs/adr/0055-opt-in-seasons-and-intentional-petting.md).
+
+Windows installers keep login startup off on a fresh installation and preserve your current
+choice through updates and repairs, including when you turned it off in Goose after an
+earlier installer opt-in. Explicit installer choices still apply. See
+[ADR 0057](docs/adr/0057-current-login-startup-installer-selection.md).
 
 Earlier releases, fixes and acceptance limits remain in the
 [readiness records](docs/readiness/). Public download verification and hosted native
@@ -344,7 +353,7 @@ cargo clippy --locked --all-targets --workspace -- -D warnings
 cargo test --locked --workspace
 cargo build --locked --release
 python -m unittest discover -s script/tests
-dist plan --tag=v1.11.1
+dist plan --tag=v1.11.2
 cargo audit --version 0.22.2
 ```
 

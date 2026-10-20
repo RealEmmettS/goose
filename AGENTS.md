@@ -6,11 +6,11 @@ Honk300 is a cross-platform Rust desktop goose with a procedural renderer and Wi
 macOS, X11, and opt-in reduced Wayland runtimes. **Goose** is the user-facing application name and `goose` is the recommended command.
 `honk300` remains the internal primary binary; `honk` and `goose` remain compatible aliases. The Cargo workspace uses Rust 1.95, edition 2021.
 
-Public stable is v1.11.1, source `91a31cedcdf621f6b067557b1ebf1750514c6454`.
-Its publication and qualification record is `docs/readiness/v1.11.1-readiness.md`.
+Public stable is v1.11.2, source `d5b898e9f0bc0e751dffe6b6068a35026b2b082f`.
+Its publication and qualification record is `docs/readiness/v1.11.2-readiness.md`.
 Task #g11 and ADR 0052 track the combined application, icon, leaf and affection update.
-The user confirms that the installed v1.11.0 Windows application now displays its logo
-and opens the graphical controls. The installed command and active immutable slot agree.
+The user confirmed that the installed v1.11.0 Windows application displays its logo
+and opens the graphical controls; preserve that historical acceptance record.
 Task #g12 and ADR 0054 track the published settings-navigation and shared tray-artwork update.
 ADR 0055 adds default-off seasonal effects, Appearance leaf switches and intentional
 petting: 2.5 seconds of active rubbing before the first petting reaction. Preserve saved
@@ -25,8 +25,14 @@ retains the separate, unresolved transparency investigation.
 Task #g15 and ADR 0057 correct Windows installers restoring an obsolete login-startup
 selection after an app opt-out. The failure is reproduced in both published MSI editions.
 Fresh startup stays default-off; installer migration must use the current owned preference
-and preserve explicit choices. The installed v1.11.1 preference has been restored to off;
-v1.11.2 qualification is in progress, with existing release assets unchanged.
+and preserve explicit choices. All required source, candidate, main, publication and fresh-public
+checks pass for v1.11.2, with all 47 public assets independently verified. After an initial
+canceled administrator prompt, the operator approved the retry: the official installed
+v1.11.2 payloads, startup-off preservation, scrolling and runtime lifecycle pass.
+Direct settings commands can still fail their input-idle check despite a responsive window.
+Task #g16 and ADR 0058 prepare v1.11.3 with bounded readiness for the exact child window,
+retained verified file leases and enforced normal DLL imports. Complete installed entry-route
+acceptance remains open. Existing release assets remain unchanged.
 
 The approved refinement is published through `.tasks/milestones/refine.md` and ADR 0041:
 the redesigned continuously projected goose, reliability cleanup, Native SDK settings

@@ -6,7 +6,6 @@ from io import BytesIO
 import json
 from pathlib import Path
 import stat
-import struct
 import sys
 import tarfile
 import tempfile
@@ -16,7 +15,9 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "script"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bundle_settings import add_files, bundle
+from pe_fixtures import settings_pe
 from verify_settings import verify
 
 
@@ -26,15 +27,7 @@ class SettingsPackagingTests(unittest.TestCase):
             root = Path(temporary)
             settings = root / "companion"
             settings.mkdir()
-            # This bounded PE header is an architecture-parser fixture. It is never
-            # executed or used as evidence that the native GUI runs.
-            pe = bytearray(256)
-            pe[:2] = b"MZ"
-            struct.pack_into("<I", pe, 0x3C, 0x80)
-            pe[0x80:0x84] = b"PE\0\0"
-            struct.pack_into("<H", pe, 0x84, 0x8664)
-            struct.pack_into("<H", pe, 0x98, 0x20B)
-            struct.pack_into("<H", pe, 0xDC, 2)
+            pe = settings_pe()
             (settings / "honk300-settings.exe").write_bytes(pe)
             (settings / "honk_settings_accessibility.dll").write_bytes(pe)
             for name in ("NATIVE_SDK_LICENSE.txt", "NATIVE_SDK_FONT_LICENSE.txt"):
@@ -77,6 +70,14 @@ class SettingsPackagingTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 verify(settings, target)
             (settings / "honk_settings_accessibility.dll").write_bytes(pe)
+            missing_import = settings_pe(dll_name=b"other.dll")
+            (settings / "honk300-settings.exe").write_bytes(missing_import)
+            metadata["sha256"] = hashlib.sha256(missing_import).hexdigest()
+            metadata_path.write_text(json.dumps(metadata))
+            with self.assertRaisesRegex(ValueError, "missing normal/load-time import"):
+                verify(settings, target)
+            (settings / "honk300-settings.exe").write_bytes(pe)
+            metadata["sha256"] = hashlib.sha256(pe).hexdigest()
             metadata["automation"] = True
             metadata_path.write_text(json.dumps(metadata))
             with self.assertRaises(AssertionError):

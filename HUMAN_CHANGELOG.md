@@ -3,12 +3,21 @@
 A plain-English account of what changed and why. The [technical changelog](CHANGELOG.md)
 has implementation details; [the README](README.md) describes current features and setup.
 
+## Opening settings reliably — October 2026
+
+### Fixed
+- Keep the settings window open once it responds, instead of closing working controls because Windows has not reported an idle moment.
+
+### Behind the scenes
+- Check that startup recognizes only its own working window, safely stops failed launches and keeps the verified application files protected until they are loaded.
+
 ## Remembering startup choices — October 2026
 
 ### Fixed
 - Keep login startup off on a new installation and remember when you turn it off later, so an update does not quietly enable it again. You can still choose to start Goose when you sign in.
 
 ### Behind the scenes
+- Verify the corrected startup choices and published downloads across every Windows installer and supported desktop, then confirm that the approved update preserves the saved choice on the user's computer. Retain failed attempts and keep the remaining settings-launch issue separate from passed scrolling and runtime checks.
 - Check startup choices across every Windows installer, including the graphical setup, repairs and recovery from failed updates.
 - Verify which installer window and menu receive each automated action, read each window's identity once before it can close, and retain the failed screen and original settings for diagnosis.
 - Check that the settings app matches its installer and verify the complete release again after an installation issue is corrected.

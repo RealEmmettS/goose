@@ -127,8 +127,8 @@ try {
                 $window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition) | ForEach-Object { $_.Current.Name } | Set-Content -LiteralPath (Join-Path $evidence "$route-failed-tree.txt")
                 throw 'Native controls did not finish loading through Rust'
             }
-            # The Rust launcher retains verification leases through its ten-second input-idle
-            # bound. Keep the route within the existing overall deadline, including cold startup.
+            # The Rust launcher retains verification leases through bounded settings-window
+            # readiness. Keep the route within the existing overall deadline, including cold startup.
             $remaining=[Math]::Max(1,[int]($deadline-[DateTime]::UtcNow).TotalMilliseconds)
             if (-not $controller.WaitForExit($remaining) -or $controller.ExitCode -ne 0) { throw "$route controller failed or did not return" }
             $results+=@{route=$route;title=$gui.MainWindowTitle;settings_sha256=$receipt.settings_app.sha256;native_controls=$true;window_icon=$true;stale_receipt_ignored=$true}

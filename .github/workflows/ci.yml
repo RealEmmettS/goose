@@ -18,7 +18,7 @@ on:
       startup_candidate_tag:
         description: Candidate version for a diagnostic artifact run
         type: string
-        default: v1.11.2
+        default: v1.11.3
 
 permissions:
   contents: read

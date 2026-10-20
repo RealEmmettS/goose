@@ -15,6 +15,7 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 from build_settings import TARGETS
+from verify_pe_imports import require_load_time_import
 
 
 def verify(directory: Path, target: str, execute: bool = False) -> Path:
@@ -37,6 +38,7 @@ def verify(directory: Path, target: str, execute: bool = False) -> Path:
         assert bridge.is_file() and not bridge.is_symlink(), "missing native accessibility DLL"
         assert bridge.stat().st_size == identity["size"]
         assert hashlib.sha256(bridge.read_bytes()).hexdigest() == identity["sha256"]
+        require_load_time_import(binary.read_bytes(), identity["name"])
         subprocess.run([sys.executable, str(root / "script/verify_binary_architecture.py"),
                         "--format", "pe", "--machine", "0x8664" if target.startswith("x86") else "0xAA64", str(bridge)], check=True)
         arguments = ["--format", "pe", "--machine", "0x8664" if target.startswith("x86") else "0xAA64", "--subsystem", "2"]
