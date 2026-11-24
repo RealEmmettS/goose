@@ -427,6 +427,14 @@ try {
         }
     }
     Stop-HeldOldProcess
+    if ($powerShellInstallerPath) {
+        $command = Join-Path $globalRoot 'bin\goose.exe'
+        Invoke-Checked $command @('install') 'Reinstall through the managed Goose CLI'
+        Assert-Active $globalRoot 'powershell'
+        Invoke-Checked $command @('update') 'Check for updates through the installed CLI'
+        Assert-Active $globalRoot 'powershell'
+    }
+
 
     $held = Start-HeldOldProcess (Join-Path $globalRoot 'bin\honk300.exe')
     Install-Msi $globalMsiPath 'Fresh Global MSI retakes PowerShell channel'

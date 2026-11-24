@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import stat
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -119,6 +120,57 @@ class DebianPackagingTests(unittest.TestCase):
                 PACKAGE_DEB.build_package_tree(
                     temp / "two", link, "1.0.1", "v1.0.1", "0" * 40, "arm64"
                 )
+
+
+class DebianMigrationTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "linux", "requires Unix filesystem and account semantics")
+    def test_interrupted_handoff_restores_aliases_receipt_and_desktop_entries(self):
+        spec = importlib.util.spec_from_file_location("migration", SCRIPT.with_name("debian_migration.py"))
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            data = home / "spaced data"
+            root = data / "honk300/install"
+            slot = root / "releases/1.11.3-x86_64-unknown-linux-gnu"
+            (slot / "bin").mkdir(parents=True)
+            (slot / "bin/honk300").write_bytes(b"old runtime")
+            (slot / "bin/honk300").chmod(0o755)
+            settings = slot / "bin/honk300-settings"
+            settings.write_bytes(b"old settings")
+            (root / "current").symlink_to(slot)
+            links = [home / ".local/bin" / name for name in migration.NAMES]
+            links[0].parent.mkdir(parents=True)
+            for link in links:
+                link.symlink_to(root / "current/bin/honk300")
+            receipt = root.parent / "install-receipt.json"
+            receipt.write_text(json.dumps({
+                "schema": "honk300.install.v2", "origin": "shell", "installer_family": "shell",
+                "version": "1.11.3", "target": "x86_64-unknown-linux-gnu", "scope": "user",
+                "layout": "linux-slots-v1", "install_root": str(root), "owned_root": str(root),
+                "active_release": str(slot), "aliases": list(map(str, links)),
+                "settings_app": {"sha256": migration.checksum(settings)},
+            }))
+            digest = migration.checksum(receipt)
+            desktop = data / "applications/honk300.desktop"
+            desktop.parent.mkdir()
+            desktop.write_text("X-Honk300-Managed=true\nX-Honk300-Owner=honk300.install.v1\n")
+            icon = data / migration.ICON
+            icon.parent.mkdir(parents=True)
+            icon.symlink_to(root / "current/icon.png")
+            # An interruption after just one alias changed must also be recoverable.
+            migration.replace_link(links[0], Path("/usr/bin/honk300"))
+            migration.restore_shell(home, root, digest, "test")
+            self.assertTrue(all(link.readlink() == root / "current/bin/honk300" for link in links))
+            for _ in range(2):
+                migration.finish(home, root, digest, "test")
+                self.assertFalse(desktop.exists())
+                self.assertFalse(icon.is_symlink())
+                self.assertTrue(all(link.readlink() == Path("/usr/bin") / link.name for link in links))
+            migration.restore_shell(home, root, digest, "test")
+            migration.validate(home, root, digest)
+            self.assertTrue(desktop.is_file())
+            self.assertEqual(icon.readlink(), root / "current/icon.png")
 
 
 if __name__ == "__main__":

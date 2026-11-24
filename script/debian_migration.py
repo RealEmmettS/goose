@@ -16,6 +16,8 @@ import uuid
 STATE = Path("/var/lib/honk300-installer")
 NAMES = ("honk300", "honk", "goose")
 PACKAGE = Path("/usr/lib/honk300")
+DESKTOP_NAMES = ("honk300.desktop", "dev.emmetts.honk300.settings.desktop")
+ICON = Path("icons/hicolor/512x512/apps/dev.emmetts.honk300.settings.png")
 
 
 def require(condition, message):
@@ -74,11 +76,20 @@ def validate(home, root, digest, *, resuming=False):
             "The active release disagrees with the receipt.")
     require(checksum(slot / "bin/honk300-settings") == info["settings_app"]["sha256"],
             "The old settings executable disagrees with its receipt.")
+    require(regular(slot / "bin/honk300") and os.access(slot / "bin/honk300", os.X_OK),
+            "The previous runtime executable is missing or invalid.")
     links = [home / ".local/bin" / name for name in NAMES]
     require(info["aliases"] == list(map(str, links)) and all(
         (link.readlink() == root / "current/bin/honk300" or
          (resuming and link.readlink() == Path("/usr/bin") / link.name)) for link in links),
         "The old command aliases are ambiguous.")
+
+
+def replace_link(link, target):
+    with tempfile.TemporaryDirectory(dir=link.parent) as directory:
+        new = Path(directory) / link.name
+        new.symlink_to(target)
+        new.replace(link)
 
 
 def finish(home, root, digest, transaction):
@@ -94,10 +105,7 @@ def finish(home, root, digest, transaction):
         if link.is_symlink() and link.readlink() == system:
             continue
         require(link.is_symlink() and link.readlink() == target, f"Foreign command alias {link}")
-        with tempfile.TemporaryDirectory(dir=link.parent) as directory:
-            new = Path(directory) / name
-            new.symlink_to(system)
-            new.replace(link)
+        replace_link(link, system)
     # Keep the old selector usable until all three aliases point to the verified package.
     if not retired.exists():
         root.rename(retired)
@@ -109,15 +117,37 @@ def finish(home, root, digest, transaction):
         receipt.rename(saved)
     require(checksum(saved) == digest, "Unexpected retired shell receipt.")
     data = root.parent.parent
-    for name in ("honk300.desktop", "dev.emmetts.honk300.settings.desktop"):
+    for name in DESKTOP_NAMES:
         entry = data / "applications" / name
         if entry.exists() and regular(entry):
             lines = entry.read_text().splitlines()
             if "X-Honk300-Managed=true" in lines and "X-Honk300-Owner=honk300.install.v1" in lines:
                 entry.rename(retired / name)
-    icon = data / "icons/hicolor/512x512/apps/dev.emmetts.honk300.settings.png"
+    icon = data / ICON
     if icon.is_symlink() and icon.readlink() == root / "current/icon.png":
-        icon.unlink()
+        icon.rename(retired / "shell-icon-link")
+
+
+def restore_shell(home, root, digest, transaction):
+    retired = root.with_name("install.retired-" + transaction)
+    receipt = root.parent / "install-receipt.json"
+    if retired.exists():
+        require(not retired.is_symlink() and not os.path.lexists(root), "Conflicting shell install during recovery.")
+        saved = retired / "shell-receipt.json"
+        require(checksum(saved if saved.exists() else receipt) == digest, "Unexpected saved shell receipt.")
+        data = root.parent.parent
+        files = [(retired / name, data / "applications" / name) for name in DESKTOP_NAMES]
+        files += [(retired / "shell-icon-link", data / ICON), (saved, receipt)]
+        for old, dest in files:
+            if os.path.lexists(old):
+                require(not os.path.lexists(dest), f"Preserved foreign integration at {dest}")
+                old.rename(dest)
+        retired.rename(root)
+    require(checksum(receipt) == digest, "The previous shell receipt changed before recovery.")
+    for name in NAMES:
+        link = home / ".local/bin" / name
+        if link.is_symlink() and link.readlink() == Path("/usr/bin") / name:
+            replace_link(link, root / "current/bin/honk300")
 
 
 def finish_with_lease(home, root, digest, transaction):
@@ -133,7 +163,11 @@ def finish_with_lease(home, root, digest, transaction):
                 selector.register(process.stdout, selectors.EVENT_READ)
                 require(selector.select(35) and process.stdout.readline().strip() ==
                         b"HONK300_INTERNAL_LIFECYCLE_LEASE_READY", "Goose did not release its runtime.")
-            finish(home, root, digest, transaction)
+            try:
+                finish(home, root, digest, transaction)
+            except Exception:
+                restore_shell(home, root, digest, transaction)
+                raise
         finally:
             process.stdin.close()
             try:
@@ -243,9 +277,14 @@ def main(phase, action):
     require(not STATE.is_symlink() and STATE.stat().st_uid == 0 and STATE.stat().st_mode & 0o077 == 0,
             "Unexpected package migration state.")
     pending, completed = STATE / "pending.json", STATE / "forwarders.json"
+    if phase == "postrm" and pending.exists():
+        record = load(pending)
+        if record["phase"] == "applying":
+            account = pwd.getpwuid(record["uid"])
+            require(account.pw_dir == record["home"], "The account home changed during recovery.")
+            as_account(account, restore_shell, Path(record["root"]), record["digest"], record["transaction"])
+        pending.unlink()
     if phase == "postrm" and action.startswith("abort-"):
-        if pending.exists() and load(pending).get("phase") == "prepared":
-            pending.unlink()
         return
     if phase == "preinst":
         prepare()

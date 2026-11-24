@@ -23,9 +23,11 @@ sh "$root/old.sh"
 app="$XDG_DATA_HOME/honk300"
 bin="$HOME/.local/bin/goose"
 old=$(readlink "$app/install/current")
+startup="$XDG_CONFIG_HOME/autostart/honk300.desktop"
+[ ! -e "$startup" ]
 mkdir -p "$app/media/Notes"
 printf 'user media\n' > "$app/media/Notes/my-note.txt"
-printf '# retain comments\n[lifecycle]\nautostart_on_login = false\n' > "$app/config.toml"
+printf 'goose_config_version = 2\n# retain comments\n[lifecycle]\nautostart_on_login = false\n' > "$app/config.toml"
 cp "$app/config.toml" "$root/config.before"
 export HONK300_TEST_LOCAL_DIR="$assets"
 if HONK300_TEST_FAIL_AFTER_SWAP=1 sh "$assets/honk300-installer.sh"; then exit 1; fi
@@ -44,6 +46,25 @@ PY
   "$app/install/current/bin/honk300-settings" --version 2>&1 | grep -F "${tag#v}"
   cmp "$app/config.toml" "$root/config.before"
   grep -Fx 'user media' "$app/media/Notes/my-note.txt"
+  if [ "$pass" = 1 ]; then
+    [ ! -e "$startup" ]
+    python3 - "$bin" "$app/config.toml" <<'PY'
+import json, subprocess, sys
+def request(command):
+    data = json.dumps({"protocol": 1, "request_id": 1, "command": command})
+    result = json.loads(subprocess.check_output(
+        [sys.argv[1], "__settings-service", "--config", sys.argv[2]], input=data, text=True))
+    assert result["ok"], result
+    return result["data"]
+initial = request({"op": "read"})
+request({"op": "save", "revision": initial["revision"], "patch": {"lifecycle.autostart_on_login": True}})
+PY
+    grep -F '# retain comments' "$app/config.toml"
+    cp "$app/config.toml" "$root/config.before"
+    cp "$startup" "$root/startup.before"
+  else
+    cmp "$startup" "$root/startup.before"
+  fi
 done
 if [ "${VERIFY_PUBLIC_CLI:-}" = true ]; then
   "$bin" install
@@ -58,6 +79,13 @@ if command -v dpkg >/dev/null; then
   "$bin" --version | grep -F "${tag#v}"
   cmp "$app/config.toml" "$root/config.before"
   grep -Fx 'user media' "$app/media/Notes/my-note.txt"
+  if [ "${VERIFY_PUBLIC_CLI:-}" = true ]; then
+    "$bin" install
+    "$bin" update
+    [ "$(readlink "$bin")" = /usr/bin/goose ]
+    cmp "$app/config.toml" "$root/config.before"
+  fi
+  cmp "$startup" "$root/startup.before"
   sudo dpkg --remove honk300
   [ ! -L "$bin" ]
 fi

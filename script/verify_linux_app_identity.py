@@ -9,7 +9,7 @@ from pathlib import Path
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gdk, Gio, Gtk  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
 
 APPLICATION_ID = "dev.emmetts.honk300.settings"
@@ -34,8 +34,11 @@ def main():
     for entry in (launcher, identity):
         assert entry.get_name() == "Goose", entry.get_name()
         assert entry.get_startup_wm_class() == APPLICATION_ID
-        assert Path(entry.get_executable()).resolve() == args.expected_binary.resolve()
-        assert entry.get_commandline().endswith(" settings"), entry.get_commandline()
+        # GLib 2.72 get_executable() stops at the first space even inside a quoted path.
+        # Parse the decoded Exec field with the same argument parser used by GIO to launch it.
+        parsed, argv = GLib.shell_parse_argv(entry.get_commandline())
+        assert parsed and len(argv) == 2 and argv[1] == "settings", argv
+        assert Path(argv[0]).resolve(strict=True) == args.expected_binary.resolve(strict=True), argv
     assert launcher.get_icon().equal(identity.get_icon())
 
     theme = Gtk.IconTheme.get_for_display(display)

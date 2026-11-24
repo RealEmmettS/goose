@@ -3,3 +3,5 @@ self-hosted-runner:
     - honk300-a11y
     # GitHub-hosted Intel preview label; actionlint v1.7.7 predates it.
     - macos-15-intel
+    # GitHub-hosted Xcode 27 image used for installer compatibility.
+    - xcode-27

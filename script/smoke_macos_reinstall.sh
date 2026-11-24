@@ -28,20 +28,35 @@ if [[ "${CHECK_XCODE_27:-}" = true ]]; then
   grep -F 'exactly one input file' "$root/baseline.log"
   for arch in arm64 x86_64; do /usr/bin/lipo "$old" -verify_arch "$arch"; done
 fi
-if [[ "${CHECK_XCODE_27:-}" != true ]]; then
-  curl -fsSL --retry 4 https://github.com/RealEmmettS/goose/releases/download/v1.11.3/honk300-installer.sh -o "$root/old.sh"
-  echo "3ee2f2ec6afa6db0ab7b20ad60b4c7d846c70e799be898b476c0ecb8929b230c  $root/old.sh" | shasum -a 256 -c -
-  if [[ "${VERIFY_PUBLIC_CLI:-}" = true ]]; then
-    (
-      export HOME="$root/cli-home"
-      mkdir -p "$HOME"
-      sh "$root/old.sh"
-      "$HOME/.local/bin/goose" update
-      "$HOME/.local/bin/goose" --version | grep -F "$version"
-    )
-  fi
-  sh "$root/old.sh"
+curl -fsSL --retry 4 https://github.com/RealEmmettS/goose/releases/download/v1.11.3/honk300-installer.sh -o "$root/old.sh"
+echo "3ee2f2ec6afa6db0ab7b20ad60b4c7d846c70e799be898b476c0ecb8929b230c  $root/old.sh" | shasum -a 256 -c -
+if [[ "${CHECK_XCODE_27:-}" = true ]]; then
+  # Model an installation performed before the user upgraded Xcode. Split only the two
+  # known lipo checks in the pinned *fixture*. All candidate and public installers run as shipped.
+  python3 - "$root/old.sh" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+text = path.read_text()
+for variable in ("STAGED_SETTINGS", "STAGED_BINARY"):
+    check = 'lipo "$' + variable + '" -verify_arch '
+    assert text.count(check + "x86_64 arm64") == 1
+    text = text.replace(check + "x86_64 arm64", check + "x86_64\n  " + check + "arm64")
+path.write_text(text)
+PY
 fi
+if [[ "${VERIFY_PUBLIC_CLI:-}" = true ]]; then
+  (
+    export HOME="$root/cli-home"
+    mkdir -p "$HOME"
+    sh "$root/old.sh"
+    "$HOME/.local/bin/goose" --version | grep -F 1.11.3
+    "$HOME/.local/bin/goose" update
+    "$HOME/.local/bin/goose" --version | grep -F "$version"
+  )
+fi
+sh "$root/old.sh"
+"$HOME/.local/bin/goose" --version | grep -F 1.11.3
 hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$assets/honk300-universal2.dmg"
 app="$HOME/Applications/Honk300.app"
 receipt="$HOME/Library/Application Support/honk300/install-receipt.json"
@@ -58,9 +73,8 @@ for startup in off on; do
   if [[ "$startup" = on ]]; then
     "$payload" install --autostart
     test -f "$agent"
+    HONK300_TEST_LOCAL_DIR="$assets" sh "$assets/honk300-installer.sh"
   fi
-  export HONK300_TEST_LOCAL_DIR="$assets"
-  sh "$assets/honk300-installer.sh"
   python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["origin"] == "shell"' "$receipt"
   "$mount/Install Honk300.app/Contents/MacOS/Install Honk300" >"$root/helper.log" 2>&1 &
   helper_pid=$!
@@ -83,5 +97,6 @@ done
 if [[ "${VERIFY_PUBLIC_CLI:-}" = true ]]; then
   "$HOME/.local/bin/goose" install
   "$HOME/.local/bin/goose" update
+  python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["origin"]=="mac-app" and r["version"]==sys.argv[2]' "$receipt" "$version"
   test -f "$agent"
 fi
