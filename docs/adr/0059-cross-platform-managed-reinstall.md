@@ -11,3 +11,5 @@ Linux activates the exact release by atomically replacing the current symlink it
 ## Qualification
 
 The release candidate must exercise both Mac slices, both Windows and Linux CPUs, GNU and Alpine installers, package transitions and repeat installations. Signed candidate and fresh public results are recorded separately from unit tests.
+
+A graphical Debian migration can use PackageKit’s active install transaction on the system bus when the backend omits the caller environment variable. Match the actual package, active role, execution status and user before transferring the previous shell installation.

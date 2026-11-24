@@ -9,7 +9,7 @@ has implementation details; [the README](README.md) describes current features a
 - Open the Mac installer again and keep your login choice.
 - Let Windows find the installed app when you use an older PowerShell.
 - Open Goose from the Linux menu when your installation folder contains spaces. Installing a newer copy switches your commands to the new version.
-- Run the installer again to refresh Goose and keep your settings and personal notes.
+- Run the installer again to refresh Goose and keep your settings and personal notes. On Debian and Ubuntu you can open the downloaded package even if you originally installed Goose in Terminal.
 
 ## Opening settings reliably — October 2026
 

@@ -13,7 +13,7 @@ features and installation, and [readiness records](docs/readiness/) for release 
 - Check each required Mach-O slice individually on macOS and preserve the owned login preference during graphical reinstall.
 - Use native Windows Program Files for MSI readback from emulated PowerShell.
 - Atomically replace the Linux active release link and encode desktop launcher arguments.
-- Reinstall through the verified managed owner and support Debian refresh and attributable per-user handoff with retained settings and media.
+- Reinstall through the verified managed owner and support Debian refresh and shell-to-package handoff using the requesting account from sudo, polkit or the active PackageKit transaction.
 
 ## [1.11.3] - 2026-10-20
 

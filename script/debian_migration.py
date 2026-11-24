@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import pwd
+import re
 import selectors
 import stat
 import subprocess
@@ -16,6 +17,8 @@ import uuid
 STATE = Path("/var/lib/honk300-installer")
 NAMES = ("honk300", "honk", "goose")
 PACKAGE = Path("/usr/lib/honk300")
+PACKAGEKIT = "org.freedesktop.PackageKit"
+PACKAGEKIT_DAEMONS = {"/usr/libexec/packagekitd", "/usr/lib/packagekit/packagekitd"}
 DESKTOP_NAMES = ("honk300.desktop", "dev.emmetts.honk300.settings.desktop")
 ICON = Path("icons/hicolor/512x512/apps/dev.emmetts.honk300.settings.png")
 
@@ -192,6 +195,41 @@ def persist(path, record):
     os.replace(stream.name, path)
 
 
+def packagekit_call(path, method, *args):
+    return subprocess.check_output(
+        ["/usr/bin/gdbus", "call", "--system", "--dest", PACKAGEKIT, "--object-path", path,
+         "--method", method, "--timeout", "3", *args],
+        env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"}, text=True, timeout=5).strip()
+
+
+def packagekit_uid():
+    # Some APT backends omit PACKAGEKIT_CALLER_UID from dpkg's environment.
+    # The system bus retains the authorized caller on the transaction itself.
+    def prop(path, name):
+        return packagekit_call(path, "org.freedesktop.DBus.Properties.Get", PACKAGEKIT + ".Transaction", name)
+
+    def number(path, name, kind="uint32"):
+        value = re.fullmatch(r"\(<" + kind + r" ([0-9]+)>,\)", prop(path, name))
+        require(value, "Unexpected PackageKit transaction property.")
+        return int(value[1])
+
+    transactions = packagekit_call("/org/freedesktop/PackageKit", PACKAGEKIT + ".GetTransactionList")
+    paths = re.findall(r"'(/[A-Za-z0-9_/]+)'", transactions)
+    require(len(paths) <= 32, "Too many simultaneous package transactions.")
+    callers = []
+    for path in paths:
+        # InstallFiles, InstallPackages or UpdatePackages, running with the package lock.
+        if number(path, "Role") not in (10, 11, 22) or number(path, "Status") not in (3, 9, 10, 16):
+            continue
+        if number(path, "TransactionFlags", "uint64") & ((1 << 2) | (1 << 3)):  # simulate or download only
+            continue
+        if re.fullmatch(r"\(<'honk300;[^';]+;[^';]+;[^']*'>,\)", prop(path, "LastPackage")):
+            callers.append(number(path, "Uid"))
+    require(len(callers) == 1 and 0 < callers[0] < 4294967295,
+            "Could not identify the active Goose package transaction.")
+    return callers[0]
+
+
 def transaction_uid():
     # Check the OS audit identity or the actual root-owned authorizing frontend.
     programs = set()
@@ -202,7 +240,8 @@ def transaction_uid():
             status = (proc / "status").read_text().splitlines()
             exe = (proc / "exe").resolve(strict=True)
             metadata = exe.stat()
-            if metadata.st_uid == 0 and not metadata.st_mode & 0o022:
+            effective_uid = next(line.split()[2] for line in status if line.startswith("Uid:"))
+            if effective_uid == "0" and metadata.st_uid == 0 and not metadata.st_mode & 0o022:
                 programs.add(str(exe))
         except (FileNotFoundError, PermissionError):
             break
@@ -213,10 +252,12 @@ def transaction_uid():
         identities.add(int(audit))
     for key, paths in (("SUDO_UID", {"/usr/bin/sudo", "/usr/bin/sudo-rs"}),
                        ("PKEXEC_UID", {"/usr/bin/pkexec"}),
-                       ("PACKAGEKIT_CALLER_UID", {"/usr/libexec/packagekitd", "/usr/lib/packagekit/packagekitd"})):
+                       ("PACKAGEKIT_CALLER_UID", PACKAGEKIT_DAEMONS)):
         value = os.environ.get(key, "")
         if paths & programs and value.isdecimal():
             identities.add(int(value))
+    if programs & PACKAGEKIT_DAEMONS and not os.environ.get("PACKAGEKIT_CALLER_UID"):
+        identities.add(packagekit_uid())
     return identities
 
 

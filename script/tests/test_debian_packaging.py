@@ -6,6 +6,7 @@ import stat
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -123,6 +124,37 @@ class DebianPackagingTests(unittest.TestCase):
 
 
 class DebianMigrationTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "linux", "requires the Linux migration module")
+    def test_packagekit_uses_only_the_active_goose_install_transaction(self):
+        spec = importlib.util.spec_from_file_location("migration", SCRIPT.with_name("debian_migration.py"))
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        install = {"Role": 10, "Status": 3, "TransactionFlags": 0, "Uid": 1000,
+                   "LastPackage": "honk300;1.11.4;amd64;+manual:local"}
+
+        def identify(rows):
+            def call(path, method, *args):
+                if method.endswith("GetTransactionList"):
+                    return "([" + ", ".join(f"objectpath '/tx{i}'" for i in range(len(rows))) + "],)"
+                field = args[-1]
+                value = rows[int(path[3:])][field]
+                if field == "LastPackage":
+                    return f"(<'{value}'>,)"
+                kind = "uint64" if field == "TransactionFlags" else "uint32"
+                return f"(<{kind} {value}>,)"
+            with patch.object(migration, "packagekit_call", side_effect=call):
+                return migration.packagekit_uid()
+
+        for change in ({"Status": 1}, {"Role": 21}, {"TransactionFlags": 4}, {"TransactionFlags": 8},
+                       {"LastPackage": "another;1.0;amd64;local"}):
+            unrelated = dict(install, **change)
+            self.assertEqual(identify([unrelated, install]), 1000)
+            with self.assertRaises(RuntimeError):
+                identify([unrelated])
+        for rows in ([], [install, dict(install, Uid=1001)], [dict(install, Uid=0)]):
+            with self.assertRaises(RuntimeError):
+                identify(rows)
+
     @unittest.skipUnless(sys.platform == "linux", "requires Unix filesystem and account semantics")
     def test_interrupted_handoff_restores_aliases_receipt_and_desktop_entries(self):
         spec = importlib.util.spec_from_file_location("migration", SCRIPT.with_name("debian_migration.py"))
