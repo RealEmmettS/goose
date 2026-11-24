@@ -856,10 +856,17 @@ fn run_inner(report: &mut UpdateReport, json: bool, reinstall: bool) -> Result<(
     #[cfg(windows)]
     let installed_executable = strategy_owned_executable(plan.strategy, source, target)?;
 
-    eprintln!(
-        "honk300: update available {current} -> {latest}; using {}.",
-        plan.strategy.label()
-    );
+    if current == latest {
+        eprintln!(
+            "honk300: reinstalling {current} using {}.",
+            plan.strategy.label()
+        );
+    } else {
+        eprintln!(
+            "honk300: updating {current} to {latest} using {}.",
+            plan.strategy.label()
+        );
+    }
     prepare_temp_artifact_path(&temp_path)?;
     download_to_file(&artifact_url, &temp_path)?;
     verify_manifest_artifact(&temp_path, artifact)?;

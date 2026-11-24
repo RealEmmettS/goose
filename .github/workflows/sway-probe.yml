@@ -24,7 +24,8 @@ jobs:
       fail-fast: false
       matrix:
         distribution: ['ubuntu:24.04', 'debian:trixie-slim']
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
+        # These host-built probes also run inside older compositor containers.
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
     steps:
       - uses: actions/checkout@v6
         with:

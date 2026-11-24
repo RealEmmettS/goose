@@ -147,6 +147,9 @@ jobs:
             -TargetTriple '${{ matrix.triple }}' `
             -AllowUnobservableTrayRecoveryHost:('${{ matrix.triple }}' -eq 'x86_64-pc-windows-msvc') `
             -OverlayEvidenceDirectory 'target/post-release-windows-overlay-${{ matrix.triple }}'
+      - name: Verify native and emulated PowerShell installer selection
+        shell: pwsh
+        run: ./script/smoke_windows_bootstrap_architecture.ps1 -Target '${{ matrix.triple }}'
       - name: Download exact public managed installers and qualify takeover
         timeout-minutes: 30
         env:

@@ -85,6 +85,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("- windows-installers", assembly)
         self.assertIn("- build-debian-packages", assembly)
         self.assertIn("- qualify-debian-packages", assembly)
+        self.assertIn("- linux-reinstall", assembly)
         self.assertIn('gh release edit "$TAG"', assembly)
         self.assertIn("--draft=false --latest", assembly)
         self.assertNotIn("--clobber", assembly)
@@ -215,8 +216,9 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertIn(required, RELEASE)
         assembly = RELEASE[RELEASE.index("assemble-and-publish:") :]
         self.assertIn("- qualify-debian-packages", assembly)
+        self.assertIn("- linux-reinstall", assembly)
         self.assertIn(
-            "Prove shell and Debian fresh-intent scope collisions fail before mutation",
+            "Verify Debian collision refusal and same-owner bootstrap refresh",
             assembly,
         )
         self.assertIn("target/install-scope-collision-evidence", assembly)

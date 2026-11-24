@@ -94,6 +94,14 @@ pub fn prepare_config_autostart(
     Ok(())
 }
 
+pub(super) fn current_owned_autostart() -> Result<bool, DynError> {
+    managed_autostart_identity()?
+        .as_ref()
+        .map(owned_autostart_state)
+        .transpose()
+        .map(Option::unwrap_or_default)
+}
+
 fn owned_autostart_state(identity: &ManagedAutostartIdentity) -> Result<bool, DynError> {
     #[cfg(windows)]
     return windows_owned_autostart_state(identity);

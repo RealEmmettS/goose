@@ -624,8 +624,7 @@ case "$OS:$UPDATE_ORIGIN" in
       || die "macOS updater could not validate the existing shell-owned app receipt"
     ;;
   Linux:)
-    # The no-sudo user bootstrap cannot silently remove a machine-owned Debian package. Refuse
-    # before staging so the package remains authoritative until the user explicitly removes it.
+    # An existing Debian installation stays with its verified system package owner.
     if has dpkg-query && [ "$(dpkg-query -W -f='${Status}' honk300 2>/dev/null || true)" = "install ok installed" ]; then
       if [ ! -L /usr/lib/honk300/install-source.txt ] \
          && [ "$(cat /usr/lib/honk300/install-source.txt 2>/dev/null || true)" = deb ] \

@@ -53,17 +53,27 @@ fn mutate_with_lifecycle_lease<L, T>(
 }
 
 pub fn install_or_reinstall(autostart: bool) -> Result<(), DynError> {
-    let source = detect_install_source();
-    if matches!(source, InstallSource::Unknown | InstallSource::ManualLocal) {
-        return install(autostart);
-    }
-    // The mounted DMG delegates to this command before its executable is installed.
+    // A verified bundle copied by the graphical helper has an external source executable.
     #[cfg(target_os = "macos")]
     if matches!(
         macos_install_disposition(&std::env::current_exe()?, &macos_app_install_path()?)?,
         MacosInstallDisposition::CopyBundle(_)
     ) {
         return install(autostart);
+    }
+    match detect_install_source() {
+        InstallSource::Unknown => {
+            if provenance::read_install_receipt_source()
+                == InstallSourceEvidence::InvalidOrConflicting
+            {
+                return Err("the installer receipt conflicts with this executable; use the official installer to repair Goose".into());
+            }
+            return install(autostart);
+        }
+        InstallSource::ManualLocal => {
+            return install(autostart || autostart::current_owned_autostart()?);
+        }
+        _ => {}
     }
     crate::update::authoritative_installed_executable()?;
     if autostart {
@@ -108,7 +118,7 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
 #[cfg(target_os = "linux")]
 pub fn install(autostart: bool) -> Result<(), DynError> {
     let root = linux_user_install_root()?;
-    ensure_owned_install_root(&root, &[InstallSource::ManualLocal, InstallSource::Shell])?;
+    ensure_owned_install_root(&root, &[InstallSource::ManualLocal])?;
     let _lifecycle_lease = LifecycleLease::acquire()?;
     let bin_dir = root.join("bin");
     fs::create_dir_all(&bin_dir)?;

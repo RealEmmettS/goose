@@ -31,6 +31,15 @@ fi
 if [[ "${CHECK_XCODE_27:-}" != true ]]; then
   curl -fsSL --retry 4 https://github.com/RealEmmettS/goose/releases/download/v1.11.3/honk300-installer.sh -o "$root/old.sh"
   echo "3ee2f2ec6afa6db0ab7b20ad60b4c7d846c70e799be898b476c0ecb8929b230c  $root/old.sh" | shasum -a 256 -c -
+  if [[ "${VERIFY_PUBLIC_CLI:-}" = true ]]; then
+    (
+      export HOME="$root/cli-home"
+      mkdir -p "$HOME"
+      sh "$root/old.sh"
+      "$HOME/.local/bin/goose" update
+      "$HOME/.local/bin/goose" --version | grep -F "$version"
+    )
+  fi
   sh "$root/old.sh"
 fi
 hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$assets/honk300-universal2.dmg"

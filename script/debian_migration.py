@@ -42,11 +42,11 @@ def load(path):
 
 
 def as_account(account, operation, *args):
-    # No user-owned executable, home path, or integration is opened as root here.
+    # Run all account mutations with the account permissions.
     child = os.fork()
     if child == 0:
         try:
-            os.setgroups([])
+            os.initgroups(account.pw_name, account.pw_gid)
             os.setgid(account.pw_gid)
             os.setuid(account.pw_uid)
             os.chdir("/")
@@ -58,7 +58,7 @@ def as_account(account, operation, *args):
     require(os.waitpid(child, 0)[1] == 0, "Account migration could not finish. Retry the installation.")
 
 
-def validate(home, root, digest):
+def validate(home, root, digest, *, resuming=False):
     receipt = root.parent / "install-receipt.json"
     require(checksum(receipt) == digest, "The previous installation receipt changed.")
     info = load(receipt)
@@ -76,7 +76,8 @@ def validate(home, root, digest):
             "The old settings executable disagrees with its receipt.")
     links = [home / ".local/bin" / name for name in NAMES]
     require(info["aliases"] == list(map(str, links)) and all(
-        link.readlink() == root / "current/bin/honk300" for link in links),
+        (link.readlink() == root / "current/bin/honk300" or
+         (resuming and link.readlink() == Path("/usr/bin") / link.name)) for link in links),
         "The old command aliases are ambiguous.")
 
 
@@ -84,17 +85,8 @@ def finish(home, root, digest, transaction):
     receipt = root.parent / "install-receipt.json"
     retired = root.with_name("install.retired-" + transaction)
     target = root / "current/bin/honk300"
-    # Moving within the account retains the sealed releases and gives retries a stable identity.
     if not retired.exists():
-        validate(home, root, digest)
-        root.rename(retired)
-    require(not root.exists() and not retired.is_symlink() and retired.is_dir(),
-            "A conflicting install appeared during migration.")
-    saved = retired / "shell-receipt.json"
-    if not saved.exists():
-        require(checksum(receipt) == digest, "The shell receipt changed during migration.")
-        receipt.rename(saved)
-    require(checksum(saved) == digest, "Unexpected retired shell receipt.")
+        validate(home, root, digest, resuming=True)
     # Older startup entries may use these aliases from a nonstandard XDG_CONFIG_HOME.
     for name in NAMES:
         link = home / ".local/bin" / name
@@ -106,6 +98,16 @@ def finish(home, root, digest, transaction):
             new = Path(directory) / name
             new.symlink_to(system)
             new.replace(link)
+    # Keep the old selector usable until all three aliases point to the verified package.
+    if not retired.exists():
+        root.rename(retired)
+    require(not root.exists() and not root.is_symlink() and not retired.is_symlink() and retired.is_dir(),
+            "A conflicting install appeared during migration.")
+    saved = retired / "shell-receipt.json"
+    if not saved.exists():
+        require(checksum(receipt) == digest, "The shell receipt changed during migration.")
+        receipt.rename(saved)
+    require(checksum(saved) == digest, "Unexpected retired shell receipt.")
     data = root.parent.parent
     for name in ("honk300.desktop", "dev.emmetts.honk300.settings.desktop"):
         entry = data / "applications" / name
@@ -162,10 +164,14 @@ def transaction_uid():
     pid = os.getppid()
     while pid > 1:
         proc = Path("/proc") / str(pid)
-        exe = (proc / "exe").resolve(strict=True)
-        if exe.stat().st_uid == 0 and not exe.stat().st_mode & 0o022:
-            programs.add(str(exe))
-        status = (proc / "status").read_text().splitlines()
+        try:
+            status = (proc / "status").read_text().splitlines()
+            exe = (proc / "exe").resolve(strict=True)
+            metadata = exe.stat()
+            if metadata.st_uid == 0 and not metadata.st_mode & 0o022:
+                programs.add(str(exe))
+        except (FileNotFoundError, PermissionError):
+            break
         pid = int(next(line.split()[1] for line in status if line.startswith("PPid:")))
     identities = set()
     audit = Path("/proc/self/loginuid").read_text().strip()
@@ -191,6 +197,9 @@ def prepare():
                 if str(dest).endswith(("/honk300/install/current/bin/honk300", "/honk300/install/bin/honk300")):
                     owners.add((account.pw_uid, dest))
     if not owners:
+        pending = STATE / "pending.json"
+        if pending.exists() and load(pending).get("phase") != "applying":
+            raise RuntimeError("The shell installation changed before the package could configure it.")
         return
     ids = transaction_uid()
     require(len(owners) == 1 and len(ids) == 1, "Install ownership is ambiguous. Run goose update from the existing account.")
@@ -212,25 +221,32 @@ def prepare():
         validate(home, root, digest)
         os.write(wr, digest.encode("ascii"))
     try:
-        as_account(account, check)
-        os.close(wr)
+        try:
+            as_account(account, check)
+        finally:
+            os.close(wr)
         digest = os.read(rd, 65).decode("ascii")
     finally:
         os.close(rd)
     require(len(digest) == 64, "Could not identify shell receipt.")
     record = {"uid": uid, "home": account.pw_dir, "root": str(root), "digest": digest,
-              "transaction": uuid.uuid4().hex}
+              "transaction": uuid.uuid4().hex, "phase": "prepared"}
     persist(pending, record)
 
 
 def main(phase, action):
     if (phase, action) not in {("preinst", "install"), ("preinst", "upgrade"),
-                               ("postinst", "configure"), ("postrm", "remove"), ("postrm", "purge")}:
+                               ("postinst", "configure"), ("postrm", "remove"), ("postrm", "purge"),
+                               ("postrm", "abort-install"), ("postrm", "abort-upgrade")}:
         return
     STATE.mkdir(mode=0o700, exist_ok=True)
     require(not STATE.is_symlink() and STATE.stat().st_uid == 0 and STATE.stat().st_mode & 0o077 == 0,
             "Unexpected package migration state.")
     pending, completed = STATE / "pending.json", STATE / "forwarders.json"
+    if phase == "postrm" and action.startswith("abort-"):
+        if pending.exists() and load(pending).get("phase") == "prepared":
+            pending.unlink()
+        return
     if phase == "preinst":
         prepare()
     elif phase == "postinst" and pending.exists():
@@ -241,6 +257,8 @@ def main(phase, action):
         require(package["origin"] == "deb" and checksum(PACKAGE / "honk300") == package["artifact"]["sha256"]
                 and checksum(PACKAGE / "honk300-settings") == package["settings_app"]["sha256"],
                 "The unpacked Debian payload failed verification.")
+        record["phase"] = "applying"
+        persist(pending, record)
         as_account(account, finish_with_lease, Path(record["root"]), record["digest"], record["transaction"])
         pending.replace(completed)
     elif phase == "postrm" and completed.exists():

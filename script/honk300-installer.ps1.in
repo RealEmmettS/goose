@@ -21,6 +21,21 @@ function Get-NativeWindowsArchitecture {
     }
 }
 
+function Get-NativeProgramFiles {
+    $nativeRegistry = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+        [Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64)
+    try {
+        $versionKey = $nativeRegistry.OpenSubKey('SOFTWARE\Microsoft\Windows\CurrentVersion')
+        try { $nativeProgramFiles = $versionKey.GetValue('ProgramFilesDir') }
+        finally { $versionKey.Dispose() }
+    } finally { $nativeRegistry.Dispose() }
+    if ([string]::IsNullOrWhiteSpace($nativeProgramFiles) -or
+        -not [IO.Path]::IsPathRooted($nativeProgramFiles)) {
+        throw 'Could not resolve the native Program Files directory'
+    }
+    return $nativeProgramFiles
+}
+
 $arch = Get-NativeWindowsArchitecture
 
 switch -Regex ($arch) {
@@ -215,17 +230,7 @@ try {
         throw "msiexec.exe exited with code $($process.ExitCode); pending or reboot-deferred replacement is not accepted"
     }
 
-    $nativeRegistry = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
-        [Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64)
-    try {
-        $versionKey = $nativeRegistry.OpenSubKey('SOFTWARE\Microsoft\Windows\CurrentVersion')
-        try { $nativeProgramFiles = $versionKey.GetValue('ProgramFilesDir') }
-        finally { $versionKey.Dispose() }
-    } finally { $nativeRegistry.Dispose() }
-    if ([string]::IsNullOrWhiteSpace($nativeProgramFiles) -or
-        -not [IO.Path]::IsPathRooted($nativeProgramFiles)) {
-        throw 'Could not resolve the native Program Files directory'
-    }
+    $nativeProgramFiles = Get-NativeProgramFiles
     $installRoot = Join-Path $nativeProgramFiles 'honk300'
     $installed = Join-Path $installRoot 'bin\honk300.exe'
     if (-not (Test-Path -LiteralPath $installed -PathType Leaf)) {

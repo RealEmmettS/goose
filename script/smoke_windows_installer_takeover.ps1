@@ -236,7 +236,7 @@ function Install-Exe([string] $Path, [string] $Label) {
     Invoke-Checked $Path @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') $Label
 }
 
-function Install-PowerShellChannel([string] $Label, [switch] $From32BitShell) {
+function Install-PowerShellChannel([string] $Label, [switch] $From32BitShell, [switch] $FromX64Shell) {
     if ($null -eq $powerShellInstallerPath) {
         # Producer qualification exercises the exact MSI transaction underneath the rendered
         # public bootstrap. Post-release qualification passes the real downloaded script below.
@@ -247,6 +247,9 @@ function Install-PowerShellChannel([string] $Label, [switch] $From32BitShell) {
         'WindowsPowerShell\v1.0\powershell.exe'
     if ($From32BitShell) {
         $systemPowerShell = Join-Path $env:SystemRoot 'SysWOW64\WindowsPowerShell\v1.0\powershell.exe'
+    }
+    if ($FromX64Shell) {
+        $systemPowerShell = Join-Path $env:RUNNER_TEMP 'goose-powershell-x64\pwsh.exe'
     }
     Invoke-Checked $systemPowerShell @(
         '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', "`"$powerShellInstallerPath`""
@@ -418,6 +421,10 @@ try {
     if ($powerShellInstallerPath) {
         Install-PowerShellChannel 'Reinstall from 32-bit Windows PowerShell' -From32BitShell
         Assert-Active $globalRoot 'powershell'
+        if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') {
+            Install-PowerShellChannel 'Reinstall from emulated x64 PowerShell' -FromX64Shell
+            Assert-Active $globalRoot 'powershell'
+        }
     }
     Stop-HeldOldProcess
 

@@ -96,7 +96,7 @@ impl InstallSourceEvidence {
     }
 }
 
-fn read_install_receipt_source() -> InstallSourceEvidence {
+pub(super) fn read_install_receipt_source() -> InstallSourceEvidence {
     let Ok(executable) = std::env::current_exe() else {
         return InstallSourceEvidence::Missing;
     };

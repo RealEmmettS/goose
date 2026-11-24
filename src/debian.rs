@@ -91,7 +91,9 @@ pub(crate) fn install_package(path: &Path, suppress_stdout: bool) -> Result<(), 
 
 #[cfg(target_os = "linux")]
 pub(crate) fn remove_package() -> Result<(), DynError> {
-    run_dpkg(&["--remove", PACKAGE_NAME], None, "uninstaller", false)
+    // The forwarding-alias cleanup adds a postrm. Purge dpkg's residual package
+    // record as well; Goose's separate per-user data policy is handled by the caller.
+    run_dpkg(&["--purge", PACKAGE_NAME], None, "uninstaller", false)
 }
 
 fn run_dpkg(
