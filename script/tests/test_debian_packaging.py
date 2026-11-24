@@ -78,11 +78,10 @@ class DebianPackagingTests(unittest.TestCase):
             preinst = staging / "DEBIAN" / "preinst"
             self.assertTrue(preinst.stat().st_mode & stat.S_IXUSR)
             preinst_text = preinst.read_text()
-            self.assertIn("awk -F: '{ print $6 }' /etc/passwd", preinst_text)
-            self.assertIn("for name in honk300 honk goose", preinst_text)
-            self.assertIn("*/honk300/install/current/bin/honk300", preinst_text)
-            self.assertIn("$alias uninstall", preinst_text)
-            self.assertNotIn("rm ", preinst_text)
+            self.assertIn("PACKAGEKIT_CALLER_UID", preinst_text)
+            for phase in ("postinst", "postrm"):
+                self.assertEqual((staging / "DEBIAN" / phase).read_text(), preinst_text)
+            self.assertIn("Pre-Depends: python3", control)
             desktop = (staging / "usr" / "share" / "applications" / "honk300.desktop").read_text()
             self.assertIn("Exec=/usr/bin/goose settings", desktop)
             self.assertIn("Icon=honk300", desktop)

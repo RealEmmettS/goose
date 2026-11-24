@@ -671,6 +671,58 @@ jobs:
       APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
       APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
 
+  linux-reinstall:
+    name: Linux website reinstall (${{ matrix.runner }})
+    needs: [plan, build-portable-artifacts, build-debian-packages]
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-22.04, ubuntu-22.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: release-*
+          path: incoming
+      - name: Stage exact Linux artifacts and render the candidate bootstrap
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          COMMIT: ${{ needs.plan.outputs.commit }}
+        run: |
+          set -euo pipefail
+          mkdir target-reinstall
+          find incoming -type f \( -name '*-unknown-linux-*.tar.xz' -o -name '*.deb' \) -exec cp -t target-reinstall {} +
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, os, sys
+          sys.path.insert(0, "script")
+          from release_metadata import render_template
+          root = Path("target-reinstall")
+          tag = os.environ["TAG"]
+          values = dict(VERSION=tag[1:], TAG=tag, COMMIT=os.environ["COMMIT"], SHA_MAC_APP="0"*64)
+          for cpu, rust, deb in (("X64", "x86_64", "amd64"), ("ARM64", "aarch64", "arm64")):
+              package = (root / f"honk300-{deb}.deb").read_bytes()
+              values["SHA_DEB_"+deb.upper()] = hashlib.sha256(package).hexdigest()
+              values["SIZE_DEB_"+deb.upper()] = str(len(package))
+              for libc in ("gnu", "musl"):
+                  archive = root / f"honk300-{rust}-unknown-linux-{libc}.tar.xz"
+                  values[f"SHA_LINUX_{cpu}_{libc.upper()}"] = hashlib.sha256(archive.read_bytes()).hexdigest()
+          template = Path("script/honk300-installer.sh.in").read_text()
+          (root / "honk300-installer.sh").write_text(render_template(template, values))
+          PY
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libgtk-4-1 libasound2
+          sh script/smoke_linux_reinstall.sh "$PWD/target-reinstall" "$TAG"
+          docker run --rm -v "$PWD:/work:ro" -w /work -e GITHUB_ACTIONS=true -e TAG alpine:3.21.3 sh -ec '
+            apk add --no-cache gtk4.0 alsa-lib curl python3 xz
+            adduser -D returning
+            su returning -s /bin/sh -c "GITHUB_ACTIONS=true sh script/smoke_linux_reinstall.sh /work/target-reinstall $TAG"
+          '
+
   assemble-and-publish:
     name: Verify, upload once, and publish latest
     needs:
@@ -684,6 +736,7 @@ jobs:
       - build-portable-artifacts
       - build-debian-packages
       - qualify-debian-packages
+      - linux-reinstall
       - qualify-windows-portable
       - windows-installers
       - macos-app
@@ -794,7 +847,7 @@ jobs:
               assert checksum.read_text(encoding='utf-8') == artifact['sha256'] + ' *' + artifact['name'] + '\n'
           PY
 
-      - name: Prove shell and Debian fresh-intent scope collisions fail before mutation
+      - name: Verify Debian collision refusal and same-owner bootstrap refresh
         shell: bash
         run: |
           set -euo pipefail
@@ -812,7 +865,7 @@ jobs:
           status=$?
           set -e
           test "$status" -ne 0
-          grep -F "run '$alias uninstall' as that user" \
+          grep -Ei "Goose installation:|ownership is ambiguous|account that owns Goose" \
             "$evidence/debian-preinst-collision.log" >/dev/null
           test "$(readlink "$alias")" = "$HOME/.local/share/honk300/install/current/bin/honk300"
           test "$(dpkg-query -W -f='${Status}' honk300 2>/dev/null || true)" != 'install ok installed'
@@ -820,17 +873,14 @@ jobs:
 
           sudo apt-get install --yes "$PWD/release-assets/honk300-amd64.deb"
           smoke="$(mktemp -d)"
-          set +e
+          mkdir -p "$smoke/home"
           HOME="$smoke/home" \
           XDG_DATA_HOME="$smoke/data" \
           XDG_CONFIG_HOME="$smoke/config" \
           HONK300_TEST_LOCAL_DIR="$PWD/release-assets" \
             sh release-assets/honk300-installer.sh \
-            > "$evidence/shell-deb-collision.log" 2>&1
-          status=$?
-          set -e
-          test "$status" -ne 0
-          grep -F 'sudo dpkg --remove honk300' "$evidence/shell-deb-collision.log" >/dev/null
+            > "$evidence/shell-deb-reinstall.log" 2>&1
+          grep -F 'installed through the system package manager' "$evidence/shell-deb-reinstall.log" >/dev/null
           test ! -e "$smoke/data/honk300/install"
           test "$(dpkg-query -W -f='${Status}' honk300)" = 'install ok installed'
           sudo dpkg --remove honk300

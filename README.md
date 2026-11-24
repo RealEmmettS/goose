@@ -193,10 +193,10 @@ removal. Configuration and personal memes/notes remain in the current user's XDG
 
 Shell-managed Linux installs use immutable release directories and an atomic `current` symlink.
 Debian installs remain dpkg-owned and update only with the matching architecture package; the two
-origins never convert into one another during `update`. Because changing between a per-user shell
-install and a machine-owned Debian package crosses an authority boundary, a fresh installer stops
-before mutation and gives the exact uninstall-and-retry command instead of leaving two competing
-owners.
+origins never convert into one another during `update`. Running the shell installer on a Debian-managed installation refreshes its native package.
+A Debian package opened over the requesting user's verified shell installation adopts the commands
+after verifying the new package. Personal media and settings stay in place. Ambiguous ownership
+stops before the handoff. Use `goose install` to reinstall through the managed owner.
 
 - Linux: managed payload under `${XDG_DATA_HOME:-~/.local/share}/honk300/install`; receipt,
   desktop entry, and user media stay in the corresponding XDG user directories; aliases under

@@ -9,29 +9,11 @@ $Tag = '__TAG__'
 $Commit = '__COMMIT__'
 $Repository = 'https://github.com/RealEmmettS/goose'
 function Get-NativeWindowsArchitecture {
-    if ($env:PROCESSOR_ARCHITEW6432) {
-        return $env:PROCESSOR_ARCHITEW6432
-    }
-    if ($env:PROCESSOR_ARCHITECTURE) {
-        return $env:PROCESSOR_ARCHITECTURE
-    }
-
-    # App-hosted terminals can deliberately scrub the inherited processor variables. The
-    # machine-scoped value is the same Windows-owned architecture signal without depending on
-    # the launching app's environment. RuntimeInformation is a final fallback for other stripped
-    # hosts and reports X64 or Arm64 on supported Windows versions.
-    try {
-        $machineArchitecture = [Environment]::GetEnvironmentVariable(
-            'PROCESSOR_ARCHITECTURE',
-            [EnvironmentVariableTarget]::Machine
-        )
-        if ($machineArchitecture) {
-            return $machineArchitecture
-        }
-    } catch {
-        # Continue to the runtime-owned fallback below.
-    }
-
+    # The machine registry view is independent of the PowerShell host's emulated CPU.
+    $machineArchitecture = [Environment]::GetEnvironmentVariable(
+        'PROCESSOR_ARCHITECTURE', [EnvironmentVariableTarget]::Machine)
+    if ($machineArchitecture) { return $machineArchitecture }
+    if ($env:PROCESSOR_ARCHITEW6432) { return $env:PROCESSOR_ARCHITEW6432 }
     try {
         return [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
     } catch {
@@ -233,7 +215,19 @@ try {
         throw "msiexec.exe exited with code $($process.ExitCode); pending or reboot-deferred replacement is not accepted"
     }
 
-    $installed = Join-Path $env:ProgramFiles 'honk300\bin\honk300.exe'
+    $nativeRegistry = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+        [Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64)
+    try {
+        $versionKey = $nativeRegistry.OpenSubKey('SOFTWARE\Microsoft\Windows\CurrentVersion')
+        try { $nativeProgramFiles = $versionKey.GetValue('ProgramFilesDir') }
+        finally { $versionKey.Dispose() }
+    } finally { $nativeRegistry.Dispose() }
+    if ([string]::IsNullOrWhiteSpace($nativeProgramFiles) -or
+        -not [IO.Path]::IsPathRooted($nativeProgramFiles)) {
+        throw 'Could not resolve the native Program Files directory'
+    }
+    $installRoot = Join-Path $nativeProgramFiles 'honk300'
+    $installed = Join-Path $installRoot 'bin\honk300.exe'
     if (-not (Test-Path -LiteralPath $installed -PathType Leaf)) {
         throw "Global MSI completed but the installed executable is missing: $installed"
     }
@@ -244,14 +238,13 @@ try {
     if ((Read-PeSubsystem $installed) -ne 3) {
         throw 'Global MSI installed a public CLI that is not a console-subsystem PE'
     }
-    $installedLauncher = Join-Path $env:ProgramFiles 'honk300\bin\honk300-app.exe'
+    $installedLauncher = Join-Path $installRoot 'bin\honk300-app.exe'
     if (-not (Test-Path -LiteralPath $installedLauncher -PathType Leaf) -or
         (Read-PeSubsystem $installedLauncher) -ne 2) {
         throw 'Global MSI did not install the windowless GUI-subsystem app launcher'
     }
     $installedLauncherHash = Get-VerifiedFileSha256 $installedLauncher 'installed app launcher'
 
-    $installRoot = Join-Path $env:ProgramFiles 'honk300'
     $protectedReceipt = Join-Path $installRoot 'install-receipt.json'
     $receipt = Get-Content -LiteralPath $protectedReceipt -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
     if ($receipt.schema -ne 'honk300.install.v2' -or $receipt.origin -ne 'powershell' -or

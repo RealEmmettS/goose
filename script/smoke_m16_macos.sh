@@ -62,7 +62,8 @@ case "${LSUI_ELEMENT}" in
     ;;
 esac
 codesign --verify --strict "${APP}"
-lipo "${BIN}" -verify_arch x86_64 arm64
+lipo "${BIN}" -verify_arch x86_64
+lipo "${BIN}" -verify_arch arm64
 
 echo "smoke_m16_macos: preparing config"
 "${BIN}" setup --config "${CONFIG}"

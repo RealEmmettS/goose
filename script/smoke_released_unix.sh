@@ -28,7 +28,7 @@ require_file() {
 }
 
 HOME="$ROOT/home"
-XDG_DATA_HOME="$ROOT/data"
+XDG_DATA_HOME="$ROOT/Goose data"
 XDG_CONFIG_HOME="$ROOT/config"
 export HOME XDG_DATA_HOME XDG_CONFIG_HOME
 mkdir -p "$HOME" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
@@ -125,15 +125,16 @@ PY
   if [ "$OS" = Linux ]; then
     require_file "$DESKTOP"
     grep -F 'X-Honk300-Managed=true' "$DESKTOP" >/dev/null
-    grep -F "Exec=$BINARY settings" "$DESKTOP" >/dev/null
+    grep -Fx "Exec=\"$BINARY\" settings" "$DESKTOP" >/dev/null
     require_file "$IDENTITY_DESKTOP"
     grep -Fx 'NoDisplay=true' "$IDENTITY_DESKTOP" >/dev/null
-    grep -F "Exec=$BINARY settings" "$IDENTITY_DESKTOP" >/dev/null
+    grep -Fx "Exec=\"$BINARY\" settings" "$IDENTITY_DESKTOP" >/dev/null
     [ -L "$THEMED_ICON" ] && [ "$(readlink "$THEMED_ICON")" = "$DEST/current/icon.png" ]
     cmp "$THEMED_ICON" "$PROJECT_ROOT/settings/assets/icon.png"
   else
     codesign --verify --deep --strict "$DEST"
-    lipo "$BINARY" -verify_arch x86_64 arm64
+    lipo "$BINARY" -verify_arch x86_64
+    lipo "$BINARY" -verify_arch arm64
     [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$DEST/Contents/Info.plist")" = dev.emmetts.honk300 ]
     [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DEST/Contents/Info.plist")" = "$VERSION" ]
   fi

@@ -135,6 +135,8 @@ class ReleaseMetadataTests(unittest.TestCase):
             root = Path(temp)
             payloads = {
                 "honk300-universal2.app.zip": b"app",
+                "honk300-amd64.deb": b"x64-deb",
+                "honk300-arm64.deb": b"arm-deb",
                 "honk300-x86_64-unknown-linux-gnu.tar.xz": b"x64-gnu",
                 "honk300-aarch64-unknown-linux-gnu.tar.xz": b"arm-gnu",
                 "honk300-x86_64-unknown-linux-musl.tar.xz": b"x64-musl",

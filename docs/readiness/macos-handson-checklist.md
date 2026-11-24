@@ -58,9 +58,10 @@ codesign -d -r- --verbose=4 '/Volumes/Honk300/Honk300.app'
 codesign -d -r- --verbose=4 '/Volumes/Honk300/Install Honk300.app'
 spctl --assess --type execute --verbose=4 '/Volumes/Honk300/Honk300.app'
 spctl --assess --type execute --verbose=4 '/Volumes/Honk300/Install Honk300.app'
-lipo '/Volumes/Honk300/Honk300.app/Contents/MacOS/honk300' -verify_arch x86_64 arm64
-lipo '/Volumes/Honk300/Install Honk300.app/Contents/MacOS/Install Honk300' \
-  -verify_arch x86_64 arm64
+lipo '/Volumes/Honk300/Honk300.app/Contents/MacOS/honk300' -verify_arch x86_64
+lipo '/Volumes/Honk300/Honk300.app/Contents/MacOS/honk300' -verify_arch arm64
+lipo '/Volumes/Honk300/Install Honk300.app/Contents/MacOS/Install Honk300' -verify_arch x86_64
+lipo '/Volumes/Honk300/Install Honk300.app/Contents/MacOS/Install Honk300' -verify_arch arm64
 xcrun vtool -show-build \
   '/Volumes/Honk300/Install Honk300.app/Contents/MacOS/Install Honk300'
 ```

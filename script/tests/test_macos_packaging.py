@@ -290,7 +290,8 @@ class MacosPackagingTests(unittest.TestCase):
         self.assertIn("x86_64-apple-macos11.0", HELPER_PACKAGE)
         self.assertIn("arm64-apple-macos11.0", HELPER_PACKAGE)
         self.assertIn("lipo -create", HELPER_PACKAGE)
-        self.assertIn('lipo "$EXECUTABLE" -verify_arch x86_64 arm64', HELPER_PACKAGE)
+        for arch in ("x86_64", "arm64"):
+            self.assertIn(f'lipo "$EXECUTABLE" -verify_arch {arch}', HELPER_PACKAGE)
         binary_sign = HELPER_PACKAGE.index(
             'codesign --force --options runtime --timestamp --sign "$IDENTITY" "$EXECUTABLE"'
         )
@@ -304,7 +305,8 @@ class MacosPackagingTests(unittest.TestCase):
         )
 
     def test_release_verifies_helper_architectures_and_macos_11_deployment(self) -> None:
-        self.assertIn('lipo "$helper_bin" -verify_arch x86_64 arm64', WORKFLOW)
+        for arch in ("x86_64", "arm64"):
+            self.assertIn(f'lipo "$helper_bin" -verify_arch {arch}', WORKFLOW)
         self.assertIn("vtool -show-build", WORKFLOW)
         self.assertIn("helper-deployment.txt", WORKFLOW)
         self.assertIn("minos 11.0", WORKFLOW)

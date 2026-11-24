@@ -39,7 +39,8 @@ lipo -create \
   "$BUILD_DIR/x86_64-apple-macos11.0" \
   "$BUILD_DIR/arm64-apple-macos11.0" \
   -output "$EXECUTABLE"
-lipo "$EXECUTABLE" -verify_arch x86_64 arm64
+lipo "$EXECUTABLE" -verify_arch x86_64
+lipo "$EXECUTABLE" -verify_arch arm64
 xcrun vtool -show-build "$EXECUTABLE" > "$BUILD_DIR/helper-deployment.txt"
 test "$(grep -c 'minos 11.0' "$BUILD_DIR/helper-deployment.txt")" -eq 2
 

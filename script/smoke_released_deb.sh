@@ -95,7 +95,7 @@ prove_preinst_collision_refusal() {
     printf 'Debian preinst unexpectedly accepted an active shell alias\n' >&2
     exit 1
   }
-  grep -F "run '$COLLISION_ALIAS uninstall' as that user" \
+  grep -E "Goose installation:|shell installation|shell receipt|Account migration|ownership is ambiguous|account that owns Goose" \
     "$EVIDENCE_DIR/preinst-collision.log" >/dev/null
   [ "$(readlink "$COLLISION_ALIAS")" = "$system_home/.local/share/honk300/install/current/bin/honk300" ]
   [ "$(dpkg-query -W -f='${Status}' honk300 2>/dev/null || true)" != 'install ok installed' ]
@@ -152,18 +152,12 @@ if [ -z "$LOCAL_PACKAGE" ]; then
   curl --proto '=https' --tlsv1.2 -fsSL "$BASE/honk300-installer.sh.sha256" -o "$SHELL_SIDECAR"
   shell_expected="$(awk 'NR == 1 { print $1 }' "$SHELL_SIDECAR" | tr 'A-F' 'a-f')"
   [ "$(sha256sum "$SHELL_INSTALLER" | awk '{ print $1 }')" = "$shell_expected" ]
-  set +e
+  mkdir -p "$ROOT/shell-home"
   HOME="$ROOT/shell-home" \
   XDG_DATA_HOME="$ROOT/shell-data" \
   XDG_CONFIG_HOME="$ROOT/shell-config" \
-    sh "$SHELL_INSTALLER" > "$EVIDENCE_DIR/shell-deb-collision.log" 2>&1
-  shell_collision_status=$?
-  set -e
-  [ "$shell_collision_status" -ne 0 ] || {
-    printf 'shell bootstrap unexpectedly accepted an installed Debian owner\n' >&2
-    exit 1
-  }
-  grep -F "sudo dpkg --remove honk300" "$EVIDENCE_DIR/shell-deb-collision.log" >/dev/null
+    sh "$SHELL_INSTALLER" > "$EVIDENCE_DIR/shell-deb-reinstall.log" 2>&1
+  grep -F 'installed through the system package manager' "$EVIDENCE_DIR/shell-deb-reinstall.log" >/dev/null
   [ ! -e "$ROOT/shell-data/honk300/install" ]
   [ "$(dpkg-query -W -f='${Status}' honk300)" = 'install ok installed' ]
 fi

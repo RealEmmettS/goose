@@ -360,6 +360,18 @@ ensure_path_marker() {
   mv -f "$temp" "$profile"
 }
 
+desktop_exec_quote() {
+  case "$1" in
+    *[!a-zA-Z0-9/._-]*)
+      # The desktop-entry string is unescaped once before Exec argument parsing.
+      printf '"'
+      printf '%s' "$1" | sed 's/[\\$"`]/\\&/g; s/\\/\\\\/g; s/%/%%/g'
+      printf '"'
+      ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 
 receipt_proves_update_origin() {
@@ -490,9 +502,49 @@ activate_linux_slot() {
   SELECTOR_TEMP="$DEST/.current.$PID"
   [ ! -e "$SELECTOR_TEMP" ] && [ ! -L "$SELECTOR_TEMP" ] || die "stale selector transaction exists: $SELECTOR_TEMP"
   ln -s "$NEW_RELEASE" "$SELECTOR_TEMP"
-  mv -f "$SELECTOR_TEMP" "$selector"
+  mv -fT "$SELECTOR_TEMP" "$selector"
   SELECTOR_TEMP=""
   SLOT_ACTIVATED=1
+  [ "$(readlink "$selector")" = "$NEW_RELEASE" ] || die "release selector did not activate the verified slot"
+}
+
+refresh_debian_install() {
+  target_arch="$(dpkg --print-architecture)"
+  case "$ARCH:$target_arch" in
+    x86_64:amd64) deb_hash=__SHA_DEB_AMD64__; deb_size=__SIZE_DEB_AMD64__ ;;
+    aarch64:arm64) deb_hash=__SHA_DEB_ARM64__; deb_size=__SIZE_DEB_ARM64__ ;;
+    *) die "installed Debian architecture does not match $ARCH" ;;
+  esac
+  deb_name="honk300-$target_arch.deb"
+  TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/honk300-deb.XXXXXX")"
+  package="$TEMP_ROOT/$deb_name"
+  if [ -n "${HONK300_TEST_LOCAL_DIR:-}" ]; then
+    cp "$HONK300_TEST_LOCAL_DIR/$deb_name" "$package"
+  else
+    download "${HONK300_DOWNLOAD_BASE:-$REPOSITORY/releases/download/$TAG}/$deb_name" "$package"
+  fi
+  verify_file "$package" "$deb_hash"
+  hold_lifecycle_lease /usr/lib/honk300/honk300
+  if [ "$(id -u)" = 0 ]; then set --
+  elif has sudo; then set -- sudo --
+  else set -- pkexec; fi
+  "$@" /bin/sh -eu -c '
+    PATH=/usr/sbin:/usr/bin:/sbin:/bin
+    export PATH
+    umask 077
+    stage=$(mktemp -d /var/tmp/honk300-deb.XXXXXX)
+    trap '\''rm -rf "$stage"'\'' EXIT
+    cat > "$stage/honk300.deb"
+    test "$(wc -c < "$stage/honk300.deb")" -eq "$2"
+    printf "%s  %s\n" "$1" "$stage/honk300.deb" | sha256sum -c -
+    dpkg --install "$stage/honk300.deb"
+  ' sh "$deb_hash" "$deb_size" < "$package"
+  [ "$(dpkg-query -W -f='${Version} ${Architecture} ${Status}' honk300)" = "$VERSION $target_arch install ok installed" ] || die "Debian package activation failed"
+  verify_binary /usr/lib/honk300/honk300
+  verify_settings /usr/lib/honk300/honk300-settings
+  COMMITTED=1
+  printf 'Goose %s installed through the system package manager.\n' "$VERSION"
+  exit 0
 }
 
 OS="$(uname -s)"
@@ -582,7 +634,7 @@ case "$OS:$UPDATE_ORIGIN" in
          && grep -F '"origin": "deb"' /usr/lib/honk300/install-receipt.json >/dev/null 2>&1 \
          && grep -F '"installer_family": "deb"' /usr/lib/honk300/install-receipt.json >/dev/null 2>&1 \
          && dpkg-query --search /usr/lib/honk300/honk300 2>/dev/null | grep -Fx 'honk300: /usr/lib/honk300/honk300' >/dev/null 2>&1; then
-        die "the Debian package currently owns Honk300; run 'sudo dpkg --remove honk300' and then rerun this command to switch to the no-sudo shell channel"
+        refresh_debian_install
       fi
       die "a Honk300 Debian registration exists but its ownership could not be validated; repair or remove it with the system package manager before installing the shell channel"
     fi
@@ -653,9 +705,11 @@ if [ "$OS" = Darwin ]; then
   verify_settings "$STAGED_SETTINGS"
   SETTINGS_SHA="$(file_sha256 "$STAGED_SETTINGS")"
   SETTINGS_SIZE="$(wc -c < "$STAGED_SETTINGS" | tr -d ' ')"
-  lipo "$STAGED_SETTINGS" -verify_arch x86_64 arm64
+  lipo "$STAGED_SETTINGS" -verify_arch x86_64
+  lipo "$STAGED_SETTINGS" -verify_arch arm64
   codesign --verify --deep --strict "$CANDIDATE"
-  lipo "$STAGED_BINARY" -verify_arch x86_64 arm64
+  lipo "$STAGED_BINARY" -verify_arch x86_64
+  lipo "$STAGED_BINARY" -verify_arch arm64
   bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$CANDIDATE/Contents/Info.plist")"
   [ "$bundle_id" = "dev.emmetts.honk300" ] || die "unexpected bundle identifier: $bundle_id"
   bundle_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$CANDIDATE/Contents/Info.plist")"
@@ -733,7 +787,7 @@ else
 [Desktop Entry]
 Type=Application
 Name=Goose
-Exec=$INSTALLED_BINARY settings
+Exec=$(desktop_exec_quote "$INSTALLED_BINARY") settings
 Icon=$DEST/current/icon.png
 Terminal=false
 Categories=Utility;

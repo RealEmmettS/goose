@@ -371,7 +371,8 @@ if [ ! -d "${APP}" ] || [ ! -x "${BIN}" ]; then
 fi
 
 codesign --verify --strict "${APP}"
-lipo "${BIN}" -verify_arch x86_64 arm64
+lipo "${BIN}" -verify_arch x86_64
+lipo "${BIN}" -verify_arch arm64
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${APP}/Contents/Info.plist")"
 if ! printf '%s\n' "${VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then

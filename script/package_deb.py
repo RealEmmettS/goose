@@ -167,29 +167,9 @@ def build_package_tree(
         "License: PolyForm-Noncommercial-1.0.0\n"
         " See /usr/share/doc/honk300/LICENSE for the complete terms.\n",
     )
-    _write(
-        root / "DEBIAN" / "preinst",
-        "#!/bin/sh\n"
-        "set -eu\n"
-        "# A machine package cannot safely delete an arbitrary user's managed shell install.\n"
-        "# Refuse before dpkg commits, leaving that install active and giving an exact recovery.\n"
-        "awk -F: '{ print $6 }' /etc/passwd | while IFS= read -r home; do\n"
-        "  [ -n \"$home\" ] && [ -d \"$home\" ] || continue\n"
-        "  for name in honk300 honk goose; do\n"
-        "    alias=\"$home/.local/bin/$name\"\n"
-        "    [ -L \"$alias\" ] || continue\n"
-        "    target=$(readlink \"$alias\")\n"
-        "    case \"$target\" in\n"
-        "      */honk300/install/current/bin/honk300|*/honk300/install/bin/honk300)\n"
-        "        printf '%s\\n' \"honk300 package: a user-scoped shell install is active; run '$alias uninstall' as that user, then retry this package to change channels\" >&2\n"
-        "        exit 1\n"
-        "        ;;\n"
-        "    esac\n"
-        "  done\n"
-        "done\n"
-        "exit 0\n",
-        0o755,
-    )
+    migration = Path(__file__).with_name("debian_migration.py").read_text(encoding="utf-8")
+    for phase in ("preinst", "postinst", "postrm"):
+        _write(root / "DEBIAN" / phase, migration, 0o755)
 
     installed_kib = (
         sum(path.stat().st_size for path in root.rglob("*") if path.is_file()) + 1023
@@ -203,6 +183,7 @@ def build_package_tree(
         f"Architecture: {architecture}\n"
         "Maintainer: Emmett S <hey@emmetts.dev>\n"
         f"Installed-Size: {installed_kib}\n"
+        "Pre-Depends: python3 (>= 3.9)\n"
         f"Depends: {DEPENDENCIES}\n"
         "Homepage: https://thegoose.app\n"
         "Description: cross-platform procedural desktop goose\n"

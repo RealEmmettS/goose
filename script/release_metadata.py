@@ -219,6 +219,8 @@ def render_installers(
     version = _stable_version(tag)
     payloads = {
         "SHA_MAC_APP": "honk300-universal2.app.zip",
+        "SHA_DEB_AMD64": "honk300-amd64.deb",
+        "SHA_DEB_ARM64": "honk300-arm64.deb",
         "SHA_LINUX_X64_GNU": "honk300-x86_64-unknown-linux-gnu.tar.xz",
         "SHA_LINUX_ARM64_GNU": "honk300-aarch64-unknown-linux-gnu.tar.xz",
         "SHA_LINUX_X64_MUSL": "honk300-x86_64-unknown-linux-musl.tar.xz",
@@ -236,7 +238,7 @@ def render_installers(
         {
             token.replace("SHA_", "SIZE_", 1): str(_regular_file(root, name).stat().st_size)
             for token, name in payloads.items()
-            if token.startswith("SHA_WINDOWS_")
+            if token.startswith(("SHA_WINDOWS_", "SHA_DEB_"))
         }
     )
 

@@ -12,6 +12,67 @@ permissions:
   contents: read
 
 jobs:
+  website-reinstall:
+    name: Published website reinstall (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-22.04, ubuntu-22.04-arm, macos-15, macos-15-intel, xcode-27]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - name: Download and verify the website release
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, platform, urllib.request
+          from pathlib import Path
+          root = Path("target-reinstall")
+          root.mkdir()
+          tag = os.environ["TAG"]
+          base = "https://github.com/RealEmmettS/goose/releases"
+          manifest = json.load(urllib.request.urlopen(base + "/download/" + tag + "/release-manifest.json"))
+          assert manifest["tag"] == tag
+          arm = platform.machine() in ("arm64", "aarch64")
+          cpu = "aarch64" if arm else "x86_64"
+          files = {"honk300-installer.sh"}
+          if platform.system() == "Darwin":
+              files.update(("honk300-universal2.app.zip", "honk300-universal2.dmg"))
+          else:
+              files.update(f"honk300-{cpu}-unknown-linux-{libc}.tar.xz" for libc in ("gnu", "musl"))
+              files.add("honk300-" + ("arm64" if arm else "amd64") + ".deb")
+          for name in sorted(files):
+              meta, = (a for a in manifest["artifacts"] if a["name"] == name)
+              data = urllib.request.urlopen(base + "/latest/download/" + name).read()
+              assert len(data) == meta["size"] and hashlib.sha256(data).hexdigest() == meta["sha256"], name
+              (root / name).write_bytes(data)
+          PY
+      - name: Exercise the published graphical and shell paths
+        env:
+          TAG: ${{ inputs.tag }}
+          RUNNER_LABEL: ${{ matrix.runner }}
+          VERIFY_PUBLIC_CLI: 'true'
+        run: |
+          if [[ "$RUNNER_OS" = macOS ]]; then
+            if [[ "$RUNNER_LABEL" = xcode-27 ]]; then
+              export CHECK_XCODE_27=true DEVELOPER_DIR=/Applications/Xcode_27.app/Contents/Developer
+            fi
+            bash script/smoke_macos_reinstall.sh "$PWD/target-reinstall" "$TAG"
+          else
+            sudo apt-get update
+            sudo apt-get install --no-install-recommends -y libgtk-4-1 libasound2
+            sh script/smoke_linux_reinstall.sh "$PWD/target-reinstall" "$TAG"
+            docker run --rm -v "$PWD:/work:ro" -w /work -e TAG alpine:3.21.3 sh -ec '
+              apk add --no-cache gtk4.0 alsa-lib curl python3 xz
+              adduser -D returning
+              su returning -s /bin/sh -c "GITHUB_ACTIONS=true VERIFY_PUBLIC_CLI=true sh script/smoke_linux_reinstall.sh /work/target-reinstall $TAG"
+            '
+          fi
+
   unix-managed-install:
     name: live managed install (${{ matrix.runner }})
     strategy:

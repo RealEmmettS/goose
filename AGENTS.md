@@ -6,6 +6,8 @@ Honk300 is a cross-platform Rust desktop goose with a procedural renderer and Wi
 macOS, X11, and opt-in reduced Wayland runtimes. **Goose** is the user-facing application name and `goose` is the recommended command.
 `honk300` remains the internal primary binary; `honk` and `goose` remain compatible aliases. The Cargo workspace uses Rust 1.95, edition 2021.
 
+Task #g17 and ADR 0059 track cross-platform installer compatibility and managed reinstalls for the v1.11.4 candidate.
+
 Public stable is v1.11.3, source `c36d8e92847045d8b931618e014ae46cbd5228ab`.
 Its publication and qualification record is `docs/readiness/v1.11.3-readiness.md`.
 All required publication and fresh-public checks pass; all 47 public assets are independently verified.

@@ -151,7 +151,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{}", serde_json::to_string_pretty(&result)?);
             Ok(())
         }
-        Some(Command::Install { autostart }) => install::install(autostart),
+        Some(Command::Install { autostart }) => install::install_or_reinstall(autostart),
         Some(Command::Uninstall { purge }) => install::uninstall(purge),
         Some(Command::Update { json, check }) => {
             if check {

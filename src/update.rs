@@ -736,7 +736,7 @@ pub fn run_check(json: bool) -> Result<(), DynError> {
 
 pub fn run(json: bool) -> Result<(), DynError> {
     let mut report = UpdateReport::new();
-    let result = run_inner(&mut report, json);
+    let result = run_inner(&mut report, json, false);
     if let Err(error) = &result {
         report.message = error.to_string();
     }
@@ -755,7 +755,7 @@ pub fn run(json: bool) -> Result<(), DynError> {
 /// stdout contract from menu-specific output.
 pub(crate) fn run_for_control_surface() -> Result<UpdateOutcome, DynError> {
     let mut report = UpdateReport::new();
-    run_inner(&mut report, false)?;
+    run_inner(&mut report, false, false)?;
     match report.result.as_str() {
         "updated" => Ok(UpdateOutcome::Updated),
         "up_to_date" => Ok(UpdateOutcome::UpToDate),
@@ -794,7 +794,14 @@ pub(crate) fn authoritative_installed_executable() -> Result<PathBuf, DynError> 
     strategy_owned_executable(plan.strategy, source, target)
 }
 
-fn run_inner(report: &mut UpdateReport, json: bool) -> Result<(), DynError> {
+pub(crate) fn reinstall() -> Result<(), DynError> {
+    let mut report = UpdateReport::new();
+    run_inner(&mut report, false, true)?;
+    eprintln!("{}", report.message);
+    Ok(())
+}
+
+fn run_inner(report: &mut UpdateReport, json: bool, reinstall: bool) -> Result<(), DynError> {
     eprintln!("honk300: checking for updates...");
     let manifest = fetch_latest_release_manifest()?;
     let latest = manifest.version.clone();
@@ -825,7 +832,7 @@ fn run_inner(report: &mut UpdateReport, json: bool) -> Result<(), DynError> {
             cleanup_retried = true;
         }
     }
-    if !is_newer(current, &latest) {
+    if !(is_newer(current, &latest) || reinstall && latest == current) {
         report.installed_version = Some(current.into());
         report.result = "up_to_date".into();
         report.activation_state = if cleanup_retried {

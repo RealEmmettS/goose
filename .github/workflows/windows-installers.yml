@@ -545,7 +545,7 @@ jobs:
           $suffix = if ('${{ matrix.edition }}' -eq 'corporate') { '-corporate' } else { '' }
           $extension = if ('${{ matrix.family }}' -eq 'msi') { '.msi' } else { '-setup.exe' }
           $name = 'honk300-${{ matrix.triple }}' + $suffix + $extension
-          gh release download v1.11.1 --repo $env:GITHUB_REPOSITORY --pattern $name --pattern "$name.sha256" --dir target/startup-previous
+          gh release download v1.11.3 --repo $env:GITHUB_REPOSITORY --pattern $name --pattern "$name.sha256" --dir target/startup-previous
           if ($LASTEXITCODE -ne 0) { throw 'Predecessor download failed.' }
           $expected = (Get-Content -LiteralPath "target/startup-previous/$name.sha256" -Raw).Split(' ')[0].Trim()
           if ($expected -notmatch '^[0-9a-fA-F]{64}$' -or (Get-FileHash -LiteralPath "target/startup-previous/$name").Hash -ne $expected) {

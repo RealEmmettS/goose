@@ -161,8 +161,8 @@ class PostReleaseSmokeTests(unittest.TestCase):
             "dpkg-query --search /usr/lib/honk300/honk300",
             "prove_preinst_collision_refusal",
             "preinst-collision.log",
-            "shell-deb-collision.log",
-            "sudo dpkg --remove honk300",
+            "shell-deb-reinstall.log",
+            "installed through the system package manager",
         ):
             self.assertIn(required, DEBIAN_SMOKE)
 

@@ -56,7 +56,8 @@ chmod 755 "$BIN"
 lipo -create "$ROOT/target/settings-macos/x86_64/honk300-settings" \
   "$ROOT/target/settings-macos/arm64/honk300-settings" -output "$SETTINGS_BIN"
 chmod 755 "$SETTINGS_BIN"
-lipo "$SETTINGS_BIN" -verify_arch x86_64 arm64
+lipo "$SETTINGS_BIN" -verify_arch x86_64
+lipo "$SETTINGS_BIN" -verify_arch arm64
 ditto "$ROOT/target/settings-macos/arm64/NATIVE_SDK_LICENSE.txt" "$RESOURCES_DIR/NATIVE_SDK_LICENSE.txt"
 ditto "$ROOT/target/settings-macos/arm64/NATIVE_SDK_FONT_LICENSE.txt" "$RESOURCES_DIR/NATIVE_SDK_FONT_LICENSE.txt"
 
@@ -123,7 +124,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 PLIST
 
 plutil -lint "$CONTENTS_DIR/Info.plist"
-lipo "$BIN" -verify_arch x86_64 arm64
+lipo "$BIN" -verify_arch x86_64
+lipo "$BIN" -verify_arch arm64
 if [[ "$IDENTITY" == "-" ]]; then
   codesign --force --options runtime --sign - "$SETTINGS_BIN"
   codesign --force --options runtime --sign - "$BIN"

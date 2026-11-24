@@ -190,7 +190,8 @@ class InstallerTemplateTests(unittest.TestCase):
         self.assertIn("$HOME/Applications/Honk300.app", SHELL)
         self.assertIn("${XDG_DATA_HOME:-$HOME/.local/share}/honk300/install", SHELL)
         self.assertIn("$HOME/.local/bin", SHELL)
-        self.assertNotRegex(SHELL, r"(^|\s)sudo(\s|$)")
+        shell_only = SHELL[:SHELL.index("refresh_debian_install()")] + SHELL[SHELL.index('OS="$(uname -s)"'):]
+        self.assertNotRegex(shell_only, r"(^|\s)sudo(\s|$)")
         self.assertIn("reject_archive_entry", SHELL)
         self.assertIn("uniq -d", SHELL)
         self.assertIn(".previous.$PID", SHELL)
@@ -245,16 +246,11 @@ class InstallerTemplateTests(unittest.TestCase):
         mac_fresh = SHELL[SHELL.index('Darwin:)'):SHELL.index('Darwin:mac-app)')]
         self.assertNotIn('INSTALL_ORIGIN=mac-app', mac_fresh)
 
-    def test_shell_bootstrap_refuses_machine_package_collision_before_staging(self) -> None:
-        collision = SHELL.index('the Debian package currently owns Honk300')
-        staging = SHELL.index('TEMP_ROOT="$(mktemp -d')
-        self.assertLess(collision, staging)
+    def test_shell_bootstrap_refreshes_proven_debian_owner(self) -> None:
+        self.assertIn("refresh_debian_install", SHELL)
         self.assertIn("dpkg-query --search /usr/lib/honk300/honk300", SHELL)
-        self.assertIn("sudo dpkg --remove honk300", SHELL)
-        self.assertIn("[ -L /usr/bin/honk ]", SHELL)
-        self.assertIn("[ -L /usr/bin/goose ]", SHELL)
-        self.assertIn("repair or remove it with the system package manager", SHELL)
-
+        self.assertIn('hold_lifecycle_lease /usr/lib/honk300/honk300', SHELL)
+        self.assertIn('dpkg --install "$stage/honk300.deb"', SHELL)
     def test_powershell_bootstrap_installs_only_verified_global_msi(self) -> None:
         for token in [
             "__VERSION__",
@@ -380,6 +376,8 @@ class InstallerTemplateTests(unittest.TestCase):
                 "__TAG__",
                 "__COMMIT__",
                 "__SHA_MAC_APP__",
+                "__SHA_DEB_AMD64__", "__SHA_DEB_ARM64__",
+                "__SIZE_DEB_AMD64__", "__SIZE_DEB_ARM64__",
                 "__SHA_LINUX_X64_GNU__",
                 "__SHA_LINUX_ARM64_GNU__",
                 "__SHA_LINUX_X64_MUSL__",

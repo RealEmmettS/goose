@@ -228,8 +228,10 @@ jobs:
           test -x "$update_launcher"
           test -f "$status_icon_runtime"
           cmp "$status_icon_runtime" settings/assets/icon.png
-          lipo "$app_bin" -verify_arch x86_64 arm64
-          lipo "$helper_bin" -verify_arch x86_64 arm64
+          lipo "$app_bin" -verify_arch x86_64
+          lipo "$app_bin" -verify_arch arm64
+          lipo "$helper_bin" -verify_arch x86_64
+          lipo "$helper_bin" -verify_arch arm64
           xcrun vtool -show-build "$helper_bin" > "$RUNNER_TEMP/helper-deployment.txt"
           test "$(grep -c 'minos 11.0' "$RUNNER_TEMP/helper-deployment.txt")" -eq 2
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = 'dev.emmetts.honk300'
@@ -432,6 +434,10 @@ jobs:
               "__TAG__": tag,
               "__COMMIT__": commit,
               "__SHA_MAC_APP__": hashlib.sha256(app_zip.read_bytes()).hexdigest(),
+              "__SHA_DEB_AMD64__": "0" * 64,
+              "__SHA_DEB_ARM64__": "0" * 64,
+              "__SIZE_DEB_AMD64__": "0",
+              "__SIZE_DEB_ARM64__": "0",
               "__SHA_LINUX_X64_GNU__": "0" * 64,
               "__SHA_LINUX_ARM64_GNU__": "0" * 64,
               "__SHA_LINUX_X64_MUSL__": "0" * 64,
@@ -526,6 +532,22 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Upgrade the previous public installation with the signed download
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          cp "$RUNNER_TEMP/honk300-mac-channel-takeover/honk300-installer.sh" "$RUNNER_TEMP/honk300-installer.sh"
+          mkdir "$RUNNER_TEMP/mac-reinstall"
+          cp target/release-artifacts/honk300-universal2.* "$RUNNER_TEMP/mac-reinstall/"
+          cp "$RUNNER_TEMP/honk300-installer.sh" "$RUNNER_TEMP/mac-reinstall/"
+          bash script/smoke_macos_reinstall.sh "$RUNNER_TEMP/mac-reinstall" "$TAG"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: internal-macos-reinstall-bootstrap
+          path: ${{ runner.temp }}/honk300-mac-channel-takeover/honk300-installer.sh
+          if-no-files-found: error
+
       - name: Delete temporary signing credentials and keychain
         if: ${{ always() }}
         shell: bash
@@ -545,3 +567,26 @@ jobs:
           if [ -n "${KEYCHAIN:-}" ]; then
             security delete-keychain "$KEYCHAIN" || true
           fi
+
+  xcode-27-reinstall:
+    needs: build-macos-app
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: release-macos-universal2
+          path: target/reinstall
+      - uses: actions/download-artifact@v7
+        with:
+          name: internal-macos-reinstall-bootstrap
+          path: target/reinstall
+      - name: Verify the original failure and the signed graphical and shell reinstall
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+          CHECK_XCODE_27: 'true'
+          TAG: ${{ inputs.tag }}
+        run: bash script/smoke_macos_reinstall.sh "$PWD/target/reinstall" "$TAG"

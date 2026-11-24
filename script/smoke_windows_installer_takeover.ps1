@@ -236,7 +236,7 @@ function Install-Exe([string] $Path, [string] $Label) {
     Invoke-Checked $Path @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') $Label
 }
 
-function Install-PowerShellChannel([string] $Label) {
+function Install-PowerShellChannel([string] $Label, [switch] $From32BitShell) {
     if ($null -eq $powerShellInstallerPath) {
         # Producer qualification exercises the exact MSI transaction underneath the rendered
         # public bootstrap. Post-release qualification passes the real downloaded script below.
@@ -245,6 +245,9 @@ function Install-PowerShellChannel([string] $Label) {
     }
     $systemPowerShell = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) `
         'WindowsPowerShell\v1.0\powershell.exe'
+    if ($From32BitShell) {
+        $systemPowerShell = Join-Path $env:SystemRoot 'SysWOW64\WindowsPowerShell\v1.0\powershell.exe'
+    }
     Invoke-Checked $systemPowerShell @(
         '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', "`"$powerShellInstallerPath`""
     ) $Label
@@ -412,6 +415,10 @@ try {
     }
     Install-PowerShellChannel 'PowerShell bootstrap takeover'
     Finish-ConflictingOwnerCleanup $globalRoot 'powershell' 'global-msi-to-powershell'
+    if ($powerShellInstallerPath) {
+        Install-PowerShellChannel 'Reinstall from 32-bit Windows PowerShell' -From32BitShell
+        Assert-Active $globalRoot 'powershell'
+    }
     Stop-HeldOldProcess
 
     $held = Start-HeldOldProcess (Join-Path $globalRoot 'bin\honk300.exe')

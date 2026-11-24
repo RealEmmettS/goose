@@ -3,6 +3,14 @@
 A plain-English account of what changed and why. The [technical changelog](CHANGELOG.md)
 has implementation details; [the README](README.md) describes current features and setup.
 
+## Installing Goose again
+
+### Fixed
+- Open the Mac installer again and keep your login choice.
+- Let Windows find the installed app when you use an older PowerShell.
+- Open Goose from the Linux menu when your installation folder contains spaces. Installing a newer copy switches your commands to the new version.
+- Run the installer again to refresh Goose and keep your settings and personal notes.
+
 ## Opening settings reliably — October 2026
 
 ### Fixed

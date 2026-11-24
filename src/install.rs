@@ -52,6 +52,26 @@ fn mutate_with_lifecycle_lease<L, T>(
     mutation()
 }
 
+pub fn install_or_reinstall(autostart: bool) -> Result<(), DynError> {
+    let source = detect_install_source();
+    if matches!(source, InstallSource::Unknown | InstallSource::ManualLocal) {
+        return install(autostart);
+    }
+    // The mounted DMG delegates to this command before its executable is installed.
+    #[cfg(target_os = "macos")]
+    if matches!(
+        macos_install_disposition(&std::env::current_exe()?, &macos_app_install_path()?)?,
+        MacosInstallDisposition::CopyBundle(_)
+    ) {
+        return install(autostart);
+    }
+    crate::update::authoritative_installed_executable()?;
+    if autostart {
+        reconcile_config_autostart(true)?;
+    }
+    crate::update::reinstall()
+}
+
 #[cfg(windows)]
 pub fn install(autostart: bool) -> Result<(), DynError> {
     let root = windows_user_install_root()?;
@@ -192,6 +212,10 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
             .into());
     }
     let _lifecycle_lease = LifecycleLease::acquire()?;
+    let autostart = autostart
+        || (receipt_owned
+            && destination_exists
+            && autostart::owned_text_autostart_state(&plist_path, OWNERSHIP_MARKER)?);
     let mut integrations =
         MacosIntegrationTransaction::capture(&alias_paths, &plist_path, &receipt_path)?;
 
@@ -3674,13 +3698,28 @@ fn home_dir() -> Result<PathBuf, DynError> {
 fn desktop_exec_quote(path: &Path) -> String {
     let raw = path.to_string_lossy();
     if raw
-        .chars()
-        .any(|c| c.is_whitespace() || c == '\'' || c == '"')
+        .bytes()
+        .all(|c| c.is_ascii_alphanumeric() || b"/._-".contains(&c))
     {
-        format!("'{}'", raw.replace('\'', "'\\''"))
-    } else {
-        raw.into_owned()
+        return raw.into_owned();
     }
+    let mut quoted = String::from("\"");
+    for ch in raw.chars() {
+        match ch {
+            '\\' => quoted.push_str(r"\\\\"),
+            '"' | '$' | '\x60' => {
+                quoted.push_str(r"\\");
+                quoted.push(ch);
+            }
+            '%' => quoted.push_str("%%"),
+            '\n' => quoted.push_str(r"\n"),
+            '\r' => quoted.push_str(r"\r"),
+            '\t' => quoted.push_str(r"\t"),
+            _ => quoted.push(ch),
+        }
+    }
+    quoted.push('"');
+    quoted
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -3889,15 +3928,23 @@ fn validate_macos_bundle(app: &Path) -> io::Result<MacosBundleMetadata> {
             String::from_utf8_lossy(&verify.stderr).trim()
         )));
     }
-    let lipo = std::process::Command::new("/usr/bin/lipo")
-        .arg(&executable)
-        .args(["-verify_arch", "x86_64", "arm64"])
-        .output()?;
-    if !lipo.status.success() {
-        return Err(io::Error::other(format!(
-            "bundle is not universal Apple Silicon/Intel code: {}",
-            String::from_utf8_lossy(&lipo.stderr).trim()
-        )));
+    for binary in [
+        &executable,
+        &executable.with_file_name(companions::SETTINGS_NAME),
+    ] {
+        for arch in ["x86_64", "arm64"] {
+            let output = std::process::Command::new("/usr/bin/lipo")
+                .arg(binary)
+                .args(["-verify_arch", arch])
+                .output()?;
+            if !output.status.success() {
+                return Err(io::Error::other(format!(
+                    "{} failed {arch} architecture verification: {}",
+                    binary.display(),
+                    String::from_utf8_lossy(&output.stderr).trim()
+                )));
+            }
+        }
     }
     Ok(MacosBundleMetadata {
         version,
