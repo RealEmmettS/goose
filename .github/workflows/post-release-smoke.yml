@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Download and verify the website release
         env:
@@ -95,7 +95,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Install Linux compositor qualification packages
         if: ${{ matrix.linux }}
@@ -135,7 +135,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Prove native rollback, upgrade, repair, PE identity, compositor, and uninstall
         env:
@@ -228,7 +228,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Install Debian and compositor qualification prerequisites
         shell: bash

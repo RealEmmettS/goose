@@ -5,6 +5,7 @@ assets=$1
 version=${2#v}
 test "${GITHUB_ACTIONS:-}" = true
 root=$(mktemp -d "${RUNNER_TEMP}/goose-reinstall.XXXXXX")
+runner_home=$HOME
 export HOME="$root/home"
 mount="$root/mount"
 mkdir -p "$HOME" "$mount"
@@ -47,11 +48,33 @@ PY
 fi
 if [[ "${VERIFY_PUBLIC_CLI:-}" = true ]]; then
   (
+    export HOME="$runner_home"
+    test ! -e "$HOME/Applications/Honk300.app"
+    sh "$root/old.sh"
+    "$HOME/.local/bin/goose" update --check --json
+    "$HOME/Applications/Honk300.app/Contents/MacOS/honk300" update --check --json
+    HONK300_TEST_LOCAL_DIR="$assets" sh "$assets/honk300-installer.sh"
+    "$HOME/.local/bin/goose" update --check --json
+    "$HOME/Applications/Honk300.app/Contents/MacOS/honk300" update --check --json
+  )
+  (
     export HOME="$root/cli-home"
     mkdir -p "$HOME"
     sh "$root/old.sh"
     "$HOME/.local/bin/goose" --version | grep -F 1.11.3
-    "$HOME/.local/bin/goose" update
+    cli="$HOME/.local/bin/goose"
+    bundle="$HOME/Applications/Honk300.app/Contents/MacOS/honk300"
+    python3 - "$HOME" <<'PY'
+import json, pathlib, sys
+home = pathlib.Path(sys.argv[1])
+receipt = json.loads((home / "Library/Application Support/honk300/install-receipt.json").read_bytes())
+print({k: receipt[k] for k in ("origin","installer_family","scope","install_root","active_release","artifact")}, flush=True)
+for path in (home, home / ".local/bin/goose", home / "Applications/Honk300.app/Contents/MacOS/honk300"):
+    print(str(path), str(path.resolve(strict=True)), flush=True)
+PY
+    "$cli" update --check --json
+    "$bundle" update --check --json
+    "$cli" update
     "$HOME/.local/bin/goose" --version | grep -F "$version"
   )
 fi
