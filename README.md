@@ -172,7 +172,7 @@ desktop guidance](docs/raspberry-pi.md), and native ARM64 labwc evidence. Physic
 Pi performance and complete desktop acceptance remain open; see the
 [published Linux release evidence](docs/readiness/v1.5.0-readiness.md).
 
-The recommended Linux install is the no-sudo official versionless bootstrap:
+Run the official versionless Linux bootstrap. Fresh installations use your account and require no sudo. If Goose is already managed by Debian, the bootstrap asks the system package manager to refresh it.
 
 ```sh
 curl --proto '=https' --tlsv1.2 -fsSL https://github.com/RealEmmettS/goose/releases/latest/download/honk300-installer.sh | sh

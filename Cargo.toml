@@ -168,6 +168,11 @@ install-updater = false
 install-path = "CARGO_HOME"
 publish-prereleases = false
 
+# Use supported native Apple Silicon and Windows ARM64 hosts for the portable archives.
+[workspace.metadata.dist.github-custom-runners]
+aarch64-apple-darwin = { runner = "macos-15", host = "aarch64-apple-darwin" }
+aarch64-pc-windows-msvc = { runner = "windows-11-arm", host = "aarch64-pc-windows-msvc" }
+
 [workspace.metadata.dist.binaries]
 x86_64-pc-windows-msvc = ["honk300", "honk300-app"]
 aarch64-pc-windows-msvc = ["honk300", "honk300-app"]

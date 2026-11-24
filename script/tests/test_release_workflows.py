@@ -124,8 +124,9 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertIn(pinned_toolchain, workflow)
             self.assertNotIn("dtolnay/rust-toolchain@stable", workflow)
 
-        self.assertIn("messense/cargo-xwin@sha256:", RELEASE)
-        self.assertIn("cargo-xwin==0.22.0", RELEASE)
+        self.assertIn('aarch64-pc-windows-msvc = { runner = "windows-11-arm", host = "aarch64-pc-windows-msvc" }', CARGO)
+        self.assertIn('aarch64-apple-darwin = { runner = "macos-15", host = "aarch64-apple-darwin" }', CARGO)
+        self.assertIn('lane["host"] == target and not lane.get("container")', RELEASE)
         self.assertIn("cd355dab0b4c02fb59038fef87655550021d07f45f1d82f947a34ef98560abb8", RELEASE)
         self.assertIn("a14e17557b269b101405e0cc6b647581d56313c954a51c7fddd423bba21e17b2", RELEASE)
         self.assertNotIn("cargo-dist-installer.sh", RELEASE)

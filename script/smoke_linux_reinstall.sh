@@ -1,7 +1,8 @@
 #!/bin/sh
-# Run only on a disposable native runner or Alpine container.
+# Run only on a disposable native runner, container, or explicitly selected test VM.
 set -eu
-[ "${GITHUB_ACTIONS:-}" = true ] && [ "$(id -u)" != 0 ]
+[ "${GITHUB_ACTIONS:-}" = true ] || [ "${HONK300_DISPOSABLE_INSTALL_TEST:-}" = 1 ] || exit 2
+[ "$(id -u)" != 0 ] || exit 2
 assets=$1
 tag=$2
 root=$(mktemp -d)

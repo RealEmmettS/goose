@@ -6,7 +6,7 @@ The native installer expresses fresh intent. An installed managed CLI uses its v
 
 A Linux shell invocation over a verified Debian owner refreshes the exact tagged system package. The normal system permission prompt applies. A Debian package may adopt the requesting account's verified shell installation after the system payload is sealed. Its maintainer scripts isolate home-directory mutations under the owning UID, preserve configuration and media, retain the old slot for recovery, and record forwarding aliases for removal. This supersedes the mutual refusal in ADR 0034 only for proven ownership. Unattributable or conflicting ownership stops with the existing installation available.
 
-Linux activates the exact release by atomically replacing the current symlink itself. Windows reads the native Program Files registry view after MSI completion. Public commands and receipt schemas retain their existing formats.
+Linux activates the exact release by atomically replacing the current symlink itself. Windows reads the native Program Files registry view after MSI completion. The Windows ARM64 and Apple Silicon cargo-dist archives build on the supported native hosted runners. This avoids a cross-compiler dependency on mutable Windows SDK catalogs and the retired macOS 14 runner. Public commands and receipt schemas retain their existing formats.
 
 ## Qualification
 

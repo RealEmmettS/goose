@@ -111,20 +111,10 @@ jobs:
           import json
           from pathlib import Path
 
-          path = Path("plan-dist-manifest.json")
-          manifest = json.loads(path.read_text(encoding="utf-8"))
-          matrix = manifest["ci"]["github"]["artifacts_matrix"]["include"]
-          for job in matrix:
-              container = job.get("container")
-              if container:
-                  if container.get("image") != "messense/cargo-xwin":
-                      raise SystemExit(f"unexpected release container: {container!r}")
-                  container["image"] = "messense/cargo-xwin@sha256:62351ad39ca7f3bd60e8e6e186d8fd35732876dda6bef93d64ee368234a3c75c"
-              packages = job.get("packages_install", "")
-              packages = packages.replace("pip3 install --upgrade pip\n", "")
-              packages = packages.replace("pip3 install cargo-xwin", "pip3 install cargo-xwin==0.22.0")
-              job["packages_install"] = packages
-          path.write_text(json.dumps(manifest, separators=(",", ":")), encoding="utf-8")
+          matrix = json.loads(Path("plan-dist-manifest.json").read_text())["ci"]["github"]["artifacts_matrix"]["include"]
+          for target, runner in (("aarch64-pc-windows-msvc", "windows-11-arm"), ("aarch64-apple-darwin", "macos-15")):
+              lane, = (job for job in matrix if job["targets"] == [target])
+              assert lane["runner"] == runner and lane["host"] == target and not lane.get("container"), lane
           PY
           jq . plan-dist-manifest.json
           echo "manifest=$(jq -c . plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
@@ -179,7 +169,6 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.plan.outputs.manifest).ci.github.artifacts_matrix }}
     runs-on: ${{ matrix.runner }}
-    container: ${{ matrix.container && matrix.container.image || null }}
     steps:
       - name: Enable Windows long paths
         run: git config --global core.longpaths true
@@ -190,15 +179,14 @@ jobs:
           ref: ${{ needs.plan.outputs.commit }}
           persist-credentials: false
 
-      - name: Install Rust in build container
-        if: ${{ matrix.container }}
-        shell: bash
+      - name: Verify native Windows ARM64 build host
+        if: matrix.host == 'aarch64-pc-windows-msvc'
+        shell: pwsh
         run: |
-          set -euo pipefail
-          if ! command -v cargo >/dev/null 2>&1; then
-            echo "pinned cargo-xwin container is missing cargo" >&2
-            exit 1
-          fi
+          $version = rustc -vV | Out-String
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch '(?m)^host: aarch64-pc-windows-msvc\s*$') {
+            throw "Expected native Windows ARM64 Rust compiler"
+          }
 
       - name: Install checksum-pinned cargo-dist (Unix)
         if: ${{ runner.os != 'Windows' }}
@@ -258,6 +246,7 @@ jobs:
             x11-xserver-utils xcompmgr xvfb python3-gi gir1.2-gtk-4.0
 
       - name: Install native packages
+        if: matrix.packages_install
         run: |
           ${{ matrix.packages_install }}
 
