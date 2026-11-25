@@ -19,12 +19,6 @@
 ## To-Do
 
 ## Active
-- [ ] **Qualify cross-platform reinstalls and publish the Mac command follow-up** (owner codex) #g17
-  - [x] Correct and regression-test macOS, Windows and Linux installer behavior.
-  - [x] Test returning website users, CLI installs and package ownership transitions.
-  - [x] Qualify exact candidate and merged source across the release matrix.
-  - [x] Publish v1.11.4 and independently verify all public assets.
-  - [ ] Qualify the v1.11.5 Mac command fix, public installs and live website downloads.
 - [ ] **Publish v1.3.7 Windows update lease-path fix-forward** - keep immutable v1.3.6, repair the generated PowerShell archive-path handoff, and complete official installed acceptance (needs #r136) (owner codex) #r137
   - [x] Preserve the safe v1.3.6 failure and unchanged v1.3.5 install evidence.
   - [x] Record ADR 0040 and replace the fragile backslash literal with transport-safe `[char]92`.
@@ -46,6 +40,12 @@
   - [ ] Close evidence after the v1.3.7 official Windows installed acceptance.
 
 ## Done
+- [x] **Qualify cross-platform reinstalls and publish the Mac command follow-up** (owner codex) (done 2026-11-25) #g17
+  - [x] Correct and regression-test macOS, Windows and Linux installer behavior.
+  - [x] Test returning website users, CLI installs and package ownership transitions.
+  - [x] Qualify exact candidate and merged source across the release matrix.
+  - [x] Publish v1.11.4 and independently verify all public assets.
+  - [x] Qualify the v1.11.5 Mac command fix, public installs and live website downloads.
 - [x] **Recognize responsive Windows settings startup** - replace the input-idle gate while retaining verified payload leases, bounded recognition and failed-child cleanup (owner codex) (done 2026-10-20) #g16
   - [x] Capture the actual installed timeout, live child and responsive window without changing published bytes.
   - [x] Recognize dispatch readiness for the exact child and retain the ten-second deadline.

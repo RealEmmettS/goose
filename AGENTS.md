@@ -6,9 +6,9 @@ Honk300 is a cross-platform Rust desktop goose with a procedural renderer and Wi
 macOS, X11, and opt-in reduced Wayland runtimes. **Goose** is the user-facing application name and `goose` is the recommended command.
 `honk300` remains the internal primary binary; `honk` and `goose` remain compatible aliases. The Cargo workspace uses Rust 1.95, edition 2021.
 
-Public stable is v1.11.4, source `c16d2097714ab0ff42e11342aee96a6f0745ee68`. Task #g17 and ADR 0059 cover cross-platform
-installer compatibility and managed reinstalls. The qualification record is `docs/readiness/v1.11.4-readiness.md`.
-ADR 0060 qualifies macOS command aliases against the actual running app. The public v1.11.4 alias lookup needs the follow-up patch.
+Public stable is v1.11.5, source `04c756188e02a512982d901850ab65fb50f02bfb`. Task #g17 and ADR 0059 cover cross-platform
+installer compatibility and managed reinstalls. ADR 0060 covers identifying the running Mac app
+when a user launches it through a command alias. See `docs/readiness/v1.11.5-readiness.md` for the release evidence.
 Task #g11 and ADR 0052 track the combined application, icon, leaf and affection update.
 The user confirmed that the installed v1.11.0 Windows application displays its logo
 and opens the graphical controls; preserve that historical acceptance record.
