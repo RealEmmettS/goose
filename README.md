@@ -6,9 +6,8 @@ bounded desktop pranks. Open **Goose** from your applications menu to start or s
 change settings, and check for updates. The native application is the primary interface;
 the existing Rust services, command line, and terminal editor remain its backend and secondary controls.
 
-**Current stable release:** [v1.11.3](https://github.com/RealEmmettS/goose/releases/tag/v1.11.3),
-published from exact commit `c36d8e92847045d8b931618e014ae46cbd5228ab`.
-All required publication and fresh-public checks pass; all 47 public assets are independently verified.
+The current stable release is [Goose v1.11.4](https://github.com/RealEmmettS/goose/releases/tag/v1.11.4), published from `c16d2097714ab0ff42e11342aee96a6f0745ee68`.
+The Mac installer works with Xcode 27. Use `goose update` or download the installer again to refresh an existing managed installation and keep your settings.
 Goose opens its graphical controls from application menus and the bare `goose` command,
 with recognizable application icons and installed Configure actions. Maple,
 oak, birch and ginkgo leaves fade away on their own; sustained rubbing earns hearts
@@ -19,7 +18,7 @@ motion, bounded rendering resources, native graphical settings, Linux notes and
 pictures, experimental Pi 4/5 64-bit Desktop guidance, and independently qualified
 KDE, Sway, Hyprland and GNOME integrations. Each desktop exposes only its proven
 capabilities. See [desktop setup](docs/wayland-integrations.md),
-[release evidence](docs/readiness/v1.11.3-readiness.md),
+[release evidence](docs/readiness/v1.11.4-readiness.md),
 [Pi guidance](docs/raspberry-pi.md), and [the refinement audit](docs/refinement-audit.md).
 
 **Goose**, the bare `goose` command, `goose settings`, and tray Configure open the
@@ -354,7 +353,7 @@ cargo clippy --locked --all-targets --workspace -- -D warnings
 cargo test --locked --workspace
 cargo build --locked --release
 python -m unittest discover -s script/tests
-dist plan --tag=v1.11.3
+dist plan --tag=v1.11.4
 cargo audit --version 0.22.2
 ```
 

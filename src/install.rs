@@ -56,7 +56,10 @@ pub fn install_or_reinstall(autostart: bool) -> Result<(), DynError> {
     // A verified bundle copied by the graphical helper has an external source executable.
     #[cfg(target_os = "macos")]
     if matches!(
-        macos_install_disposition(&std::env::current_exe()?, &macos_app_install_path()?)?,
+        macos_install_disposition(
+            &honk_control::current_executable()?,
+            &macos_app_install_path()?
+        )?,
         MacosInstallDisposition::CopyBundle(_)
     ) {
         return install(autostart);
@@ -181,7 +184,7 @@ pub fn install(autostart: bool) -> Result<(), DynError> {
 pub fn install(autostart: bool) -> Result<(), DynError> {
     let app_dir = macos_app_install_path()?;
     let installed_bin = app_dir.join("Contents").join("MacOS").join("honk300");
-    let current_exe = std::env::current_exe()?;
+    let current_exe = honk_control::current_executable()?;
     let disposition = macos_install_disposition(&current_exe, &app_dir)?;
     let media = macos_media_root()?;
     let aliases_dir = macos_user_alias_dir()?;
@@ -436,7 +439,7 @@ fn uninstall_debian_package(purge: bool) -> Result<(), DynError> {
 #[cfg(target_os = "macos")]
 pub fn uninstall(purge: bool) -> Result<(), DynError> {
     let app_dir = macos_app_install_path()?;
-    let current_exe = std::env::current_exe()?;
+    let current_exe = honk_control::current_executable()?;
     if !is_exact_macos_managed_executable(&current_exe, &app_dir) {
         return Err(format!(
             "honk300 uninstall: refusing to remove anything because this is not the managed app at {}. Use the official shell installer or remove it from that exact app.",

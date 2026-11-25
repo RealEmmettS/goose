@@ -45,14 +45,27 @@ for variable in ("STAGED_SETTINGS", "STAGED_BINARY"):
 path.write_text(text)
 PY
 fi
+assert_managed_aliases() {
+  for alias in goose honk honk300; do
+    "$HOME/.local/bin/$alias" update --check --json | python3 -c '
+import json, sys
+result = json.load(sys.stdin)
+check = result["check"]
+assert result["success"] and check["managed"] and (check["origin"], check["current_version"]) == tuple(sys.argv[1:]), result
+' "$1" "$version"
+  done
+}
 if [[ "${VERIFY_PUBLIC_CLI:-}" = true ]]; then
   (
     export HOME="$root/cli-home"
     mkdir -p "$HOME"
     sh "$root/old.sh"
     "$HOME/.local/bin/goose" --version | grep -F 1.11.3
-    "$HOME/.local/bin/goose" update
+    # Previously shipped macOS aliases cannot discover their own receipt. The old
+    # bundle CLI can upgrade in place, as can rerunning the public shell installer or DMG.
+    "$HOME/Applications/Honk300.app/Contents/MacOS/honk300" update
     "$HOME/.local/bin/goose" --version | grep -F "$version"
+    assert_managed_aliases shell
   )
 fi
 sh "$root/old.sh"
@@ -74,6 +87,7 @@ for startup in off on; do
     "$payload" install --autostart
     test -f "$agent"
     HONK300_TEST_LOCAL_DIR="$assets" sh "$assets/honk300-installer.sh"
+    assert_managed_aliases shell
   fi
   python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["origin"] == "shell"' "$receipt"
   "$mount/Install Honk300.app/Contents/MacOS/Install Honk300" >"$root/helper.log" 2>&1 &
@@ -93,7 +107,23 @@ PY
   cmp "$mount/Honk300.app/Contents/MacOS/honk300-settings" "$app/Contents/MacOS/honk300-settings"
   if [[ "$startup" = on ]]; then test -f "$agent"; else test ! -e "$agent"; fi
   kill "$helper_pid"; wait "$helper_pid" || true; helper_pid=
+  assert_managed_aliases mac-app
 done
+# The command must locate and verify its signed settings sibling inside the app.
+config="$root/alias-settings.toml"
+"$HOME/.local/bin/goose" settings --config "$config"
+python3 - "$app/Contents/MacOS/honk300-settings" "$config" <<'PY'
+import os, signal, subprocess, sys, time
+for _ in range(40):
+    listing = subprocess.check_output(["ps", "-axww", "-o", "pid=,command="], text=True)
+    for line in listing.splitlines():
+        pid, _, command = line.strip().partition(" ")
+        if command.strip() == f"{sys.argv[1]} --config {sys.argv[2]}":
+            os.kill(int(pid), signal.SIGTERM)
+            sys.exit(0)
+    time.sleep(0.1)
+sys.exit("the installed settings companion did not open with the selected config")
+PY
 if [[ "${VERIFY_PUBLIC_CLI:-}" = true ]]; then
   "$HOME/.local/bin/goose" install
   "$HOME/.local/bin/goose" update

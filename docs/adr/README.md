@@ -68,3 +68,6 @@ This folder records durable architecture decisions for `honk300`. Use it when a 
 - [0055 — Opt-in Seasons And Intentional Petting](./0055-opt-in-seasons-and-intentional-petting.md)
 - [0056 — Windows Bitmap Reuse And Performance Qualification](./0056-windows-bitmap-reuse-and-performance-qualification.md)
 - [0057 — Current Login Startup Installer Selection](./0057-current-login-startup-installer-selection.md)
+- [0058 — Recognize responsive Windows settings startup](./0058-responsive-windows-settings-readiness.md)
+- [0059 — Refresh the recognized managed installation](./0059-cross-platform-managed-reinstall.md)
+- [0060 — Locate the running Mac app from command aliases](./0060-macos-command-image-identity.md)

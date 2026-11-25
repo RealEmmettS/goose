@@ -7,6 +7,12 @@ features and installation, and [readiness records](docs/readiness/) for release 
 
 ## [Unreleased]
 
+## [1.11.5]
+
+### Fixed
+- Resolve the running macOS image through the kernel when looking up install ownership, launching the signed settings companion or starting from the terminal editor. Exercise all three command aliases after shell and graphical installation.
+- Quote the installed command path in the fresh-public Linux qualification.
+
 ## [1.11.4]
 
 ### Fixed

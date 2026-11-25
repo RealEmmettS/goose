@@ -83,7 +83,7 @@ grep -F "VERSION=\"$VERSION\"" "$INSTALLER" >/dev/null
 verify_install() {
   expected_origin="$1"
   [ -x "$BINARY" ] || { printf 'installed binary is missing: %s\n' "$BINARY" >&2; exit 1; }
-  reported="$($BINARY --version | awk '{print $NF}' | sed 's/[+-].*$//')"
+  reported="$("$BINARY" --version | awk '{print $NF}' | sed 's/[+-].*$//')"
   [ "$reported" = "$VERSION" ] || { printf 'installed version mismatch: %s\n' "$reported" >&2; exit 1; }
   require_file "$RECEIPT"
   "$PYTHON3" - "$RECEIPT" "$TAG" "$expected_origin" <<'PY'

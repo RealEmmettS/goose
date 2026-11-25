@@ -485,7 +485,7 @@ fn status_result(status: RuntimeStatus) -> CommandResult {
 }
 
 fn spawn_start(config_path: &Path) -> std::io::Result<(Child, bool)> {
-    let exe = std::env::current_exe()?;
+    let exe = honk_control::current_executable()?;
     #[cfg(target_os = "macos")]
     let launcher_may_exit = macos_bundle_root_from_exe(&exe).is_some();
     // Windows `start` is now a bounded controller around the GUI-subsystem app launcher. The

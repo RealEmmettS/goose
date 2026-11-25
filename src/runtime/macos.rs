@@ -718,7 +718,7 @@ fn detect_accessibility_onboarding() -> AccessibilityOnboarding {
     let Some(home) = std::env::var_os("HOME").map(std::path::PathBuf::from) else {
         return AccessibilityOnboarding::unmanaged();
     };
-    let Ok(executable) = std::env::current_exe() else {
+    let Ok(executable) = honk_control::current_executable() else {
         return AccessibilityOnboarding::unmanaged();
     };
     let Some(metadata) = main_bundle_release_metadata() else {
@@ -805,7 +805,7 @@ fn runtime_status(
 }
 
 fn macos_bundle_status() -> BundleStatus {
-    std::env::current_exe()
+    honk_control::current_executable()
         .ok()
         .and_then(|exe| {
             exe.ancestors()

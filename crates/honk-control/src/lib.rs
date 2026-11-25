@@ -4,6 +4,38 @@
 //! goose instance. The engine stays below this layer and only receives closed,
 //! platform-neutral command data.
 
+/// Locate the running image for install ownership and exact-sibling launches.
+#[cfg(not(target_os = "macos"))]
+pub use std::env::current_exe as current_executable;
+
+/// dyld can report the command symlink used at launch. Ask the kernel for the
+/// executing image so an alias (even one subsequently moved) cannot select a sibling.
+#[cfg(target_os = "macos")]
+pub fn current_executable() -> std::io::Result<std::path::PathBuf> {
+    use std::ffi::{CStr, OsStr};
+    use std::os::unix::ffi::OsStrExt;
+    use std::path::Path;
+
+    let mut buffer = [0u8; libc::PROC_PIDPATHINFO_MAXSIZE as usize];
+    // SAFETY: the buffer is writable for the supplied length and this is our own PID.
+    let size = unsafe {
+        libc::proc_pidpath(
+            libc::getpid(),
+            buffer.as_mut_ptr().cast(),
+            buffer.len() as u32,
+        )
+    };
+    if size <= 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let bytes = CStr::from_bytes_until_nul(&buffer).map_err(std::io::Error::other)?;
+    let path = Path::new(OsStr::from_bytes(bytes.to_bytes()));
+    if !path.is_absolute() {
+        return Err(std::io::Error::other("invalid running executable path"));
+    }
+    Ok(path.to_owned())
+}
+
 pub mod icon;
 mod platform;
 mod presence;

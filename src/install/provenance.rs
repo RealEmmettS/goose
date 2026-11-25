@@ -97,7 +97,7 @@ impl InstallSourceEvidence {
 }
 
 pub(super) fn read_install_receipt_source() -> InstallSourceEvidence {
-    let Ok(executable) = std::env::current_exe() else {
+    let Ok(executable) = honk_control::current_executable() else {
         return InstallSourceEvidence::Missing;
     };
     let owned = install_receipt_source_from_candidates(
@@ -391,7 +391,7 @@ fn read_file_install_source_marker() -> Option<InstallSource> {
 
 fn current_root_marker_candidates() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
-    if let Ok(exe) = std::env::current_exe() {
+    if let Ok(exe) = honk_control::current_executable() {
         if let Some(parent) = exe.parent() {
             candidates.push(parent.join(MARKER_FILE));
             if parent.file_name().and_then(|name| name.to_str()) == Some("bin") {
@@ -405,7 +405,7 @@ fn current_root_marker_candidates() -> Vec<PathBuf> {
 }
 
 fn classify_current_exe_install_source() -> InstallSource {
-    let Ok(exe) = std::env::current_exe() else {
+    let Ok(exe) = honk_control::current_executable() else {
         return InstallSource::Unknown;
     };
     classify_install_path(&exe.to_string_lossy())

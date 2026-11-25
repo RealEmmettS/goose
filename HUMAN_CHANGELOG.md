@@ -3,6 +3,12 @@
 A plain-English account of what changed and why. The [technical changelog](CHANGELOG.md)
 has implementation details; [the README](README.md) describes current features and setup.
 
+## Opening Goose from Terminal on Mac
+
+### Fixed
+- Typing Goose’s command now opens settings and finds your installed copy for updates. This works whether you installed Goose from the website or Terminal.
+- The Linux installation checks now cover folders with spaces when asking Goose for its version.
+
 ## Installing Goose again
 
 ### Fixed

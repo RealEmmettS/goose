@@ -145,7 +145,7 @@ pub(super) fn owned_text_autostart_state(path: &Path, marker: &str) -> Result<bo
 }
 
 fn managed_autostart_identity() -> Result<Option<ManagedAutostartIdentity>, DynError> {
-    let current_exe = std::env::current_exe()?;
+    let current_exe = honk_control::current_executable()?;
     let source = detect_install_source();
     if source == InstallSource::Unknown {
         return Ok(None);

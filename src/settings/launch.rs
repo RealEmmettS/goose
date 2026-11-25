@@ -12,7 +12,7 @@ mod windows_ready;
 use windows_ready::await_settings_start;
 
 pub(crate) fn launch(config: Option<PathBuf>) -> io::Result<()> {
-    let executable = std::env::current_exe()?;
+    let executable = honk_control::current_executable()?;
     let settings = sibling(&executable)?;
     let metadata = std::fs::symlink_metadata(&settings).map_err(|error| io::Error::new(error.kind(), format!(
         "Cannot open graphical settings at {}: {error}. Install the complete Honk300 package, or use `honk300 config` for the terminal editor.", settings.display())))?;
