@@ -78,8 +78,11 @@ the readiness records.
   ship.
 - Linux: **X11-first** (runs under XWayland); native Wayland behind an opt-in `--wayland`
   flag (reduced mischief).
-- Packaging: recommend the stable versionless official bootstrap on every platform: PowerShell
-  `irm ... | iex` on Windows and the `curl ... | sh` bootstrap on macOS/Linux. Fresh Unix installs require no sudo.
+- Packaging: match the download page to the selected system. Offer the MSI for a known Windows CPU,
+  the universal DMG on Mac, and the matching Debian package for Debian/Ubuntu. For other Linux
+  systems or an unknown Windows CPU, lead with the automatic install command. Recommend the stable
+  versionless official bootstrap for terminal installation on every platform: PowerShell
+  `irm ... | iex` on Windows and `curl ... | sh` on macOS/Linux. Fresh Unix installs require no sudo.
   Refreshing a verified Debian system package uses the normal administrator grant. The Mac
   bootstrap installs the real signed universal app in `~/Applications`; the graphical DMG,
   x64/ARM64 Global/Corporate MSI/EXE packages, and architecture-matched Debian packages remain

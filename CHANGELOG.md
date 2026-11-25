@@ -7,6 +7,9 @@ features and installation, and [readiness records](docs/readiness/) for release 
 
 ## [Unreleased]
 
+### Improved
+- Rewrite the README around the website’s platform-specific install recommendations, first-run controls and updates. Link the detailed engineering and qualification records.
+
 ## [1.11.5]
 
 ### Fixed

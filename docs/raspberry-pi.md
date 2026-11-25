@@ -5,10 +5,8 @@ Desktop**. This is an experimental target: native ARM64 automation exercises the
 real application under labwc, but a physical Pi has not yet been available for
 performance, graphics, audio, suspend or multi-monitor acceptance.
 
-This guide describes the expansion under development. Its owned Linux notes and
-pictures are not yet in the public stable release. The commands below always
-install the currently published stable version; check its release notes before
-expecting those features.
+The stable Linux release includes owned notes and pictures. Physical Raspberry Pi
+qualification remains experimental. The commands below install the [current stable release](https://github.com/RealEmmettS/goose/releases/latest).
 
 ## Desktop and installation
 

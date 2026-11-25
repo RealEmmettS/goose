@@ -3,6 +3,11 @@
 A plain-English account of what changed and why. The [technical changelog](CHANGELOG.md)
 has implementation details; [the README](README.md) describes current features and setup.
 
+## Getting started
+
+### Improved
+- The project page now leads with the same downloads as the website and shows how to start, stop, and update Goose.
+
 ## Opening Goose from Terminal on Mac
 
 ### Fixed
